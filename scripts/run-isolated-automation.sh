@@ -90,18 +90,21 @@ automation_environment=(
 
 if [[ -n "${CIDA_TIME_PROFILE_OUTPUT:-}" ]]; then
   automation_executable="${app_path:A}/Contents/MacOS/Cida"
+  /usr/bin/env "${automation_environment[@]}" "$automation_executable" "$@" &
+  target_pid=$!
   set +e
   /usr/bin/xcrun xctrace record \
     --quiet \
     --no-prompt \
     --template 'Time Profiler' \
     --output "$CIDA_TIME_PROFILE_OUTPUT" \
-    --env CIDA_ISOLATED_AUTOMATION=1 \
-    --env "CIDA_ARTIFACT_APP_TREE_SHA256=$artifact_digest" \
-    --env "CIDA_ARTIFACT_SOURCE_COMMIT=$artifact_source_commit" \
-    --env "CIDA_PERFORMANCE_POWER_SOURCE=${power_source:-unknown}" \
-    --launch -- "$app_path" "$@"
+    --attach "$target_pid"
   trace_status=$?
+  if (( trace_status != 0 )); then
+    /bin/kill -TERM "$target_pid" 2>/dev/null || true
+  fi
+  wait "$target_pid"
+  target_status=$?
   set -e
 
   # xctrace can leave its launched target suspended after the trace closes.
@@ -112,6 +115,7 @@ if [[ -n "${CIDA_TIME_PROFILE_OUTPUT:-}" ]]; then
     [[ "$command_line" == "$automation_executable"* ]] || continue
     /bin/kill -TERM "$process_id" 2>/dev/null || true
   done
+  (( target_status == 0 )) || exit "$target_status"
   exit "$trace_status"
 else
   /usr/bin/env "${automation_environment[@]}" "$app_path/Contents/MacOS/Cida" "$@"
