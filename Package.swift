@@ -16,16 +16,9 @@ let package = Package(
       name: "CSQLite",
       path: "Sources/CSQLite"
     ),
-    .target(
-      name: "CDisplayClock",
-      path: "Sources/CDisplayClock",
-      linkerSettings: [
-        .linkedFramework("CoreVideo")
-      ]
-    ),
     .executableTarget(
       name: "Cida",
-      dependencies: ["CSQLite", "CDisplayClock"],
+      dependencies: ["CSQLite"],
       resources: [
         .process("Resources")
       ]

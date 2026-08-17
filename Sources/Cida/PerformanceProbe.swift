@@ -124,7 +124,7 @@ final class FramePacingProbeNSView: NSView {
   private let exerciseInteraction: @MainActor (Int) -> Bool
   private let workloadMetrics: @MainActor () -> FramePacingWorkloadMetrics
   private let markerLayer = CALayer()
-  private var displayClock: PhysicalDisplayClock?
+  private var displayClock: DisplayLinkClock?
   private var watchdog: Timer?
   private var frameTimestamps: [CFTimeInterval] = []
   private var mainActorLatencies: [CFTimeInterval] = []
@@ -215,26 +215,15 @@ final class FramePacingProbeNSView: NSView {
       options: [.userInitiated, .latencyCritical],
       reason: "Measuring interactive frame pacing"
     )
-    let screenNumberKey = NSDeviceDescriptionKey("NSScreenNumber")
-    let displayID =
-      (screen.deviceDescription[screenNumberKey] as? NSNumber)?.uint32Value
-      ?? CGMainDisplayID()
-    guard
-      let createdDisplayClock = PhysicalDisplayClock(
-        displayID: displayID,
-        handler: { [weak self] callbackTime in
-          Task { @MainActor [weak self] in
-            self?.recordFrameTick(
-              callbackTime: callbackTime,
-              handledAt: CACurrentMediaTime()
-            )
-          }
-        }
-      )
-    else {
-      finish()
-      return
-    }
+    let createdDisplayClock = DisplayLinkClock(
+      sourceView: self,
+      handler: { [weak self] pulse in
+        self?.recordFrameTick(
+          callbackTime: pulse.timestamp,
+          handledAt: CACurrentMediaTime()
+        )
+      }
+    )
     displayClock = createdDisplayClock
     guard createdDisplayClock.start() else {
       finish()
@@ -357,7 +346,7 @@ final class FramePacingProbeNSView: NSView {
       interactionCount: interactionCount,
       requiredSampleCount: configuration.sampleCount,
       workload: configuration.workload.description,
-      frameClock: "core-video-display-link",
+      frameClock: "view-bound-ca-display-link",
       requiredFramesPerSecond: configuration.requiredFramesPerSecond,
       requiresZeroMissedFrameBudgets: configuration.requiresZeroMissedFrameBudgets,
       workloadCompleted: metrics.completed,

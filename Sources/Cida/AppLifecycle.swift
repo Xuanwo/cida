@@ -117,6 +117,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       minimumSize: CGSize(width: 640, height: 480),
       title: "辞达"
     )
+    if let contentView = mainWindowController?.window?.contentView {
+      model.attachDisplayLink(to: contentView)
+    }
     installPerformanceProbeIfNeeded()
 
     installKeyboardMonitor()

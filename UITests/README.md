@@ -114,6 +114,6 @@ xcodegen generate --spec UITests/project.yml
 
 The VM is a correctness and final-composition target, not proof of 120 Hz presentation. The
 nonactivating hardware performance gates consume the same manifest-bound Release artifact and run
-separately on a detected physical 120 Hz display. Their CoreVideo report records the physical display
+separately on a detected physical 120 Hz display. Their view-bound `CADisplayLink` report records the physical display
 cadence, main-actor callback latency, activation/key-window observations, hardware and power state,
 and the exact app-tree digest.

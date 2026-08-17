@@ -194,16 +194,19 @@ final class SmoothStreamPresenter {
   private var buffer = StreamPresentationBuffer()
   private var velocityController: StreamVelocityController
   private var displayPulseContinuation: AsyncStream<CFTimeInterval>.Continuation?
-  private var displayClock: PhysicalDisplayClock?
+  private weak var displayLinkView: NSView?
+  private var displayClock: DisplayLinkClock?
   private var lastDisplayPulseUptime = 0.0
   private var elapsedSinceLastPresentation = 0.0
   private(set) var receivedContent = false
 
   init(
     policy: StreamPresentationPolicy,
+    displayLinkView: NSView? = nil,
     publish: @escaping @MainActor (String) -> Void
   ) {
     self.policy = policy
+    self.displayLinkView = displayLinkView
     velocityController = StreamVelocityController(policy: policy)
     self.publish = publish
   }
@@ -226,7 +229,7 @@ final class SmoothStreamPresenter {
     let clock = ContinuousClock()
     try await clock.sleep(for: policy.initialBufferingDuration)
 
-    if policy.synchronizesUpdatesToDisplay, NSScreen.main != nil {
+    if policy.synchronizesUpdatesToDisplay, displayLinkView?.window != nil {
       try await runSynchronizedToDisplay()
     } else {
       try await runOnTimer(clock: clock)
@@ -234,24 +237,19 @@ final class SmoothStreamPresenter {
   }
 
   private func runSynchronizedToDisplay() async throws {
-    guard let screen = NSScreen.main else { return }
+    guard let displayLinkView else { return }
     let (pulses, continuation) = AsyncStream<CFTimeInterval>.makeStream(
       bufferingPolicy: .bufferingNewest(1)
     )
     displayPulseContinuation = continuation
 
-    let screenNumberKey = NSDeviceDescriptionKey("NSScreenNumber")
-    let displayID =
-      (screen.deviceDescription[screenNumberKey] as? NSNumber)?.uint32Value
-      ?? CGMainDisplayID()
-    guard
-      let displayClock = PhysicalDisplayClock(
-        displayID: displayID,
-        handler: { callbackTime in
-          _ = continuation.yield(callbackTime)
-        }
-      ), displayClock.start()
-    else {
+    let displayClock = DisplayLinkClock(
+      sourceView: displayLinkView,
+      handler: { pulse in
+        _ = continuation.yield(pulse.timestamp)
+      }
+    )
+    guard displayClock.start() else {
       continuation.finish()
       try await runOnTimer(clock: ContinuousClock())
       return

@@ -340,6 +340,7 @@ final class AppModel {
   @ObservationIgnored private var stagedInputDocument: String?
   @ObservationIgnored private var stagedInputDocumentUTF16Count: Int?
   @ObservationIgnored private var stagedInputDocumentHasNonWhitespace: Bool?
+  @ObservationIgnored private weak var displayLinkView: NSView?
   private var oldestLoadedHistorySortOrder: Int64?
   @ObservationIgnored private var suppressesEntrySynchronization = false
   private var performanceProbeStep = 0
@@ -427,6 +428,10 @@ final class AppModel {
 
   func requestInputFocus() {
     inputFocusRequestID &+= 1
+  }
+
+  func attachDisplayLink(to view: NSView) {
+    displayLinkView = view
   }
 
   func stageInputDocument(
@@ -744,7 +749,10 @@ final class AppModel {
   }
 
   private func makeStreamPresenter(for entryID: UUID) -> SmoothStreamPresenter {
-    SmoothStreamPresenter(policy: streamPresentationPolicy) { [weak self] delta in
+    SmoothStreamPresenter(
+      policy: streamPresentationPolicy,
+      displayLinkView: displayLinkView
+    ) { [weak self] delta in
       self?.publish(delta, to: entryID)
     }
   }
