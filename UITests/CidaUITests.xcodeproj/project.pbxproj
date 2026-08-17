@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		837BE06FAA2C71C65C6A91E1 /* CidaCriticalFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7106AB9E76A0F3BEE1ED6C36 /* CidaCriticalFlowUITests.swift */; };
+		9D2A0BD4DEF53C4A70D28B3C /* CidaReleaseArtifactSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5990720A4619BC224AB6FC2E /* CidaReleaseArtifactSmokeTests.swift */; };
 		C843C064A2652EBD409E7228 /* CidaUITestHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5FB85BE252B3B8DCCF1BC2 /* CidaUITestHost.swift */; };
 /* End PBXBuildFile section */
 
@@ -24,6 +25,7 @@
 /* Begin PBXFileReference section */
 		0D6117909E998A6029A69AE1 /* CidaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CidaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B1EC20C2F36348DA180EB42 /* CidaUITestHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CidaUITestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5990720A4619BC224AB6FC2E /* CidaReleaseArtifactSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaReleaseArtifactSmokeTests.swift; sourceTree = "<group>"; };
 		5B5FB85BE252B3B8DCCF1BC2 /* CidaUITestHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaUITestHost.swift; sourceTree = "<group>"; };
 		7106AB9E76A0F3BEE1ED6C36 /* CidaCriticalFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaCriticalFlowUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -59,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				7106AB9E76A0F3BEE1ED6C36 /* CidaCriticalFlowUITests.swift */,
+				5990720A4619BC224AB6FC2E /* CidaReleaseArtifactSmokeTests.swift */,
 			);
 			path = CidaUITests;
 			sourceTree = "<group>";
@@ -153,6 +156,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				837BE06FAA2C71C65C6A91E1 /* CidaCriticalFlowUITests.swift in Sources */,
+				9D2A0BD4DEF53C4A70D28B3C /* CidaReleaseArtifactSmokeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

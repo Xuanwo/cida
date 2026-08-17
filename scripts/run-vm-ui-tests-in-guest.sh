@@ -9,7 +9,9 @@ fi
 project_dir=${1:A}
 results_dir=${2:A}
 work_root="${project_dir:h}/cida-ui-test-work"
-app_path="$work_root/Cida UI Testing.app"
+shared_artifact_root="$results_dir/ReleaseArtifact"
+artifact_root="$work_root/ReleaseArtifact"
+app_path="$artifact_root/Cida.app"
 derived_data="$work_root/DerivedData"
 record_path="$results_dir/openai-request.json"
 port_path="$work_root/mock-port"
@@ -46,6 +48,20 @@ print_failure_log() {
   /usr/bin/tail -200 "$log_path" >&2
 }
 
+collect_diagnostics() {
+  local diagnostic_results_dir="$results_dir/DiagnosticReports"
+  mkdir -p "$diagnostic_results_dir"
+  /usr/bin/find \
+    "$HOME/Library/Logs/DiagnosticReports" \
+    "/Library/Logs/DiagnosticReports" \
+    -maxdepth 1 \
+    -type f \
+    -name '*.ips' \
+    -mmin -10 \
+    -exec /bin/cp {} "$diagnostic_results_dir/" \; \
+    2>/dev/null || true
+}
+
 if /usr/bin/nc -G 2 -z 1.1.1.1 443 >/dev/null 2>&1; then
   echo "Guest network isolation is not active: public egress is reachable" >&2
   exit 69
@@ -54,6 +70,13 @@ fi
 mkdir -p "$results_dir"
 /bin/rm -rf "$work_root"
 mkdir -p "$work_root"
+/usr/bin/ditto "$shared_artifact_root" "$artifact_root"
+
+artifact_digest=$(
+  "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+    "$artifact_root" --require-developer-id
+)
+progress "release-artifact-verified digest=$artifact_digest"
 
 cd "$project_dir"
 progress "swift-test-started"
@@ -104,51 +127,11 @@ else
 fi
 if [[ "$swift_test_failed" == true ]]; then
   /bin/sleep 2
-  diagnostic_results_dir="$results_dir/DiagnosticReports"
-  mkdir -p "$diagnostic_results_dir"
-  /usr/bin/find \
-    "$HOME/Library/Logs/DiagnosticReports" \
-    "/Library/Logs/DiagnosticReports" \
-    -maxdepth 1 \
-    -type f \
-    -name '*.ips' \
-    -mmin -10 \
-    -exec /bin/cp {} "$diagnostic_results_dir/" \; \
-    2>/dev/null || true
+  collect_diagnostics
   print_failure_log "$swift_test_log"
   exit 1
 fi
 progress "swift-test-passed"
-
-progress "release-build-started"
-if ! swift build --configuration release -Xswiftc -warnings-as-errors \
-  >"$results_dir/swift-release-build.log" 2>&1
-then
-  print_failure_log "$results_dir/swift-release-build.log"
-  exit 1
-fi
-release_binary_path=$(swift build --configuration release --show-bin-path)/Cida
-if ! "$project_dir/scripts/test-release-input-interaction.sh" "$release_binary_path" \
-  >"$results_dir/release-input-interaction.log" 2>&1
-then
-  print_failure_log "$results_dir/release-input-interaction.log"
-  exit 1
-fi
-/bin/cp \
-  "$project_dir/TestResults/release-input-interaction.json" \
-  "$results_dir/release-input-interaction.json"
-progress "release-input-interaction-passed"
-
-if ! swift build -Xswiftc -warnings-as-errors >"$results_dir/swift-build.log" 2>&1; then
-  print_failure_log "$results_dir/swift-build.log"
-  exit 1
-fi
-binary_path=$(swift build --show-bin-path)/Cida
-"$project_dir/scripts/build-isolated-app.sh" \
-  "$binary_path" \
-  "$app_path" \
-  "com.xuanwo.Cida.Automation.vm-ui"
-progress "isolated-app-built"
 
 /usr/bin/python3 "$project_dir/UITests/Fixtures/ui_e2e_stream_mock.py" \
   "$record_path" "$port_path" >"$server_log" 2>&1 &
@@ -168,6 +151,7 @@ progress "local-openai-mock-ready"
 export CIDA_UI_TEST_APP_PATH="$app_path"
 export CIDA_UI_TEST_ENDPOINT="http://127.0.0.1:$(<"$port_path")/v1/chat/completions"
 export CIDA_UI_TEST_RECORD_PATH="$record_path"
+export CIDA_UI_TEST_WORK_ROOT="$work_root"
 
 /bin/rm -rf "$xcresult_path"
 /bin/rm -f "$xcresult_summary_path"
@@ -181,6 +165,7 @@ if ! xcodebuild build-for-testing \
   CODE_SIGN_IDENTITY=- \
   >"$results_dir/xcodebuild-ui-build.log" 2>&1
 then
+  collect_diagnostics
   print_failure_log "$results_dir/xcodebuild-ui-build.log"
   exit 1
 fi
@@ -228,6 +213,8 @@ if ! xcodebuild test-without-building \
   CODE_SIGN_IDENTITY=- \
   >"$results_dir/xcodebuild-ui-tests.log" 2>&1
 then
+  /bin/sleep 2
+  collect_diagnostics
   print_failure_log "$results_dir/xcodebuild-ui-tests.log"
   exit 1
 fi
@@ -241,3 +228,23 @@ then
   exit 1
 fi
 progress "xcui-summary-generated"
+
+verified_digest=$(
+  "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+    "$artifact_root" --require-developer-id
+)
+if [[ "$verified_digest" != "$artifact_digest" ]]; then
+  echo "Release artifact changed while XCUI was running" >&2
+  exit 1
+fi
+progress "release-artifact-reverified digest=$verified_digest"
+
+shared_digest=$(
+  "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+    "$shared_artifact_root" --require-developer-id
+)
+if [[ "$shared_digest" != "$artifact_digest" ]]; then
+  echo "Shared release artifact changed while XCUI was running" >&2
+  exit 1
+fi
+progress "shared-release-artifact-reverified digest=$shared_digest"

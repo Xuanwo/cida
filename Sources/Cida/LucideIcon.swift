@@ -19,11 +19,11 @@ enum LucideIconAsset {
   static func image(for name: LucideIconName) -> NSImage? {
     if let cached = cache[name] { return cached }
     guard
-      let url = Bundle.module.url(
+      let url = CidaResourceBundle.bundle.url(
         forResource: name.rawValue,
         withExtension: "svg",
         subdirectory: "Icons"
-      ) ?? Bundle.module.url(forResource: name.rawValue, withExtension: "svg"),
+      ) ?? CidaResourceBundle.bundle.url(forResource: name.rawValue, withExtension: "svg"),
       let image = NSImage(contentsOf: url)
     else {
       return nil

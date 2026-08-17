@@ -76,16 +76,9 @@ enum FontRegistrar {
   ]
 
   static func registerBundledFonts() {
-    let packagedBundleURL = Bundle.main.resourceURL?
-      .appendingPathComponent("Cida_Cida.bundle", isDirectory: true)
-    let resourceBundle =
-      packagedBundleURL
-      .flatMap(Bundle.init(url:))
-      ?? Bundle.module
-
     for name in fontFiles {
       guard
-        let url = resourceBundle.url(
+        let url = CidaResourceBundle.bundle.url(
           forResource: name,
           withExtension: "ttf"
         )

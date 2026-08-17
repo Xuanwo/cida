@@ -75,7 +75,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       mode: launchOptions.initialMode,
       inputText: launchOptions.initialInput,
       entries: persistedEntries,
-      settings: launchOptions.isAutomation ? launchOptions.designSettings : SettingsStore.load(),
+      settings: launchOptions.initialSettings,
       service: launchOptions.textProcessingService,
       historyPersistence: historyStore,
       historyPageLoader: historyStore,
@@ -101,12 +101,14 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     FontRegistrar.registerBundledFonts()
     HistoryResultTextContainerPool.shared.prewarm()
     NSApp.setActivationPolicy(
-      launchOptions.isAutomation && !launchOptions.isUITesting ? .accessory : .regular
+      launchOptions.isAutomation && !launchOptions.displaysInteractiveAutomationUI
+        ? .accessory : .regular
     )
 
     let mainView = MainWindowView(
       model: model,
-      automaticallyFocusInput: !launchOptions.isAutomation || launchOptions.isUITesting,
+      automaticallyFocusInput:
+        !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI,
       openSettings: { [weak self] in self?.showSettings() }
     )
     mainWindowController = makeWindowController(
@@ -124,7 +126,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       }
     }
 
-    if launchOptions.isUITesting {
+    if launchOptions.displaysInteractiveAutomationUI {
       showMainWindow()
     } else if launchOptions.isAutomation {
       prepareAutomationWindow()
@@ -159,7 +161,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     if let eventMonitor {
       NSEvent.removeMonitor(eventMonitor)
     }
-    if !launchOptions.isAutomation {
+    if launchOptions.persistsSettings {
       model.persistSettings()
     }
     model.flushHistoryPersistence()
@@ -476,6 +478,7 @@ private struct LaunchOptions {
   let performanceProbe: PerformanceProbeConfiguration?
   let snapshotDelayMilliseconds: Int
   let explicitlyIsolatedAutomation: Bool
+  let isE2ETesting: Bool
   let isUITesting: Bool
   let uiTestingHistoryCount: Int
   let uiTestingScenario: UITestingScenario
@@ -489,12 +492,20 @@ private struct LaunchOptions {
       || inputInteractionOutputURL != nil || performanceProbe != nil
   }
 
+  var displaysInteractiveAutomationUI: Bool {
+    isUITesting || isE2ETesting
+  }
+
+  var persistsSettings: Bool {
+    !isAutomation || isE2ETesting
+  }
+
   private var usesDesignFixtures: Bool {
     isAutomation && !isUITesting
   }
 
-  var designSettings: CidaSettings {
-    var settings = CidaSettings()
+  var initialSettings: CidaSettings {
+    var settings = isE2ETesting ? SettingsStore.load() : CidaSettings()
     #if DEBUG
       if usesDesignFixtures {
         settings = CidaSettings.designPreview
@@ -588,6 +599,8 @@ private struct LaunchOptions {
   init(arguments: [String]) {
     explicitlyIsolatedAutomation =
       ProcessInfo.processInfo.environment["CIDA_ISOLATED_AUTOMATION"] == "1"
+    isE2ETesting =
+      explicitlyIsolatedAutomation && arguments.contains("--e2e-testing")
     automationHistoryDatabaseURL =
       explicitlyIsolatedAutomation
       ? arguments.value(after: "--automation-history-database")

@@ -29,6 +29,7 @@ fi
 mkdir -p "$results_dir"
 project_dir=${project_dir:A}
 results_dir=${results_dir:A}
+artifact_root="$results_dir/ReleaseArtifact"
 run_log="$results_dir/tart-run.log"
 progress_log="$results_dir/vm-progress.log"
 if [[ ! -d "$project_dir" || ! -d "$results_dir" ]]; then
@@ -39,6 +40,22 @@ fi
 host_progress() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1" >>"$progress_log"
 }
+
+if [[ -e "$artifact_root" ]]; then
+  if [[ "${CIDA_E2E_REUSE_ARTIFACT:-0}" != "1" ]]; then
+    echo "Release artifact already exists; use a new result directory or set CIDA_E2E_REUSE_ARTIFACT=1" >&2
+    exit 73
+  fi
+  host_progress "host-release-artifact-reuse-started"
+  "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+    "$artifact_root" --require-developer-id >/dev/null
+  host_progress "host-release-artifact-reuse-finished"
+else
+  host_progress "host-release-artifact-build-started"
+  "$project_dir/scripts/e2e/build-release-artifact.sh" "$artifact_root" \
+    >"$results_dir/release-artifact-build.log" 2>&1
+  host_progress "host-release-artifact-build-finished"
+fi
 
 run_vm=""
 run_pid=""
@@ -183,5 +200,9 @@ tart exec "$run_vm" /bin/launchctl asuser 501 \
   "$work_dir/scripts/run-vm-ui-tests-in-guest.sh" \
     "$work_dir" "$results_dir" "$1" "$2" "$3"
 ' -- "$only_testing" "$swift_test_sanitizer" "$swift_test_filter"
+
+"$project_dir/scripts/e2e/verify-release-artifact.sh" \
+  "$artifact_root" --require-developer-id >/dev/null
+host_progress "host-release-artifact-reverified"
 
 echo "$results_dir/CidaUITests.xcresult"
