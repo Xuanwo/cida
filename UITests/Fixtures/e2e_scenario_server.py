@@ -221,6 +221,13 @@ def plan_for(submitted_text):
             "delays": [0.0, 0.05, 30.0],
         },
         "CIDA_E2E_ERROR": {"status": 500, "body": "controlled upstream failure"},
+        "CIDA_E2E_POOL_GATED": {
+            "chunks": [
+                "Fresh result after pool exhaustion.\n",
+                "CIDA_E2E_POOL_GATED_COMPLETE",
+            ],
+            "gateFirstByte": True,
+        },
         "CIDA_CONTINUITY_FIRST": {
             "chunks": [*default_chunks[:-1], "CIDA_UI_E2E_COMPLETE_FIRST"],
             "initialDelay": 0.35,
@@ -230,6 +237,8 @@ def plan_for(submitted_text):
             "initialDelay": 0.35,
         },
     }
+    if submitted_text in plans:
+        return plans[submitted_text]
     if submitted_text.startswith("CIDA_E2E_POOL_"):
         return {
             "chunks": [
@@ -237,7 +246,7 @@ def plan_for(submitted_text):
                 f"{submitted_text}_COMPLETE",
             ]
         }
-    return plans.get(submitted_text, {"chunks": default_chunks, "initialDelay": 0.2})
+    return {"chunks": default_chunks, "initialDelay": 0.2}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

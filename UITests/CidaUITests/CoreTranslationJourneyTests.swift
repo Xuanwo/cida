@@ -94,7 +94,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
   }
 
-  func testResultContainerPoolRemainsCorrectBeyondItsPrewarmedCapacity() {
+  func testResultContainerPoolRemainsCorrectBeyondItsPrewarmedCapacity() throws {
     driver.launch()
 
     for index in 0..<5 {
@@ -106,7 +106,30 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
       XCTAssertFalse((completed.value as? String)?.contains("POOL_\(index - 1)") ?? false)
       XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
     }
-    XCTAssertEqual(driver.historyEntryIdentifiers().count, 5)
+
+    let gatedID = driver.submit("CIDA_E2E_POOL_GATED", expectsStreamingState: true)
+    XCTAssertNotNil(
+      try scenarioServer.wait(for: "CIDA_E2E_POOL_GATED", status: "headers-sent", timeout: 5)
+    )
+    let gatedResult = driver.app.textViews["history-result-\(gatedID.uppercased())"]
+    XCTAssertTrue(gatedResult.waitForExistence(timeout: 3))
+    XCTAssertEqual(gatedResult.value as? String, "")
+    let preByteScreenshot = gatedResult.screenshot()
+    XCTAssertLessThanOrEqual(
+      VisualOracle.neutralDarkPixelCount(
+        in: preByteScreenshot,
+        logicalWidth: gatedResult.frame.width,
+        topPoints: 64
+      ),
+      24,
+      "A result container reused beyond pool capacity leaked old compositor pixels"
+    )
+
+    try scenarioServer.releaseFirstByte(for: "CIDA_E2E_POOL_GATED")
+    XCTAssertTrue(
+      driver.result(containing: "CIDA_E2E_POOL_GATED_COMPLETE").waitForExistence(timeout: 8)
+    )
+    XCTAssertEqual(driver.historyEntryIdentifiers().count, 6)
   }
 
   func testCancellationFailureAndRecoveryKeepTheJourneyUsable() throws {

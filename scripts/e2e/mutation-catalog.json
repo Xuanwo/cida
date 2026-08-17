@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "mutations": [
+    {
+      "id": "result-layer-never-redraws",
+      "description": "Restore the stale compositor policy that never redraws recycled streaming result layers.",
+      "contracts": ["CIDA-E2E-010", "CIDA-E2E-013"],
+      "file": "Sources/Cida/HistoryResultTextView.swift",
+      "before": "    wantsLayer = true\n    layerContentsRedrawPolicy = .onSetNeedsDisplay\n    layer?.masksToBounds = true\n    setAccessibilityRole(.textArea)",
+      "after": "    wantsLayer = true\n    layerContentsRedrawPolicy = .never\n    layer?.masksToBounds = true\n    setAccessibilityRole(.textArea)",
+      "occurrences": 1,
+      "unitTests": [
+        "MutationContractTests/testStreamingRendererUsesInvalidatingLayerPolicy"
+      ],
+      "releaseTests": [
+        "CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte",
+        "CoreTranslationJourneyTests/testResultContainerPoolRemainsCorrectBeyondItsPrewarmedCapacity"
+      ]
+    },
+    {
+      "id": "reused-result-keeps-old-text",
+      "description": "Skip clearing the native result renderer when a pooled container is released.",
+      "contracts": ["CIDA-E2E-010", "CIDA-E2E-013"],
+      "file": "Sources/Cida/HistoryResultTextView.swift",
+      "before": "    renderingView.replaceText(with: NSAttributedString())\n    renderingView.isHidden = false",
+      "after": "    renderingView.isHidden = false",
+      "occurrences": 1,
+      "unitTests": [
+        "MutationContractTests/testResultContainerPoolClearsRenderedTextBeforeReuse"
+      ],
+      "releaseTests": [
+        "CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte",
+        "CoreTranslationJourneyTests/testResultContainerPoolRemainsCorrectBeyondItsPrewarmedCapacity"
+      ]
+    },
+    {
+      "id": "previous-entry-remains-current",
+      "description": "Transfer the current marker back to the previous entry after appending a submission.",
+      "contracts": ["CIDA-E2E-010", "CIDA-E2E-013", "STATE-MACHINE-CURRENT"],
+      "file": "Sources/Cida/AppModel.swift",
+      "before": "    if entries.last?.isLatestInHistory == false {\n      entries.last?.isLatestInHistory = true\n    }",
+      "after": "    previousEntries.last?.isLatestInHistory = true",
+      "occurrences": 1,
+      "unitTests": [
+        "MutationContractTests/testAppendingNewEntryTransfersTheCurrentMarker",
+        "TranslationJourneyPropertyTests/testDeterministicCommandSequencesPreserveProductAndDurabilityInvariants"
+      ],
+      "releaseTests": [
+        "TranslationStateMachineJourneyTests/testSharedStateMachineSmokeSurvivesConsecutiveSubmissionsAndRelaunch"
+      ]
+    },
+    {
+      "id": "history-follow-disabled",
+      "description": "Disable submit, stream and terminal history follow revisions.",
+      "contracts": ["CIDA-E2E-011", "CIDA-E2E-012"],
+      "file": "Sources/Cida/AppModel.swift",
+      "before": "  func requestHistoryFollow(force: Bool = true, allowsThrottling: Bool = true) {\n    let now = ProcessInfo.processInfo.systemUptime\n    guard force || !allowsThrottling || now - lastHistoryFollowTimestamp >= 0.05 else { return }\n    lastHistoryFollowTimestamp = now\n    if force {\n      historyForcePinRevision &+= 1\n    }\n    historyScrollRevision &+= 1\n  }",
+      "after": "  func requestHistoryFollow(force: Bool = true, allowsThrottling: Bool = true) {\n    _ = force\n    _ = allowsThrottling\n  }",
+      "occurrences": 1,
+      "unitTests": [
+        "AppModelTests/testTerminalHistoryFollowBypassesStreamingThrottleWithoutForcingPin"
+      ],
+      "releaseTests": [
+        "CoreTranslationJourneyTests/testUnevenStreamingFollowsFromDetachedHistoryThroughCompletion",
+        "HistoryAndScrollingJourneyTests/testDetachingDuringAStreamPausesFollowAndTheNextSubmissionReattaches"
+      ]
+    },
+    {
+      "id": "composer-does-not-shrink",
+      "description": "Stop publishing compact composer metrics after native multiline deletion.",
+      "contracts": ["CIDA-E2E-020"],
+      "file": "Sources/Cida/ComposerTextEditor.swift",
+      "before": "      } else {\n        onVirtualDocumentChange(nil, nil, nil)\n        metrics.wrappedValue = ComposerTextMetrics(text: updatedText)\n      }",
+      "after": "      } else {\n        onVirtualDocumentChange(nil, nil, nil)\n      }",
+      "occurrences": 1,
+      "unitTests": [
+        "InteractionReproductionTests/testComposerShrinksAsNativeMultilineInputIsDeleted"
+      ],
+      "releaseTests": [
+        "ComposerJourneyTests/testRealTypingPasteGrowthDeletionShrinkAndSubmission"
+      ]
+    },
+    {
+      "id": "scrollbar-position-inverted",
+      "description": "Invert the Pencil scrollbar's document-position mapping.",
+      "contracts": ["CIDA-E2E-022"],
+      "file": "Sources/Cida/CidaScrollIndicator.swift",
+      "before": "      nextValue = min(1, max(0, offset / scrollableHeight))",
+      "after": "      nextValue = 1 - min(1, max(0, offset / scrollableHeight))",
+      "occurrences": 1,
+      "unitTests": [
+        "InteractionReproductionTests/testPencilScrollIndicatorMovesDownFromDocumentTopToBottom"
+      ],
+      "releaseTests": [
+        "HistoryAndScrollingJourneyTests/testHistoryUsesOneOuterScrollSurfaceAndThePencilThumbMovesInTheRightDirection"
+      ]
+    },
+    {
+      "id": "command-c-always-copies-latest",
+      "description": "Ignore editable and selected native text responders for Command-C.",
+      "contracts": ["CIDA-E2E-023"],
+      "file": "Sources/Cida/AppLifecycle.swift",
+      "before": "  static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {\n    guard let textView = window?.firstResponder as? NSTextView else { return false }\n    return textView.isEditable || textView.selectedRange().length > 0\n  }",
+      "after": "  static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {\n    _ = window\n    return false\n  }",
+      "occurrences": 1,
+      "unitTests": [
+        "InteractionReproductionTests/testLatestResultCopyShortcutDefersToEditableTextAndSelectedResultText"
+      ],
+      "releaseTests": [
+        "ComposerJourneyTests/testCommandCCopyPrecedenceCoversComposerSelectionAndLatestResult"
+      ]
+    }
+  ]
+}
