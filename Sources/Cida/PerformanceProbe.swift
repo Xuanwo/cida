@@ -1,5 +1,4 @@
 import AppKit
-import CDisplayClock
 import Darwin
 import QuartzCore
 
@@ -107,6 +106,8 @@ struct FramePacingReport: Codable, Equatable, Sendable {
   let p95FrameTimeMilliseconds: Double
   let p99FrameTimeMilliseconds: Double
   let maximumFrameTimeMilliseconds: Double
+  let p99MainActorLatencyMilliseconds: Double
+  let maximumMainActorLatencyMilliseconds: Double
   let maximumFrameSampleIndex: Int?
   let maximumFrameEvent: String?
   let workloadCompletionSampleIndex: Int?
@@ -117,29 +118,16 @@ struct FramePacingReport: Codable, Equatable, Sendable {
   let passed: Bool
 }
 
-private final class PerformanceDisplayClockBridge: @unchecked Sendable {
-  let onTick: @Sendable () -> Void
-
-  init(onTick: @escaping @Sendable () -> Void) {
-    self.onTick = onTick
-  }
-}
-
-private func performanceDisplayClockCallback(_ context: UnsafeMutableRawPointer?) {
-  guard let context else { return }
-  Unmanaged<PerformanceDisplayClockBridge>.fromOpaque(context).takeUnretainedValue().onTick()
-}
-
 @MainActor
 final class FramePacingProbeNSView: NSView {
   private let configuration: PerformanceProbeConfiguration
   private let exerciseInteraction: @MainActor (Int) -> Bool
   private let workloadMetrics: @MainActor () -> FramePacingWorkloadMetrics
   private let markerLayer = CALayer()
-  private var displayClock: OpaquePointer?
-  private var displayClockBridge: PerformanceDisplayClockBridge?
+  private var displayClock: PhysicalDisplayClock?
   private var watchdog: Timer?
   private var frameTimestamps: [CFTimeInterval] = []
+  private var mainActorLatencies: [CFTimeInterval] = []
   private var framePhaseLabels: [String] = []
   private var frameEventLabels: [String] = []
   private var phase: CGFloat = 0
@@ -231,24 +219,24 @@ final class FramePacingProbeNSView: NSView {
     let displayID =
       (screen.deviceDescription[screenNumberKey] as? NSNumber)?.uint32Value
       ?? CGMainDisplayID()
-    let bridge = PerformanceDisplayClockBridge { [weak self] in
-      Task { @MainActor [weak self] in
-        self?.recordFrameTick(at: CACurrentMediaTime())
-      }
-    }
     guard
-      let createdDisplayClock = cida_display_clock_create(
-        displayID,
-        performanceDisplayClockCallback,
-        Unmanaged.passUnretained(bridge).toOpaque()
+      let createdDisplayClock = PhysicalDisplayClock(
+        displayID: displayID,
+        handler: { [weak self] callbackTime in
+          Task { @MainActor [weak self] in
+            self?.recordFrameTick(
+              callbackTime: callbackTime,
+              handledAt: CACurrentMediaTime()
+            )
+          }
+        }
       )
     else {
       finish()
       return
     }
     displayClock = createdDisplayClock
-    displayClockBridge = bridge
-    guard cida_display_clock_start(createdDisplayClock) else {
+    guard createdDisplayClock.start() else {
       finish()
       return
     }
@@ -279,7 +267,10 @@ final class FramePacingProbeNSView: NSView {
     probeWindowBecameKey = true
   }
 
-  private func recordFrameTick(at timestamp: CFTimeInterval) {
+  private func recordFrameTick(
+    callbackTime: CFTimeInterval,
+    handledAt handlingTime: CFTimeInterval
+  ) {
     guard !didFinish else { return }
 
     displayLinkTicks += 1
@@ -292,7 +283,8 @@ final class FramePacingProbeNSView: NSView {
       return
     }
     let sampleIndex = displayLinkTicks - configuration.warmupFrameCount
-    frameTimestamps.append(timestamp)
+    frameTimestamps.append(callbackTime)
+    mainActorLatencies.append(max(0, handlingTime - callbackTime))
     if exerciseInteraction(sampleIndex) {
       interactionCount += 1
     }
@@ -345,6 +337,7 @@ final class FramePacingProbeNSView: NSView {
     let metrics = workloadMetrics()
     let report = Self.makeReport(
       timestamps: frameTimestamps,
+      mainActorLatencies: mainActorLatencies,
       maximumFramesPerSecond: maximumFPS,
       artifactAppTreeSHA256: ProcessInfo.processInfo.environment[
         "CIDA_ARTIFACT_APP_TREE_SHA256"
@@ -412,13 +405,13 @@ final class FramePacingProbeNSView: NSView {
 
   private func stopDisplayClock() {
     guard let displayClock else { return }
-    cida_display_clock_destroy(displayClock)
+    displayClock.invalidate()
     self.displayClock = nil
-    displayClockBridge = nil
   }
 
   static func makeReport(
     timestamps: [CFTimeInterval],
+    mainActorLatencies: [CFTimeInterval] = [],
     maximumFramesPerSecond: Int,
     artifactAppTreeSHA256: String? = nil,
     artifactSourceCommit: String? = nil,
@@ -468,6 +461,7 @@ final class FramePacingProbeNSView: NSView {
     let displayRequirementSatisfied = maximumFramesPerSecond >= targetFramesPerSecond
     let phaseFramePacing = makePhaseReports(
       timestamps: timestamps,
+      mainActorLatencies: mainActorLatencies,
       phaseLabels: phaseLabels,
       expectedInterval: 1 / Double(targetFramesPerSecond)
     )
@@ -525,6 +519,8 @@ final class FramePacingProbeNSView: NSView {
         p95FrameTimeMilliseconds: 0,
         p99FrameTimeMilliseconds: 0,
         maximumFrameTimeMilliseconds: 0,
+        p99MainActorLatencyMilliseconds: 0,
+        maximumMainActorLatencyMilliseconds: 0,
         maximumFrameSampleIndex: nil,
         maximumFrameEvent: nil,
         workloadCompletionSampleIndex: workloadCompletionSampleIndex,
@@ -537,11 +533,28 @@ final class FramePacingProbeNSView: NSView {
     }
 
     let sorted = intervals.sorted()
+    let hasMeasuredMainActorLatencies = mainActorLatencies.count == timestamps.count
+    let sortedMainActorLatencies =
+      hasMeasuredMainActorLatencies ? mainActorLatencies.sorted() : []
     let mean = intervals.reduce(0, +) / Double(intervals.count)
     let measuredFPS = Double(timestamps.count - 1) / (last - first)
     let expectedInterval = 1 / Double(targetFramesPerSecond)
-    let missedFrameSampleIndices = intervals.enumerated().compactMap { index, interval in
-      interval > expectedInterval * 1.5 ? index + 1 : nil
+    let missedFrameSampleIndices: [Int]
+    let maximumBudgetSample: (offset: Int, element: Double)?
+    if hasMeasuredMainActorLatencies {
+      missedFrameSampleIndices = mainActorLatencies.enumerated().compactMap { index, latency in
+        latency > expectedInterval * 1.5 ? index + 1 : nil
+      }
+      maximumBudgetSample = mainActorLatencies.enumerated().max(by: {
+        $0.element < $1.element
+      })
+    } else {
+      missedFrameSampleIndices = intervals.enumerated().compactMap { index, interval in
+        interval > expectedInterval * 1.5 ? index + 1 : nil
+      }
+      maximumBudgetSample = intervals.enumerated().max(by: {
+        $0.element < $1.element
+      })
     }
     let missedFrameEvents = missedFrameSampleIndices.map { sampleIndex in
       eventLabels.indices.contains(sampleIndex - 1)
@@ -607,12 +620,13 @@ final class FramePacingProbeNSView: NSView {
       p95FrameTimeMilliseconds: p95 * 1_000,
       p99FrameTimeMilliseconds: p99 * 1_000,
       maximumFrameTimeMilliseconds: (sorted.last ?? 0) * 1_000,
-      maximumFrameSampleIndex: intervals.enumerated().max(by: { $0.element < $1.element })
-        .map { $0.offset + 1 },
-      maximumFrameEvent: intervals.enumerated().max(by: { $0.element < $1.element })
-        .flatMap { maximum in
-          eventLabels.indices.contains(maximum.offset) ? eventLabels[maximum.offset] : nil
-        },
+      p99MainActorLatencyMilliseconds: (sortedMainActorLatencies.isEmpty
+        ? 0 : percentile(sortedMainActorLatencies, 0.99) * 1_000),
+      maximumMainActorLatencyMilliseconds: (sortedMainActorLatencies.last ?? 0) * 1_000,
+      maximumFrameSampleIndex: maximumBudgetSample.map { $0.offset + 1 },
+      maximumFrameEvent: maximumBudgetSample.flatMap { maximum in
+        eventLabels.indices.contains(maximum.offset) ? eventLabels[maximum.offset] : nil
+      },
       workloadCompletionSampleIndex: workloadCompletionSampleIndex,
       missedFrameSampleIndices: Array(missedFrameSampleIndices.prefix(64)),
       missedFrameEvents: Array(missedFrameEvents.prefix(64)),
@@ -630,27 +644,42 @@ final class FramePacingProbeNSView: NSView {
 
   private static func makePhaseReports(
     timestamps: [CFTimeInterval],
+    mainActorLatencies: [CFTimeInterval],
     phaseLabels: [String],
     expectedInterval: Double
   ) -> [String: PhaseFramePacingReport] {
     guard timestamps.count > 1, phaseLabels.count == timestamps.count else { return [:] }
+    let hasMeasuredMainActorLatencies = mainActorLatencies.count == timestamps.count
     var intervalsByPhase: [String: [Double]] = [:]
+    var latenciesByPhase: [String: [Double]] = [:]
     for index in 1..<timestamps.count {
-      intervalsByPhase[phaseLabels[index], default: []].append(
+      let phase = phaseLabels[index]
+      intervalsByPhase[phase, default: []].append(
         timestamps[index] - timestamps[index - 1]
       )
+      if hasMeasuredMainActorLatencies {
+        latenciesByPhase[phase, default: []].append(mainActorLatencies[index])
+      }
     }
-    return intervalsByPhase.mapValues { intervals in
+    return intervalsByPhase.map { phase, intervals in
       let sorted = intervals.sorted()
       let mean = intervals.reduce(0, +) / Double(intervals.count)
-      return PhaseFramePacingReport(
-        sampleCount: intervals.count,
-        meanFrameTimeMilliseconds: mean * 1_000,
-        p95FrameTimeMilliseconds: percentile(sorted, 0.95) * 1_000,
-        p99FrameTimeMilliseconds: percentile(sorted, 0.99) * 1_000,
-        maximumFrameTimeMilliseconds: (sorted.last ?? 0) * 1_000,
-        missedFrameBudgetCount: intervals.count(where: { $0 > expectedInterval * 1.5 })
+      let budgetSamples = latenciesByPhase[phase] ?? intervals
+      return (
+        phase,
+        PhaseFramePacingReport(
+          sampleCount: intervals.count,
+          meanFrameTimeMilliseconds: mean * 1_000,
+          p95FrameTimeMilliseconds: percentile(sorted, 0.95) * 1_000,
+          p99FrameTimeMilliseconds: percentile(sorted, 0.99) * 1_000,
+          maximumFrameTimeMilliseconds: (sorted.last ?? 0) * 1_000,
+          missedFrameBudgetCount: budgetSamples.count(where: {
+            $0 > expectedInterval * 1.5
+          })
+        )
       )
+    }.reduce(into: [:]) { reports, element in
+      reports[element.0] = element.1
     }
   }
 

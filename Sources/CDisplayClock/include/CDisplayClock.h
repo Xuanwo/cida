@@ -4,7 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef void (*CidaDisplayClockCallback)(void *context);
+typedef void (*CidaDisplayClockCallback)(void *context,
+                                         double callback_time_seconds);
 typedef struct CidaDisplayClock CidaDisplayClock;
 
 CidaDisplayClock *cida_display_clock_create(uint32_t display_id,

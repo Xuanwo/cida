@@ -1,6 +1,7 @@
 #include "CDisplayClock.h"
 
 #include <CoreVideo/CVDisplayLink.h>
+#include <CoreVideo/CVHostTime.h>
 #include <stdlib.h>
 
 struct CidaDisplayClock {
@@ -21,7 +22,9 @@ static CVReturn cida_display_clock_output(CVDisplayLinkRef display_link,
   (void)flags_in;
   (void)flags_out;
   CidaDisplayClock *clock = context;
-  clock->callback(clock->context);
+  double callback_time_seconds =
+      (double)CVGetCurrentHostTime() / CVGetHostClockFrequency();
+  clock->callback(clock->context, callback_time_seconds);
   return kCVReturnSuccess;
 }
 

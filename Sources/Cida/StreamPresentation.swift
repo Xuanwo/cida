@@ -188,13 +188,13 @@ struct StreamPresentationBuffer {
 }
 
 @MainActor
-final class SmoothStreamPresenter: NSObject {
+final class SmoothStreamPresenter {
   private let policy: StreamPresentationPolicy
   private let publish: @MainActor (String) -> Void
   private var buffer = StreamPresentationBuffer()
   private var velocityController: StreamVelocityController
   private var displayPulseContinuation: AsyncStream<CFTimeInterval>.Continuation?
-  private var displayLink: CADisplayLink?
+  private var displayClock: PhysicalDisplayClock?
   private var lastDisplayPulseUptime = 0.0
   private var elapsedSinceLastPresentation = 0.0
   private(set) var receivedContent = false
@@ -206,7 +206,6 @@ final class SmoothStreamPresenter: NSObject {
     self.policy = policy
     velocityController = StreamVelocityController(policy: policy)
     self.publish = publish
-    super.init()
   }
 
   func append(_ chunk: String) {
@@ -241,24 +240,29 @@ final class SmoothStreamPresenter: NSObject {
     )
     displayPulseContinuation = continuation
 
-    let link = screen.displayLink(
-      target: self,
-      selector: #selector(displayLinkDidFire(_:))
-    )
-    let preferredFramesPerSecond = Float(min(120, screen.maximumFramesPerSecond))
-    link.preferredFrameRateRange = CAFrameRateRange(
-      minimum: min(60, preferredFramesPerSecond),
-      maximum: preferredFramesPerSecond,
-      preferred: preferredFramesPerSecond
-    )
-    link.add(to: .main, forMode: .common)
-    displayLink = link
-    lastDisplayPulseUptime = ProcessInfo.processInfo.systemUptime
+    let screenNumberKey = NSDeviceDescriptionKey("NSScreenNumber")
+    let displayID =
+      (screen.deviceDescription[screenNumberKey] as? NSNumber)?.uint32Value
+      ?? CGMainDisplayID()
+    guard
+      let displayClock = PhysicalDisplayClock(
+        displayID: displayID,
+        handler: { callbackTime in
+          _ = continuation.yield(callbackTime)
+        }
+      ), displayClock.start()
+    else {
+      continuation.finish()
+      try await runOnTimer(clock: ContinuousClock())
+      return
+    }
+    self.displayClock = displayClock
+    lastDisplayPulseUptime = CACurrentMediaTime()
     let stalledDisplayFallback = Task { @MainActor [weak self] in
       while !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(100))
         guard !Task.isCancelled, let self else { return }
-        let now = ProcessInfo.processInfo.systemUptime
+        let now = CACurrentMediaTime()
         if now - self.lastDisplayPulseUptime >= 0.09 {
           self.displayPulseContinuation?.yield(now)
         }
@@ -267,15 +271,16 @@ final class SmoothStreamPresenter: NSObject {
 
     defer {
       stalledDisplayFallback.cancel()
-      link.invalidate()
-      displayLink = nil
+      displayClock.invalidate()
+      self.displayClock = nil
       continuation.finish()
       displayPulseContinuation = nil
     }
 
-    var previousPulse = ProcessInfo.processInfo.systemUptime
+    var previousPulse = CACurrentMediaTime()
     for await pulse in pulses {
       try Task.checkCancellation()
+      lastDisplayPulseUptime = pulse
       presentNextUpdate(elapsedSeconds: pulse - previousPulse)
       previousPulse = pulse
       if buffer.isDrained { return }
@@ -299,13 +304,6 @@ final class SmoothStreamPresenter: NSObject {
       }
       try await clock.sleep(until: nextUpdate, tolerance: .milliseconds(1))
     }
-  }
-
-  @objc
-  private func displayLinkDidFire(_ displayLink: CADisplayLink) {
-    let now = ProcessInfo.processInfo.systemUptime
-    lastDisplayPulseUptime = now
-    displayPulseContinuation?.yield(now)
   }
 
   private func presentNextUpdate(elapsedSeconds: Double) {

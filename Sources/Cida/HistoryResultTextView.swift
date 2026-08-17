@@ -636,19 +636,12 @@ final class HistoryResultTextContainer: NSView {
       height: CGFloat.greatestFiniteMagnitude
     )
 
-    let textLayoutManager = renderingView.textLayoutManager
-    let textContentManager = renderingView.textContentStorage
     if needsFullTextLayout {
-      textLayoutManager.ensureLayout(for: textContentManager.documentRange)
+      renderingView.ensureLayoutForDocument()
       needsFullTextLayout = false
       pendingTextLayoutRange = nil
-    } else if let pendingTextLayoutRange,
-      ensureTextLayout(
-        forCharacterRange: pendingTextLayoutRange,
-        textLayoutManager: textLayoutManager,
-        textContentManager: textContentManager
-      )
-    {
+    } else if let pendingTextLayoutRange {
+      renderingView.ensureLayout(forCharacterRange: pendingTextLayoutRange)
       self.pendingTextLayoutRange = nil
     }
     let usedRect = renderingView.usageBounds
@@ -781,7 +774,7 @@ final class HistoryResultTextContainer: NSView {
     let origin: CGPoint
     if length == 0 {
       origin = CGPoint(x: 0, y: StreamingResultRenderingView.verticalTextInset + 3)
-    } else if let lastLineFrame = lastTextLineFrame() {
+    } else if let lastLineFrame = renderingView.lastTextLineFrame() {
       origin = CGPoint(
         x: lastLineFrame.maxX + 3,
         y: lastLineFrame.minY + max(0, (lastLineFrame.height - 20) / 2)
@@ -820,55 +813,6 @@ final class HistoryResultTextContainer: NSView {
     } else if !shouldPulse {
       caretLayer.removeAnimation(forKey: "waiting-pulse")
     }
-  }
-
-  private func lastTextLineFrame() -> CGRect? {
-    let length = textStorage?.length ?? 0
-    guard
-      length > 0,
-      let textLayoutManager = Optional(renderingView.textLayoutManager),
-      let textContentManager = textLayoutManager.textContentManager,
-      let lastCharacterLocation = textContentManager.location(
-        textContentManager.documentRange.location,
-        offsetBy: length - 1
-      ),
-      let fragment = textLayoutManager.textLayoutFragment(for: lastCharacterLocation),
-      let line = fragment.textLineFragments.last
-    else {
-      return nil
-    }
-    let fragmentFrame = fragment.layoutFragmentFrame
-    let lineFrame = line.typographicBounds
-    let textOrigin = CGPoint(x: 0, y: StreamingResultRenderingView.verticalTextInset)
-    return lineFrame.offsetBy(
-      dx: textOrigin.x + fragmentFrame.minX,
-      dy: textOrigin.y + fragmentFrame.minY
-    )
-  }
-
-  private func ensureTextLayout(
-    forCharacterRange range: NSRange,
-    textLayoutManager: NSTextLayoutManager,
-    textContentManager: NSTextContentManager
-  ) -> Bool {
-    guard
-      range.location >= 0,
-      range.length > 0,
-      NSMaxRange(range) <= (textStorage?.length ?? 0),
-      let startLocation = textContentManager.location(
-        textContentManager.documentRange.location,
-        offsetBy: range.location
-      ),
-      let endLocation = textContentManager.location(
-        startLocation,
-        offsetBy: range.length
-      ),
-      let textRange = NSTextRange(location: startLocation, end: endLocation)
-    else {
-      return false
-    }
-    textLayoutManager.ensureLayout(for: textRange)
-    return true
   }
 
   private func restartTailReveal() {
@@ -1007,15 +951,14 @@ final class HistoryResultTextContainer: NSView {
 private final class StreamingResultRenderingView: NSView {
   static let verticalTextInset: CGFloat = 2
 
-  let textContentStorage: NSTextContentStorage
-  let textLayoutManager: NSTextLayoutManager
   let textStorage: NSTextStorage
+  private let layoutManager: NSLayoutManager
 
   private let textContainer: NSTextContainer
   private var lastDrawnFragmentFrames: [CGRect] = []
 
   var usageBounds: CGRect {
-    textLayoutManager.usageBoundsForTextContainer
+    layoutManager.usedRect(for: textContainer)
   }
 
   #if DEBUG
@@ -1027,20 +970,20 @@ private final class StreamingResultRenderingView: NSView {
   override var isFlipped: Bool { true }
 
   override init(frame frameRect: NSRect) {
-    let contentStorage = NSTextContentStorage()
-    let layoutManager = NSTextLayoutManager()
-    let container = NSTextContainer(
-      size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
-    )
     let storage = NSTextStorage()
-    contentStorage.textStorage = storage
-    contentStorage.addTextLayoutManager(layoutManager)
-    layoutManager.textContainer = container
+    let layoutManager = NSLayoutManager()
+    let container = NSTextContainer(
+      containerSize: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+    )
+    container.lineFragmentPadding = 0
+    layoutManager.allowsNonContiguousLayout = true
+    layoutManager.backgroundLayoutEnabled = false
+    storage.addLayoutManager(layoutManager)
+    layoutManager.addTextContainer(container)
 
-    textContentStorage = contentStorage
-    textLayoutManager = layoutManager
-    textContainer = container
     textStorage = storage
+    self.layoutManager = layoutManager
+    textContainer = container
     super.init(frame: frameRect)
 
     wantsLayer = true
@@ -1068,27 +1011,22 @@ private final class StreamingResultRenderingView: NSView {
 
   override func draw(_ dirtyRect: NSRect) {
     super.draw(dirtyRect)
-    guard let context = NSGraphicsContext.current?.cgContext else { return }
     let visibleTextRect = dirtyRect.offsetBy(dx: 0, dy: -Self.verticalTextInset)
-    let startingFragment = textLayoutManager.textLayoutFragment(
-      for: CGPoint(x: visibleTextRect.midX, y: max(0, visibleTextRect.minY))
+    let glyphRange = layoutManager.glyphRange(
+      forBoundingRect: visibleTextRect,
+      in: textContainer
     )
     lastDrawnFragmentFrames.removeAll(keepingCapacity: true)
-    textLayoutManager.enumerateTextLayoutFragments(
-      from: startingFragment?.rangeInElement.location,
-      options: []
-    ) { fragment in
-      let frame = fragment.layoutFragmentFrame
-      guard frame.minY <= visibleTextRect.maxY else { return false }
-      if frame.intersects(visibleTextRect) {
-        lastDrawnFragmentFrames.append(frame)
-        fragment.draw(
-          at: CGPoint(x: frame.minX, y: frame.minY + Self.verticalTextInset),
-          in: context
-        )
+    layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) {
+      _, usedRect, _, _, _ in
+      let frame = usedRect.offsetBy(dx: 0, dy: Self.verticalTextInset)
+      if frame.intersects(dirtyRect) {
+        self.lastDrawnFragmentFrames.append(frame)
       }
-      return true
     }
+    let origin = CGPoint(x: 0, y: Self.verticalTextInset)
+    layoutManager.drawBackground(forGlyphRange: glyphRange, at: origin)
+    layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: origin)
   }
 
   func setTextContainerWidth(_ width: CGFloat) {
@@ -1097,19 +1035,43 @@ private final class StreamingResultRenderingView: NSView {
       width: width,
       height: CGFloat.greatestFiniteMagnitude
     )
-    textLayoutManager.invalidateLayout(for: textContentStorage.documentRange)
+    layoutManager.invalidateLayout(
+      forCharacterRange: NSRange(location: 0, length: textStorage.length),
+      actualCharacterRange: nil
+    )
   }
 
   func append(_ attributedString: NSAttributedString) {
-    textContentStorage.performEditingTransaction {
-      textStorage.append(attributedString)
-    }
+    textStorage.append(attributedString)
   }
 
   func replaceText(with attributedString: NSAttributedString) {
-    textContentStorage.performEditingTransaction {
-      textStorage.setAttributedString(attributedString)
+    textStorage.setAttributedString(attributedString)
+  }
+
+  func ensureLayoutForDocument() {
+    guard textStorage.length > 0 else { return }
+    layoutManager.ensureLayout(for: textContainer)
+  }
+
+  func ensureLayout(forCharacterRange range: NSRange) {
+    guard
+      range.location >= 0,
+      range.length > 0,
+      NSMaxRange(range) <= textStorage.length
+    else {
+      return
     }
+    layoutManager.ensureLayout(forCharacterRange: range)
+  }
+
+  func lastTextLineFrame() -> CGRect? {
+    let glyphCount = layoutManager.numberOfGlyphs
+    guard glyphCount > 0 else { return nil }
+    return layoutManager.lineFragmentUsedRect(
+      forGlyphAt: glyphCount - 1,
+      effectiveRange: nil
+    ).offsetBy(dx: 0, dy: Self.verticalTextInset)
   }
 
   func invalidateTextLayout(

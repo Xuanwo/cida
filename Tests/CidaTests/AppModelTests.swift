@@ -607,6 +607,49 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(report.missedFrameBudgetCount, 0)
   }
 
+  func testPhysicalFrameReportUsesMainActorLatencyForMissedBudgets() {
+    let timestamps = (0..<720).map { Double($0) / 120 }
+    var latencies = Array(repeating: 0.001, count: timestamps.count)
+    latencies[100] = 0.014
+    let eventLabels = (0..<timestamps.count).map { "event-\($0)" }
+
+    let report = FramePacingProbeNSView.makeReport(
+      timestamps: timestamps,
+      mainActorLatencies: latencies,
+      maximumFramesPerSecond: 120,
+      requiredFramesPerSecond: 120,
+      requiresZeroMissedFrameBudgets: true,
+      phaseLabels: Array(repeating: "translating", count: timestamps.count),
+      eventLabels: eventLabels
+    )
+
+    XCTAssertFalse(report.passed)
+    XCTAssertEqual(report.measuredFramesPerSecond, 120, accuracy: 0.01)
+    XCTAssertEqual(report.missedFrameSampleIndices, [101])
+    XCTAssertEqual(report.missedFrameEvents, ["event-100"])
+    XCTAssertEqual(report.maximumFrameSampleIndex, 101)
+    XCTAssertEqual(report.maximumMainActorLatencyMilliseconds, 14, accuracy: 0.001)
+    XCTAssertEqual(report.phaseFramePacing["translating"]?.missedFrameBudgetCount, 1)
+  }
+
+  func testPhysicalFrameReportAcceptsInBudgetCallbackHandlingJitter() {
+    let timestamps = (0..<720).map { Double($0) / 120 }
+    var latencies = Array(repeating: 0.001, count: timestamps.count)
+    latencies[100] = 0.007
+
+    let report = FramePacingProbeNSView.makeReport(
+      timestamps: timestamps,
+      mainActorLatencies: latencies,
+      maximumFramesPerSecond: 120,
+      requiredFramesPerSecond: 120,
+      requiresZeroMissedFrameBudgets: true
+    )
+
+    XCTAssertTrue(report.passed)
+    XCTAssertEqual(report.missedFrameBudgetCount, 0)
+    XCTAssertEqual(report.maximumMainActorLatencyMilliseconds, 7, accuracy: 0.001)
+  }
+
   func testFramePacingReportCarriesArtifactHardwareAndDisplayProvenance() {
     let report = FramePacingProbeNSView.makeReport(
       timestamps: (0..<120).map { Double($0) / 120 },
