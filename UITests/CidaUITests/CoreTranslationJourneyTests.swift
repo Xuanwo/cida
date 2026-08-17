@@ -54,10 +54,12 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     )
     driver.launch()
 
-    _ = driver.submit("CIDA_E2E_RESULT_A")
+    let firstID = driver.submit("CIDA_E2E_RESULT_A")
     XCTAssertTrue(
       driver.result(containing: "CIDA_E2E_RESULT_A_COMPLETE").waitForExistence(timeout: 8))
     XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
+    let firstEntry = driver.element(identifier: "history-entry-\(firstID.lowercased())")
+    XCTAssertEqual(firstEntry.value as? String, "expanded")
 
     let secondID = driver.submit("CIDA_E2E_DELAYED_RESULT_B", expectsStreamingState: true)
     XCTAssertNotNil(
@@ -70,6 +72,13 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     let secondResult = driver.app.textViews["history-result-\(secondID.uppercased())"]
     XCTAssertTrue(secondResult.waitForExistence(timeout: 3))
     XCTAssertEqual(secondResult.value as? String, "")
+    XCTAssertEqual(driver.composer.value as? String, "")
+    XCTAssertEqual(firstEntry.value as? String, "collapsed")
+    XCTAssertEqual(
+      driver.element(identifier: "history-entry-\(secondID.lowercased())").value as? String,
+      "expanded"
+    )
+    XCTAssertEqual(driver.history.value as? String, "bottom")
 
     XCTContext.runActivity(named: "No old result pixels before the first byte") { activity in
       let screenshot = secondResult.screenshot()

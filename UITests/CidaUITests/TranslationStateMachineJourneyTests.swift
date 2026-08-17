@@ -16,13 +16,33 @@ final class TranslationStateMachineJourneyTests: CidaReleaseUITestCase {
         XCTAssertTrue(oracle.apply(command))
       case .submit:
         let existingEntries = driver.historyEntryIdentifiers()
+        let previousCurrentIdentifier = driver.currentHistoryEntry.exists
+          ? driver.currentHistoryEntry.identifier
+          : nil
         XCTAssertTrue(driver.submitButton.isEnabled)
         driver.submitButton.click()
+        XCTAssertTrue(driver.waitForValue("", in: driver.composer, timeout: 1))
         let entryIdentifier = try! XCTUnwrap(
           driver.waitForNewHistoryEntry(excluding: existingEntries, timeout: 5)
         )
         let entryID = String(entryIdentifier.dropFirst("history-entry-".count))
         submittedEntryIDs.append(entryID)
+        XCTAssertTrue(
+          driver.waitForValue(
+            "expanded",
+            in: driver.element(identifier: entryIdentifier),
+            timeout: 2
+          )
+        )
+        if let previousCurrentIdentifier {
+          XCTAssertTrue(
+            driver.waitForValue(
+              "collapsed",
+              in: driver.element(identifier: previousCurrentIdentifier),
+              timeout: 2
+            )
+          )
+        }
         XCTAssertTrue(oracle.apply(command))
       case .releaseChunk:
         XCTAssertTrue(oracle.apply(command))

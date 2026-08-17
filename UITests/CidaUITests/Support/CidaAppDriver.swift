@@ -19,6 +19,17 @@ final class CidaAppDriver {
   var submitButton: XCUIElement { app.buttons["composer-submit-button"] }
   var history: XCUIElement { app.scrollViews["history-scroll-view"] }
 
+  var currentHistoryEntry: XCUIElement {
+    app.descendants(matching: .any).matching(
+      NSPredicate(
+        format: "identifier BEGINSWITH %@ AND value == %@ AND label BEGINSWITH %@",
+        "history-entry-",
+        "expanded",
+        "当前历史记录"
+      )
+    ).firstMatch
+  }
+
   func settingsProviderMenu(in settingsWindow: XCUIElement? = nil) -> XCUIElement {
     let root = settingsWindow ?? app.windows["设置"]
     return root.menuButtons.matching(
@@ -91,14 +102,39 @@ final class CidaAppDriver {
   @discardableResult
   func submitCurrentComposer(expectsStreamingState: Bool = false) -> String {
     let existing = historyEntryIdentifiers()
+    let previousCurrentIdentifier = currentHistoryEntry.exists
+      ? currentHistoryEntry.identifier
+      : nil
     XCTAssertTrue(submitButton.isEnabled)
     submitButton.click()
+    XCTAssertTrue(
+      waitForValue("", in: composer, timeout: 1),
+      "An accepted submission must clear the composer immediately"
+    )
     if expectsStreamingState {
       XCTAssertTrue(waitForLabel("停止生成", in: submitButton, timeout: 3))
     }
     let identifier = waitForNewHistoryEntry(excluding: existing, timeout: 5)
     XCTAssertNotNil(identifier)
-    return identifier.map { String($0.dropFirst("history-entry-".count)) } ?? ""
+    guard let identifier else { return "" }
+
+    let currentEntry = element(identifier: identifier)
+    XCTAssertTrue(
+      waitForValue("expanded", in: currentEntry, timeout: 2),
+      "The submitted entry must become the expanded current record"
+    )
+    if let previousCurrentIdentifier, previousCurrentIdentifier != identifier {
+      XCTAssertTrue(
+        waitForValue(
+          "collapsed",
+          in: element(identifier: previousCurrentIdentifier),
+          timeout: 2
+        ),
+        "The former automatic current record must fold when a new submission is accepted"
+      )
+    }
+
+    return String(identifier.dropFirst("history-entry-".count))
   }
 
   func result(containing marker: String) -> XCUIElement {
