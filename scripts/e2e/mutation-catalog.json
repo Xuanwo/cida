@@ -21,8 +21,8 @@
       "description": "Ignore empty native renderer replacements so reused result content survives cleanup and rebinding.",
       "contracts": ["CIDA-E2E-010", "CIDA-E2E-013"],
       "file": "Sources/Cida/HistoryResultTextView.swift",
-      "before": "  func replaceText(with attributedString: NSAttributedString) {\n    textContentStorage.performEditingTransaction {\n      textStorage.setAttributedString(attributedString)\n    }\n  }",
-      "after": "  func replaceText(with attributedString: NSAttributedString) {\n    guard attributedString.length > 0 else { return }\n    textContentStorage.performEditingTransaction {\n      textStorage.setAttributedString(attributedString)\n    }\n  }",
+      "before": "  func replaceText(with attributedString: NSAttributedString) {\n    textStorage.setAttributedString(attributedString)\n  }",
+      "after": "  func replaceText(with attributedString: NSAttributedString) {\n    guard attributedString.length > 0 else { return }\n    textStorage.setAttributedString(attributedString)\n  }",
       "occurrences": 1,
       "unitTests": [
         "MutationContractTests/testResultContainerPoolClearsRenderedTextBeforeReuse"
