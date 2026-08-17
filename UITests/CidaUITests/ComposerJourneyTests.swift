@@ -16,7 +16,7 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     let englishResult = driver.result(containing: "CIDA_E2E_IMPROVE_ENGLISH_COMPLETE")
     XCTAssertTrue(englishResult.waitForExistence(timeout: 8))
     XCTAssertEqual(englishResult.identifier, "history-result-\(englishID.uppercased())")
-    XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
+    XCTAssertTrue(driver.waitForLabel("改进", in: driver.submitButton, timeout: 3))
 
     let englishEntry = driver.element(identifier: "history-entry-\(englishID.lowercased())")
     XCTAssertTrue(englishEntry.waitForExistence(timeout: 3))
@@ -28,7 +28,7 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     let chineseResult = driver.result(containing: "CIDA_E2E_IMPROVE_CHINESE_COMPLETE")
     XCTAssertTrue(chineseResult.waitForExistence(timeout: 8))
     XCTAssertEqual(chineseResult.identifier, "history-result-\(chineseID.uppercased())")
-    XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
+    XCTAssertTrue(driver.waitForLabel("改进", in: driver.submitButton, timeout: 3))
   }
 
   func testRealTypingPasteGrowthDeletionShrinkAndSubmission() {
