@@ -134,6 +134,25 @@ struct ComposerTextMetrics: Equatable, Sendable {
   }
 }
 
+enum ComposerResetResolution: Equatable, Sendable {
+  case none
+  case clearSubmittedDocument
+  case preserveNewerNativeEdit
+}
+
+enum ComposerResetSynchronizer {
+  static func resolve(
+    revision: Int,
+    lastAppliedRevision: Int,
+    nativeEditRevision: Int
+  ) -> ComposerResetResolution {
+    guard revision != lastAppliedRevision else { return .none }
+    return nativeEditRevision == revision
+      ? .preserveNewerNativeEdit
+      : .clearSubmittedDocument
+  }
+}
+
 struct ComposerTextEditor: NSViewRepresentable {
   @Binding var text: String
   @Binding var metrics: ComposerTextMetrics
@@ -218,25 +237,23 @@ struct ComposerTextEditor: NSViewRepresentable {
     )
     scrollIndicator.setForceVisible(metrics.presentationState.showsDocumentChrome)
 
-    if context.coordinator.consumeResetRevision(resetRevision) {
-      if text.isEmpty {
-        textView.replaceDocumentFromBinding("")
-        context.coordinator.onVirtualDocumentChange(nil, nil, nil)
-      } else if textView.string != text {
-        // A native edit can arrive before SwiftUI presents an earlier submit reset.
-        // The newer binding value owns the document and must not be erased.
+    switch context.coordinator.consumeResetRevision(resetRevision) {
+    case .clearSubmittedDocument:
+      textView.replaceDocumentFromBinding("")
+      context.coordinator.onVirtualDocumentChange(nil, nil, nil)
+      context.coordinator.publishMetrics(for: "")
+    case .preserveNewerNativeEdit:
+      break
+    case .none:
+      if textView.isPerformingLargeDocumentPaste {
+        return
+      } else if context.coordinator.consumeNativeBindingEcho() {
+        // The native editor already contains this exact change.
+      } else if !textView.isVirtualizingLargeDocument, textView.string != text {
         textView.replaceDocumentFromBinding(text)
         applyTypography(to: textView)
         context.coordinator.publishMetrics(for: text)
       }
-    } else if textView.isPerformingLargeDocumentPaste {
-      return
-    } else if context.coordinator.consumeNativeBindingEcho() {
-      // The native editor already contains this exact change.
-    } else if !textView.isVirtualizingLargeDocument, textView.string != text {
-      textView.replaceDocumentFromBinding(text)
-      applyTypography(to: textView)
-      context.coordinator.publishMetrics(for: text)
     }
     scrollIndicator.refresh()
 
@@ -278,6 +295,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     var metrics: Binding<ComposerTextMetrics>
     var isFocused: FocusState<Bool>.Binding
     private var lastResetRevision: Int
+    private var nativeEditRevision: Int
     var currentResetRevision: @MainActor () -> Int
     var onSubmit: @MainActor () -> Bool
     var onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
@@ -296,6 +314,7 @@ struct ComposerTextEditor: NSViewRepresentable {
       self.metrics = metrics
       self.isFocused = isFocused
       lastResetRevision = resetRevision
+      nativeEditRevision = resetRevision
       self.currentResetRevision = currentResetRevision
       self.onSubmit = onSubmit
       self.onVirtualDocumentChange = onVirtualDocumentChange
@@ -307,7 +326,7 @@ struct ComposerTextEditor: NSViewRepresentable {
       }
       textView.virtualDocumentDidInstall = { [weak self] document, metrics in
         guard let self else { return }
-        self.consumeResetsBeforeNativeEdit()
+        self.recordNativeEdit()
         self.onVirtualDocumentChange(
           document,
           metrics.characterCount,
@@ -357,11 +376,16 @@ struct ComposerTextEditor: NSViewRepresentable {
       return true
     }
 
-    func consumeResetRevision(_ revision: Int) -> Bool {
-      guard revision != lastResetRevision else { return false }
+    func consumeResetRevision(_ revision: Int) -> ComposerResetResolution {
+      let resolution = ComposerResetSynchronizer.resolve(
+        revision: revision,
+        lastAppliedRevision: lastResetRevision,
+        nativeEditRevision: nativeEditRevision
+      )
+      guard resolution != .none else { return .none }
       lastResetRevision = revision
       expectsNativeBindingEcho = false
-      return true
+      return resolution
     }
 
     func publishMetrics(for text: String) {
@@ -373,7 +397,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     private func synchronizeText(from textView: NSTextView) {
-      consumeResetsBeforeNativeEdit()
+      recordNativeEdit()
       let nativeTextView = textView as? ComposerNativeTextView
       let updatedText = textView.string
       expectsNativeBindingEcho = true
@@ -392,8 +416,8 @@ struct ComposerTextEditor: NSViewRepresentable {
       }
     }
 
-    private func consumeResetsBeforeNativeEdit() {
-      lastResetRevision = currentResetRevision()
+    private func recordNativeEdit() {
+      nativeEditRevision = currentResetRevision()
     }
 
     private func publishLargeDocumentMetrics(_ completedMetrics: ComposerTextMetrics) {

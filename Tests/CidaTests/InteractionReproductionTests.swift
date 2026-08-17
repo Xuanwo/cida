@@ -2510,6 +2510,61 @@ final class InteractionReproductionTests: XCTestCase {
     model.cancelProcessing()
   }
 
+  func testPendingComposerResetClearsTheSubmittedNativeDocument() async throws {
+    let model = AppModel(
+      inputText: "",
+      entries: [],
+      service: ImmediateStreamingService()
+    )
+    let (_, hostingView) = makeHiddenWindow(
+      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
+      size: CGSize(width: 860, height: 640)
+    )
+    hostingView.layoutSubtreeIfNeeded()
+    let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
+
+    input.string = "submitted through the native responder"
+    input.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: input))
+    XCTAssertEqual(model.inputText, "submitted through the native responder")
+    XCTAssertTrue(model.submit())
+
+    try await waitUntil(timeout: .seconds(1)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return input.string.isEmpty
+        && (input.enclosingScrollView?.frame.height ?? .greatestFiniteMagnitude) <= 27.5
+    }
+    XCTAssertEqual(model.entries.last?.source, "submitted through the native responder")
+    XCTAssertTrue(input.string.isEmpty)
+    model.cancelProcessing()
+  }
+
+  func testComposerResetResolutionRejectsAStaleBindingEchoButPreservesANewerEdit() {
+    XCTAssertEqual(
+      ComposerResetSynchronizer.resolve(
+        revision: 4,
+        lastAppliedRevision: 3,
+        nativeEditRevision: 3
+      ),
+      .clearSubmittedDocument
+    )
+    XCTAssertEqual(
+      ComposerResetSynchronizer.resolve(
+        revision: 4,
+        lastAppliedRevision: 3,
+        nativeEditRevision: 4
+      ),
+      .preserveNewerNativeEdit
+    )
+    XCTAssertEqual(
+      ComposerResetSynchronizer.resolve(
+        revision: 4,
+        lastAppliedRevision: 4,
+        nativeEditRevision: 4
+      ),
+      .none
+    )
+  }
+
   func testLongInputUsesThePencilScrollIndicators() async throws {
     let model = AppModel(
       inputText: HistoryEntry.designLongInput,
