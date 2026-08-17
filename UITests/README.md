@@ -38,11 +38,13 @@ comes from `CIDA_UI_TEST_APP_PATH`; Debug-only preview fixtures are not an E2E e
 | `HistoryAndScrollingJourneyTests.swift` | one outer scroll surface, Pencil thumb direction, detach, and reattach |
 | `HistoryPresentationJourneyTests.swift` | fold/expand, full copy, action geometry, streaming action policy, and sticky long-result action |
 | `PersistenceJourneyTests.swift` | SQLite relaunch and OpenAI endpoint/model/API-key persistence and clearing |
+| `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, scroll, and relaunch invariants |
 | `WindowAndSettingsJourneyTests.swift` | native close/minimize/zoom/resize and editable settings |
-| `VisualAndAccessibilityJourneyTests.swift` | approved Pencil pixels and native semantic accessibility audit |
+| `VisualAndAccessibilityJourneyTests.swift` | approved Main/Settings Pencil pixels and native semantic accessibility audit |
 
 `Resources/Scenarios/pairwise-environment-v1.json` is a stable-seed pairwise environment matrix.
-`PairwiseManifestTests` mathematically verifies that every value pair remains covered.
+`PairwiseManifestTests` mathematically verifies that every value pair remains covered. The manifest
+is currently an inventory, not an eight-configuration Tart execution matrix.
 
 ## Visual and accessibility gates
 
