@@ -28,7 +28,8 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse(englishEntry.label.contains("中文"))
 
     let chineseSource = "这句话不太清楚也有一点啰嗦。CIDA_E2E_IMPROVE_CHINESE"
-    driver.replaceText(in: driver.composer, with: chineseSource)
+    driver.paste(chineseSource)
+    XCTAssertEqual(driver.textValue(in: driver.composer), chineseSource)
     XCTAssertTrue(driver.waitForLabel("中文 · 输出跟随原文", in: outputHint, timeout: 3))
     let chineseID = driver.submitCurrentComposer()
     let chineseResult = driver.result(containing: "CIDA_E2E_IMPROVE_CHINESE_COMPLETE")
