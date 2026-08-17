@@ -3,6 +3,7 @@ import XCTest
 
 struct E2EEnvironment {
   let workRoot: String
+  let sourceRoot: String
   let appPath: String
   let endpoint: String
   let controlBaseURL: String
@@ -11,6 +12,7 @@ struct E2EEnvironment {
   init() throws {
     let environment = ProcessInfo.processInfo.environment
     workRoot = environment["CIDA_UI_TEST_WORK_ROOT"] ?? "/Users/admin/cida-ui-test-work"
+    sourceRoot = environment["CIDA_UI_TEST_SOURCE_ROOT"] ?? "/Users/admin/cida-work"
     appPath =
       environment["CIDA_UI_TEST_APP_PATH"]
       ?? "\(workRoot)/ReleaseArtifact/Cida.app"

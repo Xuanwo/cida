@@ -1,0 +1,23 @@
+{
+  "namespace": "macos-26.4-xcode-26.5-retina-light-v1",
+  "baselines": [
+    {
+      "name": "main-translate",
+      "approvedImage": "Design/QACurrent/implementation-translate.png",
+      "approvedImageSHA256": "4d698a6d7387d7b27a4136796e2e928d1adbcd672763f6f632b971af5d5e4680",
+      "designReference": "Design/QACurrent/reference-translate.png",
+      "designReferenceSHA256": "0b54b18658819a263d3e49396da2dcad5b767bcf80fcd3808e978aea373ff765",
+      "designDocument": "Design/cida.pen",
+      "designDocumentSHA256": "b6a85d7cb6db979baed7393407184fc8cedd72534c280077d709a082cc9dba5b",
+      "logicalWidth": 860,
+      "logicalHeight": 640,
+      "blockSize": 8,
+      "channelTolerance": 0.08,
+      "maximumChangedBlockRatio": 0.12,
+      "maximumMeanChannelDelta": 0.025,
+      "masks": [
+        { "x": 0, "y": 0, "width": 860, "height": 46 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "seed": 1786953600,
+  "dimensions": {
+    "appearance": ["light", "dark"],
+    "reduceMotion": ["normal", "reduced"],
+    "scrollbars": ["automatic", "always"],
+    "window": ["standard", "zoomed"],
+    "lifecycle": ["cold", "relaunch"],
+    "content": ["standard", "long"]
+  },
+  "cases": [
+    {
+      "id": "p00",
+      "appearance": "light",
+      "reduceMotion": "normal",
+      "scrollbars": "automatic",
+      "window": "standard",
+      "lifecycle": "cold",
+      "content": "standard"
+    },
+    {
+      "id": "p01",
+      "appearance": "light",
+      "reduceMotion": "normal",
+      "scrollbars": "always",
+      "window": "zoomed",
+      "lifecycle": "relaunch",
+      "content": "long"
+    },
+    {
+      "id": "p02",
+      "appearance": "light",
+      "reduceMotion": "reduced",
+      "scrollbars": "automatic",
+      "window": "standard",
+      "lifecycle": "relaunch",
+      "content": "long"
+    },
+    {
+      "id": "p03",
+      "appearance": "light",
+      "reduceMotion": "reduced",
+      "scrollbars": "always",
+      "window": "zoomed",
+      "lifecycle": "cold",
+      "content": "standard"
+    },
+    {
+      "id": "p04",
+      "appearance": "dark",
+      "reduceMotion": "normal",
+      "scrollbars": "automatic",
+      "window": "zoomed",
+      "lifecycle": "cold",
+      "content": "long"
+    },
+    {
+      "id": "p05",
+      "appearance": "dark",
+      "reduceMotion": "normal",
+      "scrollbars": "always",
+      "window": "standard",
+      "lifecycle": "relaunch",
+      "content": "standard"
+    },
+    {
+      "id": "p06",
+      "appearance": "dark",
+      "reduceMotion": "reduced",
+      "scrollbars": "automatic",
+      "window": "zoomed",
+      "lifecycle": "relaunch",
+      "content": "standard"
+    },
+    {
+      "id": "p07",
+      "appearance": "dark",
+      "reduceMotion": "reduced",
+      "scrollbars": "always",
+      "window": "standard",
+      "lifecycle": "cold",
+      "content": "long"
+    }
+  ]
+}

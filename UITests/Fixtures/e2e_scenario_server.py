@@ -142,16 +142,19 @@ def seed_history(body):
             INSERT INTO history_entries (
               id, sort_order, mode, source, result, detail, timestamp,
               source_character_count, result_character_count, state, created_at, updated_at
-            ) VALUES (?, ?, 'translate', ?, ?, 'English → 中文', '12:00', ?, ?, ?, 1, 1)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
             """,
             [
                 (
                     entry["id"],
                     entry["sortOrder"],
+                    entry.get("mode", "translate"),
                     entry["source"],
                     entry["result"],
-                    len(entry["source"]),
-                    len(entry["result"]),
+                    entry.get("detail", "English → 中文"),
+                    entry.get("timestamp", "12:00"),
+                    entry.get("sourceCharacterCount", len(entry["source"])),
+                    entry.get("resultCharacterCount", len(entry["result"])),
                     entry.get("state", "completed"),
                 )
                 for entry in body.get("entries", [])

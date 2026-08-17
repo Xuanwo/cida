@@ -152,6 +152,7 @@ export CIDA_UI_TEST_APP_PATH="$app_path"
 export CIDA_UI_TEST_ENDPOINT="http://127.0.0.1:$(<"$port_path")/v1/chat/completions"
 export CIDA_UI_TEST_RECORD_PATH="$record_path"
 export CIDA_UI_TEST_WORK_ROOT="$work_root"
+export CIDA_UI_TEST_SOURCE_ROOT="$project_dir"
 
 /bin/rm -rf "$xcresult_path"
 /bin/rm -f "$xcresult_summary_path"

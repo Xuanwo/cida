@@ -2,6 +2,65 @@ import AppKit
 import XCTest
 
 enum VisualOracle {
+  @MainActor
+  static func assertActionIconInkFitsPencilBounds(
+    _ action: XCUIElement,
+    in window: XCUIElement,
+    screenshot: XCUIScreenshot,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation) else {
+      XCTFail("Could not decode the record-action screenshot", file: file, line: line)
+      return
+    }
+
+    let scale = CGFloat(bitmap.pixelsWide) / max(1, window.frame.width)
+    let actionRect = action.frame.offsetBy(dx: -window.frame.minX, dy: -window.frame.minY)
+    let searchRect = actionRect.insetBy(dx: -6, dy: -6)
+    let minimumX = max(0, Int(floor(searchRect.minX * scale)))
+    let maximumX = min(bitmap.pixelsWide - 1, Int(ceil(searchRect.maxX * scale)))
+    let minimumY = max(0, Int(floor(searchRect.minY * scale)))
+    let maximumY = min(bitmap.pixelsHigh - 1, Int(ceil(searchRect.maxY * scale)))
+    var inkCount = 0
+    var outsideActionCount = 0
+    var inkBounds = CGRect.null
+
+    for y in minimumY...maximumY {
+      for x in minimumX...maximumX {
+        guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+          continue
+        }
+        let channels = [color.redComponent, color.greenComponent, color.blueComponent]
+        let maximum = channels.max() ?? 1
+        let minimum = channels.min() ?? 0
+        guard
+          color.alphaComponent > 0.5,
+          maximum > 0.50,
+          maximum < 0.84,
+          maximum - minimum < 0.12
+        else { continue }
+
+        inkCount += 1
+        let point = CGPoint(
+          x: (CGFloat(x) + 0.5) / scale,
+          y: (CGFloat(y) + 0.5) / scale
+        )
+        inkBounds = inkBounds.union(CGRect(origin: point, size: .zero))
+        if !actionRect.insetBy(dx: -0.5, dy: -0.5).contains(point) {
+          outsideActionCount += 1
+        }
+      }
+    }
+
+    XCTAssertGreaterThan(inkCount, 12, "The action must paint a visible Lucide icon")
+    XCTAssertEqual(outsideActionCount, 0, "The icon ink escaped its 12 pt Pencil frame")
+    guard !inkBounds.isNull else { return }
+    XCTAssertLessThanOrEqual(inkBounds.width, 12, file: file, line: line)
+    XCTAssertLessThanOrEqual(inkBounds.height, 12, file: file, line: line)
+  }
+
+  @MainActor
   static func neutralDarkPixelCount(
     in screenshot: XCUIScreenshot,
     logicalWidth: CGFloat,

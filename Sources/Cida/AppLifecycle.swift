@@ -460,18 +460,6 @@ private enum DesignState: String {
   }
 }
 
-private enum UITestingScenario: String {
-  #if DEBUG
-    case criticalFlow = "critical-flow"
-    case historyContinuity = "history-continuity"
-    case historyFolding = "history-folding"
-    case recordActions = "record-actions"
-    case stickyLongResult = "sticky-long-result"
-  #else
-    case unavailable
-  #endif
-}
-
 private struct LaunchOptions {
   let designState: DesignState
   let snapshotOutputURL: URL?
@@ -480,21 +468,18 @@ private struct LaunchOptions {
   let snapshotDelayMilliseconds: Int
   let explicitlyIsolatedAutomation: Bool
   let isE2ETesting: Bool
-  let isUITesting: Bool
-  let uiTestingHistoryCount: Int
-  let uiTestingScenario: UITestingScenario
   let automationHistoryDatabaseURL: URL?
   let automationOpenAIEndpoint: String?
   let extremeWorkflowConfiguration: ExtremeWorkflowConfiguration?
   let initialHistoryPageSize: Int
 
   var isAutomation: Bool {
-    explicitlyIsolatedAutomation || isUITesting || snapshotOutputURL != nil
+    explicitlyIsolatedAutomation || snapshotOutputURL != nil
       || inputInteractionOutputURL != nil || performanceProbe != nil
   }
 
   var displaysInteractiveAutomationUI: Bool {
-    isUITesting || isE2ETesting
+    isE2ETesting
   }
 
   var persistsSettings: Bool {
@@ -502,7 +487,7 @@ private struct LaunchOptions {
   }
 
   private var usesDesignFixtures: Bool {
-    isAutomation && !isUITesting
+    isAutomation && !isE2ETesting
   }
 
   var initialSettings: CidaSettings {
@@ -543,29 +528,6 @@ private struct LaunchOptions {
   var designEntries: [HistoryEntry] {
     guard isAutomation else { return [] }
     #if DEBUG
-      if isUITesting {
-        switch uiTestingScenario {
-        case .historyContinuity:
-          return HistoryEntry.uiTestingHistoryContinuitySamples
-        case .historyFolding:
-          return HistoryEntry.uiTestingFoldingSamples
-        case .recordActions:
-          return HistoryEntry.uiTestingActionSamples
-        case .stickyLongResult:
-          return [HistoryEntry.uiTestingStickyLongResult]
-        case .criticalFlow:
-          return (0..<uiTestingHistoryCount).map { index in
-            HistoryEntry(
-              mode: .translate,
-              source: "UI test history source \(index)",
-              result:
-                "UI test history result \(index).\nA second line keeps the history scrollable.",
-              detail: "中文 → English",
-              timestamp: "17:30"
-            )
-          }
-        }
-      }
       switch designState {
       case .streaming:
         return [HistoryEntry.designSamples[1]]
@@ -581,7 +543,6 @@ private struct LaunchOptions {
 
   var initialInput: String {
     #if DEBUG
-      guard !isUITesting else { return "" }
       return switch designState {
       case .improve:
         "这个功能通过复用已有的缓存结果,使得整体的处理流程在大多数的情况下都能够得到比较明显的加速。"
@@ -619,24 +580,6 @@ private struct LaunchOptions {
           ?? 128
       )
     )
-    #if DEBUG
-      isUITesting = arguments.contains("--ui-testing")
-      uiTestingHistoryCount = min(
-        100,
-        max(
-          0,
-          arguments.value(after: "--ui-testing-history-count")
-            .flatMap(Int.init) ?? 0
-        )
-      )
-      uiTestingScenario =
-        arguments.value(after: "--ui-testing-scenario")
-        .flatMap(UITestingScenario.init(rawValue:)) ?? .criticalFlow
-    #else
-      isUITesting = false
-      uiTestingHistoryCount = 0
-      uiTestingScenario = .unavailable
-    #endif
     designState =
       arguments.value(after: "--design-state")
       .flatMap(DesignState.init(rawValue:)) ?? .translate

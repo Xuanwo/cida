@@ -416,65 +416,7 @@ struct CidaSettings: Codable, Equatable, Sendable {
       )
     ]
 
-    static let uiTestingActionSamples: [HistoryEntry] = [
-      HistoryEntry(
-        id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!,
-        mode: .improve,
-        source: "OLDER_SOURCE_SELECTION",
-        result: "OLDER_SELECTED_RESULT",
-        detail: "English",
-        timestamp: "16:01"
-      ),
-      HistoryEntry(
-        id: UUID(uuidString: "10000000-0000-0000-0000-000000000002")!,
-        mode: .translate,
-        source: "我们的系统采用了全新的存储引擎,显著提升了读写性能。",
-        result:
-          "Our system adopts a brand-new storage engine that significantly improves read and write performance.",
-        detail: "中文 → English",
-        timestamp: "14:05"
-      ),
-      HistoryEntry(
-        id: UUID(uuidString: "10000000-0000-0000-0000-000000000003")!,
-        mode: .translate,
-        source: "STREAMING_SOURCE_WITHOUT_ACTIONS",
-        result: "STREAMING_PARTIAL_RESULT",
-        detail: "中文 → English",
-        timestamp: "16:03",
-        state: .streaming
-      ),
-    ]
-
-    static let uiTestingFoldingSamples: [HistoryEntry] = [
-      HistoryEntry(
-        id: UUID(uuidString: "40000000-0000-0000-0000-000000000001")!,
-        mode: .improve,
-        source: "FOLDING_FIRST_SOURCE_MUST_START_HIDDEN",
-        result:
-          "FOLDING_FIRST_RESULT line one remains visible. Line two remains visible. Line three must be clipped until expansion.",
-        detail: "English",
-        timestamp: "16:11"
-      ),
-      HistoryEntry(
-        id: UUID(uuidString: "40000000-0000-0000-0000-000000000002")!,
-        mode: .translate,
-        source: "FOLDING_SECOND_SOURCE_MUST_START_HIDDEN",
-        result:
-          "FOLDING_SECOND_RESULT line one remains visible. Line two remains visible. Line three must be clipped until expansion.",
-        detail: "中文 → English",
-        timestamp: "16:12"
-      ),
-      HistoryEntry(
-        id: UUID(uuidString: "40000000-0000-0000-0000-000000000003")!,
-        mode: .translate,
-        source: "FOLDING_LATEST_SOURCE_STAYS_EXPANDED",
-        result: "FOLDING_LATEST_RESULT_STAYS_EXPANDED",
-        detail: "中文 → English",
-        timestamp: "16:13"
-      ),
-    ]
-
-    static let uiTestingStickyLongResult = HistoryEntry(
+    static let interactionTestStickyLongResult = HistoryEntry(
       id: UUID(uuidString: "20000000-0000-0000-0000-000000000001")!,
       mode: .translate,
       source:
@@ -490,7 +432,7 @@ struct CidaSettings: Codable, Equatable, Sendable {
       reportedResultCharacterCount: 3_214
     )
 
-    static let uiTestingHistoryContinuitySamples: [HistoryEntry] = {
+    static let interactionTestHistoryContinuitySamples: [HistoryEntry] = {
       let leadingMultilineResult = (0...10).map { index in
         "Earlier persisted result line \(index) keeps the production-shaped history geometry realistic."
       }.joined(separator: "\n")

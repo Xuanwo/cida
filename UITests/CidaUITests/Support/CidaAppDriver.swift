@@ -242,7 +242,8 @@ class CidaReleaseUITestCase: XCTestCase {
   private(set) var scenarioServer: ScenarioServerClient!
   private(set) var driver: CidaAppDriver!
 
-  override func setUpWithError() throws {
+  override func setUp() async throws {
+    try await super.setUp()
     continueAfterFailure = false
     e2eEnvironment = try E2EEnvironment()
     e2eEnvironment.resetProductionSettings()
@@ -254,8 +255,9 @@ class CidaReleaseUITestCase: XCTestCase {
     )
   }
 
-  override func tearDownWithError() throws {
+  override func tearDown() async throws {
     driver?.terminate()
     e2eEnvironment?.resetProductionSettings()
+    try await super.tearDown()
   }
 }

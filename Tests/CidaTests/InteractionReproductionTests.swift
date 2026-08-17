@@ -393,7 +393,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   func testProductionShapedHistoryMaterializesNewestEntriesAcrossConsecutiveSubmissions() throws {
-    let model = AppModel(entries: HistoryEntry.uiTestingHistoryContinuitySamples)
+    let model = AppModel(entries: HistoryEntry.interactionTestHistoryContinuitySamples)
     let (window, hostingView) = makeHiddenWindow(
       rootView: MainWindowView(model: model, automaticallyFocusInput: false),
       size: CGSize(width: 860, height: 640)
@@ -1145,7 +1145,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   func testExpandedHistoryTrackerAttachesToTheRealHistoryViewport() async throws {
-    let model = AppModel(entries: [.uiTestingStickyLongResult])
+    let model = AppModel(entries: [.interactionTestStickyLongResult])
     let (window, hostingView) = makeHiddenWindow(
       rootView: MainWindowView(model: model, automaticallyFocusInput: false),
       size: CGSize(width: 860, height: 640)
@@ -1166,7 +1166,7 @@ final class InteractionReproductionTests: XCTestCase {
     let resultView = try XCTUnwrap(
       firstTextView(
         in: hostingView,
-        identifier: "history-result-\(HistoryEntry.uiTestingStickyLongResult.id.uuidString)"
+        identifier: "history-result-\(HistoryEntry.interactionTestStickyLongResult.id.uuidString)"
       )
     )
     tracker.updateTrackingAreas()
