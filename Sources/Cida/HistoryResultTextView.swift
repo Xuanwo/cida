@@ -1044,7 +1044,7 @@ private final class StreamingResultRenderingView: NSView {
     super.init(frame: frameRect)
 
     wantsLayer = true
-    layerContentsRedrawPolicy = .never
+    layerContentsRedrawPolicy = .onSetNeedsDisplay
     layer?.masksToBounds = true
     setAccessibilityRole(.textArea)
   }
