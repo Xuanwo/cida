@@ -41,6 +41,24 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 ## Verification
 
+Run a release decision from a clean, committed checkout with one of the unified gates:
+
+```sh
+scripts/e2e/run-pr-gate.sh
+scripts/e2e/run-nightly-gate.sh
+scripts/e2e/run-release-gate.sh
+```
+
+Every profile runs the complete Swift suite, builds and signs one Release app, binds its manifest to
+the current commit, and verifies the app-tree digest again after all consumers finish. The PR profile
+runs the P0 Release journeys in Tart and the unit mutation contracts. Nightly runs the full Tart suite,
+all unit and Release mutations, the focused 120 Hz workloads, and the extreme smoke matrix. Release
+adds three fresh-clone P0 burn-in rounds by default and replaces the extreme smoke matrix with the
+full million-row and thousand-by-one-million-character matrix. Each invocation writes a single
+`gate-summary.json`; standalone scripts are diagnostic entry points, not a release verdict.
+
+Useful standalone diagnostics are:
+
 ```sh
 swift test -Xswiftc -warnings-as-errors
 scripts/test-ui-in-tart.sh
@@ -55,23 +73,21 @@ scripts/benchmark-extreme-workflows.sh smoke
 scripts/benchmark-extreme-workflows.sh full
 ```
 
-The XCUI regression runs inside a fresh clone of the local `cida-ui-golden` macOS VM through [OpenAI Tart](https://github.com/openai/tart). Tart starts without graphics, audio, or host clipboard sharing; the guest network is disabled, the repository is mounted read-only, and only `TestResults/vm-ui` is writable from the VM. The ephemeral clone is deleted after every run, so the test never launches a host application or reads the production API key, UserDefaults, Keychain, or SQLite history. See `UITests/README.md` for the golden-image contract and artifacts.
+The XCUI regression runs inside a fresh clone of the local `cida-ui-golden` macOS VM through [OpenAI Tart](https://github.com/openai/tart). Tart starts without graphics, audio, or host clipboard sharing; the guest network is disabled, the repository is mounted read-only, and only the selected result directory is writable from the VM. The exact signed artifact is copied into that writable share, verified against its source digest, consumed by the guest, and reverified on the host after the run. The ephemeral clone is deleted after every attempt, so the test never launches a host application or reads the production API key, UserDefaults, Keychain, or SQLite history. Host-session snapshots additionally reject a test Cida process left frontmost or any change to the set of production Cida processes. See `UITests/README.md` for the golden-image contract and artifacts.
 
-Snapshot and performance modes use a fresh temporary `辞达测试.app` for every invocation. Each instance receives a unique `com.xuanwo.Cida.Automation.*` bundle identifier, isolated UserDefaults and Keychain namespaces, and is removed after the run. Automation never opens the production history database, rebuilds or launches `build/Cida.app`, activates the application, or makes a probe window key.
+Standalone design snapshots and native input probes use a fresh temporary `辞达测试.app` with a unique `com.xuanwo.Cida.Automation.*` bundle identifier. Release performance gates instead launch the exact manifest-bound `Cida.app` in an isolated automation data directory. The performance instance has activation policy `.accessory`, is ordered behind existing windows, never activates the application or makes its probe window key, and never opens the production history database. Reports fail if activation or a key probe window is observed.
 
 The in-process integration suite and the VM XCUI suite both start a loopback OpenAI-compatible SSE server. XCUI drives the visible guest application through Settings, the OpenAI endpoint, model and API Key editors, the standard close button, multiline growth and deletion shrinkage, latest-only history focus, independent expansion and collapse, full copy from folded previews, consecutive submissions, submission from detached history, uneven streaming, forced follow, completed-result visibility, hover actions and copy feedback, an active-scroll 4 × 90 pt indicator pixel gate, and the exact outbound request body. A separate Release executable gate routes a real mouse click through AppKit hit testing, performs an isolated focus handoff, sends real key-down events, and verifies the native editor and `AppModel` receive identical text. No external credential or network service is used. `CIDA_UI_TEST_ONLY_TESTING` can select one XCUI identifier for diagnosis; omitting it always runs the complete regression suite.
 
-The strict performance gates require a 120 Hz-capable display, at least 118.8 measured ticks per
-second, P99 no greater than 12.5 ms, and zero intervals above 12.5 ms. The focused gates collect
-1,440 samples; the extreme matrix collects 2,400. The history gate continuously scrolls upward
-through 1,000 persisted-shaped records for at least 12,000 points. Because macOS suspends the app's
-visual display callbacks while this non-activating test instance remains in the background, the
-automation report explicitly labels its measurement clock `background-deadline`. Production
-streaming uses the screen's display link; the background gate is a non-disruptive main-actor deadline
-and workload regression, not a claim that a hidden window was presented by WindowServer at 120
-visible frames per second. The deadline clock still runs at the requested 120 Hz on a 60 Hz display
-so headless runs can expose main-actor stalls, but `displayRequirementSatisfied` remains false and the
-report cannot pass until it is rerun on a physical 120 Hz-capable display.
+The strict performance gates require a detected 120 Hz-capable display, at least 118.8 measured
+physical display callbacks per second, a P99 physical interval no greater than 12.5 ms, and zero
+main-actor callback latencies above the 12.5 ms budget. The focused gates collect 1,440 samples; the
+extreme matrix collects 2,400. The history gate continuously scrolls upward through 1,000
+persisted-shaped records for at least 12,000 points. Production stream pacing and the probe both use
+the selected display's CoreVideo clock; the report labels it `core-video-display-link` and records
+physical callback cadence separately from main-actor handling latency. A nonactivating fallback only
+keeps an unsupported clock from hanging the process; a 60 Hz or unavailable physical display still
+fails `displayRequirementSatisfied` and cannot produce a passing 120 Hz report.
 
 The extreme matrix has a quick smoke profile and two exact, opt-in profiles: one million persisted
 history rows, and one thousand persisted results containing one million characters each. Every
@@ -87,7 +103,7 @@ successfully completed data flow, and a correct data flow never masks a long fra
 
 - SwiftUI owns composition and observable application state. AppKit owns standard titled windows, the global shortcut, native text controls, keyboard routing, snapshots, and performance instrumentation.
 - Model requests keep stable prompt policy, typed runtime parameters, and untrusted source content separate. The same contract is used for OpenAI, compatible remote providers, and loopback mock endpoints without requiring provider-specific template syntax.
-- Streamed results use a stable native TextKit view. Presentation storage publishes a native append notification, so TextKit appends only the missing UTF-16 suffix without invalidating the SwiftUI history tree. A display-linked adaptive presenter smooths uneven network delivery at 30–400 grapheme clusters per second with a maximum of eight grapheme clusters per update.
+- Streamed results use a lightweight TextKit 1 rendering view and materialize a native selection editor only when needed. Presentation storage publishes an append notification, so TextKit appends only the missing UTF-16 suffix without invalidating the SwiftUI history tree. A physical-display-clock adaptive presenter smooths uneven network delivery at 30–400 grapheme clusters per second with a maximum of eight grapheme clusters per update.
 - New streamed text uses one batched 120 ms fade pipeline and an inline caret. Results grow naturally inside the history document and never install a second scroll region; the outer history alone follows while the user remains pinned to the bottom. Glyph presentation remains display-paced, while natural-height TextKit layout is coalesced to at most 30 Hz and notifies the history surface directly instead of round-tripping through the observable model.
 - The actual vertical scroll surfaces—history, composer, and Settings—keep native `NSScrollView` gesture, momentum, and accessibility behavior while drawing exactly one Pencil thumb layer: 4 pt wide, rounded, trackless, fixed to the design-state length, and hidden when content does not overflow. The indicator owns a top-origin coordinate system, so its thumb moves in the same visual direction for both flipped and standard AppKit documents. AppKit's own overlay scroller remains suppressed even when the framework reinstalls it during live scrolling; its overlay layout mode is preserved so content width never oscillates. Geometry notifications are coalesced and repeated installation is idempotent.
 - The composer grows and contracts from the current logical and wrapped line counts, so deleting multiline text immediately restores the compact input height. It uses a full backing document with a virtualized TextKit viewport. Documents of at least 100,000 UTF-16 units materialize only the final 512 units; upward scrolling prepends earlier 1,024-unit pages on demand. Presentation-only layout metrics expand through bounded 9 ms stages, while the native backing store and accessibility value retain the exact count. The full document remains available for editing and submission without entering SwiftUI's observed text value. An accepted submit synchronously cancels pending presentation stages, captures the document, clears native TextKit, and resets Composer-owned layout metrics in the same input event.

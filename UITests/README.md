@@ -1,19 +1,27 @@
 # Release E2E regression system
 
-The macOS E2E suite exercises a signed `release` build in a fresh, headless Tart clone. It never
-launches Cida, changes the pasteboard, or takes focus in the host session.
+The macOS E2E suite exercises an exact signed Release artifact in a fresh, headless Tart clone. It
+does not launch Cida on the host, share the host pasteboard, or request host focus.
 
 ## Test contract
 
-- `scripts/e2e/build-release-artifact.sh` builds, signs, and records the exact app digest.
-- `scripts/test-ui-in-tart.sh` verifies that artifact, clones `cida-ui-golden`, starts Tart with
+- `scripts/e2e/build-release-artifact.sh` builds and signs one app, then records its source commit,
+  clean/dirty state, signing identity, executable digest, and complete app-tree digest.
+- `scripts/test-ui-in-tart.sh` verifies the supplied artifact, stages a byte-identical copy into the
+  writable result share, clones `cida-ui-golden`, starts Tart with
   `--no-graphics --no-audio --no-clipboard`, disables guest Ethernet, and mounts source read-only.
+- Both the source artifact and its staged copy are verified after the guest exits. Unified gates also
+  require a clean checkout, a manifest commit equal to `HEAD`, and a Developer ID signature.
 - `UITests/Fixtures/e2e_scenario_server.py` provides a deterministic OpenAI-compatible local
   endpoint. Tests release response headers and chunks through named gates instead of sleeping.
 - `SQLiteHistoryFixture` seeds each journey's isolated production-schema database before launch.
 - Every UI test starts with a new app container, database, Keychain service, and pasteboard.
 - Application assertion failures are never retried. Only a failed Tart boot may use one fresh
   clone retry.
+- Host snapshots record the frontmost app, pasteboard change count, and production Cida processes
+  before and after each Tart run. `--no-clipboard` is the isolation guarantee; the pasteboard count is
+  retained as a diagnostic so normal user copying during a long run is not misclassified as a test
+  mutation. A test Cida process left frontmost or a changed production process set fails the guard.
 
 The checked-in UI test host compiles the driver and assertions only. The app under test always
 comes from `CIDA_UI_TEST_APP_PATH`; Debug-only preview fixtures are not an E2E execution path.
@@ -51,32 +59,49 @@ position or test order.
 
 ## Run
 
-Full release suite:
+Use the unified profiles for gate decisions:
+
+| Profile | Required work |
+| --- | --- |
+| PR | full Swift suite, one exact Release artifact, P0 Tart journeys, unit mutation contracts |
+| Nightly | full Tart suite, all unit/Release mutations, focused 120 Hz gates, extreme smoke |
+| Release | nightly correctness plus three fresh P0 burn-ins and the full extreme 120 Hz matrix |
+
+These profiles require a clean, committed checkout:
+
+```sh
+scripts/e2e/run-pr-gate.sh
+scripts/e2e/run-nightly-gate.sh
+scripts/e2e/run-release-gate.sh
+```
+
+The Release burn-in defaults to three rounds and may be raised with
+`CIDA_GATE_BURN_IN_ROUNDS`; values below two are clamped to two. Every profile writes a
+machine-readable `gate-summary.json` with stage status, artifact provenance, UI summaries,
+mutation summaries, host guards, performance reports, and the final app digest comparison.
+
+For a standalone full UI diagnostic that builds its own artifact:
 
 ```sh
 scripts/test-ui-in-tart.sh
 ```
 
-Selected journeys against a newly built artifact:
+To run selected journeys against a prebuilt exact artifact, keep the artifact outside the Tart result
+directory because the runner stages a verified copy into that directory:
 
 ```sh
+artifact_root="$PWD/TestResults/manual-artifact/ReleaseArtifact"
+scripts/e2e/build-release-artifact.sh "$artifact_root"
+
+CIDA_RELEASE_ARTIFACT_ROOT="$artifact_root" \
 CIDA_TART_RESULTS_DIR="$PWD/TestResults/selected" \
 CIDA_UI_TEST_ONLY_TESTING='CidaUITests/CoreTranslationJourneyTests,CidaUITests/ComposerJourneyTests' \
 scripts/test-ui-in-tart.sh
 ```
 
-Reuse is allowed only when product source is unchanged; the runner verifies the digest before and
-after the guest run:
-
-```sh
-CIDA_E2E_REUSE_ARTIFACT=1 \
-CIDA_TART_RESULTS_DIR="$PWD/TestResults/selected" \
-CIDA_UI_TEST_ONLY_TESTING='CidaUITests/VisualAndAccessibilityJourneyTests' \
-scripts/test-ui-in-tart.sh
-```
-
 Artifacts include `CidaUITests.xcresult`, `xcresult-summary.json`, signed Release artifact metadata,
-scenario request logs, VM progress, guest logs, screenshots, video, and retained audit diagnostics.
+scenario request logs, VM progress, guest logs, screenshots, video, host-session snapshots and guard,
+and retained audit diagnostics.
 
 Regenerate the project after adding or removing UI source files:
 
@@ -85,5 +110,7 @@ xcodegen generate --spec UITests/project.yml
 ```
 
 The VM is a correctness and final-composition target, not proof of 120 Hz presentation. The
-nonactivating hardware performance gates consume the same Release artifact manifest and run
-separately on a detected 120 Hz display.
+nonactivating hardware performance gates consume the same manifest-bound Release artifact and run
+separately on a detected physical 120 Hz display. Their CoreVideo report records the physical display
+cadence, main-actor callback latency, activation/key-window observations, hardware and power state,
+and the exact app-tree digest.
