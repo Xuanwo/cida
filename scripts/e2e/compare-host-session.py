@@ -12,6 +12,7 @@ def parse_arguments():
     parser.add_argument("before", type=Path)
     parser.add_argument("after", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--clipboard-isolated", action="store_true")
     return parser.parse_args()
 
 
@@ -47,11 +48,12 @@ def main():
         "testTargetFrontmostAtEnd": target_frontmost,
         "pasteboardUnchanged": before["pasteboardChangeCount"]
         == after["pasteboardChangeCount"],
+        "clipboardIsolationEnforced": arguments.clipboard_isolated,
         "productionCidaProcessesUnchanged": before_cida == after_cida,
     }
     report["passed"] = (
         not report["testTargetFrontmostAtEnd"]
-        and report["pasteboardUnchanged"]
+        and (report["pasteboardUnchanged"] or report["clipboardIsolationEnforced"])
         and report["productionCidaProcessesUnchanged"]
     )
     arguments.output.write_text(

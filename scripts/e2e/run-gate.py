@@ -86,6 +86,9 @@ class GateRun:
                             "frontmostApplicationChanged"
                         ),
                         "pasteboardUnchanged": payload.get("pasteboardUnchanged"),
+                        "clipboardIsolationEnforced": payload.get(
+                            "clipboardIsolationEnforced"
+                        ),
                         "productionCidaProcessesUnchanged": payload.get(
                             "productionCidaProcessesUnchanged"
                         ),
@@ -146,6 +149,11 @@ class GateRun:
         required_stages_passed = bool(self.stages) and all(
             stage["status"] == "passed" for stage in self.stages
         )
+        final_verification_passed = any(
+            stage["name"] == "release-artifact-final-verify"
+            and stage["status"] == "passed"
+            for stage in self.stages
+        )
         performance_artifacts_match = all(
             report["artifactAppTreeSHA256"] == self.artifact_digest
             for report in performance_reports
@@ -175,6 +183,7 @@ class GateRun:
             "performanceReports": performance_reports,
             "performanceArtifactsMatch": performance_artifacts_match,
             "passed": required_stages_passed
+            and final_verification_passed
             and self.artifact_digest is not None
             and performance_artifacts_match,
         }

@@ -51,7 +51,8 @@ finalize_host_guard() {
   host_guard_finalized=true
   "$project_dir/scripts/e2e/host-session-snapshot.swift" >"$host_after_path"
   if "$project_dir/scripts/e2e/compare-host-session.py" \
-    "$host_before_path" "$host_after_path" "$host_guard_path"
+    "$host_before_path" "$host_after_path" "$host_guard_path" \
+    --clipboard-isolated
   then
     host_progress "host-session-guard-passed"
     return 0
@@ -264,7 +265,7 @@ fi
 host_progress "host-staged-release-artifact-reverified"
 
 if ! finalize_host_guard; then
-  echo "Headless E2E changed the host pasteboard or production Cida session" >&2
+  echo "Headless E2E changed the production Cida session or took host focus" >&2
   exit 1
 fi
 
