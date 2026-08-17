@@ -49,8 +49,9 @@ scripts/e2e/run-nightly-gate.sh
 scripts/e2e/run-release-gate.sh
 ```
 
-Every profile runs the complete Swift suite, builds and signs one Release app, binds its manifest to
-the current commit, and verifies the app-tree digest again after all consumers finish. The PR profile
+Every profile first validates every mutation anchor, then runs the complete Swift suite, builds and
+signs one Release app, binds its manifest to the current commit, and verifies the app-tree digest
+again after all consumers finish. The PR profile
 runs the P0 Release journeys in Tart and the unit mutation contracts. Nightly runs the full Tart suite,
 all unit and Release mutations, the focused 120 Hz workloads, and the extreme smoke matrix. Release
 adds three fresh-clone P0 burn-in rounds by default and replaces the extreme smoke matrix with the

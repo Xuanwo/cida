@@ -80,7 +80,8 @@ scripts/e2e/run-release-gate.sh
 The Release burn-in defaults to three rounds and may be raised with
 `CIDA_GATE_BURN_IN_ROUNDS`; values below two are clamped to two. Every profile writes a
 machine-readable `gate-summary.json` with stage status, artifact provenance, UI summaries,
-mutation summaries, host guards, performance reports, and the final app digest comparison.
+mutation summaries, host guards, performance reports, and the final app digest comparison. Mutation
+anchor drift is validated before any expensive build or VM work.
 
 For a standalone full UI diagnostic that builds its own artifact:
 

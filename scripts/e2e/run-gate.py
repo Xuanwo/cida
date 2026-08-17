@@ -381,6 +381,16 @@ def main():
         return 1
 
     if not gate.run_stage(
+        "mutation-catalog",
+        [
+            str(PROJECT_ROOT / "scripts/e2e/run-mutation-contracts.sh"),
+            "--mode",
+            "catalog",
+        ],
+    ):
+        print(gate.summary_path)
+        return 1
+    if not gate.run_stage(
         "swift-tests",
         ["swift", "test", "-Xswiftc", "-warnings-as-errors"],
     ):
