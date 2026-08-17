@@ -18,6 +18,24 @@
       "masks": [
         { "x": 0, "y": 0, "width": 860, "height": 46 }
       ]
+    },
+    {
+      "name": "settings",
+      "approvedImage": "Design/QACurrent/implementation-settings.png",
+      "approvedImageSHA256": "aa420f24589a8f43e3a0ec10b870b3dbffa6d8f7dc3d9d7fd300167c324d12d5",
+      "designReference": "Design/QACurrent/reference-settings.png",
+      "designReferenceSHA256": "4608f83c8f6374c411092567825394c3dcce367b9ceef23c702f844d511737ec",
+      "designDocument": "Design/cida.pen",
+      "designDocumentSHA256": "b6a85d7cb6db979baed7393407184fc8cedd72534c280077d709a082cc9dba5b",
+      "logicalWidth": 560,
+      "logicalHeight": 660,
+      "blockSize": 8,
+      "channelTolerance": 0.08,
+      "maximumChangedBlockRatio": 0.12,
+      "maximumMeanChannelDelta": 0.025,
+      "masks": [
+        { "x": 0, "y": 0, "width": 560, "height": 46 }
+      ]
     }
   ]
 }

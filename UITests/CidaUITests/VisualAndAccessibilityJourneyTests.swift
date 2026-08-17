@@ -21,6 +21,33 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     }
   }
 
+  func testSettingsMatchesTheApprovedPencilBaseline() throws {
+    driver.launch(endpointOverride: false)
+    driver.app.buttons["model-settings-button"].click()
+    let settingsWindow = driver.app.windows["设置"]
+    XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+
+    let apiKey = driver.app.secureTextFields["settings-api-key-editor"]
+    driver.replaceText(in: apiKey, with: "sk-preview-key-3f2a")
+    settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
+    driver.app.buttons["model-settings-button"].click()
+    XCTAssertTrue(settingsWindow.waitForExistence(timeout: 3))
+    XCTAssertEqual(settingsWindow.frame.width, 560, accuracy: 1)
+    XCTAssertEqual(settingsWindow.frame.height, 660, accuracy: 1)
+
+    let manifest = try VisualBaselineManifest.load(from: e2eEnvironment.sourceRoot)
+    let baseline = try manifest.baseline(named: "settings")
+    try XCTContext.runActivity(named: "Pencil visual baseline: settings") { activity in
+      try PixelDiff.assertScreenshot(
+        settingsWindow.screenshot(),
+        matches: baseline,
+        sourceRoot: e2eEnvironment.sourceRoot,
+        activity: activity
+      )
+    }
+  }
+
   func testMainWindowPassesTheNativeSemanticAccessibilityAudit() throws {
     try seedDesignTranslateHistory()
     driver.launch()

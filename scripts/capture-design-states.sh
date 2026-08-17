@@ -13,7 +13,7 @@ comparison_renderer="$script_dir/compose-qa.swift"
 mkdir -p "$implementation_dir" "$qa_dir"
 swift build --package-path "$project_dir"
 
-for state in translate improve large-input; do
+for state in translate improve large-input settings; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
     --snapshot-output "$implementation_dir/$state.png"
@@ -36,6 +36,11 @@ done
 /usr/bin/sips --cropToHeightWidth 640 860 --cropOffset 67 90 \
   "$reference_dir/J9Vlmv.png" \
   --out "$qa_dir/reference-streaming.png" >/dev/null
+/usr/bin/sips --cropToHeightWidth 1306 1122 --cropOffset 132 180 \
+  "$reference_dir/l1gIe.png" \
+  --out "$qa_dir/reference-settings.png" >/dev/null
+/usr/bin/sips --resampleHeightWidth 660 560 \
+  "$qa_dir/reference-settings.png" >/dev/null
 
 /usr/bin/sips --resampleHeightWidth 640 860 \
   "$implementation_dir/translate.png" \
@@ -49,6 +54,9 @@ done
 /usr/bin/sips --resampleHeightWidth 640 860 \
   "$implementation_dir/streaming.png" \
   --out "$qa_dir/implementation-streaming.png" >/dev/null
+/usr/bin/sips --resampleHeightWidth 660 560 \
+  "$implementation_dir/settings.png" \
+  --out "$qa_dir/implementation-settings.png" >/dev/null
 for image in "$qa_dir"/implementation-*.png; do
   /usr/bin/sips \
     --setProperty dpiWidth 72 \
@@ -56,7 +64,7 @@ for image in "$qa_dir"/implementation-*.png; do
     "$image" >/dev/null
 done
 
-for state in translate improve large-input streaming; do
+for state in translate improve large-input streaming settings; do
   /usr/bin/xcrun swift "$comparison_renderer" \
     "$qa_dir/reference-$state.png" \
     "$qa_dir/implementation-$state.png" \
