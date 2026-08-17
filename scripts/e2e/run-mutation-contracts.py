@@ -265,7 +265,7 @@ def main():
     if output(["git", "status", "--porcelain"], cwd=PROJECT_ROOT):
         raise RuntimeError("mutation execution requires a clean source checkout")
     source_commit = output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT)
-    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     results_root = arguments.results_dir or (
         PROJECT_ROOT / "TestResults" / f"mutations-{arguments.mode}-{timestamp}"
     )
