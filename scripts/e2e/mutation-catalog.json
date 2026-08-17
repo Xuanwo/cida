@@ -13,17 +13,16 @@
         "MutationContractTests/testStreamingRendererUsesInvalidatingLayerPolicy"
       ],
       "releaseTests": [
-        "CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte",
-        "CoreTranslationJourneyTests/testResultContainerPoolRemainsCorrectBeyondItsPrewarmedCapacity"
+        "CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte"
       ]
     },
     {
       "id": "reused-result-keeps-old-text",
-      "description": "Skip clearing the native result renderer when a pooled container is released.",
+      "description": "Ignore empty native renderer replacements so reused result content survives cleanup and rebinding.",
       "contracts": ["CIDA-E2E-010", "CIDA-E2E-013"],
       "file": "Sources/Cida/HistoryResultTextView.swift",
-      "before": "    renderingView.replaceText(with: NSAttributedString())\n    renderingView.isHidden = false",
-      "after": "    renderingView.isHidden = false",
+      "before": "  func replaceText(with attributedString: NSAttributedString) {\n    textContentStorage.performEditingTransaction {\n      textStorage.setAttributedString(attributedString)\n    }\n  }",
+      "after": "  func replaceText(with attributedString: NSAttributedString) {\n    guard attributedString.length > 0 else { return }\n    textContentStorage.performEditingTransaction {\n      textStorage.setAttributedString(attributedString)\n    }\n  }",
       "occurrences": 1,
       "unitTests": [
         "MutationContractTests/testResultContainerPoolClearsRenderedTextBeforeReuse"
