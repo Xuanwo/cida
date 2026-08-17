@@ -400,7 +400,7 @@ final class AppModel {
     case .translate:
       "\(sourceLanguage.title) → \(targetLanguage.title)"
     case .improve:
-      "中文 · 输出跟随原文"
+      "输出跟随原文"
     }
   }
 
@@ -669,7 +669,7 @@ final class AppModel {
       result: "",
       detail: request.mode == .translate
         ? "\(request.sourceLanguage.title) → \(request.targetLanguage.title)"
-        : request.sourceLanguage.title,
+        : "跟随原文",
       timestamp: Self.timeFormatter.string(from: Date()),
       reportedSourceCharacterCount: reportedSourceCharacterCount ?? request.text.utf16.count,
       state: .streaming

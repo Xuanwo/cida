@@ -229,17 +229,18 @@ final class HistoryEntry: Identifiable, Equatable, @unchecked Sendable {
   }
 
   var metadata: String {
-    switch state {
+    let presentedDetail = mode == .improve ? "跟随原文" : detail
+    return switch state {
     case .streaming:
-      "\(detail) · 生成中"
+      "\(presentedDetail) · 生成中"
     case .cancelled:
-      "\(detail) · 已停止"
+      "\(presentedDetail) · 已停止"
     case .failed:
-      "\(detail) · 出错 · 重试"
+      "\(presentedDetail) · 出错 · 重试"
     case .completed where isLongDocument:
-      "\(detail) · \(timestamp) · \(sourceCharacterCount.formatted()) → \(resultCharacterCount.formatted()) 字"
+      "\(presentedDetail) · \(timestamp) · \(sourceCharacterCount.formatted()) → \(resultCharacterCount.formatted()) 字"
     case .completed:
-      "\(detail) · \(timestamp)"
+      "\(presentedDetail) · \(timestamp)"
     }
   }
 

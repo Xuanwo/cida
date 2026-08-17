@@ -516,6 +516,7 @@ final class AppModelTests: XCTestCase {
     XCTAssertFalse(prompt.systemMessage.contains("SOURCE_ONLY_8472"))
     XCTAssertTrue(prompt.systemMessage.contains(settings.translationPrompt))
     XCTAssertEqual(prompt.parameters.operation, .translate)
+    XCTAssertEqual(prompt.parameters.languageBehavior, .translateToTarget)
     XCTAssertEqual(prompt.parameters.sourceLanguage, .chinese)
     XCTAssertEqual(prompt.parameters.targetLanguage, .english)
     XCTAssertTrue(prompt.systemMessage.contains(#""operation":"translate""#))
@@ -530,9 +531,11 @@ final class AppModelTests: XCTestCase {
       ),
       settings: settings
     )
+    XCTAssertEqual(improvePrompt.parameters.languageBehavior, .preserveSource)
+    XCTAssertNil(improvePrompt.parameters.sourceLanguage)
     XCTAssertNil(improvePrompt.parameters.targetLanguage)
     XCTAssertFalse(improvePrompt.systemMessage.contains(#""source_language""#))
-    XCTAssertFalse(improvePrompt.systemMessage.contains("target_language"))
+    XCTAssertFalse(improvePrompt.systemMessage.contains(#""target_language""#))
     XCTAssertTrue(
       improvePrompt.systemMessage.contains(#""language_behavior":"preserve_source""#)
     )
