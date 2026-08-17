@@ -1999,12 +1999,15 @@ final class InteractionReproductionTests: XCTestCase {
     let complete = StreamGlyphFadeAnimation.style(elapsed: 0.12)
 
     XCTAssertEqual(initial.opacity, 0.82, accuracy: 0.001)
+    XCTAssertEqual(initial.blurRadius, 2, accuracy: 0.001)
     XCTAssertGreaterThan(midpoint.opacity, initial.opacity)
     XCTAssertEqual(midpoint.opacity, 0.9775, accuracy: 0.001)
+    XCTAssertEqual(midpoint.blurRadius, 0.25, accuracy: 0.001)
     XCTAssertEqual(complete.opacity, 1, accuracy: 0.001)
+    XCTAssertEqual(complete.blurRadius, 0, accuracy: 0.001)
   }
 
-  func testStreamingLineGrowthReusesTheSingleCompositorTailReveal() {
+  func testStreamingLineGrowthReusesTheSingleCompositorTailReveal() throws {
     let resultView = HistoryResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 320, height: HistoryResultTextContainer.minimumHeight)
     )
@@ -2027,6 +2030,19 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertGreaterThan(expandedHeight, HistoryResultTextContainer.minimumHeight)
     XCTAssertEqual(resultView.glyphRevealLayerCountForTesting, 1)
     XCTAssertEqual(resultView.glyphRevealAnimationForTesting?.duration, 0.12)
+    let blurAnimation = try XCTUnwrap(resultView.glyphRevealBlurAnimationForTesting)
+    XCTAssertEqual(blurAnimation.duration, 0.12)
+    XCTAssertEqual(
+      try XCTUnwrap(blurAnimation.fromValue as? NSNumber).doubleValue,
+      2,
+      accuracy: 0.001
+    )
+    XCTAssertEqual(
+      try XCTUnwrap(blurAnimation.toValue as? NSNumber).doubleValue,
+      0,
+      accuracy: 0.001
+    )
+    XCTAssertEqual(resultView.glyphRevealBlurRadiusForTesting, 0, accuracy: 0.001)
   }
 
   func testRecordActionsRequireHoverAndACompletedOrTerminalEntry() {

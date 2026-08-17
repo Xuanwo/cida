@@ -1,4 +1,5 @@
 import AppKit
+import CoreImage
 import QuartzCore
 import SwiftUI
 
@@ -323,6 +324,7 @@ private struct NativeHistoryResultTextView: NSViewRepresentable {
 
 struct StreamGlyphFadeStyle: Equatable, Sendable {
   let opacity: CGFloat
+  let blurRadius: CGFloat
 }
 
 enum StreamGlyphFadeAnimation {
@@ -332,7 +334,8 @@ enum StreamGlyphFadeAnimation {
     let progress = min(1, max(0, elapsed / duration))
     let easedProgress = 1 - pow(1 - progress, 3)
     return StreamGlyphFadeStyle(
-      opacity: CGFloat(0.82 + 0.18 * easedProgress)
+      opacity: CGFloat(0.82 + 0.18 * easedProgress),
+      blurRadius: CidaMotion.characterBlurRadius * CGFloat(1 - easedProgress)
     )
   }
 }
@@ -397,6 +400,12 @@ final class HistoryResultTextContainer: NSView {
 
   private let caretLayer = CALayer()
   private let tailRevealLayer = CAGradientLayer()
+  private let tailRevealBlurFilter: CIFilter = {
+    let filter = CIFilter(name: "CIGaussianBlur")!
+    filter.name = "glyphRevealBlur"
+    filter.setValue(0, forKey: kCIInputRadiusKey)
+    return filter
+  }()
   private let contentEndLayoutView = ResultContentEndLayoutView()
   private var isStreaming = false
   private var needsFullTextLayout = true
@@ -439,6 +448,14 @@ final class HistoryResultTextContainer: NSView {
     var glyphRevealAnimationForTesting: CABasicAnimation? {
       tailRevealLayer.animation(forKey: "glyph-reveal") as? CABasicAnimation
     }
+    var glyphRevealBlurAnimationForTesting: CABasicAnimation? {
+      tailRevealLayer.animation(forKey: "glyph-reveal-blur") as? CABasicAnimation
+    }
+    var glyphRevealBlurRadiusForTesting: CGFloat {
+      CGFloat(
+        (tailRevealBlurFilter.value(forKey: kCIInputRadiusKey) as? NSNumber)?.doubleValue ?? 0
+      )
+    }
     var streamingVisibleFragmentFramesForTesting: [CGRect] {
       renderingView.visibleFragmentFramesForTesting
     }
@@ -475,6 +492,8 @@ final class HistoryResultTextContainer: NSView {
     tailRevealLayer.locations = [0, 0.35]
     tailRevealLayer.startPoint = CGPoint(x: 0.5, y: 0)
     tailRevealLayer.endPoint = CGPoint(x: 0.5, y: 1)
+    tailRevealLayer.masksToBounds = true
+    tailRevealLayer.backgroundFilters = [tailRevealBlurFilter]
     tailRevealLayer.opacity = 0
     renderingView.layer?.addSublayer(tailRevealLayer)
 
@@ -829,6 +848,15 @@ final class HistoryResultTextContainer: NSView {
     animation.duration = StreamGlyphFadeAnimation.duration
     animation.timingFunction = CAMediaTimingFunction(controlPoints: 0.33, 1, 0.68, 1)
     tailRevealLayer.add(animation, forKey: "glyph-reveal")
+
+    let blurAnimation = CABasicAnimation(
+      keyPath: "backgroundFilters.glyphRevealBlur.inputRadius"
+    )
+    blurAnimation.fromValue = StreamGlyphFadeAnimation.style(elapsed: 0).blurRadius
+    blurAnimation.toValue = 0
+    blurAnimation.duration = StreamGlyphFadeAnimation.duration
+    blurAnimation.timingFunction = animation.timingFunction
+    tailRevealLayer.add(blurAnimation, forKey: "glyph-reveal-blur")
   }
 
   private func updateTailRevealFrame() {
@@ -846,7 +874,8 @@ final class HistoryResultTextContainer: NSView {
   private func cancelGlyphReveals() {
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    tailRevealLayer.removeAnimation(forKey: "glyph-reveal")
+    tailRevealLayer.removeAllAnimations()
+    tailRevealBlurFilter.setValue(0, forKey: kCIInputRadiusKey)
     tailRevealLayer.opacity = 0
     CATransaction.commit()
   }
