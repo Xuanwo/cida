@@ -1,0 +1,44 @@
+{
+  "applicationActivationObserved" : false,
+  "currentResidentMemoryBytes" : 114081792,
+  "displayMaximumFramesPerSecond" : 60,
+  "displayRequirementSatisfied" : true,
+  "frameClock" : "background-deadline",
+  "inputCharacterCount" : 1000000,
+  "interactionCount" : 1,
+  "maximumFrameEvent" : "unspecified",
+  "maximumFrameSampleIndex" : 177,
+  "maximumFrameTimeMilliseconds" : 17.519416753202677,
+  "meanFrameTimeMilliseconds" : 16.666644819207768,
+  "measuredFramesPerSecond" : 60.00007865095513,
+  "minimumMeasuredFramesPerSecond" : 59.4,
+  "missedFrameBudgetCount" : 0,
+  "missedFrameEvents" : [
+
+  ],
+  "missedFrameSampleIndices" : [
+
+  ],
+  "missedFrameSampleIndicesTruncated" : false,
+  "operationDurationMilliseconds" : 0.8278333116322756,
+  "p95FrameTimeMilliseconds" : 16.68654172681272,
+  "p99FrameTimeMilliseconds" : 16.703291796147823,
+  "passed" : true,
+  "peakResidentMemoryBytes" : 114081792,
+  "phaseFramePacing" : {
+    "unspecified" : {
+      "maximumFrameTimeMilliseconds" : 17.519416753202677,
+      "meanFrameTimeMilliseconds" : 16.666644819207768,
+      "missedFrameBudgetCount" : 0,
+      "p95FrameTimeMilliseconds" : 16.68654172681272,
+      "p99FrameTimeMilliseconds" : 16.703291796147823,
+      "sampleCount" : 719
+    }
+  },
+  "probeWindowBecameKey" : false,
+  "requiredFramesPerSecond" : 60,
+  "sampleCount" : 720,
+  "workload" : "Pasting a 1,000,000-character document into the native composer",
+  "workloadCompleted" : true,
+  "workloadCompletionSampleIndex" : 1
+}

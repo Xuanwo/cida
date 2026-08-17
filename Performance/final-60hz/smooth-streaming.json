@@ -1,0 +1,45 @@
+{
+  "applicationActivationObserved" : false,
+  "currentResidentMemoryBytes" : 102809600,
+  "displayMaximumFramesPerSecond" : 60,
+  "displayRequirementSatisfied" : true,
+  "frameClock" : "background-deadline",
+  "interactionCount" : 108,
+  "maximumFrameEvent" : "unspecified",
+  "maximumFrameSampleIndex" : 177,
+  "maximumFrameTimeMilliseconds" : 17.829083371907473,
+  "maximumStreamPresentationBatchCharacterCount" : 8,
+  "meanFrameTimeMilliseconds" : 16.666624536388067,
+  "measuredFramesPerSecond" : 60.00015166938635,
+  "minimumMeasuredFramesPerSecond" : 59.4,
+  "missedFrameBudgetCount" : 0,
+  "missedFrameEvents" : [
+
+  ],
+  "missedFrameSampleIndices" : [
+
+  ],
+  "missedFrameSampleIndicesTruncated" : false,
+  "outputCharacterCount" : 3282,
+  "p95FrameTimeMilliseconds" : 16.69212500564754,
+  "p99FrameTimeMilliseconds" : 16.708166571334004,
+  "passed" : true,
+  "peakResidentMemoryBytes" : 110903296,
+  "phaseFramePacing" : {
+    "unspecified" : {
+      "maximumFrameTimeMilliseconds" : 17.829083371907473,
+      "meanFrameTimeMilliseconds" : 16.666624536388067,
+      "missedFrameBudgetCount" : 0,
+      "p95FrameTimeMilliseconds" : 16.69212500564754,
+      "p99FrameTimeMilliseconds" : 16.708166571334004,
+      "sampleCount" : 719
+    }
+  },
+  "probeWindowBecameKey" : false,
+  "requiredFramesPerSecond" : 60,
+  "sampleCount" : 720,
+  "streamPresentationUpdateCount" : 412,
+  "workload" : "Adaptive burst-smoothed streaming with Core Animation rendering",
+  "workloadCompleted" : true,
+  "workloadCompletionSampleIndex" : 4
+}

@@ -1,0 +1,43 @@
+name: CidaUITests
+options:
+  bundleIdPrefix: com.xuanwo.Cida.Automation
+  deploymentTarget:
+    macOS: "15.0"
+  xcodeVersion: "26.0"
+settings:
+  base:
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    SWIFT_VERSION: "6.0"
+targets:
+  CidaUITestHost:
+    type: application
+    platform: macOS
+    sources:
+      - path: CidaUITestHost
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.xuanwo.Cida.Automation.UITestHost
+  CidaUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: CidaUITests
+    dependencies:
+      - target: CidaUITestHost
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.xuanwo.Cida.Automation.UITests
+        TEST_TARGET_NAME: CidaUITestHost
+schemes:
+  CidaUITests:
+    build:
+      targets:
+        CidaUITestHost: all
+        CidaUITests:
+          - test
+    test:
+      targets:
+        - CidaUITests

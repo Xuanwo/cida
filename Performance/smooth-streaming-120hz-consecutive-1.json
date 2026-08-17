@@ -1,0 +1,28 @@
+{
+  "applicationActivationObserved" : false,
+  "displayMaximumFramesPerSecond" : 120,
+  "displayRequirementSatisfied" : true,
+  "frameClock" : "background-deadline",
+  "interactionCount" : 216,
+  "maximumFrameSampleIndex" : 141,
+  "maximumFrameTimeMilliseconds" : 9.554499993100762,
+  "maximumStreamPresentationBatchCharacterCount" : 8,
+  "meanFrameTimeMilliseconds" : 8.33333072739914,
+  "measuredFramesPerSecond" : 120.00003752546411,
+  "minimumMeasuredFramesPerSecond" : 118.8,
+  "missedFrameBudgetCount" : 0,
+  "missedFrameSampleIndices" : [
+
+  ],
+  "missedFrameSampleIndicesTruncated" : false,
+  "p95FrameTimeMilliseconds" : 8.383041596971452,
+  "p99FrameTimeMilliseconds" : 9.031083434820175,
+  "passed" : true,
+  "probeWindowBecameKey" : false,
+  "requiredFramesPerSecond" : 120,
+  "sampleCount" : 1440,
+  "streamPresentationUpdateCount" : 1535,
+  "workload" : "Adaptive burst-smoothed streaming with Core Animation rendering",
+  "workloadCompleted" : true,
+  "workloadCompletionSampleIndex" : 4
+}

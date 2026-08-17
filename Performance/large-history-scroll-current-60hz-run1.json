@@ -1,0 +1,40 @@
+{
+  "applicationActivationObserved" : false,
+  "currentResidentMemoryBytes" : 130777088,
+  "displayMaximumFramesPerSecond" : 60,
+  "displayRequirementSatisfied" : true,
+  "frameClock" : "background-deadline",
+  "historyEntryCount" : 1000,
+  "interactionCount" : 1440,
+  "maximumFrameSampleIndex" : 175,
+  "maximumFrameTimeMilliseconds" : 17.508374992758036,
+  "meanFrameTimeMilliseconds" : 16.666600359001865,
+  "measuredFramesPerSecond" : 60.00023870854297,
+  "minimumMeasuredFramesPerSecond" : 59.4,
+  "missedFrameBudgetCount" : 0,
+  "missedFrameSampleIndices" : [
+
+  ],
+  "missedFrameSampleIndicesTruncated" : false,
+  "p95FrameTimeMilliseconds" : 16.696708276867867,
+  "p99FrameTimeMilliseconds" : 16.71804185025394,
+  "passed" : true,
+  "peakResidentMemoryBytes" : 141737984,
+  "phaseFramePacing" : {
+    "unspecified" : {
+      "maximumFrameTimeMilliseconds" : 17.508374992758036,
+      "meanFrameTimeMilliseconds" : 16.666600359001865,
+      "missedFrameBudgetCount" : 0,
+      "p95FrameTimeMilliseconds" : 16.696708276867867,
+      "p99FrameTimeMilliseconds" : 16.71804185025394,
+      "sampleCount" : 1439
+    }
+  },
+  "probeWindowBecameKey" : false,
+  "requiredFramesPerSecond" : 60,
+  "sampleCount" : 1440,
+  "scrollDistancePoints" : 46080,
+  "workload" : "Continuously scrolling upward through 1,000 persisted history records",
+  "workloadCompleted" : true,
+  "workloadCompletionSampleIndex" : 375
+}

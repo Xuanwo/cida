@@ -1,0 +1,390 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		837BE06FAA2C71C65C6A91E1 /* CidaCriticalFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7106AB9E76A0F3BEE1ED6C36 /* CidaCriticalFlowUITests.swift */; };
+		C843C064A2652EBD409E7228 /* CidaUITestHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5FB85BE252B3B8DCCF1BC2 /* CidaUITestHost.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A57CE95984A4A3F3604AE164 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B483C66168A294C3F37F85E6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F04C09C965E4AFFC80ABF8AA;
+			remoteInfo = CidaUITestHost;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0D6117909E998A6029A69AE1 /* CidaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CidaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B1EC20C2F36348DA180EB42 /* CidaUITestHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CidaUITestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B5FB85BE252B3B8DCCF1BC2 /* CidaUITestHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaUITestHost.swift; sourceTree = "<group>"; };
+		7106AB9E76A0F3BEE1ED6C36 /* CidaCriticalFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaCriticalFlowUITests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		082325B5A3FCF889FA7044A3 /* CidaUITestHost */ = {
+			isa = PBXGroup;
+			children = (
+				5B5FB85BE252B3B8DCCF1BC2 /* CidaUITestHost.swift */,
+			);
+			path = CidaUITestHost;
+			sourceTree = "<group>";
+		};
+		4CDB0C6C12991B52B5301FE8 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4B1EC20C2F36348DA180EB42 /* CidaUITestHost.app */,
+				0D6117909E998A6029A69AE1 /* CidaUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		61C7EF4244398E82AD6EBF24 = {
+			isa = PBXGroup;
+			children = (
+				082325B5A3FCF889FA7044A3 /* CidaUITestHost */,
+				7E021BACEF3CA8171142B526 /* CidaUITests */,
+				4CDB0C6C12991B52B5301FE8 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7E021BACEF3CA8171142B526 /* CidaUITests */ = {
+			isa = PBXGroup;
+			children = (
+				7106AB9E76A0F3BEE1ED6C36 /* CidaCriticalFlowUITests.swift */,
+			);
+			path = CidaUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4B671A76944938F2FC7B24E5 /* CidaUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EA0B6966CD2E69F05DCF8689 /* Build configuration list for PBXNativeTarget "CidaUITests" */;
+			buildPhases = (
+				D3DF12ED4955CFC229D19B74 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				360BFC8E4DB3EF3A1C676CC1 /* PBXTargetDependency */,
+			);
+			name = CidaUITests;
+			packageProductDependencies = (
+			);
+			productName = CidaUITests;
+			productReference = 0D6117909E998A6029A69AE1 /* CidaUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		F04C09C965E4AFFC80ABF8AA /* CidaUITestHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6EAF64D1E5C82CFCD259A754 /* Build configuration list for PBXNativeTarget "CidaUITestHost" */;
+			buildPhases = (
+				17AAF6D4E512AF4CCD9594B1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CidaUITestHost;
+			packageProductDependencies = (
+			);
+			productName = CidaUITestHost;
+			productReference = 4B1EC20C2F36348DA180EB42 /* CidaUITestHost.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B483C66168A294C3F37F85E6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					4B671A76944938F2FC7B24E5 = {
+						ProvisioningStyle = Manual;
+						TestTargetID = F04C09C965E4AFFC80ABF8AA;
+					};
+					F04C09C965E4AFFC80ABF8AA = {
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 8D73196E03C9287955A1C97D /* Build configuration list for PBXProject "CidaUITests" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 61C7EF4244398E82AD6EBF24;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4CDB0C6C12991B52B5301FE8 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F04C09C965E4AFFC80ABF8AA /* CidaUITestHost */,
+				4B671A76944938F2FC7B24E5 /* CidaUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		17AAF6D4E512AF4CCD9594B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C843C064A2652EBD409E7228 /* CidaUITestHost.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D3DF12ED4955CFC229D19B74 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				837BE06FAA2C71C65C6A91E1 /* CidaCriticalFlowUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		360BFC8E4DB3EF3A1C676CC1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F04C09C965E4AFFC80ABF8AA /* CidaUITestHost */;
+			targetProxy = A57CE95984A4A3F3604AE164 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		284560A926824B4799A9EED3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.xuanwo.Cida.Automation.UITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = CidaUITestHost;
+			};
+			name = Debug;
+		};
+		886B4669459A27E11837DBD5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		B203CDC2F5A58071EFC62CDD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.xuanwo.Cida.Automation.UITestHost;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		F0D155F9AC4C3792CFF8CD43 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.xuanwo.Cida.Automation.UITestHost;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		F9172F10AE23F577C6A27316 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.xuanwo.Cida.Automation.UITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = CidaUITestHost;
+			};
+			name = Release;
+		};
+		FE55933EE4E84D439C2D5B00 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		6EAF64D1E5C82CFCD259A754 /* Build configuration list for PBXNativeTarget "CidaUITestHost" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0D155F9AC4C3792CFF8CD43 /* Debug */,
+				B203CDC2F5A58071EFC62CDD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8D73196E03C9287955A1C97D /* Build configuration list for PBXProject "CidaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FE55933EE4E84D439C2D5B00 /* Debug */,
+				886B4669459A27E11837DBD5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EA0B6966CD2E69F05DCF8689 /* Build configuration list for PBXNativeTarget "CidaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				284560A926824B4799A9EED3 /* Debug */,
+				F9172F10AE23F577C6A27316 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B483C66168A294C3F37F85E6 /* Project object */;
+}

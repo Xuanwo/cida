@@ -1,0 +1,267 @@
+{
+  "passed": true,
+  "profiles": [
+    {
+      "frame_pacing_passed": true,
+      "frame_report": {
+        "applicationActivationObserved": false,
+        "currentResidentMemoryBytes": 161513472,
+        "databaseBytes": 476237928,
+        "displayMaximumFramesPerSecond": 60,
+        "displayRequirementSatisfied": true,
+        "frameClock": "background-deadline",
+        "historyEntryCount": 257,
+        "historyLoadDurationMilliseconds": 86.27745835110545,
+        "hyperScrollDistancePoints": 120320,
+        "initialRenderDurationMilliseconds": 238.40308329090476,
+        "inputCharacterCount": 1000000,
+        "interactionCount": 424,
+        "maximumFrameEvent": "completed",
+        "maximumFrameSampleIndex": 1676,
+        "maximumFrameTimeMilliseconds": 20.140625070780516,
+        "maximumScrollStepPoints": 512,
+        "maximumStreamPresentationBatchCharacterCount": 8,
+        "meanFrameTimeMilliseconds": 16.666621908470958,
+        "measuredFramesPerSecond": 60.00016112993727,
+        "minimumMeasuredFramesPerSecond": 59.4,
+        "missedFrameBudgetCount": 0,
+        "missedFrameEvents": [],
+        "missedFrameSampleIndices": [],
+        "missedFrameSampleIndicesTruncated": false,
+        "normalScrollDistancePoints": 6016,
+        "operationDurationMilliseconds": 13666.55108332634,
+        "outputCharacterCount": 1024,
+        "p95FrameTimeMilliseconds": 16.703750006854534,
+        "p99FrameTimeMilliseconds": 16.73458330333233,
+        "passed": true,
+        "peakResidentMemoryBytes": 161562624,
+        "phaseFramePacing": {
+          "completed": {
+            "maximumFrameTimeMilliseconds": 20.140625070780516,
+            "meanFrameTimeMilliseconds": 16.6666195817435,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.70416654087603,
+            "p99FrameTimeMilliseconds": 16.720999963581562,
+            "sampleCount": 1092
+          },
+          "hyper-scroll": {
+            "maximumFrameTimeMilliseconds": 16.732624964788556,
+            "meanFrameTimeMilliseconds": 16.666634259323892,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.701041720807552,
+            "p99FrameTimeMilliseconds": 16.716333338990808,
+            "sampleCount": 243
+          },
+          "normal-scroll": {
+            "maximumFrameTimeMilliseconds": 16.713874880224466,
+            "meanFrameTimeMilliseconds": 16.666596301603228,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.698166728019714,
+            "p99FrameTimeMilliseconds": 16.71141665428877,
+            "sampleCount": 196
+          },
+          "translating": {
+            "maximumFrameTimeMilliseconds": 17.676833318546414,
+            "meanFrameTimeMilliseconds": 16.66662716017049,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.70500007458031,
+            "p99FrameTimeMilliseconds": 17.211666563525796,
+            "sampleCount": 868
+          }
+        },
+        "probeWindowBecameKey": false,
+        "requiredFramesPerSecond": 60,
+        "sampleCount": 2400,
+        "scrollDistancePoints": 126336,
+        "streamPresentationUpdateCount": 129,
+        "totalHistoryEntryCount": 1000001,
+        "workflowPhase": "completed",
+        "workload": "Submit, stream, persist, scroll, and hyper-scroll an extreme persisted history",
+        "workloadCompleted": true,
+        "workloadCompletionSampleIndex": 1309
+      },
+      "frame_workflow_passed": true,
+      "passed": true,
+      "persistence": {
+        "latest_result_characters": 1024,
+        "latest_source_characters": 1000000,
+        "latest_state": "completed",
+        "passed": true,
+        "row_count": 1000001
+      },
+      "process": {
+        "crash": null,
+        "duration_milliseconds": 42721.815792,
+        "peak_process_tree_resident_bytes": 164151296,
+        "return_code": 0,
+        "rss_limit_bytes": 1073741824,
+        "stderr": "/var/folders/hq/gx9hbsvn1bj2jwyzly_39kgr0000gn/T//cida-isolated-automation.XveNLI/Cida Automation.app: replacing existing signature\n",
+        "stdout": "",
+        "termination_reason": null
+      },
+      "profile": {
+        "hyper_scroll_points": 120000,
+        "input_characters": 1000000,
+        "million_character_record_count": 0,
+        "name": "million-history",
+        "normal_scroll_points": 6000,
+        "output_characters": 1024,
+        "rss_limit_bytes": 1073741824,
+        "small_record_count": 999999,
+        "small_result_characters": 256,
+        "timeout_seconds": 300
+      },
+      "request": [
+        {
+          "body_bytes": 1010706,
+          "input_characters": 1000000,
+          "model": "cida-extreme-local-model",
+          "path": "/v1/chat/completions",
+          "stream": true
+        }
+      ],
+      "request_passed": true,
+      "seed": {
+        "database_bytes": 476192768,
+        "duration_milliseconds": 1700.1213340000002,
+        "expected_result_payload_characters": 255999757,
+        "result_payload_characters": 255999757,
+        "row_count": 1000000
+      },
+      "seed_passed": true,
+      "workflow_correctness_passed": true
+    },
+    {
+      "frame_pacing_passed": true,
+      "frame_report": {
+        "applicationActivationObserved": false,
+        "currentResidentMemoryBytes": 182108160,
+        "databaseBytes": 1001594984,
+        "displayMaximumFramesPerSecond": 60,
+        "displayRequirementSatisfied": true,
+        "frameClock": "background-deadline",
+        "historyEntryCount": 34,
+        "historyLoadDurationMilliseconds": 126.95391662418842,
+        "hyperScrollDistancePoints": 120216,
+        "initialRenderDurationMilliseconds": 274.5088334195316,
+        "inputCharacterCount": 1000000,
+        "interactionCount": 424,
+        "maximumFrameEvent": "streaming-entry-visible",
+        "maximumFrameSampleIndex": 2,
+        "maximumFrameTimeMilliseconds": 21.903291810303926,
+        "maximumScrollStepPoints": 512,
+        "maximumStreamPresentationBatchCharacterCount": 8,
+        "meanFrameTimeMilliseconds": 16.666630054243676,
+        "measuredFramesPerSecond": 60.00013180501231,
+        "minimumMeasuredFramesPerSecond": 59.4,
+        "missedFrameBudgetCount": 0,
+        "missedFrameEvents": [],
+        "missedFrameSampleIndices": [],
+        "missedFrameSampleIndicesTruncated": false,
+        "normalScrollDistancePoints": 6016,
+        "operationDurationMilliseconds": 13718.626500107348,
+        "outputCharacterCount": 1024,
+        "p95FrameTimeMilliseconds": 16.70554163865745,
+        "p99FrameTimeMilliseconds": 16.928958240896463,
+        "passed": true,
+        "peakResidentMemoryBytes": 187727872,
+        "phaseFramePacing": {
+          "completed": {
+            "maximumFrameTimeMilliseconds": 21.427958272397518,
+            "meanFrameTimeMilliseconds": 16.666670687888708,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.704375157132745,
+            "p99FrameTimeMilliseconds": 16.7259166482836,
+            "sampleCount": 1088
+          },
+          "hyper-scroll": {
+            "maximumFrameTimeMilliseconds": 17.877916572615504,
+            "meanFrameTimeMilliseconds": 16.666294910494607,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.703999834135175,
+            "p99FrameTimeMilliseconds": 17.718458315357566,
+            "sampleCount": 244
+          },
+          "normal-scroll": {
+            "maximumFrameTimeMilliseconds": 16.73116651363671,
+            "meanFrameTimeMilliseconds": 16.666882866233284,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.70520822517574,
+            "p99FrameTimeMilliseconds": 16.72941679134965,
+            "sampleCount": 196
+          },
+          "translating": {
+            "maximumFrameTimeMilliseconds": 21.903291810303926,
+            "meanFrameTimeMilliseconds": 16.66661629364553,
+            "missedFrameBudgetCount": 0,
+            "p95FrameTimeMilliseconds": 16.70649996958673,
+            "p99FrameTimeMilliseconds": 17.40975002758205,
+            "sampleCount": 871
+          }
+        },
+        "probeWindowBecameKey": false,
+        "requiredFramesPerSecond": 60,
+        "sampleCount": 2400,
+        "scrollDistancePoints": 126232,
+        "streamPresentationUpdateCount": 129,
+        "totalHistoryEntryCount": 1002,
+        "workflowPhase": "completed",
+        "workload": "Submit, stream, persist, scroll, and hyper-scroll an extreme persisted history",
+        "workloadCompleted": true,
+        "workloadCompletionSampleIndex": 1313
+      },
+      "frame_workflow_passed": true,
+      "passed": true,
+      "persistence": {
+        "latest_result_characters": 1024,
+        "latest_source_characters": 1000000,
+        "latest_state": "completed",
+        "passed": true,
+        "row_count": 1002
+      },
+      "process": {
+        "crash": null,
+        "duration_milliseconds": 42760.84716600001,
+        "peak_process_tree_resident_bytes": 190332928,
+        "return_code": 0,
+        "rss_limit_bytes": 3221225472,
+        "stderr": "/var/folders/hq/gx9hbsvn1bj2jwyzly_39kgr0000gn/T//cida-isolated-automation.DvL7aA/Cida Automation.app: replacing existing signature\n",
+        "stdout": "",
+        "termination_reason": null
+      },
+      "profile": {
+        "hyper_scroll_points": 120000,
+        "input_characters": 1000000,
+        "million_character_record_count": 1000,
+        "name": "thousand-million-character-records",
+        "normal_scroll_points": 6000,
+        "output_characters": 1024,
+        "rss_limit_bytes": 3221225472,
+        "small_record_count": 0,
+        "small_result_characters": 0,
+        "timeout_seconds": 300
+      },
+      "request": [
+        {
+          "body_bytes": 1010706,
+          "input_characters": 1000000,
+          "model": "cida-extreme-local-model",
+          "path": "/v1/chat/completions",
+          "stream": true
+        }
+      ],
+      "request_passed": true,
+      "seed": {
+        "database_bytes": 1001549824,
+        "duration_milliseconds": 1220.1467920000014,
+        "expected_result_payload_characters": 1000000013,
+        "result_payload_characters": 1000000013,
+        "row_count": 1001
+      },
+      "seed_passed": true,
+      "workflow_correctness_passed": true
+    }
+  ],
+  "required_frames_per_second": 60,
+  "sample_count": 2400
+}

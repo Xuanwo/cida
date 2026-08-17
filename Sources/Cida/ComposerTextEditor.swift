@@ -1,0 +1,391 @@
+import AppKit
+import SwiftUI
+
+struct ComposerTextMetrics: Equatable, Sendable {
+  let characterCount: Int
+  let formattedCharacterCount: String
+  let hasLineBreak: Bool
+  let lineCount: Int
+  let hasNonWhitespace: Bool
+  let isImportingLargeDocument: Bool
+
+  init(text: String, isImportingLargeDocument: Bool = false) {
+    let value = text as NSString
+    let utf16Count = value.length
+    characterCount =
+      utf16Count >= ComposerNativeTextView.virtualDocumentThreshold
+      ? utf16Count
+      : text.count
+    formattedCharacterCount = Self.formatCharacterCount(characterCount)
+    lineCount =
+      utf16Count < 800
+      ? text.reduce(into: 1) { count, character in
+        if character.isNewline { count += 1 }
+      }
+      : 1
+    hasLineBreak = lineCount > 1
+    hasNonWhitespace =
+      value.rangeOfCharacter(from: .whitespacesAndNewlines.inverted).location != NSNotFound
+    self.isImportingLargeDocument = isImportingLargeDocument
+  }
+
+  init(
+    characterCount: Int,
+    formattedCharacterCount: String? = nil,
+    hasLineBreak: Bool,
+    lineCount: Int = 1,
+    hasNonWhitespace: Bool,
+    isImportingLargeDocument: Bool
+  ) {
+    self.characterCount = characterCount
+    self.formattedCharacterCount =
+      formattedCharacterCount ?? Self.formatCharacterCount(characterCount)
+    self.hasLineBreak = hasLineBreak
+    self.lineCount = max(lineCount, hasLineBreak ? 2 : 1)
+    self.hasNonWhitespace = hasNonWhitespace
+    self.isImportingLargeDocument = isImportingLargeDocument
+  }
+
+  var hasText: Bool {
+    characterCount > 0
+  }
+
+  var usesMultilineEditor: Bool {
+    characterCount > 120 || hasLineBreak
+  }
+
+  var isDocument: Bool {
+    characterCount >= 800
+  }
+
+  var boundedForVirtualDocumentPresentation: Self {
+    guard characterCount >= ComposerNativeTextView.virtualDocumentThreshold else { return self }
+    return Self(
+      characterCount: 800,
+      formattedCharacterCount: formattedCharacterCount,
+      hasLineBreak: hasLineBreak,
+      lineCount: lineCount,
+      hasNonWhitespace: hasNonWhitespace,
+      isImportingLargeDocument: isImportingLargeDocument
+    )
+  }
+
+  private static func formatCharacterCount(_ value: Int) -> String {
+    let digits = String(value)
+    guard digits.count > 3 else { return digits }
+    var result = ""
+    result.reserveCapacity(digits.count + digits.count / 3)
+    for (index, character) in digits.enumerated() {
+      if index > 0, (digits.count - index).isMultiple(of: 3) {
+        result.append(",")
+      }
+      result.append(character)
+    }
+    return result
+  }
+}
+
+struct ComposerTextEditor: NSViewRepresentable {
+  @Binding var text: String
+  @Binding var metrics: ComposerTextMetrics
+  let isFocused: FocusState<Bool>.Binding
+  let resetRevision: Int
+  let onSubmit: @MainActor () -> Bool
+  let onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(
+      text: $text,
+      metrics: $metrics,
+      isFocused: isFocused,
+      resetRevision: resetRevision,
+      onSubmit: onSubmit,
+      onVirtualDocumentChange: onVirtualDocumentChange
+    )
+  }
+
+  func makeNSView(context: Context) -> NSScrollView {
+    let scrollView = NSScrollView()
+    scrollView.drawsBackground = false
+    scrollView.borderType = .noBorder
+    scrollView.hasVerticalScroller = false
+    scrollView.hasHorizontalScroller = false
+    scrollView.autohidesScrollers = true
+
+    let textView = ComposerNativeTextView(usingTextLayoutManager: true)
+    textView.delegate = context.coordinator
+    context.coordinator.configure(textView)
+    textView.isRichText = false
+    textView.importsGraphics = false
+    textView.drawsBackground = false
+    textView.isHorizontallyResizable = false
+    textView.isVerticallyResizable = true
+    textView.autoresizingMask = [.width]
+    textView.textContainerInset = NSSize(width: 28, height: 0)
+    textView.textContainer?.lineFragmentPadding = 0
+    textView.textContainer?.widthTracksTextView = true
+    textView.textContainer?.containerSize = NSSize(
+      width: 0,
+      height: CGFloat.greatestFiniteMagnitude
+    )
+    textView.focusRingType = .none
+    textView.isContinuousSpellCheckingEnabled = false
+    textView.isGrammarCheckingEnabled = false
+    textView.isAutomaticQuoteSubstitutionEnabled = false
+    textView.isAutomaticDashSubstitutionEnabled = false
+    textView.isAutomaticSpellingCorrectionEnabled = false
+    textView.isAutomaticTextReplacementEnabled = false
+    textView.isAutomaticTextCompletionEnabled = false
+    textView.setAccessibilityLabel("待处理文本")
+    textView.setAccessibilityIdentifier("composer-input")
+    applyTypography(to: textView)
+    textView.replaceDocumentFromBinding(text)
+
+    scrollView.documentView = textView
+    let scrollIndicator = CidaScrollIndicator.install(
+      on: scrollView,
+      configuration: .composer
+    )
+    scrollIndicator.setForceVisible(ComposerTextMetrics(text: text).isDocument)
+    scrollIndicator.refresh()
+    return scrollView
+  }
+
+  func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    guard let textView = scrollView.documentView as? ComposerNativeTextView else { return }
+    context.coordinator.text = $text
+    context.coordinator.metrics = $metrics
+    context.coordinator.isFocused = isFocused
+    context.coordinator.onSubmit = onSubmit
+    context.coordinator.onVirtualDocumentChange = onVirtualDocumentChange
+    let scrollIndicator = CidaScrollIndicator.install(
+      on: scrollView,
+      configuration: .composer
+    )
+    scrollIndicator.setForceVisible(metrics.isDocument)
+
+    if context.coordinator.consumeResetRevision(resetRevision) {
+      textView.replaceDocumentFromBinding("")
+      context.coordinator.onVirtualDocumentChange(nil, nil, nil)
+    } else if textView.isPerformingLargeDocumentPaste {
+      return
+    } else if context.coordinator.consumeNativeBindingEcho() {
+      // The native editor already contains this exact change.
+    } else if !textView.isVirtualizingLargeDocument, textView.string != text {
+      textView.replaceDocumentFromBinding(text)
+      applyTypography(to: textView)
+      context.coordinator.publishMetrics(for: text)
+    }
+    scrollIndicator.refresh()
+
+    if isFocused.wrappedValue, textView.window?.firstResponder !== textView {
+      Task { @MainActor in
+        await Task.yield()
+        textView.window?.makeFirstResponder(textView)
+      }
+    }
+  }
+
+  private func applyTypography(to textView: NSTextView) {
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.minimumLineHeight = 26
+    paragraphStyle.maximumLineHeight = 26
+
+    let attributes: [NSAttributedString.Key: Any] = [
+      .font: CidaDesign.appKitBody(16),
+      .foregroundColor: NSColor(
+        red: 26 / 255,
+        green: 26 / 255,
+        blue: 24 / 255,
+        alpha: 1
+      ),
+      .paragraphStyle: paragraphStyle,
+    ]
+
+    textView.defaultParagraphStyle = paragraphStyle
+    textView.typingAttributes = attributes
+    textView.textStorage?.setAttributes(
+      attributes,
+      range: NSRange(location: 0, length: textView.textStorage?.length ?? 0)
+    )
+  }
+
+  @MainActor
+  final class Coordinator: NSObject, NSTextViewDelegate {
+    var text: Binding<String>
+    var metrics: Binding<ComposerTextMetrics>
+    var isFocused: FocusState<Bool>.Binding
+    private var lastResetRevision: Int
+    var onSubmit: @MainActor () -> Bool
+    var onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
+    private var expectsNativeBindingEcho = false
+    private var largeDocumentPresentationTask: Task<Void, Never>?
+
+    init(
+      text: Binding<String>,
+      metrics: Binding<ComposerTextMetrics>,
+      isFocused: FocusState<Bool>.Binding,
+      resetRevision: Int,
+      onSubmit: @escaping @MainActor () -> Bool,
+      onVirtualDocumentChange: @escaping @MainActor (String?, Int?, Bool?) -> Void
+    ) {
+      self.text = text
+      self.metrics = metrics
+      self.isFocused = isFocused
+      lastResetRevision = resetRevision
+      self.onSubmit = onSubmit
+      self.onVirtualDocumentChange = onVirtualDocumentChange
+    }
+
+    func configure(_ textView: ComposerNativeTextView) {
+      textView.largeDocumentPasteDidBegin = { [weak self] pasteMetrics in
+        self?.publishLargeDocumentMetrics(pasteMetrics)
+      }
+      textView.virtualDocumentDidInstall = { [weak self] document, metrics in
+        guard let self else { return }
+        self.onVirtualDocumentChange(
+          document,
+          metrics.characterCount,
+          metrics.hasNonWhitespace
+        )
+      }
+    }
+
+    func textDidBeginEditing(_ notification: Notification) {
+      isFocused.wrappedValue = true
+    }
+
+    func textDidEndEditing(_ notification: Notification) {
+      isFocused.wrappedValue = false
+    }
+
+    func textDidChange(_ notification: Notification) {
+      guard
+        let textView = notification.object as? ComposerNativeTextView,
+        !textView.isPerformingLargeDocumentPaste
+      else {
+        return
+      }
+      synchronizeText(from: textView)
+    }
+
+    func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+      guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+      if (textView as? ComposerNativeTextView)?.isPerformingLargeDocumentPaste == true {
+        return true
+      }
+      let modifiers = NSApp.currentEvent?.modifierFlags ?? []
+      if modifiers.contains(.shift) || modifiers.contains(.option) {
+        return false
+      }
+      if onSubmit() {
+        cancelPendingLargeDocumentPresentation()
+        (textView as? ComposerNativeTextView)?.replaceDocumentFromBinding("")
+        onVirtualDocumentChange(nil, nil, nil)
+        text.wrappedValue = ""
+      }
+      return true
+    }
+
+    func consumeNativeBindingEcho() -> Bool {
+      guard expectsNativeBindingEcho else { return false }
+      expectsNativeBindingEcho = false
+      return true
+    }
+
+    func consumeResetRevision(_ revision: Int) -> Bool {
+      guard revision != lastResetRevision else { return false }
+      lastResetRevision = revision
+      expectsNativeBindingEcho = false
+      cancelPendingLargeDocumentPresentation()
+      return true
+    }
+
+    func publishMetrics(for text: String) {
+      cancelPendingLargeDocumentPresentation()
+      let updatedMetrics = ComposerTextMetrics(text: text)
+      guard metrics.wrappedValue != updatedMetrics else { return }
+      Task { @MainActor [weak self] in
+        self?.metrics.wrappedValue = updatedMetrics
+      }
+    }
+
+    private func synchronizeText(from textView: NSTextView) {
+      cancelPendingLargeDocumentPresentation()
+      let nativeTextView = textView as? ComposerNativeTextView
+      let updatedText = textView.string
+      expectsNativeBindingEcho = true
+      text.wrappedValue = updatedText
+      if let nativeTextView, nativeTextView.isVirtualizingLargeDocument {
+        onVirtualDocumentChange(
+          nativeTextView.documentStringForBinding(),
+          nativeTextView.documentUTF16Length,
+          nativeTextView.documentMetrics.hasNonWhitespace
+        )
+        metrics.wrappedValue =
+          nativeTextView.documentMetrics.boundedForVirtualDocumentPresentation
+      } else {
+        onVirtualDocumentChange(nil, nil, nil)
+        metrics.wrappedValue = ComposerTextMetrics(text: updatedText)
+      }
+    }
+
+    private func publishLargeDocumentMetrics(_ completedMetrics: ComposerTextMetrics) {
+      cancelPendingLargeDocumentPresentation()
+
+      metrics.wrappedValue = ComposerTextMetrics(
+        characterCount: 1,
+        hasLineBreak: false,
+        hasNonWhitespace: completedMetrics.hasNonWhitespace,
+        isImportingLargeDocument: false
+      )
+
+      let multilineMetrics = ComposerTextMetrics(
+        characterCount: 121,
+        hasLineBreak: completedMetrics.hasLineBreak,
+        hasNonWhitespace: completedMetrics.hasNonWhitespace,
+        isImportingLargeDocument: false
+      )
+      let expandedMultilineMetrics = ComposerTextMetrics(
+        characterCount: 799,
+        hasLineBreak: completedMetrics.hasLineBreak,
+        lineCount: 5,
+        hasNonWhitespace: completedMetrics.hasNonWhitespace,
+        isImportingLargeDocument: false
+      )
+      let documentMetrics = ComposerTextMetrics(
+        characterCount: 800,
+        formattedCharacterCount: completedMetrics.formattedCharacterCount,
+        hasLineBreak: completedMetrics.hasLineBreak,
+        hasNonWhitespace: completedMetrics.hasNonWhitespace,
+        isImportingLargeDocument: false
+      )
+
+      largeDocumentPresentationTask = Task { @MainActor [weak self] in
+        guard await Self.waitForPresentationTurn() else { return }
+        self?.metrics.wrappedValue = multilineMetrics
+
+        guard await Self.waitForPresentationTurn() else { return }
+        self?.metrics.wrappedValue = expandedMultilineMetrics
+
+        guard await Self.waitForPresentationTurn() else { return }
+        self?.metrics.wrappedValue = documentMetrics
+        self?.largeDocumentPresentationTask = nil
+      }
+    }
+
+    private func cancelPendingLargeDocumentPresentation() {
+      largeDocumentPresentationTask?.cancel()
+      largeDocumentPresentationTask = nil
+    }
+
+    private static func waitForPresentationTurn() async -> Bool {
+      do {
+        try await Task.sleep(for: .milliseconds(9))
+        return !Task.isCancelled
+      } catch {
+        return false
+      }
+    }
+  }
+}

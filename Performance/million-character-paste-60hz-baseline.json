@@ -1,0 +1,28 @@
+{
+  "applicationActivationObserved" : false,
+  "displayMaximumFramesPerSecond" : 60,
+  "displayRequirementSatisfied" : true,
+  "frameClock" : "background-deadline",
+  "inputCharacterCount" : 1000000,
+  "interactionCount" : 1,
+  "maximumFrameSampleIndex" : 1,
+  "maximumFrameTimeMilliseconds" : 17.190958373248577,
+  "meanFrameTimeMilliseconds" : 16.66661404735138,
+  "measuredFramesPerSecond" : 60.00018943013309,
+  "minimumMeasuredFramesPerSecond" : 59.4,
+  "missedFrameBudgetCount" : 0,
+  "missedFrameSampleIndices" : [
+
+  ],
+  "missedFrameSampleIndicesTruncated" : false,
+  "operationDurationMilliseconds" : 0.160708324983716,
+  "p95FrameTimeMilliseconds" : 16.689708339981735,
+  "p99FrameTimeMilliseconds" : 16.716000041924417,
+  "passed" : true,
+  "probeWindowBecameKey" : false,
+  "requiredFramesPerSecond" : 60,
+  "sampleCount" : 720,
+  "workload" : "Pasting a 1,000,000-character document into the native composer",
+  "workloadCompleted" : true,
+  "workloadCompletionSampleIndex" : 1
+}
