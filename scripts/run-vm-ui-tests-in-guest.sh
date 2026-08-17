@@ -133,7 +133,7 @@ if [[ "$swift_test_failed" == true ]]; then
 fi
 progress "swift-test-passed"
 
-/usr/bin/python3 "$project_dir/UITests/Fixtures/ui_e2e_stream_mock.py" \
+/usr/bin/python3 "$project_dir/UITests/Fixtures/e2e_scenario_server.py" \
   "$record_path" "$port_path" >"$server_log" 2>&1 &
 server_pid=$!
 trap '/bin/kill "$server_pid" 2>/dev/null || true' EXIT
