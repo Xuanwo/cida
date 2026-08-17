@@ -45,13 +45,42 @@ final class PairwiseManifestTests: XCTestCase {
     }
   }
 
+  func testPRGateIncludesEveryReleaseUITestSuite() throws {
+    let repositoryRoot = repositoryRoot()
+    let suiteDirectory = repositoryRoot.appendingPathComponent("UITests/CidaUITests")
+    let suiteNames = try FileManager.default.contentsOfDirectory(
+      at: suiteDirectory,
+      includingPropertiesForKeys: nil
+    )
+    .filter { $0.lastPathComponent.hasSuffix("Tests.swift") }
+    .map { $0.deletingPathExtension().lastPathComponent }
+    .sorted()
+    let gateSource = try String(
+      contentsOf: repositoryRoot.appendingPathComponent("scripts/e2e/run-gate.py"),
+      encoding: .utf8
+    )
+
+    XCTAssertFalse(suiteNames.isEmpty)
+    for suiteName in suiteNames {
+      XCTAssertTrue(
+        gateSource.contains("CidaUITests/\(suiteName)"),
+        "The PR gate does not execute \(suiteName)"
+      )
+    }
+  }
+
   private func loadManifest() throws -> PairwiseManifest {
-    let testDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repositoryRoot = testDirectory.deletingLastPathComponent().deletingLastPathComponent()
     let url =
-      repositoryRoot
+      repositoryRoot()
       .appendingPathComponent("UITests/Resources/Scenarios/pairwise-environment-v1.json")
     return try JSONDecoder().decode(PairwiseManifest.self, from: Data(contentsOf: url))
+  }
+
+  private func repositoryRoot() -> URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
   }
 }
 
