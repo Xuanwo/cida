@@ -33,7 +33,7 @@ comes from `CIDA_UI_TEST_APP_PATH`; Debug-only preview fixtures are not an E2E e
 | File | Contract |
 | --- | --- |
 | `CidaReleaseArtifactSmokeTests.swift` | signed artifact provenance and a production translation |
-| `ComposerJourneyTests.swift` | responder-chain typing, multiline growth/shrink, paste, submit, and Command-C precedence |
+| `ComposerJourneyTests.swift` | responder-chain typing, multiline growth/shrink, paste, submit, source-language-preserving improvement, and Command-C precedence |
 | `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, follow, reuse, cancel, failure, and recovery |
 | `HistoryAndScrollingJourneyTests.swift` | one outer scroll surface, Pencil thumb direction, detach, and reattach |
 | `HistoryPresentationJourneyTests.swift` | fold/expand, full copy, action geometry, streaming action policy, and sticky long-result action |

@@ -108,6 +108,21 @@
       "releaseTests": [
         "ComposerJourneyTests/testCommandCCopyPrecedenceCoversComposerSelectionAndLatestResult"
       ]
+    },
+    {
+      "id": "improvement-reuses-translation-source-language",
+      "description": "Reintroduce the selected translation source language into improvement runtime parameters.",
+      "contracts": ["CIDA-E2E-024", "PROMPT-PRESERVE-SOURCE"],
+      "file": "Sources/Cida/ModelPrompt.swift",
+      "before": "    case .improve:\n      languageBehavior = .preserveSource\n      sourceLanguage = nil\n      targetLanguage = nil",
+      "after": "    case .improve:\n      languageBehavior = .preserveSource\n      sourceLanguage = request.sourceLanguage\n      targetLanguage = nil",
+      "occurrences": 1,
+      "unitTests": [
+        "AppModelTests/testPromptBuilderSeparatesTypedParametersFromTheUserDocument"
+      ],
+      "releaseTests": [
+        "ComposerJourneyTests/testImprovementPreservesEnglishAndChineseSourceLanguages"
+      ]
     }
   ]
 }
