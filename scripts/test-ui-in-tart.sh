@@ -37,22 +37,60 @@ progress_log="$results_dir/vm-progress.log"
 host_before_path="$results_dir/host-session-before.json"
 host_after_path="$results_dir/host-session-after.json"
 host_guard_path="$results_dir/host-session-guard.json"
+host_monitor_path="$results_dir/host-session-observations.jsonl"
 if [[ ! -d "$project_dir" || ! -d "$results_dir" ]]; then
   echo "Tart directory shares must resolve to existing directories" >&2
   exit 66
 fi
 : >"$progress_log"
+: >"$host_monitor_path"
 host_progress() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1" >>"$progress_log"
+}
+host_monitor_pid=""
+host_monitor_healthy=false
+start_host_monitor() {
+  : >"$host_monitor_path"
+  "$project_dir/scripts/e2e/host-session-snapshot.swift" \
+    --monitor 0.1 "$artifact_root/Cida.app" "$shared_artifact_root/Cida.app" \
+    >"$host_monitor_path" &
+  host_monitor_pid=$!
+  for _ in {1..200}; do
+    [[ -s "$host_monitor_path" ]] && return 0
+    kill -0 "$host_monitor_pid" 2>/dev/null || return 1
+    /bin/sleep 0.05
+  done
+  return 1
+}
+stop_host_monitor() {
+  [[ -z "$host_monitor_pid" ]] && return 0
+  if kill -0 "$host_monitor_pid" 2>/dev/null; then
+    host_monitor_healthy=true
+    /bin/kill "$host_monitor_pid" 2>/dev/null || true
+    wait "$host_monitor_pid" 2>/dev/null || true
+  else
+    host_monitor_healthy=false
+  fi
+  host_monitor_pid=""
 }
 host_guard_finalized=false
 finalize_host_guard() {
   [[ "$host_guard_finalized" == true ]] && return 0
   host_guard_finalized=true
+  stop_host_monitor
   "$project_dir/scripts/e2e/host-session-snapshot.swift" >"$host_after_path"
-  if "$project_dir/scripts/e2e/compare-host-session.py" \
-    "$host_before_path" "$host_after_path" "$host_guard_path" \
+  guard_arguments=(
+    "$project_dir/scripts/e2e/compare-host-session.py"
+    "$host_before_path"
+    "$host_after_path"
+    "$host_guard_path"
     --clipboard-isolated
+    --monitor-observations "$host_monitor_path"
+  )
+  if [[ "$host_monitor_healthy" == true ]]; then
+    guard_arguments+=(--monitor-healthy)
+  fi
+  if "${guard_arguments[@]}"
   then
     host_progress "host-session-guard-passed"
     return 0
@@ -98,6 +136,12 @@ else
     >"$results_dir/release-artifact-build.log" 2>&1
   host_progress "host-release-artifact-build-finished"
 fi
+"$project_dir/scripts/e2e/host-session-snapshot.swift" >"$host_before_path"
+if ! start_host_monitor; then
+  echo "Host artifact monitor failed to start" >&2
+  exit 1
+fi
+host_progress "host-artifact-monitor-ready"
 
 run_vm=""
 run_pid=""
@@ -265,7 +309,7 @@ fi
 host_progress "host-staged-release-artifact-reverified"
 
 if ! finalize_host_guard; then
-  echo "Headless E2E changed the production Cida session or took host focus" >&2
+  echo "Headless E2E launched the exact artifact on the host or lost its isolation monitor" >&2
   exit 1
 fi
 

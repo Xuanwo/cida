@@ -19,9 +19,11 @@ does not launch Cida on the host, share the host pasteboard, or request host foc
 - Application assertion failures are never retried. Only a failed Tart boot may use one fresh
   clone retry.
 - Host snapshots record the frontmost app, pasteboard change count, and production Cida processes
-  before and after each Tart run. `--no-clipboard` is the isolation guarantee; the pasteboard count is
-  retained as a diagnostic so normal user copying during a long run is not misclassified as a test
-  mutation. A test Cida process left frontmost or a changed production process set fails the guard.
+  before and after each Tart run. A separate 100 ms monitor fails closed if either exact artifact copy
+  is launched or takes focus on the host. `--no-clipboard` is the pasteboard isolation guarantee;
+  frontmost-app, pasteboard, and production-Cida changes remain diagnostics so normal user activity
+  during a long run is not misclassified as a test mutation. A missing, dead, or discontinuous
+  monitor fails the run.
 
 The checked-in UI test host compiles the driver and assertions only. The app under test always
 comes from `CIDA_UI_TEST_APP_PATH`; Debug-only preview fixtures are not an E2E execution path.

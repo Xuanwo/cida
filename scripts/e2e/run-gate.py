@@ -85,12 +85,29 @@ class GateRun:
                         "frontmostApplicationChanged": payload.get(
                             "frontmostApplicationChanged"
                         ),
+                        "hostUserActivityObserved": payload.get(
+                            "hostUserActivityObserved"
+                        ),
                         "pasteboardUnchanged": payload.get("pasteboardUnchanged"),
                         "clipboardIsolationEnforced": payload.get(
                             "clipboardIsolationEnforced"
                         ),
                         "productionCidaProcessesUnchanged": payload.get(
                             "productionCidaProcessesUnchanged"
+                        ),
+                        "monitorHealthy": payload.get("monitorHealthy"),
+                        "monitorSampleCount": payload.get("monitorSampleCount"),
+                        "monitorCoverageComplete": payload.get(
+                            "monitorCoverageComplete"
+                        ),
+                        "monitorMaximumGapMilliseconds": payload.get(
+                            "monitorMaximumGapMilliseconds"
+                        ),
+                        "testArtifactProcessObserved": payload.get(
+                            "testArtifactProcessObserved"
+                        ),
+                        "testArtifactFrontmostObserved": payload.get(
+                            "testArtifactFrontmostObserved"
                         ),
                     }
                 )
