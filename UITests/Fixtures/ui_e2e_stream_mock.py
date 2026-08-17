@@ -32,7 +32,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         messages = record["body"].get("messages", [])
         submitted_text = messages[-1].get("content", "") if messages else ""
-        if submitted_text == "CIDA_CONTINUITY_FIRST":
+        if submitted_text == "CIDA_STALE_PIXEL_PROBE":
+            response_chunks = ["CIDA_STALE_PIXEL_PROBE_COMPLETE"]
+            initial_delay = 10.0
+        elif submitted_text == "CIDA_CONTINUITY_FIRST":
             response_chunks = [*default_response_chunks[:-1], "CIDA_UI_E2E_COMPLETE_FIRST"]
             initial_delay = 3.0
         elif submitted_text == "CIDA_CONTINUITY_SECOND":

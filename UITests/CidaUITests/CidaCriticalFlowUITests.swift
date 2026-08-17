@@ -327,6 +327,56 @@ final class CidaCriticalFlowUITests: XCTestCase {
     XCTAssertTrue(firstSubmittedResult.waitForNonExistence(timeout: 2))
   }
 
+  func testNewSubmissionClearsReusedResultPixelsBeforeFirstByte() throws {
+    continueAfterFailure = false
+
+    launchApp(arguments: ["--ui-testing", "--ui-testing-scenario", "history-continuity"])
+    let endpoint = try localOpenAIEndpoint()
+    configureOpenAI(endpoint: endpoint)
+
+    let history = app.scrollViews["history-scroll-view"]
+    let composer = app.textViews["composer-input"]
+    let submitButton = app.buttons["composer-submit-button"]
+    XCTAssertTrue(history.waitForExistence(timeout: 5))
+    XCTAssertTrue(composer.waitForExistence(timeout: 5))
+    XCTAssertTrue(submitButton.waitForExistence(timeout: 5))
+
+    let previousEntryIdentifiers = historyEntryIdentifiers()
+    paste("CIDA_STALE_PIXEL_PROBE", into: composer)
+    submitButton.click()
+    XCTAssertTrue(waitForLabel("停止生成", in: submitButton, timeout: 2))
+
+    let newEntryIdentifier = try XCTUnwrap(
+      waitForNewHistoryEntry(excluding: previousEntryIdentifiers, timeout: 3),
+      "Submitting must materialize a new current history entry before the first response byte"
+    )
+    let entryID = String(newEntryIdentifier.dropFirst("history-entry-".count))
+    let result = app.textViews["history-result-\(entryID.uppercased())"]
+    XCTAssertTrue(result.waitForExistence(timeout: 2))
+    XCTAssertEqual(result.value as? String, "")
+
+    XCTContext.runActivity(named: "The new result is visibly empty before the first byte") {
+      activity in
+      let screenshot = result.screenshot()
+      let attachment = XCTAttachment(screenshot: screenshot)
+      attachment.name = "CIDA-E2E-010 new result before first byte"
+      attachment.lifetime = .keepAlways
+      activity.add(attachment)
+
+      let staleNeutralInkPixels = neutralDarkPixelCount(
+        in: screenshot,
+        logicalWidth: result.frame.width,
+        topPoints: 64
+      )
+      XCTAssertLessThanOrEqual(
+        staleNeutralInkPixels,
+        24,
+        "The Accessibility value is empty, but the compositor still exposes "
+          + "\(staleNeutralInkPixels) neutral text pixels from the recycled result layer"
+      )
+    }
+  }
+
   func testHistoryFoldingFocusExpansionAndFullCopyContract() {
     continueAfterFailure = false
     launchApp(arguments: ["--ui-testing", "--ui-testing-scenario", "history-folding"])
@@ -752,6 +802,61 @@ final class CidaCriticalFlowUITests: XCTestCase {
         count += 1
       }
     }
+  }
+
+  private func historyEntryIdentifiers() -> Set<String> {
+    let entries = app.descendants(matching: .any).matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "history-entry-")
+    )
+    return Set(entries.allElementsBoundByIndex.map(\.identifier))
+  }
+
+  private func waitForNewHistoryEntry(
+    excluding existingIdentifiers: Set<String>,
+    timeout: TimeInterval
+  ) -> String? {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if let identifier = historyEntryIdentifiers().first(where: {
+        !existingIdentifiers.contains($0)
+      }) {
+        return identifier
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    } while Date() < deadline
+    return nil
+  }
+
+  private func neutralDarkPixelCount(
+    in screenshot: XCUIScreenshot,
+    logicalWidth: CGFloat,
+    topPoints: CGFloat
+  ) -> Int {
+    guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation) else {
+      XCTFail("Could not decode the result screenshot")
+      return .max
+    }
+
+    let scale = CGFloat(bitmap.pixelsWide) / max(1, logicalWidth)
+    let maximumY = min(bitmap.pixelsHigh, max(1, Int(ceil(topPoints * scale))))
+    var count = 0
+    for y in 0..<maximumY {
+      for x in 0..<bitmap.pixelsWide {
+        guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+          continue
+        }
+        let channels = [color.redComponent, color.greenComponent, color.blueComponent]
+        let maximumChannel = channels.max() ?? 1
+        let minimumChannel = channels.min() ?? 0
+        if color.alphaComponent > 0.5
+          && maximumChannel < 0.82
+          && maximumChannel - minimumChannel < 0.08
+        {
+          count += 1
+        }
+      }
+    }
+    return count
   }
 
   private func element(identifier: String) -> XCUIElement {
