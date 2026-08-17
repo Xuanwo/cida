@@ -678,6 +678,8 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   func testRecycledFoldedHistoryRowDoesNotLeakHoverActions() throws {
+    var redoCount = 0
+    var copyCount = 0
     let row = FoldedHistoryEntryNSView()
     row.frame = NSRect(x: 0, y: 0, width: 720, height: 100)
     row.configure(
@@ -688,8 +690,8 @@ final class InteractionReproductionTests: XCTestCase {
       previewNeedsFade: false,
       state: .completed,
       onExpand: {},
-      onRedo: {},
-      onCopyResult: {}
+      onRedo: { redoCount += 1 },
+      onCopyResult: { copyCount += 1 }
     )
     let entered = try XCTUnwrap(
       NSEvent.mouseEvent(
@@ -714,6 +716,21 @@ final class InteractionReproductionTests: XCTestCase {
       (row.accessibilityChildren() ?? []).compactMap { $0 as? NSButton }.count,
       2
     )
+    let accessibilityButtons = (row.accessibilityChildren() ?? [])
+      .compactMap { $0 as? NSButton }
+    XCTAssertTrue(accessibilityButtons.allSatisfy { $0.accessibilityRole() == .button })
+    XCTAssertTrue(accessibilityButtons.allSatisfy { !($0.accessibilityLabel() ?? "").isEmpty })
+    XCTAssertTrue(accessibilityButtons.allSatisfy { !($0.accessibilityHelp() ?? "").isEmpty })
+    XCTAssertTrue(
+      accessibilityButtons.allSatisfy {
+        $0.image?.accessibilityDescription == $0.accessibilityLabel()
+      }
+    )
+    for button in accessibilityButtons {
+      XCTAssertTrue(button.accessibilityPerformPress())
+    }
+    XCTAssertEqual(redoCount, 1)
+    XCTAssertEqual(copyCount, 1)
 
     row.prepareForReuse()
 

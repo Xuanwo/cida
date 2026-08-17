@@ -789,6 +789,12 @@ class FoldedHistoryActionButton: NSButton {
     setHovering(false)
   }
 
+  override func accessibilityPerformPress() -> Bool {
+    guard isEnabled, !isHidden else { return false }
+    performClick(nil)
+    return true
+  }
+
   func setFeedbackTint(_ color: NSColor?) {
     usesFeedbackTint = color != nil
     if let color {
@@ -1555,14 +1561,24 @@ final class FoldedHistoryEntryNSView: NSControl {
     action: Selector
   ) -> FoldedHistoryActionButton {
     let button = FoldedHistoryActionButton(frame: .zero)
-    button.iconImage = LucideIconAsset.image(for: icon)
     button.target = self
     button.action = action
     button.normalTintColor = Self.tertiaryTextColor
     button.hoverTintColor = Self.secondaryTextColor
-    button.setAccessibilityLabel(label)
+    button.setAccessibilityElement(true)
+    button.setAccessibilityRole(.button)
+    let accessibilityDescription =
+      label == "重新处理"
+      ? "重新处理这条历史记录"
+      : "复制这条历史记录的完整结果"
+    let describedIcon = LucideIconAsset.image(for: icon)?.copy() as? NSImage
+    describedIcon?.isTemplate = true
+    describedIcon?.accessibilityDescription = accessibilityDescription
+    button.image = describedIcon
+    button.iconImage = describedIcon
+    button.setAccessibilityLabel(accessibilityDescription)
+    button.setAccessibilityHelp(accessibilityDescription)
     button.setAccessibilityIdentifier(identifier)
-    button.setAccessibilityValue("idle")
     return button
   }
 
@@ -1577,8 +1593,7 @@ final class FoldedHistoryEntryNSView: NSControl {
     copyResetWorkItem?.cancel()
     (sender as? FoldedHistoryActionButton)?.iconImage = LucideIconAsset.image(for: .check)
     (sender as? FoldedHistoryActionButton)?.setFeedbackTint(Self.accentColor)
-    sender.setAccessibilityLabel("已复制结果")
-    sender.setAccessibilityValue("copied")
+    sender.setAccessibilityLabel("已复制这条历史记录的完整结果")
     let entryID = self.entryID
     let workItem = DispatchWorkItem { [weak self] in
       guard let self, self.entryID == entryID else { return }
@@ -1592,7 +1607,6 @@ final class FoldedHistoryEntryNSView: NSControl {
   private func resetCopyFeedback() {
     copyButton?.iconImage = LucideIconAsset.image(for: .copy)
     copyButton?.setFeedbackTint(nil)
-    copyButton?.setAccessibilityLabel("复制结果")
-    copyButton?.setAccessibilityValue("idle")
+    copyButton?.setAccessibilityLabel("复制这条历史记录的完整结果")
   }
 }
