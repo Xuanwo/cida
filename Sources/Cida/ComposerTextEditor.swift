@@ -282,7 +282,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     var onSubmit: @MainActor () -> Bool
     var onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
     private var expectsNativeBindingEcho = false
-    private var largeDocumentPresentationTask: Task<Void, Never>?
 
     init(
       text: Binding<String>,
@@ -345,7 +344,6 @@ struct ComposerTextEditor: NSViewRepresentable {
         return false
       }
       if onSubmit() {
-        cancelPendingLargeDocumentPresentation()
         (textView as? ComposerNativeTextView)?.replaceDocumentFromBinding("")
         onVirtualDocumentChange(nil, nil, nil)
         text.wrappedValue = ""
@@ -363,12 +361,10 @@ struct ComposerTextEditor: NSViewRepresentable {
       guard revision != lastResetRevision else { return false }
       lastResetRevision = revision
       expectsNativeBindingEcho = false
-      cancelPendingLargeDocumentPresentation()
       return true
     }
 
     func publishMetrics(for text: String) {
-      cancelPendingLargeDocumentPresentation()
       let updatedMetrics = ComposerTextMetrics(text: text)
       guard metrics.wrappedValue != updatedMetrics else { return }
       Task { @MainActor [weak self] in
@@ -377,7 +373,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     private func synchronizeText(from textView: NSTextView) {
-      cancelPendingLargeDocumentPresentation()
       consumeResetsBeforeNativeEdit()
       let nativeTextView = textView as? ComposerNativeTextView
       let updatedText = textView.string
@@ -402,42 +397,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     private func publishLargeDocumentMetrics(_ completedMetrics: ComposerTextMetrics) {
-      cancelPendingLargeDocumentPresentation()
-
-      metrics.wrappedValue = completedMetrics.presented(as: .compact)
-      let multilineMetrics = completedMetrics.presented(
-        as: .multiline(visibleLineCount: 2)
-      )
-      let expandedMultilineMetrics = completedMetrics.presented(
-        as: .multiline(visibleLineCount: 5)
-      )
-      let documentMetrics = completedMetrics.presented(as: .document)
-
-      largeDocumentPresentationTask = Task { @MainActor [weak self] in
-        guard await Self.waitForPresentationTurn() else { return }
-        self?.metrics.wrappedValue = multilineMetrics
-
-        guard await Self.waitForPresentationTurn() else { return }
-        self?.metrics.wrappedValue = expandedMultilineMetrics
-
-        guard await Self.waitForPresentationTurn() else { return }
-        self?.metrics.wrappedValue = documentMetrics
-        self?.largeDocumentPresentationTask = nil
-      }
-    }
-
-    private func cancelPendingLargeDocumentPresentation() {
-      largeDocumentPresentationTask?.cancel()
-      largeDocumentPresentationTask = nil
-    }
-
-    private static func waitForPresentationTurn() async -> Bool {
-      do {
-        try await Task.sleep(for: .milliseconds(9))
-        return !Task.isCancelled
-      } catch {
-        return false
-      }
+      metrics.wrappedValue = completedMetrics.presented(as: .document)
     }
   }
 }

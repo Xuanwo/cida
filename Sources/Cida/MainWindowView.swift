@@ -41,6 +41,7 @@ struct MainWindowView: View {
   let automaticallyFocusInput: Bool
   let animatesHistoryTransitions: Bool
   let openSettings: @MainActor () -> Void
+  @State private var composerMetrics: ComposerTextMetrics
 
   init(
     model: AppModel,
@@ -52,6 +53,7 @@ struct MainWindowView: View {
     self.automaticallyFocusInput = automaticallyFocusInput
     self.animatesHistoryTransitions = animatesHistoryTransitions
     self.openSettings = openSettings
+    _composerMetrics = State(initialValue: ComposerTextMetrics(text: model.inputText))
   }
 
   var body: some View {
@@ -70,13 +72,21 @@ struct MainWindowView: View {
             .padding(
               .bottom,
               Self.compactComposerHeight
-                + composerHeightDelta(availableHeight: geometry.size.height)
+                + composerHeightDelta(
+                  for: composerMetrics,
+                  availableHeight: geometry.size.height
+                )
+            )
+            .animation(
+              .easeOut(duration: CidaMotion.heightSeconds),
+              value: composerMetrics.presentationState
             )
 
             Composer(
               model: model,
               automaticallyFocusInput: automaticallyFocusInput,
-              availableHeight: geometry.size.height
+              availableHeight: geometry.size.height,
+              inputMetrics: $composerMetrics
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
           }
@@ -103,8 +113,10 @@ struct MainWindowView: View {
 
   private static let compactComposerHeight: CGFloat = 101
 
-  private func composerHeightDelta(availableHeight: CGFloat) -> CGFloat {
-    let metrics = ComposerTextMetrics(text: model.inputText)
+  private func composerHeightDelta(
+    for metrics: ComposerTextMetrics,
+    availableHeight: CGFloat
+  ) -> CGFloat {
     let editorHeight = ComposerLayout.editorHeight(
       for: metrics,
       availableHeight: availableHeight
@@ -1552,17 +1564,18 @@ private struct Composer: View {
   let automaticallyFocusInput: Bool
   let availableHeight: CGFloat
   @FocusState private var isInputFocused: Bool
-  @State private var inputMetrics: ComposerTextMetrics
+  @Binding var inputMetrics: ComposerTextMetrics
 
   init(
     model: AppModel,
     automaticallyFocusInput: Bool,
-    availableHeight: CGFloat
+    availableHeight: CGFloat,
+    inputMetrics: Binding<ComposerTextMetrics>
   ) {
     self.model = model
     self.automaticallyFocusInput = automaticallyFocusInput
     self.availableHeight = availableHeight
-    _inputMetrics = State(initialValue: ComposerTextMetrics(text: model.inputText))
+    _inputMetrics = inputMetrics
   }
 
   var body: some View {
@@ -1595,6 +1608,10 @@ private struct Composer: View {
       }
       .frame(maxWidth: .infinity)
       .frame(height: editorHeight(for: inputMetrics))
+      .animation(
+        .easeOut(duration: CidaMotion.heightSeconds),
+        value: inputMetrics.presentationState
+      )
 
       HStack(spacing: 12) {
         HStack(spacing: 8) {

@@ -2351,6 +2351,13 @@ final class InteractionReproductionTests: XCTestCase {
     hostingView.layoutSubtreeIfNeeded()
     XCTAssertEqual(model.inputText, largeInput)
     let inputScrollView = try XCTUnwrap(input.enclosingScrollView)
+    let intermediateEditorHeight = inputScrollView.frame.height
+    XCTAssertGreaterThan(intermediateEditorHeight, 27)
+    XCTAssertLessThan(intermediateEditorHeight, 220)
+    try await waitUntil(timeout: .seconds(1)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return inputScrollView.frame.height >= 150
+    }
     XCTAssertFalse(inputScrollView.hasVerticalScroller)
     XCTAssertFalse(CidaScrollIndicator.installed(in: inputScrollView)?.isHidden ?? true)
     let editorHeight = try XCTUnwrap(input.enclosingScrollView?.frame.height)
@@ -2393,6 +2400,24 @@ final class InteractionReproductionTests: XCTestCase {
       size: CGSize(width: 860, height: 640)
     )
     let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
+    let inputScrollView = try XCTUnwrap(input.enclosingScrollView)
+    let historyScrollView = try XCTUnwrap(
+      allScrollViews(in: hostingView).first {
+        $0.accessibilityIdentifier() == "history-scroll-view"
+      }
+    )
+
+    func assertComposerDoesNotCoverHistory(file: StaticString = #filePath, line: UInt = #line) {
+      let inputFrame = inputScrollView.convert(inputScrollView.bounds, to: hostingView)
+      let historyFrame = historyScrollView.convert(historyScrollView.bounds, to: hostingView)
+      XCTAssertLessThanOrEqual(
+        inputFrame.intersection(historyFrame).height,
+        0.5,
+        "The history viewport and composer must use the same presentation state.",
+        file: file,
+        line: line
+      )
+    }
 
     let threeLines = "First line\nSecond line\nThird line"
     input.insertText(threeLines, replacementRange: NSRange(location: 0, length: 0))
@@ -2402,6 +2427,7 @@ final class InteractionReproductionTests: XCTestCase {
         && abs((input.enclosingScrollView?.frame.height ?? 0) - 94) <= 0.5
     }
     XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 94, accuracy: 0.5)
+    assertComposerDoesNotCoverHistory()
 
     let thirdLineRange = (input.string as NSString).range(of: "\nThird line")
     input.insertText("", replacementRange: thirdLineRange)
@@ -2412,6 +2438,7 @@ final class InteractionReproductionTests: XCTestCase {
         && abs((input.enclosingScrollView?.frame.height ?? 0) - 68) <= 0.5
     }
     XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 68, accuracy: 0.5)
+    assertComposerDoesNotCoverHistory()
 
     let secondLineRange = (input.string as NSString).range(of: "\nSecond line")
     input.insertText("", replacementRange: secondLineRange)
@@ -2421,6 +2448,7 @@ final class InteractionReproductionTests: XCTestCase {
         && abs((input.enclosingScrollView?.frame.height ?? 0) - 27) <= 0.5
     }
     XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 27, accuracy: 0.5)
+    assertComposerDoesNotCoverHistory()
 
     input.insertText(
       "",
@@ -2432,6 +2460,7 @@ final class InteractionReproductionTests: XCTestCase {
         && abs((input.enclosingScrollView?.frame.height ?? 0) - 27) <= 0.5
     }
     XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 27, accuracy: 0.5)
+    assertComposerDoesNotCoverHistory()
     assertTestProcessIsNotFrontmost()
     withExtendedLifetime(window) {}
   }
@@ -2807,7 +2836,7 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
-  func testImmediateLargeDocumentSubmissionCancelsStagedComposerExpansion() async throws {
+  func testImmediateLargeDocumentSubmissionKeepsComposerCompact() async throws {
     let model = AppModel(
       inputText: "",
       entries: [],
