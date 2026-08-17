@@ -976,7 +976,7 @@ final class AppModel {
     entry.isLatestInHistory = false
     automaticFoldCleanupTask?.cancel()
     automaticFoldCleanupTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(250))
+      try? await Task.sleep(for: .milliseconds(CidaMotion.historyFoldMilliseconds))
       guard !Task.isCancelled, self?.automaticallyFoldingHistoryEntryID == entry.id else {
         return
       }

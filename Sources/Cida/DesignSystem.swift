@@ -6,14 +6,31 @@ enum CidaDesign {
   static let background = Color(hex: 0xFAFAF8)
   static let surface = Color.white
   static let surfaceDim = Color(hex: 0xF4F4F1)
+  static let surfaceFold = Color(hex: 0xF1F1EC)
   static let border = Color(hex: 0xE8E8E3)
   static let textPrimary = Color(hex: 0x1A1A18)
   static let textSecondary = Color(hex: 0x8A8A83)
   static let textTertiary = Color(hex: 0xB5B5AE)
   static let accent = Color(hex: 0x2E6B4F)
   static let accentSoft = Color(hex: 0xEAF2EE)
+  static let accentForeground = Color.white
   static let toggleOff = Color(hex: 0xDBDBD5)
-  static let windowRadius: CGFloat = 14
+
+  enum Radius {
+    static let window: CGFloat = 14
+    static let card: CGFloat = 8
+    static let segment: CGFloat = 7
+    static let chip: CGFloat = 6
+    static let segmentItem: CGFloat = 5
+  }
+
+  enum Spacing {
+    static let windowHorizontal: CGFloat = 28
+    static let entryVertical: CGFloat = 16
+    static let component: CGFloat = 12
+  }
+
+  static let windowRadius = Radius.window
 
   static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
     .system(size: size, weight: weight)
@@ -53,6 +70,34 @@ enum CidaDesign {
     if weight == .bold { return "Inter-Bold" }
     return "Inter-Regular"
   }
+}
+
+enum CidaMotion {
+  static let characterInMilliseconds = 120
+  static let iconInMilliseconds = 120
+  static let iconSwapMilliseconds = 150
+  static let heightMilliseconds = 150
+  static let cursorOutMilliseconds = 200
+  static let historyFoldMilliseconds = 200
+  static let copiedHoldMilliseconds = 800
+  static let breatheMilliseconds = 1_200
+  static let catchUpMilliseconds = 400
+
+  static let characterInSeconds: CFTimeInterval = 0.120
+  static let iconInSeconds: Double = 0.120
+  static let iconSwapSeconds: Double = 0.150
+  static let heightSeconds: Double = 0.150
+  static let cursorOutSeconds: CFTimeInterval = 0.200
+  static let historyFoldSeconds: Double = 0.200
+  static let breatheHalfCycleSeconds: CFTimeInterval = 0.600
+
+  static let minimumCharactersPerSecond = 30.0
+  static let maximumCharactersPerSecond = 400.0
+  static let smoothingAlphaPer120HzFrame = 0.15
+  static let characterBlurRadius: CGFloat = 2
+  static let cursorMinimumOpacity: Float = 0.3
+  static let cursorWidth: CGFloat = 2
+  static let cursorHeight: CGFloat = 20
 }
 
 extension Color {

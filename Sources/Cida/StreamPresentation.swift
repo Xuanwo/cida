@@ -15,11 +15,11 @@ struct StreamPresentationPolicy: Equatable, Sendable {
   static let production = StreamPresentationPolicy(
     initialBufferingDuration: .milliseconds(84),
     updateInterval: .milliseconds(8),
-    targetCatchUpDurationSeconds: 0.4,
-    minimumCharactersPerSecond: 30,
-    maximumCharactersPerSecond: 400,
-    smoothingAlphaPer120HzFrame: 0.15,
-    minimumPresentationIntervalSeconds: 1 / 30,
+    targetCatchUpDurationSeconds: Double(CidaMotion.catchUpMilliseconds) / 1_000,
+    minimumCharactersPerSecond: CidaMotion.minimumCharactersPerSecond,
+    maximumCharactersPerSecond: CidaMotion.maximumCharactersPerSecond,
+    smoothingAlphaPer120HzFrame: CidaMotion.smoothingAlphaPer120HzFrame,
+    minimumPresentationIntervalSeconds: 1 / 120,
     maximumGraphemeClustersPerUpdate: 8,
     synchronizesUpdatesToDisplay: true
   )

@@ -25,14 +25,14 @@ private enum ComposerLayout {
     for metrics: ComposerTextMetrics,
     availableHeight: CGFloat
   ) -> CGFloat {
-    if metrics.isDocument {
+    switch metrics.presentationState {
+    case .compact:
+      return 27
+    case .document:
       return min(220, max(150, availableHeight * 0.275))
+    case .multiline(let visibleLineCount):
+      return CGFloat(min(5, max(2, visibleLineCount)) * 26 + 16)
     }
-
-    guard metrics.usesMultilineEditor else { return 27 }
-    let wrappedLineCount = max(1, Int(ceil(Double(metrics.characterCount) / 90)))
-    let visibleLineCount = min(5, max(metrics.lineCount, wrappedLineCount))
-    return CGFloat(visibleLineCount * 26 + 16)
   }
 }
 
@@ -619,7 +619,7 @@ private struct HistoryEntryView: View {
         return
       }
       if animatesTransitions, !accessibilityReduceMotion {
-        try? await Task.sleep(for: .milliseconds(200))
+        try? await Task.sleep(for: .milliseconds(CidaMotion.historyFoldMilliseconds))
       }
       guard !Task.isCancelled else { return }
       retainsAutomaticallyExpandedBody = false
@@ -707,7 +707,7 @@ private struct HistoryEntryView: View {
           .transition(.opacity)
         }
       }
-      .animation(.easeOut(duration: 0.12), value: actionsAreVisible)
+      .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
 
       HStack(alignment: .top, spacing: HistoryEntryPencilLayout.actionGap) {
         ZStack(alignment: .bottom) {
@@ -739,7 +739,7 @@ private struct HistoryEntryView: View {
           .transition(.opacity)
         }
       }
-      .animation(.easeOut(duration: 0.12), value: actionsAreVisible)
+      .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
 
       if renderingStage >= 1 {
         expandedResult
@@ -850,7 +850,7 @@ private struct HistoryEntryView: View {
         .transition(.opacity)
       }
     }
-    .animation(.easeOut(duration: 0.12), value: showsResultCopyAction)
+    .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: showsResultCopyAction)
   }
 
   @ViewBuilder
@@ -872,7 +872,7 @@ private struct HistoryEntryView: View {
 
   private var historyTransitionAnimation: Animation? {
     guard animatesTransitions, !accessibilityReduceMotion else { return nil }
-    return .easeOut(duration: 0.2)
+    return .easeOut(duration: CidaMotion.historyFoldSeconds)
   }
 
   private static func initialRenderingStage(for entry: HistoryEntry) -> Int {
@@ -912,7 +912,7 @@ private struct HistoryEntryView: View {
     copyResetTask?.cancel()
     copiedAction = action
     copyResetTask = Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(800))
+      try? await Task.sleep(for: .milliseconds(CidaMotion.copiedHoldMilliseconds))
       guard !Task.isCancelled, copiedAction == action else { return }
       copiedAction = nil
       copyResetTask = nil
@@ -1605,7 +1605,7 @@ private struct Composer: View {
         Spacer(minLength: 8)
 
         HStack(spacing: 12) {
-          if inputMetrics.isDocument {
+          if inputMetrics.presentationState.showsDocumentChrome {
             Text("\(inputMetrics.formattedCharacterCount) 字")
               .font(CidaDesign.mainUI(11.5))
               .foregroundStyle(CidaDesign.textTertiary)
@@ -1640,7 +1640,7 @@ private struct Composer: View {
                 .opacity(model.isProcessing ? 0 : 1)
             }
             .frame(width: 30, height: 30)
-            .animation(.easeOut(duration: 0.15), value: model.isProcessing)
+            .animation(.easeOut(duration: CidaMotion.iconSwapSeconds), value: model.isProcessing)
           }
           .buttonStyle(HoverFadeButtonStyle())
           .disabled(
@@ -1718,7 +1718,7 @@ private final class HistoryScrollTrackingNSView: NSView {
   var onEndLiveScroll: (@MainActor () -> Void)?
   private weak var observedScrollView: NSScrollView?
   private weak var observedDocumentView: NSView?
-  private var followsBottom = true
+  private var followState = HistoryFollowState.followingBottom
   private var isFollowScheduled = false
   private var lastFollowRevision: Int?
   private var lastForcePinRevision: Int?
@@ -1765,7 +1765,7 @@ private final class HistoryScrollTrackingNSView: NSView {
       name: NSView.frameDidChangeNotification,
       object: documentView
     )
-    if followsBottom {
+    if followState == .followingBottom {
       scheduleFollowToBottom()
     }
     updateAccessibilityState()
@@ -1774,7 +1774,7 @@ private final class HistoryScrollTrackingNSView: NSView {
   func forceFollowToBottom(revision: Int) {
     guard revision != lastForcePinRevision else { return }
     lastForcePinRevision = revision
-    followsBottom = true
+    followState = .followingBottom
     updateAccessibilityState()
     scheduleFollowToBottom()
   }
@@ -1782,7 +1782,7 @@ private final class HistoryScrollTrackingNSView: NSView {
   func followContentGrowth(revision: Int) {
     guard revision != lastFollowRevision else { return }
     lastFollowRevision = revision
-    guard followsBottom else { return }
+    guard followState == .followingBottom else { return }
     scheduleFollowToBottom()
   }
 
@@ -1798,7 +1798,7 @@ private final class HistoryScrollTrackingNSView: NSView {
 
   @objc
   private func documentFrameDidChange(_ notification: Notification) {
-    guard followsBottom else { return }
+    guard followState == .followingBottom else { return }
     scheduleFollowToBottom()
   }
 
@@ -1811,8 +1811,9 @@ private final class HistoryScrollTrackingNSView: NSView {
       documentView.isFlipped
       ? visibleRect.maxY >= documentView.bounds.maxY - 24
       : visibleRect.minY <= documentView.bounds.minY + 24
-    guard isPinned != followsBottom else { return }
-    followsBottom = isPinned
+    let nextState: HistoryFollowState = isPinned ? .followingBottom : .detached
+    guard nextState != followState else { return }
+    followState = nextState
     updateAccessibilityState()
   }
 
@@ -1822,7 +1823,7 @@ private final class HistoryScrollTrackingNSView: NSView {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.isFollowScheduled = false
-      guard self.followsBottom else { return }
+      guard self.followState == .followingBottom else { return }
       self.scrollToBottom()
     }
   }
@@ -1843,7 +1844,7 @@ private final class HistoryScrollTrackingNSView: NSView {
   }
 
   private func updateAccessibilityState() {
-    let state = followsBottom ? "bottom" : "detached"
+    let state = followState == .followingBottom ? "bottom" : "detached"
     guard state != lastAccessibilityState else { return }
     lastAccessibilityState = state
     observedScrollView?.setAccessibilityValue(state)

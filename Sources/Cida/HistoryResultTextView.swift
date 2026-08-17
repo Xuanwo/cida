@@ -326,7 +326,7 @@ struct StreamGlyphFadeStyle: Equatable, Sendable {
 }
 
 enum StreamGlyphFadeAnimation {
-  static let duration: CFTimeInterval = 0.12
+  static let duration = CidaMotion.characterInSeconds
 
   static func style(elapsed: CFTimeInterval) -> StreamGlyphFadeStyle {
     let progress = min(1, max(0, elapsed / duration))
@@ -617,7 +617,7 @@ final class HistoryResultTextContainer: NSView {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = caretLayer.presentation()?.opacity ?? caretLayer.opacity
         fade.toValue = 0
-        fade.duration = 0.2
+        fade.duration = CidaMotion.cursorOutSeconds
         caretLayer.add(fade, forKey: "completion-fade")
         caretLayer.opacity = 0
       }
@@ -803,9 +803,9 @@ final class HistoryResultTextContainer: NSView {
       && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     if shouldPulse, caretLayer.animation(forKey: "waiting-pulse") == nil {
       let pulse = CABasicAnimation(keyPath: "opacity")
-      pulse.fromValue = 0.3
+      pulse.fromValue = CidaMotion.cursorMinimumOpacity
       pulse.toValue = 1
-      pulse.duration = 0.6
+      pulse.duration = CidaMotion.breatheHalfCycleSeconds
       pulse.autoreverses = true
       pulse.repeatCount = .infinity
       pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)

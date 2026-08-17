@@ -343,7 +343,7 @@ final class AppModelTests: XCTestCase {
     }
   }
 
-  func testProductionPresenterKeepsTextKitMutationsAtThirtyHertzOnA120HertzDisplay() async {
+  func testProductionPresenterConsumesTheBufferOnEvery120HertzDisplayFrame() async {
     var publishedDeltas: [String] = []
     let presenter = SmoothStreamPresenter(policy: .production) { delta in
       publishedDeltas.append(delta)
@@ -356,13 +356,50 @@ final class AppModelTests: XCTestCase {
     }
     try? await Task.sleep(for: .milliseconds(1))
 
-    XCTAssertEqual(publishedDeltas.count, 30)
+    XCTAssertEqual(publishedDeltas.count, 120)
     XCTAssertTrue(
       publishedDeltas.allSatisfy {
         $0.count <= StreamPresentationPolicy.production.maximumGraphemeClustersPerUpdate
       }
     )
     XCTAssertGreaterThan(publishedDeltas.joined().count, 200)
+  }
+
+  func testPencilMotionTokensDriveTheProductionStreamPolicy() {
+    let policy = StreamPresentationPolicy.production
+
+    XCTAssertEqual(policy.targetCatchUpDurationSeconds, 0.4)
+    XCTAssertEqual(policy.minimumCharactersPerSecond, CidaMotion.minimumCharactersPerSecond)
+    XCTAssertEqual(policy.maximumCharactersPerSecond, CidaMotion.maximumCharactersPerSecond)
+    XCTAssertEqual(
+      policy.smoothingAlphaPer120HzFrame,
+      CidaMotion.smoothingAlphaPer120HzFrame
+    )
+    XCTAssertEqual(policy.minimumPresentationIntervalSeconds, 1 / 120)
+    XCTAssertEqual(StreamGlyphFadeAnimation.duration, CidaMotion.characterInSeconds)
+  }
+
+  func testComposerPresentationStateDoesNotReplaceTheTrueDocumentMetrics() {
+    let metrics = ComposerTextMetrics(
+      characterCount: 1_000_000,
+      formattedCharacterCount: "1,000,000",
+      hasLineBreak: true,
+      lineCount: 8_000,
+      hasNonWhitespace: true,
+      isImportingLargeDocument: false
+    )
+
+    let compactPresentation = metrics.presented(as: .compact)
+    let multilinePresentation = metrics.presented(as: .multiline(visibleLineCount: 5))
+
+    XCTAssertEqual(compactPresentation.characterCount, 1_000_000)
+    XCTAssertEqual(compactPresentation.formattedCharacterCount, "1,000,000")
+    XCTAssertEqual(compactPresentation.presentationState, .compact)
+    XCTAssertEqual(multilinePresentation.characterCount, 1_000_000)
+    XCTAssertEqual(
+      multilinePresentation.presentationState,
+      .multiline(visibleLineCount: 5)
+    )
   }
 
   func testHistoryMetadataTransitionsFromGeneratingToCompletedCounts() {

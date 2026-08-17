@@ -8,8 +8,13 @@ struct ComposerTextMetrics: Equatable, Sendable {
   let lineCount: Int
   let hasNonWhitespace: Bool
   let isImportingLargeDocument: Bool
+  let presentationState: ComposerPresentationState
 
-  init(text: String, isImportingLargeDocument: Bool = false) {
+  init(
+    text: String,
+    isImportingLargeDocument: Bool = false,
+    presentationState: ComposerPresentationState? = nil
+  ) {
     let value = text as NSString
     let utf16Count = value.length
     characterCount =
@@ -27,6 +32,13 @@ struct ComposerTextMetrics: Equatable, Sendable {
     hasNonWhitespace =
       value.rangeOfCharacter(from: .whitespacesAndNewlines.inverted).location != NSNotFound
     self.isImportingLargeDocument = isImportingLargeDocument
+    self.presentationState =
+      presentationState
+      ?? Self.presentationState(
+        characterCount: characterCount,
+        lineCount: lineCount,
+        hasLineBreak: hasLineBreak
+      )
   }
 
   init(
@@ -35,7 +47,8 @@ struct ComposerTextMetrics: Equatable, Sendable {
     hasLineBreak: Bool,
     lineCount: Int = 1,
     hasNonWhitespace: Bool,
-    isImportingLargeDocument: Bool
+    isImportingLargeDocument: Bool,
+    presentationState: ComposerPresentationState? = nil
   ) {
     self.characterCount = characterCount
     self.formattedCharacterCount =
@@ -44,6 +57,13 @@ struct ComposerTextMetrics: Equatable, Sendable {
     self.lineCount = max(lineCount, hasLineBreak ? 2 : 1)
     self.hasNonWhitespace = hasNonWhitespace
     self.isImportingLargeDocument = isImportingLargeDocument
+    self.presentationState =
+      presentationState
+      ?? Self.presentationState(
+        characterCount: characterCount,
+        lineCount: self.lineCount,
+        hasLineBreak: hasLineBreak
+      )
   }
 
   var hasText: Bool {
@@ -51,7 +71,8 @@ struct ComposerTextMetrics: Equatable, Sendable {
   }
 
   var usesMultilineEditor: Bool {
-    characterCount > 120 || hasLineBreak
+    if case .multiline = presentationState { return true }
+    return presentationState == .document
   }
 
   var isDocument: Bool {
@@ -61,13 +82,41 @@ struct ComposerTextMetrics: Equatable, Sendable {
   var boundedForVirtualDocumentPresentation: Self {
     guard characterCount >= ComposerNativeTextView.virtualDocumentThreshold else { return self }
     return Self(
-      characterCount: 800,
+      characterCount: characterCount,
       formattedCharacterCount: formattedCharacterCount,
       hasLineBreak: hasLineBreak,
       lineCount: lineCount,
       hasNonWhitespace: hasNonWhitespace,
-      isImportingLargeDocument: isImportingLargeDocument
+      isImportingLargeDocument: isImportingLargeDocument,
+      presentationState: .document
     )
+  }
+
+  func presented(as presentationState: ComposerPresentationState) -> Self {
+    Self(
+      characterCount: characterCount,
+      formattedCharacterCount: formattedCharacterCount,
+      hasLineBreak: hasLineBreak,
+      lineCount: lineCount,
+      hasNonWhitespace: hasNonWhitespace,
+      isImportingLargeDocument: isImportingLargeDocument,
+      presentationState: presentationState
+    )
+  }
+
+  private static func presentationState(
+    characterCount: Int,
+    lineCount: Int,
+    hasLineBreak: Bool
+  ) -> ComposerPresentationState {
+    if characterCount >= 800 {
+      return .document
+    }
+    guard characterCount > 120 || hasLineBreak else {
+      return .compact
+    }
+    let wrappedLineCount = max(1, Int(ceil(Double(characterCount) / 90)))
+    return .multiline(visibleLineCount: min(5, max(lineCount, wrappedLineCount)))
   }
 
   private static func formatCharacterCount(_ value: Int) -> String {
@@ -148,7 +197,9 @@ struct ComposerTextEditor: NSViewRepresentable {
       on: scrollView,
       configuration: .composer
     )
-    scrollIndicator.setForceVisible(ComposerTextMetrics(text: text).isDocument)
+    scrollIndicator.setForceVisible(
+      ComposerTextMetrics(text: text).presentationState.showsDocumentChrome
+    )
     scrollIndicator.refresh()
     return scrollView
   }
@@ -165,7 +216,7 @@ struct ComposerTextEditor: NSViewRepresentable {
       on: scrollView,
       configuration: .composer
     )
-    scrollIndicator.setForceVisible(metrics.isDocument)
+    scrollIndicator.setForceVisible(metrics.presentationState.showsDocumentChrome)
 
     if context.coordinator.consumeResetRevision(resetRevision) {
       if text.isEmpty {
@@ -353,33 +404,14 @@ struct ComposerTextEditor: NSViewRepresentable {
     private func publishLargeDocumentMetrics(_ completedMetrics: ComposerTextMetrics) {
       cancelPendingLargeDocumentPresentation()
 
-      metrics.wrappedValue = ComposerTextMetrics(
-        characterCount: 1,
-        hasLineBreak: false,
-        hasNonWhitespace: completedMetrics.hasNonWhitespace,
-        isImportingLargeDocument: false
+      metrics.wrappedValue = completedMetrics.presented(as: .compact)
+      let multilineMetrics = completedMetrics.presented(
+        as: .multiline(visibleLineCount: 2)
       )
-
-      let multilineMetrics = ComposerTextMetrics(
-        characterCount: 121,
-        hasLineBreak: completedMetrics.hasLineBreak,
-        hasNonWhitespace: completedMetrics.hasNonWhitespace,
-        isImportingLargeDocument: false
+      let expandedMultilineMetrics = completedMetrics.presented(
+        as: .multiline(visibleLineCount: 5)
       )
-      let expandedMultilineMetrics = ComposerTextMetrics(
-        characterCount: 799,
-        hasLineBreak: completedMetrics.hasLineBreak,
-        lineCount: 5,
-        hasNonWhitespace: completedMetrics.hasNonWhitespace,
-        isImportingLargeDocument: false
-      )
-      let documentMetrics = ComposerTextMetrics(
-        characterCount: 800,
-        formattedCharacterCount: completedMetrics.formattedCharacterCount,
-        hasLineBreak: completedMetrics.hasLineBreak,
-        hasNonWhitespace: completedMetrics.hasNonWhitespace,
-        isImportingLargeDocument: false
-      )
+      let documentMetrics = completedMetrics.presented(as: .document)
 
       largeDocumentPresentationTask = Task { @MainActor [weak self] in
         guard await Self.waitForPresentationTurn() else { return }
