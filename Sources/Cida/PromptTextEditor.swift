@@ -4,6 +4,7 @@ import SwiftUI
 struct PromptTextEditor: NSViewRepresentable {
   @Binding var text: String
   let accessibilityLabel: String
+  let accessibilityIdentifier: String
 
   func makeCoordinator() -> Coordinator {
     Coordinator(text: $text)
@@ -37,6 +38,7 @@ struct PromptTextEditor: NSViewRepresentable {
     textView.isAutomaticQuoteSubstitutionEnabled = false
     textView.isAutomaticDashSubstitutionEnabled = false
     textView.setAccessibilityLabel(accessibilityLabel)
+    textView.setAccessibilityIdentifier(accessibilityIdentifier)
 
     applyTypography(to: textView)
     scrollView.documentView = textView
@@ -51,6 +53,7 @@ struct PromptTextEditor: NSViewRepresentable {
       applyTypography(to: textView)
     }
     textView.setAccessibilityLabel(accessibilityLabel)
+    textView.setAccessibilityIdentifier(accessibilityIdentifier)
   }
 
   private func applyTypography(to textView: NSTextView) {
@@ -59,7 +62,7 @@ struct PromptTextEditor: NSViewRepresentable {
     paragraphStyle.maximumLineHeight = 20
 
     let attributes: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 12.5, weight: .regular),
+      .font: CidaDesign.appKitBody(12.5),
       .foregroundColor: NSColor(
         red: 26 / 255,
         green: 26 / 255,

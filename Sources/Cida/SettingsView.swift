@@ -259,6 +259,7 @@ private struct OpenAIEndpointRow: View {
           .buttonStyle(.plain)
           .font(CidaDesign.ui(10.5, weight: .medium))
           .foregroundStyle(CidaDesign.accent)
+          .accessibilityIdentifier("settings-openai-endpoint-reset")
         }
       }
     }
@@ -356,6 +357,7 @@ private struct CollapsedPromptRow: View {
         .foregroundStyle(CidaDesign.textPrimary)
         .buttonStyle(SettingsBorderedButtonStyle())
         .frame(width: 50, height: 28)
+        .accessibilityIdentifier("settings-prompt-edit-\(mode.rawValue)")
     }
     .frame(height: 55)
   }
@@ -377,10 +379,15 @@ private struct ExpandedPromptRow: View {
           .buttonStyle(.plain)
           .font(CidaDesign.ui(12, weight: .medium))
           .foregroundStyle(CidaDesign.textSecondary)
+          .accessibilityIdentifier("settings-prompt-reset-\(mode.rawValue)")
       }
       .frame(height: 20)
 
-      PromptTextEditor(text: $prompt, accessibilityLabel: "\(mode.title)提示词")
+      PromptTextEditor(
+        text: $prompt,
+        accessibilityLabel: "\(mode.title)提示词",
+        accessibilityIdentifier: "settings-prompt-editor-\(mode.rawValue)"
+      )
         .frame(height: 84)
         .background(CidaDesign.surface)
         .clipShape(.rect(cornerRadius: 8, style: .continuous))
@@ -438,6 +445,7 @@ private struct LaunchAtLoginRow: View {
       .toggleStyle(.switch)
       .tint(CidaDesign.accent)
       .controlSize(.mini)
+      .accessibilityIdentifier("settings-launch-at-login-toggle")
     }
     .frame(height: 38)
     .onAppear(perform: model.refreshLaunchAtLoginStatus)
