@@ -72,7 +72,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     let secondResult = driver.app.textViews["history-result-\(secondID.uppercased())"]
     XCTAssertTrue(secondResult.waitForExistence(timeout: 3))
     XCTAssertEqual(secondResult.value as? String, "")
-    XCTAssertEqual(driver.composer.value as? String, "")
+    XCTAssertEqual(driver.textValue(in: driver.composer), "")
     XCTAssertEqual(firstEntry.value as? String, "collapsed")
     XCTAssertEqual(
       driver.element(identifier: "history-entry-\(secondID.lowercased())").value as? String,

@@ -45,7 +45,7 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
 
     driver.composer.click()
     driver.composer.typeText("Typed through the real responder chain")
-    XCTAssertEqual(driver.composer.value as? String, "Typed through the real responder chain")
+    XCTAssertEqual(driver.textValue(in: driver.composer), "Typed through the real responder chain")
 
     driver.composer.typeKey("a", modifierFlags: .command)
     driver.composer.typeKey(.delete, modifierFlags: [])
@@ -55,16 +55,16 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     )
     driver.paste(multiline)
     XCTAssertTrue(driver.waitForFrameHeight(atLeast: 150, in: driver.composer, timeout: 5))
-    XCTAssertEqual(driver.composer.value as? String, multiline)
+    XCTAssertEqual(driver.textValue(in: driver.composer), multiline)
 
     driver.composer.typeKey("a", modifierFlags: .command)
     driver.composer.typeKey(.delete, modifierFlags: [])
     XCTAssertTrue(driver.waitForFrameHeight(atMost: 30, in: driver.composer, timeout: 5))
-    XCTAssertEqual(driver.composer.value as? String, "")
+    XCTAssertEqual(driver.textValue(in: driver.composer), "")
 
     _ = driver.submit("CIDA_E2E_POOL_COMPOSER")
     XCTAssertTrue(driver.waitForFrameHeight(atMost: 30, in: driver.composer, timeout: 5))
-    XCTAssertEqual(driver.composer.value as? String, "")
+    XCTAssertEqual(driver.textValue(in: driver.composer), "")
     XCTAssertTrue(
       driver.result(containing: "CIDA_E2E_POOL_COMPOSER_COMPLETE")
         .waitForExistence(timeout: 8)

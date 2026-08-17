@@ -12,7 +12,7 @@ final class TranslationStateMachineJourneyTests: CidaReleaseUITestCase {
       case .paste(let value):
         driver.replaceText(in: driver.composer, with: "")
         driver.paste(value)
-        XCTAssertEqual(driver.composer.value as? String, value)
+        XCTAssertEqual(driver.textValue(in: driver.composer), value)
         XCTAssertTrue(oracle.apply(command))
       case .submit:
         let existingEntries = driver.historyEntryIdentifiers()
@@ -21,7 +21,7 @@ final class TranslationStateMachineJourneyTests: CidaReleaseUITestCase {
           : nil
         XCTAssertTrue(driver.submitButton.isEnabled)
         driver.submitButton.click()
-        XCTAssertTrue(driver.waitForValue("", in: driver.composer, timeout: 1))
+        XCTAssertTrue(driver.waitForTextValue("", in: driver.composer, timeout: 1))
         let entryIdentifier = try! XCTUnwrap(
           driver.waitForNewHistoryEntry(excluding: existingEntries, timeout: 5)
         )

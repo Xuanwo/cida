@@ -95,7 +95,7 @@ final class CidaAppDriver {
   @discardableResult
   func submit(_ text: String, expectsStreamingState: Bool = false) -> String {
     paste(text)
-    XCTAssertEqual(composer.value as? String, text)
+    XCTAssertEqual(textValue(in: composer), text)
     return submitCurrentComposer(expectsStreamingState: expectsStreamingState)
   }
 
@@ -108,7 +108,7 @@ final class CidaAppDriver {
     XCTAssertTrue(submitButton.isEnabled)
     submitButton.click()
     XCTAssertTrue(
-      waitForValue("", in: composer, timeout: 1),
+      waitForTextValue("", in: composer, timeout: 1),
       "An accepted submission must clear the composer immediately"
     )
     if expectsStreamingState {
@@ -219,6 +219,23 @@ final class CidaAppDriver {
     let predicate = NSPredicate(format: "value == %@", expectedValue)
     let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
     return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+  }
+
+  func textValue(in element: XCUIElement) -> String {
+    element.value as? String ?? ""
+  }
+
+  func waitForTextValue(
+    _ expectedValue: String,
+    in element: XCUIElement,
+    timeout: TimeInterval
+  ) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if textValue(in: element) == expectedValue { return true }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    } while Date() < deadline
+    return false
   }
 
   func waitForLabel(
