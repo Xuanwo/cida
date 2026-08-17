@@ -44,7 +44,9 @@ final class WindowAndSettingsJourneyTests: CidaReleaseUITestCase {
     let providerMenu = driver.settingsProviderMenu(in: settingsWindow)
     XCTAssertEqual(providerMenu.label, "DeepSeek")
     XCTAssertFalse(driver.app.textFields["settings-openai-endpoint"].exists)
-    XCTAssertTrue(driver.app.switches["settings-launch-at-login-toggle"].exists)
+    let launchAtLogin = driver.element(identifier: "settings-launch-at-login-toggle")
+    XCTAssertTrue(launchAtLogin.exists)
+    XCTAssertEqual(launchAtLogin.elementType, .checkBox)
 
     let improveEditor = driver.app.textViews["settings-prompt-editor-improve"]
     XCTAssertTrue(improveEditor.waitForExistence(timeout: 3))

@@ -59,7 +59,9 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
       driver.result(containing: "CIDA_E2E_RESULT_A_COMPLETE").waitForExistence(timeout: 8))
     XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
     let firstEntry = driver.element(identifier: "history-entry-\(firstID.lowercased())")
-    XCTAssertEqual(firstEntry.value as? String, "expanded")
+    XCTAssertTrue(
+      driver.waitForCurrentExpandedEntry(firstEntry.identifier, timeout: 2)
+    )
 
     let secondID = driver.submit("CIDA_E2E_DELAYED_RESULT_B", expectsStreamingState: true)
     XCTAssertNotNil(
@@ -73,10 +75,12 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(secondResult.waitForExistence(timeout: 3))
     XCTAssertEqual(secondResult.value as? String, "")
     XCTAssertEqual(driver.textValue(in: driver.composer), "")
-    XCTAssertEqual(firstEntry.value as? String, "collapsed")
-    XCTAssertEqual(
-      driver.element(identifier: "history-entry-\(secondID.lowercased())").value as? String,
-      "expanded"
+    XCTAssertTrue(driver.waitForFoldedEntry(firstEntry.identifier, timeout: 2))
+    XCTAssertTrue(
+      driver.waitForCurrentExpandedEntry(
+        "history-entry-\(secondID.lowercased())",
+        timeout: 2
+      )
     )
     XCTAssertEqual(driver.history.value as? String, "bottom")
 

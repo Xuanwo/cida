@@ -22,9 +22,8 @@ final class CidaAppDriver {
   var currentHistoryEntry: XCUIElement {
     app.descendants(matching: .any).matching(
       NSPredicate(
-        format: "identifier BEGINSWITH %@ AND value == %@ AND label BEGINSWITH %@",
+        format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@",
         "history-entry-",
-        "expanded",
         "当前历史记录"
       )
     ).firstMatch
@@ -118,23 +117,64 @@ final class CidaAppDriver {
     XCTAssertNotNil(identifier)
     guard let identifier else { return "" }
 
-    let currentEntry = element(identifier: identifier)
     XCTAssertTrue(
-      waitForValue("expanded", in: currentEntry, timeout: 2),
+      waitForCurrentExpandedEntry(identifier, timeout: 2),
       "The submitted entry must become the expanded current record"
     )
     if let previousCurrentIdentifier, previousCurrentIdentifier != identifier {
       XCTAssertTrue(
-        waitForValue(
-          "collapsed",
-          in: element(identifier: previousCurrentIdentifier),
-          timeout: 2
-        ),
+        waitForFoldedEntry(previousCurrentIdentifier, timeout: 2),
         "The former automatic current record must fold when a new submission is accepted"
       )
     }
 
     return String(identifier.dropFirst("history-entry-".count))
+  }
+
+  func waitForCurrentExpandedEntry(
+    _ identifier: String,
+    timeout: TimeInterval
+  ) -> Bool {
+    let suffix = String(identifier.dropFirst("history-entry-".count))
+    let entry = element(identifier: identifier)
+    let source = element(identifier: "history-source-\(suffix)")
+    let result = app.textViews["history-result-\(suffix.uppercased())"]
+    let foldedCard = element(identifier: "history-expand-\(suffix)")
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if entry.exists,
+        entry.label.hasPrefix("当前历史记录"),
+        source.exists,
+        result.exists,
+        !foldedCard.exists
+      {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    } while Date() < deadline
+    return false
+  }
+
+  func waitForFoldedEntry(
+    _ identifier: String,
+    timeout: TimeInterval
+  ) -> Bool {
+    let suffix = String(identifier.dropFirst("history-entry-".count))
+    let entry = element(identifier: identifier)
+    let foldedCard = element(identifier: "history-expand-\(suffix)")
+    let result = app.textViews["history-result-\(suffix.uppercased())"]
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if entry.exists,
+        entry.value as? String == "collapsed",
+        foldedCard.exists,
+        !result.exists
+      {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    } while Date() < deadline
+    return false
   }
 
   func result(containing marker: String) -> XCUIElement {
