@@ -271,7 +271,7 @@ final class InteractionReproductionTests: XCTestCase {
     scrollView.reflectScrolledClipView(scrollView.contentView)
 
     let entryID = UUID()
-    model.isProcessing = true
+    model.setGenerationStateForTesting(.revealing(entryID: entryID))
     model.entries.append(
       HistoryEntry(
         id: entryID,
@@ -290,7 +290,7 @@ final class InteractionReproductionTests: XCTestCase {
     let delta = String(repeating: "\nNext chunk", count: 12)
     model.entries[model.entries.count - 1].appendPresentationDelta(delta)
     model.entries[model.entries.count - 1].state = .completed
-    model.isProcessing = false
+    model.setGenerationStateForTesting(.idle)
     model.requestHistoryFollow()
     RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     XCTAssertTrue(isScrolledToBottom(scrollView), scrollDescription(scrollView))
@@ -383,7 +383,7 @@ final class InteractionReproductionTests: XCTestCase {
         state: .streaming
       )
     )
-    model.isProcessing = true
+    model.setGenerationStateForTesting(.revealing(entryID: model.entries.last!.id))
     model.requestHistoryFollow(force: true)
     Thread.sleep(forTimeInterval: 0.06)
     model.requestHistoryFollow(force: false)
@@ -418,7 +418,7 @@ final class InteractionReproductionTests: XCTestCase {
         state: .streaming
       )
     )
-    model.isProcessing = true
+    model.setGenerationStateForTesting(.revealing(entryID: firstEntryID))
     model.requestHistoryFollow(force: true)
     RunLoop.current.run(until: Date().addingTimeInterval(0.4))
     hostingView.layoutSubtreeIfNeeded()
@@ -1569,7 +1569,7 @@ final class InteractionReproductionTests: XCTestCase {
     withExtendedLifetime(window) {}
   }
 
-  func testStagedLongStreamingEntryPreservesDeltasThatArriveBeforeResultMounts() async throws {
+  func testLongStreamingEntryMountsWaitingResultImmediatelyAndPreservesEarlyDeltas() async throws {
     let entry = HistoryEntry(
       mode: .translate,
       source: "Virtual million-character source",
@@ -1596,12 +1596,17 @@ final class InteractionReproductionTests: XCTestCase {
     hostingView.layoutSubtreeIfNeeded()
 
     let identifier = "history-result-\(entry.id.uuidString)"
-    XCTAssertNil(
+    let initialResultTextView = try XCTUnwrap(
       firstTextView(in: hostingView, identifier: identifier),
-      "The first frame should mount only the large source preview"
+      "An accepted long-document submission must expose its empty waiting result immediately."
     )
+    let initialResultContainer = try XCTUnwrap(
+      initialResultTextView.superview as? HistoryResultTextContainer
+    )
+    XCTAssertEqual(initialResultContainer.renderedString, "")
+    XCTAssertTrue(initialResultContainer.streamingCaretIsVisible)
 
-    let earlyDelta = "A stream delta received before the result renderer is mounted."
+    let earlyDelta = "A stream delta received immediately after the result renderer is mounted."
     entry.appendPresentationDelta(earlyDelta)
     try await waitUntil(timeout: .seconds(2)) {
       hostingView.layoutSubtreeIfNeeded()
@@ -2040,6 +2045,14 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertTrue(
       HistoryEntryActionPolicy.showsActions(isHovering: true, state: .failed)
     )
+    XCTAssertEqual(
+      HistoryEntryActionPolicy.presentationState(
+        isHovering: false,
+        state: .completed,
+        copiedAction: .copyResult
+      ),
+      .copied(.copyResult)
+    )
   }
 
   func testLongResultActionSticksToTheVisibleIntersectionAndStaysInsideItsBlock() {
@@ -2261,7 +2274,7 @@ final class InteractionReproductionTests: XCTestCase {
     )
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
 
-    model.isProcessing = true
+    model.setGenerationStateForTesting(.revealing(entryID: model.entries.last!.id))
     model.entries[model.entries.count - 1].state = .streaming
     model.entries[model.entries.count - 1].appendPresentationDelta("\nNew streamed line")
     model.requestHistoryFollow(force: false)

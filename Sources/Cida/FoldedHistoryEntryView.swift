@@ -1601,7 +1601,10 @@ final class FoldedHistoryEntryNSView: NSControl {
       self.copyResetWorkItem = nil
     }
     copyResetWorkItem = workItem
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: workItem)
+    DispatchQueue.main.asyncAfter(
+      deadline: .now() + .milliseconds(CidaMotion.copiedHoldMilliseconds),
+      execute: workItem
+    )
   }
 
   private func resetCopyFeedback() {

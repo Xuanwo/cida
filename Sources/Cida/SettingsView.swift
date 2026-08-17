@@ -500,7 +500,7 @@ struct MaskedAPIKeyField: View {
     .accessibilityElement(children: .contain)
     .accessibilityLabel("API Key")
     .overlay(alignment: .trailing) {
-      VerifiedAPIKeyIcon(isVisible: !apiKey.isEmpty)
+      ConfiguredAPIKeyIcon(isVisible: !apiKey.isEmpty)
         .padding(.trailing, 10)
     }
   }
@@ -513,7 +513,7 @@ struct MaskedAPIKeyField: View {
   }
 }
 
-private struct VerifiedAPIKeyIcon: View {
+private struct ConfiguredAPIKeyIcon: View {
   let isVisible: Bool
 
   var body: some View {
@@ -523,6 +523,7 @@ private struct VerifiedAPIKeyIcon: View {
       .opacity(isVisible ? 1 : 0)
       .fixedSize()
       .accessibilityLabel("API Key 已配置")
+      .accessibilityHidden(!isVisible)
   }
 }
 

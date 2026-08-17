@@ -33,7 +33,7 @@ enum CidaDesign {
   static let windowRadius = Radius.window
 
   static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-    .system(size: size, weight: weight)
+    .custom(interName(for: weight), fixedSize: size)
   }
 
   static func mainUI(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {

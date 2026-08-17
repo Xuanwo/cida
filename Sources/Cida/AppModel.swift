@@ -305,13 +305,7 @@ final class AppModel {
   var settings = CidaSettings()
   private(set) var generationState = GenerationPresentationState.idle
   var isProcessing: Bool {
-    get { generationState.isActive }
-    set {
-      generationState =
-        newValue
-        ? .waiting(entryID: entries.last?.id ?? UUID())
-        : .idle
-    }
+    generationState.isActive
   }
   var errorMessage: String?
   var editingPrompt: ProcessingMode? = .improve
@@ -433,6 +427,12 @@ final class AppModel {
   func attachDisplayLink(to view: NSView) {
     displayLinkView = view
   }
+
+  #if DEBUG
+    func setGenerationStateForTesting(_ state: GenerationPresentationState) {
+      generationState = state
+    }
+  #endif
 
   func stageInputDocument(
     _ document: String?,
@@ -1023,7 +1023,6 @@ final class AppModel {
   ) -> Bool {
     if performancePresenter == nil {
       let entryID = UUID()
-      isProcessing = true
       entries.append(
         HistoryEntry(
           id: entryID,
@@ -1035,6 +1034,7 @@ final class AppModel {
           state: .streaming
         )
       )
+      generationState = .revealing(entryID: entryID)
       let presenter = makeStreamPresenter(for: entryID)
       performancePresenter = presenter
     }

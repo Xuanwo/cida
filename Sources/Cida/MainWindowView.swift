@@ -2,8 +2,19 @@ import AppKit
 import SwiftUI
 
 enum HistoryEntryActionPolicy {
+  static func presentationState(
+    isHovering: Bool,
+    state: HistoryEntryState,
+    copiedAction: RecordAction? = nil
+  ) -> RecordActionPresentationState {
+    if let copiedAction {
+      return .copied(copiedAction)
+    }
+    return isHovering && state != .streaming ? .visible : .hidden
+  }
+
   static func showsActions(isHovering: Bool, state: HistoryEntryState) -> Bool {
-    isHovering && state != .streaming
+    presentationState(isHovering: isHovering, state: state) == .visible
   }
 }
 
@@ -566,27 +577,20 @@ private struct HistoryFollowController: View {
 }
 
 private struct HistoryEntryView: View {
-  private enum CopiedAction {
-    case source
-    case result
-  }
-
   private let standaloneEntry: HistoryEntry?
   let model: AppModel
   let animatesTransitions: Bool
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
   @State private var isHovering = false
-  @State private var copiedAction: CopiedAction?
+  @State private var copiedAction: RecordAction?
   @State private var copyResetTask: Task<Void, Never>?
   @State private var retainsAutomaticallyExpandedBody: Bool
-  @State private var renderingStage: Int
 
   init(entry: HistoryEntry, model: AppModel, animatesTransitions: Bool) {
     standaloneEntry = entry
     self.model = model
     self.animatesTransitions = animatesTransitions
     _retainsAutomaticallyExpandedBody = State(initialValue: entry.isLatestInHistory)
-    _renderingStage = State(initialValue: Self.initialRenderingStage(for: entry))
   }
 
   private var entry: HistoryEntry {
@@ -601,14 +605,8 @@ private struct HistoryEntryView: View {
     entry.isLatestInHistory
   }
 
-  private var isManuallyExpanded: Bool {
-    model.isHistoryEntryManuallyExpanded(entry.id)
-  }
-
   private var shouldRenderExpandedBody: Bool {
-    isExpanded
-      || (retainsAutomaticallyExpandedBody
-        && model.automaticallyFoldingHistoryEntryID != entry.id)
+    isExpanded || retainsAutomaticallyExpandedBody
   }
 
   var body: some View {
@@ -624,7 +622,7 @@ private struct HistoryEntryView: View {
         Hairline()
       }
     }
-    .animation(historyTransitionAnimation, value: isManuallyExpanded)
+    .animation(historyTransitionAnimation, value: isExpanded)
     .task(id: isExpanded) {
       if isExpanded {
         retainsAutomaticallyExpandedBody = true
@@ -635,15 +633,6 @@ private struct HistoryEntryView: View {
       }
       guard !Task.isCancelled else { return }
       retainsAutomaticallyExpandedBody = false
-    }
-    .task {
-      guard renderingStage < 2 else { return }
-      try? await Task.sleep(for: .milliseconds(17))
-      guard !Task.isCancelled else { return }
-      renderingStage = 1
-      try? await Task.sleep(for: .milliseconds(17))
-      guard !Task.isCancelled else { return }
-      renderingStage = 2
     }
   }
 
@@ -656,12 +645,10 @@ private struct HistoryEntryView: View {
           .accessibilityHidden(!isExpanded)
       }
 
-      if renderingStage >= 2 {
-        foldedBody
-          .opacity(isExpanded ? 0 : 1)
-          .allowsHitTesting(!isExpanded)
-          .accessibilityHidden(isExpanded)
-      }
+      foldedBody
+        .opacity(isExpanded ? 0 : 1)
+        .allowsHitTesting(!isExpanded)
+        .accessibilityHidden(isExpanded)
     }
     .frame(
       height: isExpanded ? nil : HistoryEntryPencilLayout.foldedHeight,
@@ -737,15 +724,15 @@ private struct HistoryEntryView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
 
-        if actionsAreVisible || copiedAction == .source {
+        if actionsAreVisible || copiedAction == .copySource {
           EntryActionButton(
             icon: .copy,
-            label: copiedAction == .source ? "已复制原文" : "复制原文",
+            label: copiedAction == .copySource ? "已复制原文" : "复制原文",
             identifier: actionIdentifier("copy-source"),
-            isCopied: copiedAction == .source
+            isCopied: copiedAction == .copySource
           ) {
             model.copySource(entry)
-            showCopiedState(.source)
+            showCopiedState(.copySource)
           }
           .padding(.top, 4)
           .transition(.opacity)
@@ -753,15 +740,13 @@ private struct HistoryEntryView: View {
       }
       .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
 
-      if renderingStage >= 1 {
-        expandedResult
-      }
+      expandedResult
     }
     .padding(.vertical, 16)
     .frame(maxWidth: .infinity, alignment: .topLeading)
     .contentShape(Rectangle())
     .background {
-      if renderingStage >= 2 && isExpanded {
+      if isExpanded {
         HistoryEntryHoverTrackingView(isActive: isExpanded, isHovering: $isHovering)
           .accessibilityHidden(true)
       }
@@ -787,12 +772,12 @@ private struct HistoryEntryView: View {
     }
     .accessibilityAction(named: "复制原文") {
       model.copySource(entry)
-      showCopiedState(.source)
+      showCopiedState(.copySource)
     }
     .accessibilityAction(named: "复制结果") {
       guard entry.resultUTF16Length > 0 else { return }
       model.copyResult(entry)
-      showCopiedState(.result)
+      showCopiedState(.copyResult)
     }
     .accessibilityAction(named: "重新处理") {
       guard entry.state != .streaming else { return }
@@ -829,7 +814,7 @@ private struct HistoryEntryView: View {
     .accessibilityAction(named: "复制结果") {
       guard entry.resultUTF16Length > 0 else { return }
       model.copyResult(entry)
-      showCopiedState(.result)
+      showCopiedState(.copyResult)
     }
     .accessibilityAction(named: "重新处理") {
       guard entry.state != .streaming else { return }
@@ -856,7 +841,7 @@ private struct HistoryEntryView: View {
           isCopied: isResultCopied
         ) {
           model.copyResult(entry)
-          showCopiedState(.result)
+          showCopiedState(.copyResult)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .transition(.opacity)
@@ -887,10 +872,6 @@ private struct HistoryEntryView: View {
     return .easeOut(duration: CidaMotion.historyFoldSeconds)
   }
 
-  private static func initialRenderingStage(for entry: HistoryEntry) -> Int {
-    entry.state == .streaming && entry.isLongDocument ? 0 : 2
-  }
-
   private var entryIdentifierSuffix: String {
     entry.id.uuidString.lowercased()
   }
@@ -905,11 +886,19 @@ private struct HistoryEntryView: View {
   }
 
   private var actionsAreVisible: Bool {
-    HistoryEntryActionPolicy.showsActions(isHovering: isHovering, state: entry.state)
+    actionPresentationState == .visible
   }
 
   private var isResultCopied: Bool {
-    copiedAction == .result
+    copiedAction == .copyResult
+  }
+
+  private var actionPresentationState: RecordActionPresentationState {
+    HistoryEntryActionPolicy.presentationState(
+      isHovering: isHovering,
+      state: entry.state,
+      copiedAction: copiedAction
+    )
   }
 
   private var showsResultCopyAction: Bool {
@@ -920,7 +909,7 @@ private struct HistoryEntryView: View {
     "history-action-\(action)-\(entry.id.uuidString.lowercased())"
   }
 
-  private func showCopiedState(_ action: CopiedAction) {
+  private func showCopiedState(_ action: RecordAction) {
     copyResetTask?.cancel()
     copiedAction = action
     copyResetTask = Task { @MainActor in
