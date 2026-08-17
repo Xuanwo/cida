@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import os
 
 @MainActor
 final class MillionCharacterPasteWorkload {
@@ -7,6 +8,7 @@ final class MillionCharacterPasteWorkload {
   static let maximumAcceptanceDurationMilliseconds = 50.0
 
   private let model: AppModel
+  private let signposter = OSSignposter(subsystem: "com.xuanwo.Cida", category: "Performance")
   private weak var rootView: NSView?
   private let warmupPasteboard = NSPasteboard.withUniqueName()
   private let document: String
@@ -38,6 +40,8 @@ final class MillionCharacterPasteWorkload {
   func performPaste() -> Bool {
     guard !didAttemptPaste else { return false }
     didAttemptPaste = true
+    let signpostState = signposter.beginInterval("MillionCharacterPaste")
+    defer { signposter.endInterval("MillionCharacterPaste", signpostState) }
 
     guard
       let textView = (textView ?? composerTextView()) as? ComposerNativeTextView

@@ -607,21 +607,30 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(report.missedFrameBudgetCount, 0)
   }
 
-  func testBackgroundPerformanceClockKeepsTheRequested120HzCadenceOnA60HzDisplay() {
-    XCTAssertEqual(
-      FramePacingProbeNSView.measurementClockFramesPerSecond(
-        displayMaximumFramesPerSecond: 60,
-        requiredFramesPerSecond: 120
-      ),
-      120
+  func testFramePacingReportCarriesArtifactHardwareAndDisplayProvenance() {
+    let report = FramePacingProbeNSView.makeReport(
+      timestamps: (0..<120).map { Double($0) / 120 },
+      maximumFramesPerSecond: 120,
+      artifactAppTreeSHA256: "app-digest",
+      artifactSourceCommit: "source-commit",
+      hardwareModel: "Mac-test",
+      operatingSystemVersion: "macOS test",
+      thermalState: "nominal",
+      lowPowerModeEnabled: false,
+      powerSource: "AC Power",
+      displayName: "Test Display",
+      displayBackingScaleFactor: 2,
+      displayPixelWidth: 3_456,
+      displayPixelHeight: 2_234
     )
-    XCTAssertEqual(
-      FramePacingProbeNSView.measurementClockFramesPerSecond(
-        displayMaximumFramesPerSecond: 60,
-        requiredFramesPerSecond: nil
-      ),
-      60
-    )
+
+    XCTAssertEqual(report.frameClock, "display-link")
+    XCTAssertEqual(report.artifactAppTreeSHA256, "app-digest")
+    XCTAssertEqual(report.artifactSourceCommit, "source-commit")
+    XCTAssertEqual(report.hardwareModel, "Mac-test")
+    XCTAssertEqual(report.powerSource, "AC Power")
+    XCTAssertEqual(report.displayMaximumFramesPerSecond, 120)
+    XCTAssertEqual(report.displayPixelWidth, 3_456)
   }
 
   func testFramePacingReportRejects60HzRenderingOn120HzDisplay() {

@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 @MainActor
 final class LargeHistoryScrollWorkload {
@@ -6,6 +7,7 @@ final class LargeHistoryScrollWorkload {
   static let minimumScrollDistancePoints: CGFloat = 12_000
 
   private let model: AppModel
+  private let signposter = OSSignposter(subsystem: "com.xuanwo.Cida", category: "Performance")
   private weak var rootView: NSView?
   private weak var historyScrollView: NSScrollView?
   private var scrollDistancePoints: CGFloat = 0
@@ -18,7 +20,9 @@ final class LargeHistoryScrollWorkload {
 
   @discardableResult
   func performUpwardScroll() -> Bool {
-    scrollUpward(recordsDistance: true)
+    let signpostState = signposter.beginInterval("HistoryScrollFrame")
+    defer { signposter.endInterval("HistoryScrollFrame", signpostState) }
+    return scrollUpward(recordsDistance: true)
   }
 
   func warmUpUpwardScroll() {

@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import os
 
 struct ExtremeWorkflowConfiguration: Equatable, Sendable {
   let expectedInitialHistoryEntryCount: Int
@@ -70,6 +71,7 @@ final class ExtremeWorkflowWorkload {
   }
 
   private let model: AppModel
+  private let signposter = OSSignposter(subsystem: "com.xuanwo.Cida", category: "Performance")
   private weak var rootView: NSView?
   private let configuration: ExtremeWorkflowConfiguration
   private let diagnostics: LaunchPerformanceDiagnostics
@@ -87,6 +89,9 @@ final class ExtremeWorkflowWorkload {
   private var completionSettlingFramesRemaining = 48
   private var scrollTransitionFramesRemaining = 0
   private var event = "ready"
+  private var streamSignpostState: OSSignpostIntervalState?
+  private var normalScrollSignpostState: OSSignpostIntervalState?
+  private var hyperScrollSignpostState: OSSignpostIntervalState?
 
   init(
     model: AppModel,
@@ -117,7 +122,12 @@ final class ExtremeWorkflowWorkload {
         hasNonWhitespace: true
       )
       submissionStartedAt = CACurrentMediaTime()
+      let submitSignpostState = signposter.beginInterval("Submit")
       submitted = model.submit()
+      signposter.endInterval("Submit", submitSignpostState)
+      if submitted {
+        streamSignpostState = signposter.beginInterval("StreamPresentation")
+      }
       phase = submitted ? .translating : .failed
       return true
 
@@ -156,8 +166,13 @@ final class ExtremeWorkflowWorkload {
         return false
       }
       event = "prepare-normal-scroll"
+      if let streamSignpostState {
+        signposter.endInterval("StreamPresentation", streamSignpostState)
+        self.streamSignpostState = nil
+      }
       prepareForScrolling()
       scrollTransitionFramesRemaining = 8
+      normalScrollSignpostState = signposter.beginInterval("NormalScroll")
       phase = .normalScroll
       return false
 
@@ -172,6 +187,11 @@ final class ExtremeWorkflowWorkload {
       normalScrollDistancePoints += distance
       maximumScrollStepPoints = max(maximumScrollStepPoints, distance)
       if normalScrollDistancePoints >= configuration.minimumNormalScrollDistancePoints {
+        if let normalScrollSignpostState {
+          signposter.endInterval("NormalScroll", normalScrollSignpostState)
+          self.normalScrollSignpostState = nil
+        }
+        hyperScrollSignpostState = signposter.beginInterval("HyperScroll")
         scrollTransitionFramesRemaining = 8
         phase = .hyperScroll
       } else if distance < 0.5 {
@@ -191,6 +211,10 @@ final class ExtremeWorkflowWorkload {
       hyperScrollDistancePoints += distance
       maximumScrollStepPoints = max(maximumScrollStepPoints, distance)
       if hyperScrollDistancePoints >= configuration.minimumHyperScrollDistancePoints {
+        if let hyperScrollSignpostState {
+          signposter.endInterval("HyperScroll", hyperScrollSignpostState)
+          self.hyperScrollSignpostState = nil
+        }
         phase = .completed
       } else if distance < 0.5 {
         prepareForScrolling()

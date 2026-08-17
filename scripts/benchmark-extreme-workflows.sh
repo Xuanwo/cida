@@ -26,15 +26,7 @@ esac
 
 mkdir -p "$output_dir"
 
-swift build \
-  --package-path "$project_dir" \
-  --configuration release \
-  -Xswiftc -warnings-as-errors
-
-binary_path=$(swift build \
-  --package-path "$project_dir" \
-  --configuration release \
-  --show-bin-path)
+artifact_root=$("$script_dir/e2e/resolve-release-artifact.sh")
 
 profile_arguments=()
 for profile in "${profiles[@]}"; do
@@ -42,7 +34,7 @@ for profile in "${profiles[@]}"; do
 done
 
 /usr/bin/python3 "$script_dir/extreme-performance-matrix.py" \
-  --binary "$binary_path/Cida" \
+  --artifact "$artifact_root" \
   --runner "$script_dir/run-isolated-automation.sh" \
   --output-directory "$output_dir" \
   --required-fps "$required_fps" \

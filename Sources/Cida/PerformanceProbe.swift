@@ -1,4 +1,5 @@
 import AppKit
+import CDisplayClock
 import Darwin
 import QuartzCore
 
@@ -61,6 +62,17 @@ struct PhaseFramePacingReport: Codable, Equatable, Sendable {
 }
 
 struct FramePacingReport: Codable, Equatable, Sendable {
+  let artifactAppTreeSHA256: String?
+  let artifactSourceCommit: String?
+  let hardwareModel: String
+  let operatingSystemVersion: String
+  let thermalState: String
+  let lowPowerModeEnabled: Bool
+  let powerSource: String?
+  let displayName: String?
+  let displayBackingScaleFactor: Double
+  let displayPixelWidth: Int
+  let displayPixelHeight: Int
   let workload: String
   let frameClock: String
   let applicationActivationObserved: Bool
@@ -105,13 +117,27 @@ struct FramePacingReport: Codable, Equatable, Sendable {
   let passed: Bool
 }
 
+private final class PerformanceDisplayClockBridge: @unchecked Sendable {
+  let onTick: @Sendable () -> Void
+
+  init(onTick: @escaping @Sendable () -> Void) {
+    self.onTick = onTick
+  }
+}
+
+private func performanceDisplayClockCallback(_ context: UnsafeMutableRawPointer?) {
+  guard let context else { return }
+  Unmanaged<PerformanceDisplayClockBridge>.fromOpaque(context).takeUnretainedValue().onTick()
+}
+
 @MainActor
 final class FramePacingProbeNSView: NSView {
   private let configuration: PerformanceProbeConfiguration
   private let exerciseInteraction: @MainActor (Int) -> Bool
   private let workloadMetrics: @MainActor () -> FramePacingWorkloadMetrics
   private let markerLayer = CALayer()
-  private var backgroundFrameClock: DispatchSourceTimer?
+  private var displayClock: OpaquePointer?
+  private var displayClockBridge: PerformanceDisplayClockBridge?
   private var watchdog: Timer?
   private var frameTimestamps: [CFTimeInterval] = []
   private var framePhaseLabels: [String] = []
@@ -170,8 +196,7 @@ final class FramePacingProbeNSView: NSView {
 
     NotificationCenter.default.removeObserver(self)
 
-    backgroundFrameClock?.cancel()
-    backgroundFrameClock = nil
+    stopDisplayClock()
     watchdog?.invalidate()
     watchdog = nil
     if let latencyActivity {
@@ -202,24 +227,35 @@ final class FramePacingProbeNSView: NSView {
       options: [.userInitiated, .latencyCritical],
       reason: "Measuring interactive frame pacing"
     )
-    let clockFramesPerSecond = Self.measurementClockFramesPerSecond(
-      displayMaximumFramesPerSecond: screen.maximumFramesPerSecond,
-      requiredFramesPerSecond: configuration.requiredFramesPerSecond
-    )
-    let intervalNanoseconds = 1_000_000_000 / clockFramesPerSecond
-    let backgroundClock = DispatchSource.makeTimerSource(flags: .strict, queue: .main)
-    backgroundClock.schedule(
-      deadline: .now(),
-      repeating: .nanoseconds(intervalNanoseconds),
-      leeway: .nanoseconds(0)
-    )
-    backgroundClock.setEventHandler { [weak self] in
-      MainActor.assumeIsolated {
+    let screenNumberKey = NSDeviceDescriptionKey("NSScreenNumber")
+    let displayID =
+      (screen.deviceDescription[screenNumberKey] as? NSNumber)?.uint32Value
+      ?? CGMainDisplayID()
+    let bridge = PerformanceDisplayClockBridge { [weak self] in
+      Task { @MainActor [weak self] in
         self?.recordFrameTick(at: CACurrentMediaTime())
       }
     }
-    backgroundClock.activate()
-    backgroundFrameClock = backgroundClock
+    guard
+      let createdDisplayClock = cida_display_clock_create(
+        displayID,
+        performanceDisplayClockCallback,
+        Unmanaged.passUnretained(bridge).toOpaque()
+      )
+    else {
+      finish()
+      return
+    }
+    displayClock = createdDisplayClock
+    displayClockBridge = bridge
+    guard cida_display_clock_start(createdDisplayClock) else {
+      finish()
+      return
+    }
+    let clockFramesPerSecond = max(
+      1,
+      configuration.requiredFramesPerSecond ?? screen.maximumFramesPerSecond
+    )
     let expectedDuration =
       Double(configuration.sampleCount + configuration.warmupFrameCount)
       / Double(clockFramesPerSecond)
@@ -289,18 +325,10 @@ final class FramePacingProbeNSView: NSView {
     CATransaction.commit()
   }
 
-  static func measurementClockFramesPerSecond(
-    displayMaximumFramesPerSecond: Int,
-    requiredFramesPerSecond: Int?
-  ) -> Int {
-    max(1, requiredFramesPerSecond ?? displayMaximumFramesPerSecond)
-  }
-
   private func finish() {
     guard !didFinish else { return }
     didFinish = true
-    backgroundFrameClock?.cancel()
-    backgroundFrameClock = nil
+    stopDisplayClock()
     watchdog?.invalidate()
     watchdog = nil
     if let latencyActivity {
@@ -311,15 +339,32 @@ final class FramePacingProbeNSView: NSView {
     applicationActivationObserved = applicationActivationObserved || NSApp.isActive
     probeWindowBecameKey = probeWindowBecameKey || window?.isKeyWindow == true
 
-    let maximumFPS = window?.screen?.maximumFramesPerSecond ?? 60
+    let screen = window?.screen ?? NSScreen.main
+    let maximumFPS = screen?.maximumFramesPerSecond ?? 60
+    let backingFrame = screen.map { $0.convertRectToBacking($0.frame) } ?? .zero
     let metrics = workloadMetrics()
     let report = Self.makeReport(
       timestamps: frameTimestamps,
       maximumFramesPerSecond: maximumFPS,
+      artifactAppTreeSHA256: ProcessInfo.processInfo.environment[
+        "CIDA_ARTIFACT_APP_TREE_SHA256"
+      ],
+      artifactSourceCommit: ProcessInfo.processInfo.environment[
+        "CIDA_ARTIFACT_SOURCE_COMMIT"
+      ],
+      hardwareModel: Self.hardwareModel(),
+      operatingSystemVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+      thermalState: Self.thermalStateDescription(ProcessInfo.processInfo.thermalState),
+      lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+      powerSource: ProcessInfo.processInfo.environment["CIDA_PERFORMANCE_POWER_SOURCE"],
+      displayName: screen?.localizedName,
+      displayBackingScaleFactor: Double(screen?.backingScaleFactor ?? 1),
+      displayPixelWidth: Int(backingFrame.width.rounded()),
+      displayPixelHeight: Int(backingFrame.height.rounded()),
       interactionCount: interactionCount,
       requiredSampleCount: configuration.sampleCount,
       workload: configuration.workload.description,
-      frameClock: "background-deadline",
+      frameClock: "core-video-display-link",
       requiredFramesPerSecond: configuration.requiredFramesPerSecond,
       requiresZeroMissedFrameBudgets: configuration.requiresZeroMissedFrameBudgets,
       workloadCompleted: metrics.completed,
@@ -355,7 +400,7 @@ final class FramePacingProbeNSView: NSView {
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
       let data = try encoder.encode(report)
-      try data.write(to: configuration.outputURL, options: .atomic)
+      try data.write(to: configuration.outputURL, options: Data.WritingOptions.atomic)
     } catch {
       fputs("Failed to write frame pacing report: \(error)\n", stderr)
     }
@@ -365,9 +410,27 @@ final class FramePacingProbeNSView: NSView {
     }
   }
 
+  private func stopDisplayClock() {
+    guard let displayClock else { return }
+    cida_display_clock_destroy(displayClock)
+    self.displayClock = nil
+    displayClockBridge = nil
+  }
+
   static func makeReport(
     timestamps: [CFTimeInterval],
     maximumFramesPerSecond: Int,
+    artifactAppTreeSHA256: String? = nil,
+    artifactSourceCommit: String? = nil,
+    hardwareModel: String = "unknown",
+    operatingSystemVersion: String = "unknown",
+    thermalState: String = "unknown",
+    lowPowerModeEnabled: Bool = false,
+    powerSource: String? = nil,
+    displayName: String? = nil,
+    displayBackingScaleFactor: Double = 1,
+    displayPixelWidth: Int = 0,
+    displayPixelHeight: Int = 0,
     interactionCount: Int = 0,
     requiredSampleCount: Int? = nil,
     workload: String = FramePacingWorkload.streaming.description,
@@ -416,6 +479,17 @@ final class FramePacingProbeNSView: NSView {
       !intervals.isEmpty
     else {
       return FramePacingReport(
+        artifactAppTreeSHA256: artifactAppTreeSHA256,
+        artifactSourceCommit: artifactSourceCommit,
+        hardwareModel: hardwareModel,
+        operatingSystemVersion: operatingSystemVersion,
+        thermalState: thermalState,
+        lowPowerModeEnabled: lowPowerModeEnabled,
+        powerSource: powerSource,
+        displayName: displayName,
+        displayBackingScaleFactor: displayBackingScaleFactor,
+        displayPixelWidth: displayPixelWidth,
+        displayPixelHeight: displayPixelHeight,
         workload: workload,
         frameClock: frameClock,
         applicationActivationObserved: applicationActivationObserved,
@@ -487,6 +561,17 @@ final class FramePacingProbeNSView: NSView {
       && !applicationActivationObserved && !probeWindowBecameKey
 
     return FramePacingReport(
+      artifactAppTreeSHA256: artifactAppTreeSHA256,
+      artifactSourceCommit: artifactSourceCommit,
+      hardwareModel: hardwareModel,
+      operatingSystemVersion: operatingSystemVersion,
+      thermalState: thermalState,
+      lowPowerModeEnabled: lowPowerModeEnabled,
+      powerSource: powerSource,
+      displayName: displayName,
+      displayBackingScaleFactor: displayBackingScaleFactor,
+      displayPixelWidth: displayPixelWidth,
+      displayPixelHeight: displayPixelHeight,
       workload: workload,
       frameClock: frameClock,
       applicationActivationObserved: applicationActivationObserved,
@@ -566,6 +651,31 @@ final class FramePacingProbeNSView: NSView {
         maximumFrameTimeMilliseconds: (sorted.last ?? 0) * 1_000,
         missedFrameBudgetCount: intervals.count(where: { $0 > expectedInterval * 1.5 })
       )
+    }
+  }
+
+  private static func hardwareModel() -> String {
+    var size = 0
+    guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 1 else {
+      return "unknown"
+    }
+    var value = [CChar](repeating: 0, count: size)
+    guard sysctlbyname("hw.model", &value, &size, nil, 0) == 0 else {
+      return "unknown"
+    }
+    let bytes = value.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }
+    return String(decoding: bytes, as: UTF8.self)
+  }
+
+  private static func thermalStateDescription(
+    _ state: ProcessInfo.ThermalState
+  ) -> String {
+    switch state {
+    case .nominal: "nominal"
+    case .fair: "fair"
+    case .serious: "serious"
+    case .critical: "critical"
+    @unknown default: "unknown"
     }
   }
 }

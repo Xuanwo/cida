@@ -231,6 +231,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       window.hasShadow = false
       window.contentView?.alphaValue = 0.004
       window.ignoresMouseEvents = true
+      window.collectionBehavior = [.ignoresCycle, .stationary]
       for buttonType in [
         NSWindow.ButtonType.closeButton,
         .miniaturizeButton,
@@ -238,7 +239,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       ] {
         window.standardWindowButton(buttonType)?.isHidden = true
       }
-      window.orderFrontRegardless()
+      window.orderBack(nil)
       window.displayIfNeeded()
       launchDiagnostics.recordInitialRenderIfNeeded()
     }

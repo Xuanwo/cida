@@ -12,17 +12,9 @@ mkdir -p "$output_dir"
 pending_path=$(mktemp "$output_dir/.smooth-streaming.XXXXXX")
 trap '/bin/rm -f "$pending_path"' EXIT
 
-swift build \
-  --package-path "$project_dir" \
-  --configuration release \
-  -Xswiftc -warnings-as-errors
+artifact_root=$("$script_dir/e2e/resolve-release-artifact.sh")
 
-binary_path=$(swift build \
-  --package-path "$project_dir" \
-  --configuration release \
-  --show-bin-path)
-
-"$script_dir/run-isolated-automation.sh" "$binary_path/Cida" \
+"$script_dir/run-isolated-automation.sh" "$artifact_root" \
   --performance-output "$pending_path" \
   --performance-workload streaming \
   --performance-required-fps 120 \

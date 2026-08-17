@@ -358,7 +358,7 @@ def validate_database(database_path: Path, profile: Profile) -> dict[str, Any]:
 
 def run_profile(
     profile: Profile,
-    binary_path: Path,
+    automation_target: Path,
     runner_path: Path,
     output_directory: Path,
     required_fps: int,
@@ -378,7 +378,7 @@ def run_profile(
 
         command = [
             str(runner_path),
-            str(binary_path),
+            str(automation_target),
             "--automation-history-database",
             str(database_path),
             "--automation-openai-endpoint",
@@ -526,7 +526,13 @@ def run_profile(
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--binary", required=True, type=Path)
+    parser.add_argument(
+        "--artifact",
+        "--binary",
+        dest="automation_target",
+        required=True,
+        type=Path,
+    )
     parser.add_argument("--runner", required=True, type=Path)
     parser.add_argument("--output-directory", required=True, type=Path)
     parser.add_argument(
@@ -549,7 +555,7 @@ def main() -> int:
         print(f"Running extreme profile: {profile_name}", flush=True)
         result = run_profile(
             PROFILES[profile_name],
-            arguments.binary,
+            arguments.automation_target,
             arguments.runner,
             arguments.output_directory,
             max(1, arguments.required_fps),
