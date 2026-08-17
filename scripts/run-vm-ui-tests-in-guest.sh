@@ -1,15 +1,15 @@
 #!/bin/zsh
 set -euo pipefail
 
-if (( $# < 2 || $# > 5 )); then
-  echo "Usage: $0 <guest source directory> <guest results directory> [only-testing] [swift-test-sanitizer] [swift-test-filter]" >&2
+if (( $# < 2 || $# > 6 )); then
+  echo "Usage: $0 <guest source directory> <guest results directory> [only-testing] [swift-test-sanitizer] [swift-test-filter] [shared-artifact-directory]" >&2
   exit 64
 fi
 
 project_dir=${1:A}
 results_dir=${2:A}
 work_root="${project_dir:h}/cida-ui-test-work"
-shared_artifact_root="$results_dir/ReleaseArtifact"
+shared_artifact_root=${6:-"$results_dir/ReleaseArtifact"}
 artifact_root="$work_root/ReleaseArtifact"
 app_path="$artifact_root/Cida.app"
 derived_data="$work_root/DerivedData"

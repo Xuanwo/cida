@@ -3,7 +3,8 @@ set -euo pipefail
 
 script_dir=${0:A:h}
 project_dir=${script_dir:h}
-output_dir="$project_dir/Performance"
+output_dir=${CIDA_PERFORMANCE_OUTPUT_DIR:-"$project_dir/Performance"}
+output_dir=${output_dir:A}
 mode=${1:-smoke}
 required_fps=${2:-120}
 sample_count=${3:-2400}

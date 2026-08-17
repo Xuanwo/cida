@@ -3,7 +3,8 @@ set -euo pipefail
 
 script_dir=${0:A:h}
 project_dir=${script_dir:h}
-output_dir="$project_dir/Performance"
+output_dir=${CIDA_PERFORMANCE_OUTPUT_DIR:-"$project_dir/Performance"}
+output_dir=${output_dir:A}
 report_path="$output_dir/frame-pacing.json"
 sample_count=${1:-720}
 

@@ -29,9 +29,14 @@ fi
 mkdir -p "$results_dir"
 project_dir=${project_dir:A}
 results_dir=${results_dir:A}
-artifact_root="$results_dir/ReleaseArtifact"
+artifact_root=${CIDA_RELEASE_ARTIFACT_ROOT:-"$results_dir/ReleaseArtifact"}
+artifact_root=${artifact_root:A}
+shared_artifact_root="$results_dir/ReleaseArtifact"
 run_log="$results_dir/tart-run.log"
 progress_log="$results_dir/vm-progress.log"
+host_before_path="$results_dir/host-session-before.json"
+host_after_path="$results_dir/host-session-after.json"
+host_guard_path="$results_dir/host-session-guard.json"
 if [[ ! -d "$project_dir" || ! -d "$results_dir" ]]; then
   echo "Tart directory shares must resolve to existing directories" >&2
   exit 66
@@ -40,8 +45,44 @@ fi
 host_progress() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1" >>"$progress_log"
 }
+host_guard_finalized=false
+finalize_host_guard() {
+  [[ "$host_guard_finalized" == true ]] && return 0
+  host_guard_finalized=true
+  "$project_dir/scripts/e2e/host-session-snapshot.swift" >"$host_after_path"
+  if "$project_dir/scripts/e2e/compare-host-session.py" \
+    "$host_before_path" "$host_after_path" "$host_guard_path"
+  then
+    host_progress "host-session-guard-passed"
+    return 0
+  fi
+  host_progress "host-session-guard-failed"
+  return 1
+}
+"$project_dir/scripts/e2e/host-session-snapshot.swift" >"$host_before_path"
+trap 'finalize_host_guard || true' EXIT INT TERM
 
-if [[ -e "$artifact_root" ]]; then
+if [[ -n "${CIDA_RELEASE_ARTIFACT_ROOT:-}" ]]; then
+  host_progress "host-external-release-artifact-verification-started"
+  if [[ -e "$shared_artifact_root" ]]; then
+    echo "External artifact staging path already exists: $shared_artifact_root" >&2
+    exit 73
+  fi
+  /usr/bin/ditto "$artifact_root" "$shared_artifact_root"
+  shared_artifact_digest=$(
+    "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+      "$shared_artifact_root" --require-developer-id
+  )
+  external_artifact_digest=$(
+    "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+      "$artifact_root" --require-developer-id
+  )
+  if [[ "$shared_artifact_digest" != "$external_artifact_digest" ]]; then
+    echo "External Release artifact digest changed while staging it for Tart" >&2
+    exit 1
+  fi
+  host_progress "host-external-release-artifact-verification-finished"
+elif [[ -e "$artifact_root" ]]; then
   if [[ "${CIDA_E2E_REUSE_ARTIFACT:-0}" != "1" ]]; then
     echo "Release artifact already exists; use a new result directory or set CIDA_E2E_REUSE_ARTIFACT=1" >&2
     exit 73
@@ -70,7 +111,10 @@ cleanup_current_vm() {
     run_vm=""
   fi
 }
-cleanup() { cleanup_current_vm }
+cleanup() {
+  cleanup_current_vm
+  finalize_host_guard || true
+}
 trap cleanup EXIT INT TERM
 
 probe_guest_agent() {
@@ -198,11 +242,30 @@ tart exec "$run_vm" /bin/launchctl asuser 501 \
   work_dir="/Users/admin/cida-work"
   results_dir="/Volumes/My Shared Files/artifacts"
   "$work_dir/scripts/run-vm-ui-tests-in-guest.sh" \
-    "$work_dir" "$results_dir" "$1" "$2" "$3"
-' -- "$only_testing" "$swift_test_sanitizer" "$swift_test_filter"
+    "$work_dir" "$results_dir" "$1" "$2" "$3" "$4"
+' -- "$only_testing" "$swift_test_sanitizer" "$swift_test_filter" \
+  "/Volumes/My Shared Files/artifacts/ReleaseArtifact"
 
 "$project_dir/scripts/e2e/verify-release-artifact.sh" \
   "$artifact_root" --require-developer-id >/dev/null
 host_progress "host-release-artifact-reverified"
+staged_digest=$(
+  "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+    "$shared_artifact_root" --require-developer-id
+)
+source_digest=$(
+  "$project_dir/scripts/e2e/verify-release-artifact.sh" \
+    "$artifact_root" --require-developer-id
+)
+if [[ "$staged_digest" != "$source_digest" ]]; then
+  echo "Tart artifact staging copy no longer matches the source artifact" >&2
+  exit 1
+fi
+host_progress "host-staged-release-artifact-reverified"
+
+if ! finalize_host_guard; then
+  echo "Headless E2E changed the host pasteboard or production Cida session" >&2
+  exit 1
+fi
 
 echo "$results_dir/CidaUITests.xcresult"
