@@ -8,11 +8,15 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     let improveMode = driver.app.buttons["改进"]
     XCTAssertTrue(improveMode.waitForExistence(timeout: 3))
     improveMode.click()
-    XCTAssertTrue(driver.app.buttons["输出跟随原文"].waitForExistence(timeout: 3))
+    let outputHint = driver.element(identifier: "improvement-output-hint")
+    XCTAssertTrue(outputHint.waitForExistence(timeout: 3))
+    XCTAssertEqual(outputHint.label, "输出跟随原文")
 
     let englishSource =
       "This sentence are unclear and too wordy. CIDA_E2E_IMPROVE_ENGLISH"
-    let englishID = driver.submit(englishSource)
+    driver.replaceText(in: driver.composer, with: englishSource)
+    XCTAssertTrue(driver.waitForLabel("English · 输出跟随原文", in: outputHint, timeout: 3))
+    let englishID = driver.submitCurrentComposer()
     let englishResult = driver.result(containing: "CIDA_E2E_IMPROVE_ENGLISH_COMPLETE")
     XCTAssertTrue(englishResult.waitForExistence(timeout: 8))
     XCTAssertEqual(englishResult.identifier, "history-result-\(englishID.uppercased())")
@@ -20,15 +24,20 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
 
     let englishEntry = driver.element(identifier: "history-entry-\(englishID.lowercased())")
     XCTAssertTrue(englishEntry.waitForExistence(timeout: 3))
-    XCTAssertTrue(englishEntry.label.contains("跟随原文"))
+    XCTAssertTrue(englishEntry.label.contains("English · 语气与语法"))
     XCTAssertFalse(englishEntry.label.contains("中文"))
 
     let chineseSource = "这句话不太清楚也有一点啰嗦。CIDA_E2E_IMPROVE_CHINESE"
-    let chineseID = driver.submit(chineseSource)
+    driver.replaceText(in: driver.composer, with: chineseSource)
+    XCTAssertTrue(driver.waitForLabel("中文 · 输出跟随原文", in: outputHint, timeout: 3))
+    let chineseID = driver.submitCurrentComposer()
     let chineseResult = driver.result(containing: "CIDA_E2E_IMPROVE_CHINESE_COMPLETE")
     XCTAssertTrue(chineseResult.waitForExistence(timeout: 8))
     XCTAssertEqual(chineseResult.identifier, "history-result-\(chineseID.uppercased())")
     XCTAssertTrue(driver.waitForLabel("改进", in: driver.submitButton, timeout: 3))
+    let chineseEntry = driver.element(identifier: "history-entry-\(chineseID.lowercased())")
+    XCTAssertTrue(chineseEntry.waitForExistence(timeout: 3))
+    XCTAssertTrue(chineseEntry.label.contains("中文 · 语气与语法"))
   }
 
   func testRealTypingPasteGrowthDeletionShrinkAndSubmission() {

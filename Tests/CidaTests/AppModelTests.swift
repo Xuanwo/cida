@@ -21,10 +21,10 @@ final class AppModelTests: XCTestCase {
 
     XCTAssertEqual(model.mode, .improve)
     XCTAssertEqual(model.inputText, "Keep this text")
-    XCTAssertEqual(model.outputHint, "输出跟随原文")
+    XCTAssertEqual(model.outputHint, "English · 输出跟随原文")
   }
 
-  func testImprovementHistoryAlwaysDescribesTheSourceLanguagePolicy() {
+  func testImprovementHistoryShowsTheDetectedSourceLanguageAndProfile() {
     let legacyEntry = HistoryEntry(
       mode: .improve,
       source: "This sentence needs improvement.",
@@ -33,8 +33,26 @@ final class AppModelTests: XCTestCase {
       timestamp: "18:00"
     )
 
-    XCTAssertTrue(legacyEntry.metadata.hasPrefix("跟随原文 · "))
+    XCTAssertTrue(legacyEntry.metadata.hasPrefix("English · 语气与语法 · "))
     XCTAssertFalse(legacyEntry.metadata.contains("中文"))
+  }
+
+  func testImprovementComposerHintTracksChineseAndEnglishWithoutChangingTheModelPolicy() {
+    let model = AppModel(mode: .improve, inputText: "这句话需要改进。")
+
+    XCTAssertEqual(model.outputHint, "中文 · 输出跟随原文")
+    model.inputText = "This sentence needs improvement."
+    XCTAssertEqual(model.outputHint, "English · 输出跟随原文")
+
+    let request = ProcessingRequest(
+      text: model.inputText,
+      mode: .improve,
+      sourceLanguage: .chinese,
+      targetLanguage: .chinese
+    )
+    XCTAssertEqual(ModelTaskParameters(request: request).languageBehavior, .preserveSource)
+    XCTAssertNil(ModelTaskParameters(request: request).sourceLanguage)
+    XCTAssertNil(ModelTaskParameters(request: request).targetLanguage)
   }
 
   func testLatestCopyableResultSkipsTheActiveStreamingEntry() {
@@ -150,9 +168,11 @@ final class AppModelTests: XCTestCase {
 
     let processing = Task { await model.process(text: "Draft") }
 
+    try await waitUntil { model.generationState.phase == .waiting }
     try await waitUntil { model.entries.last?.result.hasPrefix("Clear") == true }
     let partialScrollRevision = model.historyScrollRevision
     XCTAssertTrue(model.isProcessing)
+    XCTAssertEqual(model.generationState.phase, .revealing)
     XCTAssertEqual(model.entries.last?.state, .streaming)
     XCTAssertEqual(model.inputText, "")
 
@@ -162,6 +182,7 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.entries[0].result, "Clear and concise.")
     XCTAssertEqual(model.entries[0].state, .completed)
     XCTAssertFalse(model.isProcessing)
+    XCTAssertEqual(model.generationState, .idle)
     XCTAssertGreaterThan(model.historyScrollRevision, partialScrollRevision)
   }
 
@@ -201,7 +222,9 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.entries.last?.state, .cancelled)
   }
 
-  func testCancellingDuringSubmissionPreflightRestoresThePreviousLatestEntry() async throws {
+  func testSubmitAtomicallyClearsTheComposerFoldsThePreviousEntryAndInsertsWaitingOutput()
+    async throws
+  {
     let previous = HistoryEntry(
       mode: .translate,
       source: "Previous source",
@@ -217,19 +240,25 @@ final class AppModelTests: XCTestCase {
         delay: .milliseconds(250)
       )
     )
-    var didReachFoldedPreflight = false
-    model.submissionPreflightDidFoldPreviousEntry = { [weak model] in
-      didReachFoldedPreflight = true
-      model?.cancelProcessing()
-    }
-
     XCTAssertTrue(model.submit())
+
+    let submitted = try XCTUnwrap(model.entries.last)
+    XCTAssertEqual(model.inputText, "")
+    XCTAssertEqual(model.entries.count, 2)
+    XCTAssertFalse(previous.isLatestInHistory)
+    XCTAssertTrue(submitted.isLatestInHistory)
+    XCTAssertEqual(submitted.source, "Next source")
+    XCTAssertEqual(submitted.result, "")
+    XCTAssertEqual(submitted.state, .streaming)
+    XCTAssertEqual(model.generationState, .waiting(entryID: submitted.id))
+
+    model.cancelProcessing()
     try await waitUntil { !model.isProcessing }
 
-    XCTAssertTrue(didReachFoldedPreflight)
-    XCTAssertEqual(model.entries.count, 1)
-    XCTAssertTrue(previous.isLatestInHistory)
-    XCTAssertTrue(model.isHistoryEntryExpanded(previous))
+    XCTAssertEqual(model.entries.count, 2)
+    XCTAssertEqual(submitted.state, .cancelled)
+    XCTAssertFalse(model.isHistoryEntryExpanded(previous))
+    XCTAssertTrue(model.isHistoryEntryExpanded(submitted))
   }
 
   func testBurstyResponseIsReleasedInBoundedPresentationUpdates() async {

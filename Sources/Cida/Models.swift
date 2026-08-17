@@ -194,7 +194,10 @@ final class HistoryEntry: Identifiable, Equatable, @unchecked Sendable {
     self.mode = mode
     self.source = source
     resultStorage = HistoryResultStorage(result)
-    self.detail = detail
+    self.detail =
+      mode == .improve
+      ? ImprovementPresentation.historyDetail(for: source)
+      : detail
     self.timestamp = timestamp
     self.reportedSourceCharacterCount = reportedSourceCharacterCount
     self.reportedResultCharacterCount = reportedResultCharacterCount
@@ -229,18 +232,17 @@ final class HistoryEntry: Identifiable, Equatable, @unchecked Sendable {
   }
 
   var metadata: String {
-    let presentedDetail = mode == .improve ? "跟随原文" : detail
     return switch state {
     case .streaming:
-      "\(presentedDetail) · 生成中"
+      "\(detail) · 生成中"
     case .cancelled:
-      "\(presentedDetail) · 已停止"
+      "\(detail) · 已停止"
     case .failed:
-      "\(presentedDetail) · 出错 · 重试"
+      "\(detail) · 出错 · 重试"
     case .completed where isLongDocument:
-      "\(presentedDetail) · \(timestamp) · \(sourceCharacterCount.formatted()) → \(resultCharacterCount.formatted()) 字"
+      "\(detail) · \(timestamp) · \(sourceCharacterCount.formatted()) → \(resultCharacterCount.formatted()) 字"
     case .completed:
-      "\(presentedDetail) · \(timestamp)"
+      "\(detail) · \(timestamp)"
     }
   }
 

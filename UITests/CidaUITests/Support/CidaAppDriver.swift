@@ -83,9 +83,14 @@ final class CidaAppDriver {
 
   @discardableResult
   func submit(_ text: String, expectsStreamingState: Bool = false) -> String {
-    let existing = historyEntryIdentifiers()
     paste(text)
     XCTAssertEqual(composer.value as? String, text)
+    return submitCurrentComposer(expectsStreamingState: expectsStreamingState)
+  }
+
+  @discardableResult
+  func submitCurrentComposer(expectsStreamingState: Bool = false) -> String {
+    let existing = historyEntryIdentifiers()
     XCTAssertTrue(submitButton.isEnabled)
     submitButton.click()
     if expectsStreamingState {

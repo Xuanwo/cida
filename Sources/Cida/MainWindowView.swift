@@ -1631,9 +1631,9 @@ private struct Composer: View {
             ZStack {
               RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(CidaDesign.accent)
-              Image(systemName: "stop.fill")
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(.white)
+              RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(CidaDesign.accentForeground)
+                .frame(width: 10, height: 10)
                 .opacity(model.isProcessing ? 1 : 0)
               LucideIcon(.arrowUp, size: 15)
                 .foregroundStyle(.white)
@@ -1895,28 +1895,40 @@ private struct ModeSegmentedControl: View {
 private struct OutputHint: View {
   @Bindable var model: AppModel
 
+  @ViewBuilder
   var body: some View {
-    Button {
-      if model.mode == .translate {
+    if model.mode == .translate {
+      Button {
         model.swapLanguages()
-      }
-    } label: {
-      HStack(spacing: 6) {
-        if model.mode == .translate {
+      } label: {
+        HStack(spacing: 6) {
           Text(model.sourceLanguage.title)
           LucideIcon(.arrowLeftRight, size: 11)
           Text(model.targetLanguage.title)
-        } else {
-          LucideIcon(.scanText, size: 11)
-          Text(model.outputHint)
         }
+        .modifier(OutputHintStyle())
       }
+      .buttonStyle(HoverFadeButtonStyle())
+      .accessibilityLabel("交换源语言与目标语言")
+    } else {
+      HStack(spacing: 6) {
+        LucideIcon(.scanText, size: 11)
+        Text(model.outputHint)
+      }
+      .modifier(OutputHintStyle())
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel(model.outputHint)
+      .accessibilityIdentifier("improvement-output-hint")
+    }
+  }
+}
+
+private struct OutputHintStyle: ViewModifier {
+  func body(content: Content) -> some View {
+    content
       .font(CidaDesign.mainUI(11.5, weight: .medium))
       .foregroundStyle(CidaDesign.textTertiary)
       .padding(.horizontal, 10)
       .padding(.vertical, 4)
-    }
-    .buttonStyle(HoverFadeButtonStyle())
-    .accessibilityLabel(model.mode == .translate ? "交换源语言与目标语言" : model.outputHint)
   }
 }

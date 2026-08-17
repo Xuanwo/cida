@@ -303,7 +303,16 @@ final class AppModel {
   private(set) var hasOlderHistory: Bool
   private(set) var isLoadingOlderHistory = false
   var settings = CidaSettings()
-  var isProcessing = false
+  private(set) var generationState = GenerationPresentationState.idle
+  var isProcessing: Bool {
+    get { generationState.isActive }
+    set {
+      generationState =
+        newValue
+        ? .waiting(entryID: entries.last?.id ?? UUID())
+        : .idle
+    }
+  }
   var errorMessage: String?
   var editingPrompt: ProcessingMode? = .improve
   var inputFocusRequestID = 0
@@ -322,9 +331,6 @@ final class AppModel {
   private let clearPersistedAPIKey: @MainActor () -> Void
   private var processingTask: Task<Void, Never>?
   @ObservationIgnored private var automaticFoldCleanupTask: Task<Void, Never>?
-  #if DEBUG
-    @ObservationIgnored var submissionPreflightDidFoldPreviousEntry: (() -> Void)?
-  #endif
   private var settingsSaveTask: Task<Void, Never>?
   private var olderHistoryLoadTask: Task<Void, Never>?
   @ObservationIgnored private var olderHistoryLoadRequestTask: Task<Void, Never>?
@@ -400,7 +406,9 @@ final class AppModel {
     case .translate:
       "\(sourceLanguage.title) → \(targetLanguage.title)"
     case .improve:
-      "输出跟随原文"
+      ImprovementPresentation.composerHint(
+        for: stagedInputDocument ?? inputText
+      )
     }
   }
 
@@ -458,34 +466,18 @@ final class AppModel {
     inputResetRevision &+= 1
     inputText = ""
     processingTask?.cancel()
-    isProcessing = true
+    let request = ProcessingRequest(
+      text: requestText,
+      mode: mode,
+      sourceLanguage: sourceLanguage,
+      targetLanguage: targetLanguage
+    )
+    let entryID = beginGeneration(
+      request: request,
+      reportedSourceCharacterCount: requestCharacterCount
+    )
     processingTask = Task { [weak self] in
-      // Present the composer reset, previous-card fold, and newest-card insert
-      // on separate 60 Hz turns. Combining those structural changes can exceed
-      // a frame budget for a very large virtual history.
-      try? await Task.sleep(for: .milliseconds(17))
-      guard !Task.isCancelled else {
-        self?.restoreLatestHistoryEntryAfterCancelledReplacement()
-        self?.isProcessing = false
-        self?.processingTask = nil
-        return
-      }
-      self?.prepareLatestHistoryEntryForReplacement()
-      #if DEBUG
-        self?.submissionPreflightDidFoldPreviousEntry?()
-      #endif
-      try? await Task.sleep(for: .milliseconds(17))
-      guard !Task.isCancelled else {
-        self?.restoreLatestHistoryEntryAfterCancelledReplacement()
-        self?.isProcessing = false
-        self?.processingTask = nil
-        return
-      }
-      await self?.process(
-        text: requestText,
-        reportedSourceCharacterCount: requestCharacterCount,
-        clearInput: false
-      )
+      await self?.runGeneration(request: request, entryID: entryID)
     }
     return true
   }
@@ -498,11 +490,18 @@ final class AppModel {
     guard !isProcessing else { return }
     setMode(entry.mode)
     processingTask?.cancel()
+    let request = ProcessingRequest(
+      text: entry.source,
+      mode: entry.mode,
+      sourceLanguage: sourceLanguage,
+      targetLanguage: targetLanguage
+    )
+    let entryID = beginGeneration(
+      request: request,
+      reportedSourceCharacterCount: entry.reportedSourceCharacterCount
+    )
     processingTask = Task { [weak self] in
-      await self?.process(
-        text: entry.source,
-        reportedSourceCharacterCount: entry.reportedSourceCharacterCount
-      )
+      await self?.runGeneration(request: request, entryID: entryID)
     }
   }
 
@@ -644,24 +643,31 @@ final class AppModel {
     reportedSourceCharacterCount: Int? = nil,
     clearInput: Bool = true
   ) async {
-    let latencyActivity = ProcessInfo.processInfo.beginActivity(
-      options: [.userInitiated, .latencyCritical],
-      reason: "Presenting a streamed response"
-    )
-    defer {
-      ProcessInfo.processInfo.endActivity(latencyActivity)
-    }
-    isProcessing = true
-    errorMessage = nil
-
     let request = ProcessingRequest(
       text: text,
       mode: mode,
       sourceLanguage: sourceLanguage,
       targetLanguage: targetLanguage
     )
+    let entryID = beginGeneration(
+      request: request,
+      reportedSourceCharacterCount: reportedSourceCharacterCount
+    )
+    if clearInput, stagedInputDocument != nil || !inputText.isEmpty {
+      stageInputDocument(nil)
+      inputResetRevision &+= 1
+      inputText = ""
+    }
+    await runGeneration(request: request, entryID: entryID)
+  }
 
+  private func beginGeneration(
+    request: ProcessingRequest,
+    reportedSourceCharacterCount: Int?
+  ) -> UUID {
+    errorMessage = nil
     let entryID = UUID()
+    generationState = .waiting(entryID: entryID)
     let entry = HistoryEntry(
       id: entryID,
       mode: request.mode,
@@ -669,7 +675,7 @@ final class AppModel {
       result: "",
       detail: request.mode == .translate
         ? "\(request.sourceLanguage.title) → \(request.targetLanguage.title)"
-        : "跟随原文",
+        : ImprovementPresentation.historyDetail(for: request.text),
       timestamp: Self.timeFormatter.string(from: Date()),
       reportedSourceCharacterCount: reportedSourceCharacterCount ?? request.text.utf16.count,
       state: .streaming
@@ -679,13 +685,21 @@ final class AppModel {
       hasLongHistoryDocument = true
     }
     historyPersistence?.insert(HistoryPersistenceRecord(entry))
-    if clearInput, stagedInputDocument != nil || !inputText.isEmpty {
-      stageInputDocument(nil)
-      inputResetRevision &+= 1
-      inputText = ""
-    }
     requestHistoryFollow()
+    return entryID
+  }
 
+  private func runGeneration(
+    request: ProcessingRequest,
+    entryID: UUID
+  ) async {
+    let latencyActivity = ProcessInfo.processInfo.beginActivity(
+      options: [.userInitiated, .latencyCritical],
+      reason: "Presenting a streamed response"
+    )
+    defer {
+      ProcessInfo.processInfo.endActivity(latencyActivity)
+    }
     let presenter = makeStreamPresenter(for: entryID)
     let presentationTask = Task { @MainActor in
       try await presenter.run()
@@ -693,6 +707,7 @@ final class AppModel {
 
     do {
       try await withTaskCancellationHandler {
+        try Task.checkCancellation()
         for try await chunk in service.stream(request, settings: settings) {
           try Task.checkCancellation()
           presenter.append(chunk)
@@ -722,7 +737,9 @@ final class AppModel {
       requestHistoryFollow(force: false, allowsThrottling: false)
     }
 
-    isProcessing = false
+    if generationState.entryID == entryID {
+      generationState = .idle
+    }
     processingTask = nil
   }
 
@@ -740,6 +757,9 @@ final class AppModel {
           $0.appendPresentationDelta(delta)
         })
     else { return }
+    if generationState == .waiting(entryID: entryID) {
+      generationState = .revealing(entryID: entryID)
+    }
     historyPersistence?.appendResult(entryID: entryID, delta: delta)
     streamPresentationUpdateCount &+= 1
     maximumStreamPresentationCharacterCount = max(
@@ -952,18 +972,6 @@ final class AppModel {
     if !hasLongHistoryDocument, appendedEntries.contains(where: \.isLongDocument) {
       hasLongHistoryDocument = true
     }
-  }
-
-  private func prepareLatestHistoryEntryForReplacement() {
-    beginAutomaticFold(of: entries.last)
-  }
-
-  private func restoreLatestHistoryEntryAfterCancelledReplacement() {
-    guard entries.last?.isLatestInHistory == false else { return }
-    automaticFoldCleanupTask?.cancel()
-    automaticFoldCleanupTask = nil
-    automaticallyFoldingHistoryEntryID = nil
-    entries.last?.isLatestInHistory = true
   }
 
   private func beginAutomaticFold(of entry: HistoryEntry?) {
