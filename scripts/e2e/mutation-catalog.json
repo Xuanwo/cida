@@ -49,6 +49,22 @@
       ]
     },
     {
+      "id": "submitted-composer-is-not-cleared",
+      "description": "Accept a submission without clearing the native composer or advancing its reset generation.",
+      "contracts": ["CIDA-E2E-010", "STATE-MACHINE-COMPOSER-RESET"],
+      "file": "Sources/Cida/AppModel.swift",
+      "before": "    stageInputDocument(nil)\n    inputResetRevision &+= 1\n    inputText = \"\"\n    processingTask?.cancel()",
+      "after": "    processingTask?.cancel()",
+      "occurrences": 1,
+      "unitTests": [
+        "AppModelTests/testSubmitAtomicallyClearsTheComposerFoldsThePreviousEntryAndInsertsWaitingOutput"
+      ],
+      "releaseTests": [
+        "CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte",
+        "TranslationStateMachineJourneyTests/testSharedStateMachineSmokeSurvivesConsecutiveSubmissionsAndRelaunch"
+      ]
+    },
+    {
       "id": "history-follow-disabled",
       "description": "Disable submit, stream and terminal history follow revisions.",
       "contracts": ["CIDA-E2E-011", "CIDA-E2E-012"],
