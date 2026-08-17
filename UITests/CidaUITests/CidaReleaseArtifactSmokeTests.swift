@@ -23,6 +23,9 @@ final class CidaReleaseArtifactSmokeTests: XCTestCase {
       endpoint = "http://127.0.0.1:\(port)/v1/chat/completions"
     }
     let databasePath = "\(workRoot)/release-smoke-\(UUID().uuidString).sqlite3"
+    let settingsNamespace =
+      "com.xuanwo.Cida.Automation.ReleaseSmoke."
+      + UUID().uuidString.replacingOccurrences(of: "-", with: "")
 
     app = XCUIApplication(url: URL(fileURLWithPath: appPath))
     app.launchEnvironment["CIDA_ISOLATED_AUTOMATION"] = "1"
@@ -30,6 +33,8 @@ final class CidaReleaseArtifactSmokeTests: XCTestCase {
       "--e2e-testing",
       "--automation-history-database",
       databasePath,
+      "--automation-settings-namespace",
+      settingsNamespace,
       "--automation-openai-endpoint",
       endpoint,
     ]

@@ -15,7 +15,8 @@ does not launch Cida on the host, share the host pasteboard, or request host foc
 - `UITests/Fixtures/e2e_scenario_server.py` provides a deterministic OpenAI-compatible local
   endpoint. Tests release response headers and chunks through named gates instead of sleeping.
 - `SQLiteHistoryFixture` seeds each journey's isolated production-schema database before launch.
-- Every UI test starts with a new app container, database, Keychain service, and pasteboard.
+- Every UI test starts with a unique settings domain, SQLite database, Keychain service, and VM-only
+  pasteboard. Relaunches inside one test deliberately retain that test's namespace.
 - Application assertion failures are never retried. Only a failed Tart boot may use one fresh
   clone retry.
 - Host snapshots record the frontmost app, pasteboard change count, and production Cida processes

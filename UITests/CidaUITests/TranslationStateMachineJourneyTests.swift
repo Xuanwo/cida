@@ -45,7 +45,7 @@ final class TranslationStateMachineJourneyTests: CidaReleaseUITestCase {
       XCTAssertTrue(oracle.invariantViolations().isEmpty)
     }
 
-    XCTAssertEqual(driver.historyEntryIdentifiers().count, oracle.entries.count)
+    XCTAssertEqual(driver.historyEntryCount(), oracle.entries.count)
     let expected = try! XCTUnwrap(oracle.currentEntry)
     let latestID = try! XCTUnwrap(submittedEntryIDs.last)
     let latestResult = driver.app.textViews["history-result-\(latestID.uppercased())"]

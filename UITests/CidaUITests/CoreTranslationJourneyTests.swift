@@ -142,7 +142,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(
       driver.result(containing: "CIDA_E2E_POOL_GATED_COMPLETE").waitForExistence(timeout: 8)
     )
-    XCTAssertEqual(driver.historyEntryIdentifiers().count, 6)
+    XCTAssertEqual(driver.historyEntryCount(), 6)
   }
 
   func testCancellationFailureAndRecoveryKeepTheJourneyUsable() throws {

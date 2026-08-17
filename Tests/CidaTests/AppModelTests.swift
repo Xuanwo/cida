@@ -631,6 +631,25 @@ final class AppModelTests: XCTestCase {
     )
   }
 
+  func testSettingsPersistWithinOneNamespaceWithoutLeakingIntoAnother() {
+    let firstNamespace = "com.xuanwo.Cida.Automation.Unit.First.\(UUID().uuidString)"
+    let secondNamespace = "com.xuanwo.Cida.Automation.Unit.Second.\(UUID().uuidString)"
+    defer {
+      SettingsStore.reset(namespace: firstNamespace)
+      SettingsStore.reset(namespace: secondNamespace)
+    }
+
+    var firstSettings = CidaSettings()
+    firstSettings.provider = .openAI
+    firstSettings.model = "isolated-model"
+    SettingsStore.save(firstSettings, namespace: firstNamespace)
+
+    XCTAssertEqual(SettingsStore.load(namespace: firstNamespace).provider, .openAI)
+    XCTAssertEqual(SettingsStore.load(namespace: firstNamespace).model, "isolated-model")
+    XCTAssertEqual(SettingsStore.load(namespace: secondNamespace).provider, .deepSeek)
+    XCTAssertEqual(SettingsStore.load(namespace: secondNamespace).model, "deepseek-chat")
+  }
+
   func testSavingUnrelatedSettingsDoesNotClearAnUnavailableAPIKey() {
     var clearCount = 0
     var persistedSettings: CidaSettings?

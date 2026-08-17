@@ -6,11 +6,17 @@ import XCTest
 final class CidaAppDriver {
   let environment: E2EEnvironment
   let databasePath: String
+  let settingsNamespace: String
   private(set) var app: XCUIApplication
 
-  init(environment: E2EEnvironment, databasePath: String) {
+  init(
+    environment: E2EEnvironment,
+    databasePath: String,
+    settingsNamespace: String
+  ) {
     self.environment = environment
     self.databasePath = databasePath
+    self.settingsNamespace = settingsNamespace
     app = XCUIApplication(url: URL(fileURLWithPath: environment.appPath))
   }
 
@@ -50,6 +56,8 @@ final class CidaAppDriver {
       "--e2e-testing",
       "--automation-history-database",
       databasePath,
+      "--automation-settings-namespace",
+      settingsNamespace,
     ]
     if endpointOverride {
       app.launchArguments += ["--automation-openai-endpoint", environment.endpoint]
@@ -100,9 +108,10 @@ final class CidaAppDriver {
 
   @discardableResult
   func submitCurrentComposer(expectsStreamingState: Bool = false) -> String {
-    let existing = historyEntryIdentifiers()
-    let previousCurrentIdentifier = currentHistoryEntry.exists
-      ? currentHistoryEntry.identifier
+    let previousCurrentEntry = currentHistoryEntry
+    let previousCurrentIdentifier =
+      previousCurrentEntry.exists
+      ? previousCurrentEntry.identifier
       : nil
     XCTAssertTrue(submitButton.isEnabled)
     submitButton.click()
@@ -113,7 +122,10 @@ final class CidaAppDriver {
     if expectsStreamingState {
       XCTAssertTrue(waitForLabel("停止生成", in: submitButton, timeout: 3))
     }
-    let identifier = waitForNewHistoryEntry(excluding: existing, timeout: 5)
+    let identifier = waitForNewCurrentHistoryEntry(
+      excluding: previousCurrentIdentifier,
+      timeout: 5
+    )
     XCTAssertNotNil(identifier)
     guard let identifier else { return "" }
 
@@ -183,23 +195,24 @@ final class CidaAppDriver {
     ).firstMatch
   }
 
-  func historyEntryIdentifiers() -> Set<String> {
-    let entries = app.descendants(matching: .any).matching(
+  func historyEntryCount() -> Int {
+    app.descendants(matching: .any).matching(
       NSPredicate(format: "identifier BEGINSWITH %@", "history-entry-")
-    )
-    return Set(entries.allElementsBoundByIndex.map(\.identifier))
+    ).count
   }
 
-  func waitForNewHistoryEntry(
-    excluding existingIdentifiers: Set<String>,
+  func waitForNewCurrentHistoryEntry(
+    excluding previousIdentifier: String?,
     timeout: TimeInterval
   ) -> String? {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
-      if let identifier = historyEntryIdentifiers().first(where: {
-        !existingIdentifiers.contains($0)
-      }) {
-        return identifier
+      let entry = currentHistoryEntry
+      if entry.exists {
+        let identifier = entry.identifier
+        if identifier != previousIdentifier {
+          return identifier
+        }
       }
       RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     } while Date() < deadline
@@ -344,18 +357,22 @@ class CidaReleaseUITestCase: XCTestCase {
     try await super.setUp()
     continueAfterFailure = false
     e2eEnvironment = try E2EEnvironment()
-    e2eEnvironment.resetProductionSettings()
     scenarioServer = ScenarioServerClient(baseURL: e2eEnvironment.controlBaseURL)
     try scenarioServer.reset()
+    let settingsNamespace = e2eEnvironment.uniqueSettingsNamespace(for: name)
+    e2eEnvironment.resetSettings(namespace: settingsNamespace)
     driver = CidaAppDriver(
       environment: e2eEnvironment,
-      databasePath: e2eEnvironment.uniqueDatabasePath(for: name)
+      databasePath: e2eEnvironment.uniqueDatabasePath(for: name),
+      settingsNamespace: settingsNamespace
     )
   }
 
   override func tearDown() async throws {
     driver?.terminate()
-    e2eEnvironment?.resetProductionSettings()
+    if let driver {
+      e2eEnvironment?.resetSettings(namespace: driver.settingsNamespace)
+    }
     try await super.tearDown()
   }
 }

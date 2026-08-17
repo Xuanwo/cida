@@ -1922,7 +1922,7 @@ private struct OutputHint: View {
         Text(model.outputHint)
       }
       .modifier(OutputHintStyle())
-      .accessibilityElement(children: .combine)
+      .accessibilityElement(children: .ignore)
       .accessibilityLabel(model.outputHint)
       .accessibilityIdentifier("improvement-output-hint")
     }

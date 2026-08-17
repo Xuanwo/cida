@@ -102,6 +102,37 @@ final class WindowAndSettingsJourneyTests: CidaReleaseUITestCase {
     )
   }
 
+  func testFreshAppInstancesDoNotShareSettingsOrCredentials() {
+    driver.launch(endpointOverride: false)
+    driver.configureOpenAI(
+      endpoint: e2eEnvironment.endpoint,
+      model: "first-instance-model",
+      apiKey: "sk-first-instance"
+    )
+    driver.terminate()
+
+    let secondNamespace = e2eEnvironment.uniqueSettingsNamespace(for: name + "-second")
+    let secondDriver = CidaAppDriver(
+      environment: e2eEnvironment,
+      databasePath: e2eEnvironment.uniqueDatabasePath(for: name + "-second"),
+      settingsNamespace: secondNamespace
+    )
+    defer {
+      secondDriver.terminate()
+      e2eEnvironment.resetSettings(namespace: secondNamespace)
+    }
+
+    secondDriver.launch(endpointOverride: false)
+    secondDriver.app.buttons["model-settings-button"].click()
+    let settingsWindow = secondDriver.app.windows["设置"]
+    XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+    XCTAssertEqual(secondDriver.settingsProviderMenu(in: settingsWindow).label, "DeepSeek")
+    XCTAssertEqual(
+      secondDriver.app.secureTextFields["settings-api-key-editor"].value as? String,
+      ""
+    )
+  }
+
   private func waitForWindowFrameChange(from frame: CGRect, timeout: TimeInterval) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {

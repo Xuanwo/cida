@@ -50,6 +50,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
   }()
   private lazy var model: AppModel = {
+    let settingsStorageNamespace = launchOptions.settingsStorageNamespace
     let persistedEntries: [HistoryEntry]
     var historyPage: HistoryPage?
     if let historyStore {
@@ -82,7 +83,13 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       historyTotalCount: historyPage?.totalCount,
       historyOldestSortOrder: historyPage?.oldestSortOrder,
       historyHasMoreBefore: historyPage?.hasMoreBefore ?? false,
-      historyPageSize: launchOptions.initialHistoryPageSize
+      historyPageSize: launchOptions.initialHistoryPageSize,
+      saveSettings: { settings in
+        SettingsStore.save(settings, namespace: settingsStorageNamespace)
+      },
+      clearPersistedAPIKey: {
+        SettingsStore.clearAPIKey(namespace: settingsStorageNamespace)
+      }
     )
   }()
 
@@ -179,7 +186,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       return
     }
     didAttemptInteractiveAPIKeyRecovery = true
-    if let apiKey = SettingsStore.loadAPIKeyAllowingInteraction() {
+    if let apiKey = SettingsStore.loadAPIKeyAllowingInteraction(
+      namespace: launchOptions.settingsStorageNamespace
+    ) {
       model.restorePersistedAPIKey(apiKey)
     }
   }
@@ -474,6 +483,7 @@ private struct LaunchOptions {
   let isE2ETesting: Bool
   let automationHistoryDatabaseURL: URL?
   let automationOpenAIEndpoint: String?
+  let automationSettingsNamespace: String?
   let extremeWorkflowConfiguration: ExtremeWorkflowConfiguration?
   let initialHistoryPageSize: Int
 
@@ -490,12 +500,19 @@ private struct LaunchOptions {
     !isAutomation || isE2ETesting
   }
 
+  var settingsStorageNamespace: String {
+    automationSettingsNamespace ?? SettingsStore.storageNamespace
+  }
+
   private var usesDesignFixtures: Bool {
     isAutomation && !isE2ETesting
   }
 
   var initialSettings: CidaSettings {
-    var settings = isE2ETesting ? SettingsStore.load() : CidaSettings()
+    var settings =
+      isE2ETesting
+      ? SettingsStore.load(namespace: settingsStorageNamespace)
+      : CidaSettings()
     #if DEBUG
       if usesDesignFixtures {
         settings = CidaSettings.designPreview
@@ -576,6 +593,21 @@ private struct LaunchOptions {
       explicitlyIsolatedAutomation
       ? arguments.value(after: "--automation-openai-endpoint")
       : nil
+    let requestedAutomationSettingsNamespace =
+      explicitlyIsolatedAutomation
+      ? arguments.value(after: "--automation-settings-namespace")
+      : nil
+    if isE2ETesting {
+      guard
+        let requestedAutomationSettingsNamespace,
+        requestedAutomationSettingsNamespace.hasPrefix("com.xuanwo.Cida.Automation.")
+      else {
+        fatalError("E2E testing requires an isolated automation settings namespace")
+      }
+      automationSettingsNamespace = requestedAutomationSettingsNamespace
+    } else {
+      automationSettingsNamespace = nil
+    }
     initialHistoryPageSize = min(
       5_000,
       max(

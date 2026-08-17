@@ -46,16 +46,26 @@ struct E2EEnvironment {
     return "\(workRoot)/history-\(safeName)-\(UUID().uuidString).sqlite3"
   }
 
-  func resetProductionSettings() {
+  func uniqueSettingsNamespace(for testName: String) -> String {
+    let safeName = testName.replacingOccurrences(
+      of: "[^A-Za-z0-9]",
+      with: "",
+      options: .regularExpression
+    )
+    let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    return "com.xuanwo.Cida.Automation.\(safeName).\(nonce)"
+  }
+
+  func resetSettings(namespace: String) {
     _ = try? ProcessRunner.run(
       "/usr/bin/defaults",
-      arguments: ["delete", "com.xuanwo.Cida"]
+      arguments: ["delete", namespace]
     )
     _ = try? ProcessRunner.run(
       "/usr/bin/security",
       arguments: [
         "delete-generic-password",
-        "-s", "com.xuanwo.Cida",
+        "-s", namespace,
         "-a", "provider-api-key",
       ]
     )

@@ -10,7 +10,7 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     improveMode.click()
     let outputHint = driver.element(identifier: "improvement-output-hint")
     XCTAssertTrue(outputHint.waitForExistence(timeout: 3))
-    XCTAssertEqual(outputHint.label, "输出跟随原文")
+    XCTAssertTrue(driver.waitForLabel("输出跟随原文", in: outputHint, timeout: 3))
 
     let englishSource =
       "This sentence are unclear and too wordy. CIDA_E2E_IMPROVE_ENGLISH"
