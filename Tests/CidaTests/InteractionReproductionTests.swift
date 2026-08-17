@@ -2392,6 +2392,38 @@ final class InteractionReproductionTests: XCTestCase {
     withExtendedLifetime(window) {}
   }
 
+  func testNativeEditAfterPendingComposerResetIsNotCleared() async throws {
+    let model = AppModel(
+      inputText: "",
+      entries: [],
+      service: ImmediateStreamingService()
+    )
+    let (_, hostingView) = makeHiddenWindow(
+      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
+      size: CGSize(width: 860, height: 640)
+    )
+    hostingView.layoutSubtreeIfNeeded()
+    let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
+
+    input.string = "first request"
+    input.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: input))
+    XCTAssertEqual(model.inputText, "first request")
+    XCTAssertTrue(model.submit())
+
+    input.string = "recovery request"
+    input.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: input))
+    XCTAssertEqual(model.inputText, "recovery request")
+
+    await Task.yield()
+    hostingView.layoutSubtreeIfNeeded()
+    try await Task.sleep(for: .milliseconds(50))
+    hostingView.layoutSubtreeIfNeeded()
+
+    XCTAssertEqual(input.string, "recovery request")
+    XCTAssertEqual(model.inputText, "recovery request")
+    model.cancelProcessing()
+  }
+
   func testLongInputUsesThePencilScrollIndicators() async throws {
     let model = AppModel(
       inputText: HistoryEntry.designLongInput,

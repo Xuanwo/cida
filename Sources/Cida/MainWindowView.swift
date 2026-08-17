@@ -1571,6 +1571,7 @@ private struct Composer: View {
           metrics: $inputMetrics,
           isFocused: $isInputFocused,
           resetRevision: model.inputResetRevision,
+          currentResetRevision: { model.inputResetRevision },
           onSubmit: submit,
           onVirtualDocumentChange: { document, utf16Count, hasNonWhitespace in
             model.stageInputDocument(
@@ -1658,6 +1659,7 @@ private struct Composer: View {
       isInputFocused = true
     }
     .onChange(of: model.inputResetRevision) {
+      guard model.inputText.isEmpty else { return }
       inputMetrics = ComposerTextMetrics(text: "")
     }
   }

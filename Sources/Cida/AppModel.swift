@@ -483,7 +483,8 @@ final class AppModel {
       }
       await self?.process(
         text: requestText,
-        reportedSourceCharacterCount: requestCharacterCount
+        reportedSourceCharacterCount: requestCharacterCount,
+        clearInput: false
       )
     }
     return true
@@ -640,7 +641,8 @@ final class AppModel {
 
   func process(
     text: String,
-    reportedSourceCharacterCount: Int? = nil
+    reportedSourceCharacterCount: Int? = nil,
+    clearInput: Bool = true
   ) async {
     let latencyActivity = ProcessInfo.processInfo.beginActivity(
       options: [.userInitiated, .latencyCritical],
@@ -677,7 +679,7 @@ final class AppModel {
       hasLongHistoryDocument = true
     }
     historyPersistence?.insert(HistoryPersistenceRecord(entry))
-    if stagedInputDocument != nil || !inputText.isEmpty {
+    if clearInput, stagedInputDocument != nil || !inputText.isEmpty {
       stageInputDocument(nil)
       inputResetRevision &+= 1
       inputText = ""
