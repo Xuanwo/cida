@@ -370,6 +370,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     let hostingView = NSHostingView(rootView: rootView)
     hostingView.frame = NSRect(origin: .zero, size: size)
     hostingView.autoresizingMask = [.width, .height]
+    hostingView.setAccessibilityLabel("\(title)窗口内容")
     hostingView.wantsLayer = true
     hostingView.layer?.backgroundColor = NSColor.clear.cgColor
     window.contentView = hostingView

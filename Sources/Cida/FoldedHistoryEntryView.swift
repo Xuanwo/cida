@@ -853,6 +853,15 @@ private final class FoldedHistoryAccessibilityElement: NSAccessibilityElement,
       currentOwner?.accessibilityFrame(for: currentRegion) ?? .zero
     }
   }
+
+  nonisolated override func accessibilityPerformPress() -> Bool {
+    let currentOwner = owner
+    let currentRegion = region
+    return MainActor.assumeIsolated {
+      guard currentRegion == .entry else { return false }
+      return currentOwner?.accessibilityPerformPress() ?? false
+    }
+  }
 }
 
 @MainActor

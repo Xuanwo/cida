@@ -243,6 +243,8 @@ private struct NativeHistoryScrollView: NSViewRepresentable {
       hostingView.onResultHeightChange = { [weak self] delta in
         self?.applyResultHeightChange(delta)
       }
+      documentView.setAccessibilityElement(false)
+      hostingView.setAccessibilityLabel("历史记录内容")
       documentView.addSubview(hostingView)
       scrollView.documentView = documentView
       resizeDocument()
@@ -685,9 +687,13 @@ private struct HistoryEntryView: View {
           model.collapseHistoryEntry(entry.id)
         }
       }
-      .accessibilityLabel(isLatestEntry ? "当前记录" : "收起历史记录")
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(
+        "\(isLatestEntry ? "当前记录" : "收起历史记录")，\(entry.mode.title)，\(entry.metadata)"
+      )
       .accessibilityIdentifier("history-collapse-\(entryIdentifierSuffix)")
       .accessibilityAddTraits(isLatestEntry ? [] : .isButton)
+      .accessibilityHidden(isLatestEntry)
       .overlay(alignment: .topTrailing) {
         if actionsAreVisible {
           EntryActionButton(
@@ -754,6 +760,11 @@ private struct HistoryEntryView: View {
       copyResetTask = nil
     }
     .accessibilityElement(children: .contain)
+    .accessibilityLabel(
+      isLatestEntry
+        ? "当前历史记录，\(entry.mode.title)，\(entry.metadata)"
+        : "展开的历史记录"
+    )
     .accessibilityIdentifier("history-entry-\(entryIdentifierSuffix)")
     .accessibilityValue("expanded")
     .accessibilityAction(named: "收起") {

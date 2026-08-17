@@ -806,6 +806,33 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
+  func testFoldedHistoryAccessibilityExpandElementPerformsItsPressAction() throws {
+    var expansionCount = 0
+    let row = FoldedHistoryEntryNSView(
+      frame: NSRect(x: 0, y: 0, width: 320, height: 96)
+    )
+    row.configure(
+      entryID: UUID(),
+      mode: .translate,
+      metadata: "中文 → English · 09:14",
+      preview: "The accessible expand button must invoke the same action as a pointer click.",
+      previewNeedsFade: false,
+      state: .completed,
+      onExpand: { expansionCount += 1 },
+      onRedo: {},
+      onCopyResult: {}
+    )
+
+    let expandElement = try XCTUnwrap(
+      (row.accessibilityChildren() ?? [])
+        .compactMap { $0 as? NSAccessibilityElement }
+        .first { $0.accessibilityLabel() == "展开历史记录" }
+    )
+
+    XCTAssertTrue(expandElement.accessibilityPerformPress())
+    XCTAssertEqual(expansionCount, 1)
+  }
+
   func testFoldedHistoryActionInkStaysInsideThePencilIconBounds() throws {
     let row = FoldedHistoryEntryNSView()
     row.configure(
