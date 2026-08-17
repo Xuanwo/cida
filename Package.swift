@@ -26,7 +26,9 @@ let package = Package(
     .testTarget(
       name: "CidaTests",
       dependencies: ["Cida", "CSQLite"],
-      exclude: ["Fixtures"]
+      path: "Tests",
+      exclude: ["CidaTests/Fixtures"],
+      sources: ["CidaTests", "Shared"]
     ),
   ]
 )

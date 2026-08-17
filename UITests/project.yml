@@ -24,6 +24,8 @@ targets:
     platform: macOS
     sources:
       - path: CidaUITests
+      - path: ../Tests/Shared
+        group: Shared
     dependencies:
       - target: CidaUITestHost
     settings:
