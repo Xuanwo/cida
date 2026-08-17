@@ -2,6 +2,35 @@ import XCTest
 
 @MainActor
 final class ComposerJourneyTests: CidaReleaseUITestCase {
+  func testImprovementPreservesEnglishAndChineseSourceLanguages() {
+    driver.launch()
+
+    let improveMode = driver.app.buttons["改进"]
+    XCTAssertTrue(improveMode.waitForExistence(timeout: 3))
+    improveMode.click()
+    XCTAssertTrue(driver.app.buttons["输出跟随原文"].waitForExistence(timeout: 3))
+
+    let englishSource =
+      "This sentence are unclear and too wordy. CIDA_E2E_IMPROVE_ENGLISH"
+    let englishID = driver.submit(englishSource)
+    let englishResult = driver.result(containing: "CIDA_E2E_IMPROVE_ENGLISH_COMPLETE")
+    XCTAssertTrue(englishResult.waitForExistence(timeout: 8))
+    XCTAssertEqual(englishResult.identifier, "history-result-\(englishID.uppercased())")
+    XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
+
+    let englishEntry = driver.element(identifier: "history-entry-\(englishID.lowercased())")
+    XCTAssertTrue(englishEntry.waitForExistence(timeout: 3))
+    XCTAssertTrue(englishEntry.label.contains("跟随原文"))
+    XCTAssertFalse(englishEntry.label.contains("中文"))
+
+    let chineseSource = "这句话不太清楚也有一点啰嗦。CIDA_E2E_IMPROVE_CHINESE"
+    let chineseID = driver.submit(chineseSource)
+    let chineseResult = driver.result(containing: "CIDA_E2E_IMPROVE_CHINESE_COMPLETE")
+    XCTAssertTrue(chineseResult.waitForExistence(timeout: 8))
+    XCTAssertEqual(chineseResult.identifier, "history-result-\(chineseID.uppercased())")
+    XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
+  }
+
   func testRealTypingPasteGrowthDeletionShrinkAndSubmission() {
     driver.launch()
 

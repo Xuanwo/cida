@@ -21,6 +21,20 @@ final class AppModelTests: XCTestCase {
 
     XCTAssertEqual(model.mode, .improve)
     XCTAssertEqual(model.inputText, "Keep this text")
+    XCTAssertEqual(model.outputHint, "输出跟随原文")
+  }
+
+  func testImprovementHistoryAlwaysDescribesTheSourceLanguagePolicy() {
+    let legacyEntry = HistoryEntry(
+      mode: .improve,
+      source: "This sentence needs improvement.",
+      result: "This sentence is clearer.",
+      detail: "中文",
+      timestamp: "18:00"
+    )
+
+    XCTAssertTrue(legacyEntry.metadata.hasPrefix("跟随原文 · "))
+    XCTAssertFalse(legacyEntry.metadata.contains("中文"))
   }
 
   func testLatestCopyableResultSkipsTheActiveStreamingEntry() {
@@ -517,7 +531,11 @@ final class AppModelTests: XCTestCase {
       settings: settings
     )
     XCTAssertNil(improvePrompt.parameters.targetLanguage)
+    XCTAssertFalse(improvePrompt.systemMessage.contains(#""source_language""#))
     XCTAssertFalse(improvePrompt.systemMessage.contains("target_language"))
+    XCTAssertTrue(
+      improvePrompt.systemMessage.contains(#""language_behavior":"preserve_source""#)
+    )
   }
 
   func testSelectingProviderKeepsModelValid() {

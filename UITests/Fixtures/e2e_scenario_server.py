@@ -236,6 +236,34 @@ def plan_for(submitted_text):
             "chunks": [*default_chunks[:-1], "CIDA_UI_E2E_COMPLETE_SECOND"],
             "initialDelay": 0.35,
         },
+        "This sentence are unclear and too wordy. CIDA_E2E_IMPROVE_ENGLISH": {
+            "chunks": [
+                "This sentence is clearer and more concise.\n",
+                "CIDA_E2E_IMPROVE_ENGLISH_COMPLETE",
+            ],
+            "requiredSystemFragments": [
+                '"operation":"improve"',
+                '"language_behavior":"preserve_source"',
+            ],
+            "forbiddenSystemFragments": [
+                '"source_language"',
+                '"target_language"',
+            ],
+        },
+        "这句话不太清楚也有一点啰嗦。CIDA_E2E_IMPROVE_CHINESE": {
+            "chunks": [
+                "这句话更加清晰、简洁。\n",
+                "CIDA_E2E_IMPROVE_CHINESE_COMPLETE",
+            ],
+            "requiredSystemFragments": [
+                '"operation":"improve"',
+                '"language_behavior":"preserve_source"',
+            ],
+            "forbiddenSystemFragments": [
+                '"source_language"',
+                '"target_language"',
+            ],
+        },
     }
     if submitted_text in plans:
         return plans[submitted_text]
@@ -305,6 +333,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
         scenario = submitted_text
         request_id = state.begin(scenario, request)
         plan = plan_for(scenario)
+        system_message = next(
+            (
+                message.get("content", "")
+                for message in messages
+                if message.get("role") == "system"
+            ),
+            "",
+        )
+        missing_fragments = [
+            fragment
+            for fragment in plan.get("requiredSystemFragments", [])
+            if fragment not in system_message
+        ]
+        forbidden_fragments = [
+            fragment
+            for fragment in plan.get("forbiddenSystemFragments", [])
+            if fragment in system_message
+        ]
+        if missing_fragments or forbidden_fragments:
+            plan = {
+                "status": 422,
+                "body": json.dumps(
+                    {
+                        "missingSystemFragments": missing_fragments,
+                        "forbiddenSystemFragments": forbidden_fragments,
+                    },
+                    ensure_ascii=False,
+                ),
+            }
         if plan.get("status", 200) != 200:
             time.sleep(2.0)
             payload = plan.get("body", "controlled failure").encode("utf-8")
