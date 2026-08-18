@@ -40,41 +40,97 @@ enum VisualOracle {
     }
     backgroundLuminance /= Double(backgroundSamples)
 
-    let midpoint = bitmap.pixelsHigh / 2
     let horizontalInset = max(1, bitmap.pixelsWide / 100)
-    let topContrast = totalInkContrast(
-      in: bitmap,
-      xRange: horizontalInset..<(bitmap.pixelsWide - horizontalInset),
-      yRange: 0..<midpoint,
-      backgroundLuminance: backgroundLuminance
-    )
-    let bottomContrast = totalInkContrast(
-      in: bitmap,
-      xRange: horizontalInset..<(bitmap.pixelsWide - horizontalInset),
-      yRange: midpoint..<bitmap.pixelsHigh,
-      backgroundLuminance: backgroundLuminance
-    )
+    let rowContrasts = (0..<bitmap.pixelsHigh).map { y in
+      totalInkContrast(
+        in: bitmap,
+        xRange: horizontalInset..<(bitmap.pixelsWide - horizontalInset),
+        yRange: y..<(y + 1),
+        backgroundLuminance: backgroundLuminance
+      )
+    }
+    guard let fadeMetrics = repeatedLineFadeMetrics(rowContrasts: rowContrasts) else {
+      XCTFail("Could not resolve two visible preview lines", file: file, line: line)
+      return
+    }
 
     XCTAssertGreaterThan(
-      topContrast,
-      50,
-      "The first preview line must remain legible",
+      fadeMetrics.firstLineContrast,
+      100,
+      "The first preview line must remain legible and measurable",
       file: file,
       line: line
     )
     XCTAssertGreaterThan(
-      bottomContrast,
-      5,
+      fadeMetrics.secondLineContrast,
+      50,
       "The second preview line must remain perceptible",
       file: file,
       line: line
     )
     XCTAssertLessThan(
-      bottomContrast / max(1, topContrast),
-      0.78,
-      "The second preview line must visibly fade toward the card background",
+      fadeMetrics.overallRatio,
+      0.94,
+      "The repeated second line must lose contrast across the Pencil fade",
       file: file,
       line: line
+    )
+    XCTAssertLessThan(
+      fadeMetrics.tailRatio,
+      0.90,
+      "The lower half of the second line must fade more than matching first-line glyphs",
+      file: file,
+      line: line
+    )
+  }
+
+  struct RepeatedLineFadeMetrics: Equatable {
+    let firstLineContrast: Double
+    let secondLineContrast: Double
+    let overallRatio: Double
+    let tailRatio: Double
+  }
+
+  static func repeatedLineFadeMetrics(
+    rowContrasts: [Double],
+    inkThreshold: Double = 5
+  ) -> RepeatedLineFadeMetrics? {
+    var runs: [Range<Int>] = []
+    var runStart: Int?
+    for (index, contrast) in rowContrasts.enumerated() {
+      if contrast > inkThreshold {
+        if runStart == nil { runStart = index }
+      } else if let start = runStart {
+        runs.append(start..<index)
+        runStart = nil
+      }
+    }
+    if let runStart {
+      runs.append(runStart..<rowContrasts.count)
+    }
+    guard runs.count >= 2 else { return nil }
+
+    let first = runs[0]
+    let second = runs[1]
+    let comparedCount = min(first.count, second.count)
+    guard comparedCount >= 4 else { return nil }
+    let firstRows = Array(
+      rowContrasts[first.lowerBound..<(first.lowerBound + comparedCount)]
+    )
+    let secondRows = Array(
+      rowContrasts[second.lowerBound..<(second.lowerBound + comparedCount)]
+    )
+    let firstLineContrast = firstRows.reduce(0, +)
+    let secondLineContrast = secondRows.reduce(0, +)
+    let tailStart = comparedCount / 2
+    let firstTailContrast = firstRows[tailStart...].reduce(0, +)
+    let secondTailContrast = secondRows[tailStart...].reduce(0, +)
+    guard firstLineContrast > 0, firstTailContrast > 0 else { return nil }
+    return RepeatedLineFadeMetrics(
+      firstLineContrast: firstLineContrast,
+      secondLineContrast: secondLineContrast,
+      overallRatio: secondLineContrast / firstLineContrast,
+      tailRatio: secondTailContrast / firstTailContrast
     )
   }
 

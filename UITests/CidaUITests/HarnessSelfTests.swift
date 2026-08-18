@@ -66,6 +66,31 @@ final class HarnessSelfTests: XCTestCase {
     XCTAssertEqual(result.observations.map(\.value), ["waiting", "still-waiting"])
     XCTAssertTrue(result.diagnosticDescription.contains("still-waiting"))
   }
+
+  func testFadeOracleRejectsAnIdenticalUnfadedSecondLine() throws {
+    let line = [20.0, 80, 100, 95, 90, 70, 40, 10]
+    let metrics = try XCTUnwrap(
+      VisualOracle.repeatedLineFadeMetrics(
+        rowContrasts: [0, 0] + line + [0, 0, 0] + line + [0, 0]
+      )
+    )
+
+    XCTAssertEqual(metrics.overallRatio, 1, accuracy: 0.0001)
+    XCTAssertEqual(metrics.tailRatio, 1, accuracy: 0.0001)
+  }
+
+  func testFadeOracleMeasuresTheSecondLinesLowerContrastTail() throws {
+    let firstLine = [20.0, 80, 100, 95, 90, 70, 40, 10]
+    let secondLine = [20.0, 78, 94, 84, 70, 48, 22, 6]
+    let metrics = try XCTUnwrap(
+      VisualOracle.repeatedLineFadeMetrics(
+        rowContrasts: [0, 0] + firstLine + [0, 0, 0] + secondLine + [0, 0]
+      )
+    )
+
+    XCTAssertLessThan(metrics.overallRatio, 0.94)
+    XCTAssertLessThan(metrics.tailRatio, 0.90)
+  }
 }
 
 @MainActor
