@@ -175,8 +175,8 @@
       "description": "Force every latest source preview to reserve its full two-line height.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
       "file": "Sources/Cida/HistoryEntryView.swift",
-      "before": "    let naturalHeight = ceil(max(Layout.sourceLineHeight, measuredBounds.height))",
-      "after": "    let naturalHeight = Layout.sourceMaximumHeight",
+      "before": "      height: min(Layout.sourceMaximumHeight, naturalHeight),",
+      "after": "      height: Layout.sourceMaximumHeight,",
       "occurrences": 1,
       "unitTests": [
         "InteractionReproductionTests/testLatestSingleLineSourceUsesNaturalHeightWithoutFadeOrDeadSpace"
