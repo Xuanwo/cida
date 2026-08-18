@@ -369,8 +369,11 @@ final class HistoryResultTextContainer: NSView {
     renderingView.setAccessibilityLabel("处理结果")
     renderingView.isHidden = false
     renderingView.setAccessibilityElement(true)
-    renderingView.setAccessibilityRole(.staticText)
     addSubview(renderingView)
+
+    setAccessibilityElement(true)
+    setAccessibilityRole(.group)
+    setAccessibilityLabel("处理结果区域")
 
     tailRevealLayer.colors = [
       glyphRevealColor.withAlphaComponent(0).cgColor,

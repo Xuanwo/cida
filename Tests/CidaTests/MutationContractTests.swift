@@ -16,7 +16,8 @@ final class MutationContractTests: XCTestCase {
       })
     )
 
-    XCTAssertEqual(renderer.accessibilityRole(), .staticText)
+    XCTAssertEqual(container.accessibilityRole(), .group)
+    XCTAssertEqual(renderer.accessibilityRole(), .textArea)
     XCTAssertTrue(renderer.wantsLayer)
     XCTAssertEqual(renderer.layerContentsRedrawPolicy, .onSetNeedsDisplay)
   }
