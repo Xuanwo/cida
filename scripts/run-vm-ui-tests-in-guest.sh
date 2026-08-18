@@ -1,8 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
-if (( $# < 2 || $# > 6 )); then
-  echo "Usage: $0 <guest source directory> <guest results directory> [only-testing] [swift-test-sanitizer] [swift-test-filter] [shared-artifact-directory]" >&2
+if (( $# < 2 || $# > 7 )); then
+  echo "Usage: $0 <guest source directory> <guest results directory> [only-testing] [swift-test-sanitizer] [swift-test-filter] [shared-artifact-directory] [diagnostic-mode]" >&2
   exit 64
 fi
 
@@ -27,6 +27,7 @@ server_pid=""
 only_testing=${3:-}
 swift_test_sanitizer=${4:-}
 swift_test_filter=${5:-}
+diagnostic_mode=${7:-0}
 typeset -a test_selection
 test_selection=()
 if [[ -n "$only_testing" ]]; then
@@ -105,20 +106,26 @@ artifact_digest=$(
 progress "release-artifact-verified digest=$artifact_digest"
 
 cd "$project_dir"
-progress "swift-test-started"
-failure_category="source-test"
-failure_phase="swift-test"
-failure_detail="The guest Swift test preflight failed."
 swift_test_log="$results_dir/swift-test.log"
 : >"$swift_test_log"
 swift_test_failed=false
-if [[ -n "$swift_test_filter" ]]; then
+if [[ "$diagnostic_mode" == 1 ]]; then
+  progress "swift-test-skipped diagnostic-mode=true"
+elif [[ -n "$swift_test_filter" ]]; then
+  progress "swift-test-started"
+  failure_category="source-test"
+  failure_phase="swift-test"
+  failure_detail="The guest Swift test preflight failed."
   if ! SWIFT_BACKTRACE=enable swift test "${swift_test_arguments[@]}" \
     >>"$swift_test_log" 2>&1
   then
     swift_test_failed=true
   fi
 else
+  progress "swift-test-started"
+  failure_category="source-test"
+  failure_phase="swift-test"
+  failure_detail="The guest Swift test preflight failed."
   if ! SWIFT_BACKTRACE=enable swift test "${swift_test_arguments[@]}" \
     --skip InteractionReproductionTests >>"$swift_test_log" 2>&1
   then
@@ -154,13 +161,14 @@ else
     fi
   done
 fi
-if [[ "$swift_test_failed" == true ]]; then
+if [[ "$diagnostic_mode" != 1 && "$swift_test_failed" == true ]]; then
   /bin/sleep 2
   collect_diagnostics
   print_failure_log "$swift_test_log"
   exit 1
+elif [[ "$diagnostic_mode" != 1 ]]; then
+  progress "swift-test-passed"
 fi
-progress "swift-test-passed"
 
 failure_category="infrastructure"
 failure_phase="local-mock-startup"

@@ -9,6 +9,7 @@ results_dir=${CIDA_TART_RESULTS_DIR:-"$project_dir/TestResults/vm-ui"}
 only_testing=${CIDA_UI_TEST_ONLY_TESTING:-}
 swift_test_sanitizer=${CIDA_TART_SWIFT_TEST_SANITIZER:-}
 swift_test_filter=${CIDA_TART_SWIFT_TEST_FILTER:-}
+diagnostic_mode=${CIDA_TART_DIAGNOSTIC_MODE:-0}
 guest_timeout_seconds=${CIDA_TART_GUEST_TIMEOUT_SECONDS:-600}
 guest_session_timeout_seconds=${CIDA_TART_GUEST_SESSION_TIMEOUT_SECONDS:-900}
 boot_attempts=${CIDA_TART_BOOT_ATTEMPTS:-2}
@@ -41,6 +42,14 @@ trap record_host_failure EXIT
 
 if (( $# != 0 )); then
   echo "Usage: $0" >&2
+  exit 64
+fi
+if [[ "$diagnostic_mode" != 0 && "$diagnostic_mode" != 1 ]]; then
+  echo "CIDA_TART_DIAGNOSTIC_MODE must be 0 or 1" >&2
+  exit 64
+fi
+if [[ "$diagnostic_mode" == 1 && -z "$only_testing" ]]; then
+  echo "Diagnostic mode requires CIDA_UI_TEST_ONLY_TESTING" >&2
   exit 64
 fi
 if ! command -v tart >/dev/null 2>&1; then
@@ -331,9 +340,9 @@ tart exec "$run_vm" /bin/launchctl asuser 501 \
   work_dir="/Users/admin/cida-work"
   results_dir="/Volumes/My Shared Files/artifacts"
   "$work_dir/scripts/run-vm-ui-tests-in-guest.sh" \
-    "$work_dir" "$results_dir" "$1" "$2" "$3" "$4"
+    "$work_dir" "$results_dir" "$1" "$2" "$3" "$4" "$5"
 ' -- "$only_testing" "$swift_test_sanitizer" "$swift_test_filter" \
-  "/Volumes/My Shared Files/artifacts/ReleaseArtifact"
+  "/Volumes/My Shared Files/artifacts/ReleaseArtifact" "$diagnostic_mode"
 
 failure_category="artifact"
 failure_phase="host-artifact-final-verification"

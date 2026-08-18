@@ -63,6 +63,8 @@ Useful standalone diagnostics are:
 ```sh
 swift test -Xswiftc -warnings-as-errors
 scripts/test-ui-in-tart.sh
+scripts/e2e/run-focused-tart-diagnostic.sh \
+  CidaUITests/CoreTranslationJourneyTests/testTranslationShowsANewEmptyCurrentResultBeforeTheFirstByte
 scripts/capture-design-states.sh
 scripts/test-release-input-interaction.sh
 scripts/benchmark-frame-pacing.sh
@@ -73,6 +75,10 @@ scripts/benchmark-extreme-workflows.sh smoke
 # Opt-in: creates about 1.5 GB of isolated SQLite fixtures in total.
 scripts/benchmark-extreme-workflows.sh full
 ```
+
+The focused Tart diagnostic performs an incremental host compile, runs exactly one selected XCUI
+journey in a fresh no-graphics VM, and skips the duplicate guest Swift preflight. It is intentionally
+not a release verdict; every delivery still requires one of the unified gates above.
 
 The XCUI regression runs inside a fresh clone of the local `cida-ui-golden` macOS VM through [OpenAI Tart](https://github.com/openai/tart). Tart starts without graphics, audio, or host clipboard sharing; the guest network is disabled, the repository is mounted read-only, and only the selected result directory is writable from the VM. The exact signed artifact is copied into that writable share, verified against its source digest, consumed by the guest, and reverified on the host after the run. The ephemeral clone is deleted after every attempt, so the test never launches a host application or reads the production API key, UserDefaults, Keychain, or SQLite history. A 100 ms host monitor fails if either exact artifact copy is launched or takes focus on the host; frontmost-app, pasteboard, and production-Cida changes caused by concurrent user activity remain recorded diagnostics. See `UITests/README.md` for the golden-image contract and artifacts.
 
