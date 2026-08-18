@@ -6,6 +6,7 @@ import unittest
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]
 GATE_MODULE_PATH = PROJECT_ROOT / "scripts/e2e/run-gate.py"
+DISPLAY_MODULE_PATH = PROJECT_ROOT / "scripts/e2e/check-display-readiness.py"
 
 
 def load_gate_module():
@@ -15,7 +16,70 @@ def load_gate_module():
     return module
 
 
+def load_display_module():
+    spec = importlib.util.spec_from_file_location(
+        "cida_display_readiness", DISPLAY_MODULE_PATH
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class PerformanceGateContractTests(unittest.TestCase):
+    def test_display_preflight_requires_an_awake_active_120hz_screen(self):
+        display_module = load_display_module()
+        report = display_module.evaluate_screens(
+            [
+                {
+                    "name": "Sleeping ProMotion",
+                    "displayID": 1,
+                    "maximumFramesPerSecond": 120,
+                    "online": True,
+                    "active": False,
+                    "asleep": True,
+                },
+                {
+                    "name": "Active Studio Display",
+                    "displayID": 2,
+                    "maximumFramesPerSecond": 60,
+                    "online": True,
+                    "active": True,
+                    "asleep": False,
+                },
+            ],
+            120,
+        )
+
+        self.assertFalse(report["passed"])
+        self.assertEqual(report["failureCategory"], "infrastructure")
+        self.assertEqual(report["qualifiedDisplayIDs"], [])
+
+    def test_display_preflight_accepts_an_awake_active_120hz_screen(self):
+        display_module = load_display_module()
+        report = display_module.evaluate_screens(
+            [
+                {
+                    "name": "ProMotion",
+                    "displayID": 7,
+                    "maximumFramesPerSecond": 120,
+                    "online": True,
+                    "active": True,
+                    "asleep": False,
+                }
+            ],
+            120,
+        )
+
+        self.assertTrue(report["passed"])
+        self.assertIsNone(report["failureCategory"])
+        self.assertEqual(report["qualifiedDisplayIDs"], [7])
+
+    def test_expensive_release_work_starts_after_display_preflight(self):
+        source = (PROJECT_ROOT / "scripts/e2e/run-gate.py").read_text(encoding="utf-8")
+        preflight = source.index("gate.run_performance_environment_preflight()")
+        mutation_catalog = source.index('"mutation-catalog"')
+        self.assertLess(preflight, mutation_catalog)
+
     def test_pr_proxy_names_every_bounded_rendering_invariant(self):
         source = (PROJECT_ROOT / "scripts/e2e/run-performance-proxies.sh").read_text(
             encoding="utf-8"

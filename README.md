@@ -58,6 +58,9 @@ all unit and Release mutations, the focused 120 Hz workloads, and the extreme sm
 adds three fresh-clone P0 burn-in rounds by default and replaces the extreme smoke matrix with the
 full million-row and thousand-by-one-million-character matrix. Each invocation writes a single
 `gate-summary.json`; standalone scripts are diagnostic entry points, not a release verdict.
+After the harness contract check, nightly and release profiles query AppKit and Core Graphics for an
+awake, active display whose native maximum is at least 120 Hz. An unavailable physical frame clock
+is classified as infrastructure and stops the gate before builds, Tart clones, or mutation runs.
 
 Useful standalone diagnostics are:
 

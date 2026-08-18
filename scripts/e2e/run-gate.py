@@ -360,6 +360,30 @@ class GateRun:
             ],
         )
 
+    def run_performance_environment_preflight(self):
+        report_path = self.results_directory / "performance-environment.json"
+        passed = self.run_stage(
+            "performance-environment-preflight",
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "scripts/e2e/check-display-readiness.py"),
+                "--minimum-fps",
+                "120",
+                "--output",
+                str(report_path),
+            ],
+        )
+        report = read_json(report_path)
+        if report is not None:
+            self.stages[-1]["evidence"] = report
+            if not passed:
+                self.stages[-1]["failureClassification"] = {
+                    "category": report.get("failureCategory", "infrastructure"),
+                    "reason": report.get("reason", "display-preflight-failed"),
+                }
+            self.write_summary()
+        return passed
+
     def run_performance(self):
         performance_directory = self.results_directory / "performance"
         environment = os.environ.copy()
@@ -423,6 +447,11 @@ def main():
     ):
         print(gate.summary_path)
         return 1
+
+    if gate.profile in ("nightly", "release"):
+        if not gate.run_performance_environment_preflight():
+            print(gate.summary_path)
+            return 1
 
     if not gate.run_stage(
         "mutation-catalog",
