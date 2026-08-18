@@ -1291,7 +1291,6 @@ final class InteractionReproductionTests: XCTestCase {
       }
     )
     XCTAssertFalse(sourceAction.isHidden)
-    XCTAssertTrue(row.hasLocalActionMouseDownMonitorForTesting)
     let actionPoint = NSPoint(x: sourceAction.frame.midX, y: sourceAction.frame.midY)
     guard
       let clickEvent = NSEvent.mouseEvent(

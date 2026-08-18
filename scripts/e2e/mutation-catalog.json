@@ -203,7 +203,7 @@
     },
     {
       "id": "history-action-hit-target-swallowed",
-      "description": "Disable explicit action dispatch so the parent history control swallows clicks on its icon buttons.",
+      "description": "Disable unified window action dispatch so a SwiftUI wrapper can swallow history icon clicks.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-ACTIONS"],
       "file": "Sources/Cida/HistoryEntryView.swift",
       "before": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })\n    where !button.isHidden && button.frame.insetBy(dx: -6, dy: -6).contains(location) {\n      button.performClick(nil)\n      return true\n    }\n    return false\n  }",
