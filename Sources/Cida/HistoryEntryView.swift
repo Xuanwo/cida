@@ -944,8 +944,16 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     static let actionSize = HistoryEntryPencilLayout.actionIconSize
     static let actionColumnWidth = HistoryEntryPencilLayout.actionColumnWidth
     static let foldedPreferredHeight = HistoryEntryPencilLayout.foldedHeight
-    static let sourceHeight = HistoryEntryPencilLayout.latestSourcePreviewHeight
+    static let sourceLineHeight = HistoryEntryPencilLayout.latestSourceLineHeight
+    static let sourceMaximumHeight = HistoryEntryPencilLayout.latestSourcePreviewHeight
     static let sourceFadeHeight = HistoryEntryPencilLayout.latestSourceFadeHeight
+  }
+
+  private struct SourcePresentationLayout {
+    static let hidden = SourcePresentationLayout(height: 0, usesFade: false)
+
+    let height: CGFloat
+    let usesFade: Bool
   }
 
   private static let accentColor = NSColor(
@@ -1066,6 +1074,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private var modeAttributedString = NSAttributedString()
   private var metadataAttributedString = NSAttributedString()
   private var previewAttributedString = NSAttributedString()
+  private var measuredSourceWidth: CGFloat?
+  private var measuredSourceLayout = SourcePresentationLayout.hidden
   private var onExpand: (@MainActor () -> Void)?
   private var onCollapse: (@MainActor () -> Void)?
   private var onRedo: (@MainActor () -> Void)?
@@ -1077,6 +1087,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     var foldedPreviewFrameForTesting: NSRect { previewTextLayer.frame }
     var sourceFrameForTesting: NSRect { sourceTextField.frame }
     var sourceFadeFrameForTesting: NSRect { sourceFadeLayer.frame }
+    var sourceUsesFadeForTesting: Bool { sourceTextField.layer?.mask === sourceFadeLayer }
+    private(set) var sourceMeasurementCountForTesting = 0
     var resultFrameForTesting: NSRect { resultContainer?.frame ?? .zero }
     var resultContainerForTesting: HistoryResultTextContainer? { resultContainer }
     var hasExpandHandlerForTesting: Bool { onExpand != nil }
@@ -1158,7 +1170,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     ]
     sourceFadeLayer.startPoint = CGPoint(x: 0.5, y: 0)
     sourceFadeLayer.endPoint = CGPoint(x: 0.5, y: 1)
-    sourceTextField.layer?.mask = sourceFadeLayer
     sourceTextField.isHidden = true
     addSubview(sourceTextField)
 
@@ -1251,7 +1262,11 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       state: state,
       showsSeparator: showsSeparator
     )
-    displayedSource = String(source.prefix(420))
+    let nextDisplayedSource = String(source.prefix(420))
+    if displayedSource != nextDisplayedSource {
+      displayedSource = nextDisplayedSource
+      invalidateSourceLayout()
+    }
     self.resultStorage = resultStorage
     resultPresentationRevision = presentationRevision
     self.latestPresentationDelta = latestPresentationDelta
@@ -1333,6 +1348,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     hoverTrackingView = nil
     sourceTextField.stringValue = ""
     sourceTextField.isHidden = true
+    sourceTextField.layer?.mask = nil
+    sourceFadeLayer.isHidden = true
     isHovering = false
     isSourceCopied = false
     isResultCopied = false
@@ -1344,6 +1361,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     copySourceButton?.resetHoverState()
     presentation = .folded
     displayedSource = ""
+    invalidateSourceLayout()
     resultStorage = nil
     resultPresentationRevision = 0
     latestPresentationDelta = nil
@@ -1387,6 +1405,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       stickyResultActionView?.removeFromSuperview()
       stickyResultActionView = nil
       sourceTextField.isHidden = true
+      sourceTextField.layer?.mask = nil
       sourceFadeLayer.isHidden = true
       copySourceButton?.isHidden = true
       previewTextLayer.isHidden = false
@@ -1395,7 +1414,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       previewTextLayer.isHidden = true
       fadeLayer.isHidden = true
       sourceTextField.isHidden = !isLatest
-      sourceFadeLayer.isHidden = !isLatest
+      if !isLatest {
+        sourceTextField.layer?.mask = nil
+        sourceFadeLayer.isHidden = true
+      }
       hoverTrackingView?.setActive(true)
       stickyResultActionView?.isHidden = false
     }
@@ -1411,17 +1433,21 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
 
   private func configureExpandedContent() {
     guard presentation.isExpanded, let resultStorage else { return }
-    let sourceParagraphStyle = NSMutableParagraphStyle()
-    sourceParagraphStyle.lineSpacing = 3
-    sourceParagraphStyle.lineBreakMode = .byWordWrapping
-    sourceTextField.attributedStringValue = NSAttributedString(
-      string: displayedSource,
-      attributes: [
-        .font: CidaDesign.appKitBody(13),
-        .foregroundColor: Self.tertiaryTextColor,
-        .paragraphStyle: sourceParagraphStyle,
-      ]
-    )
+    if sourceTextField.stringValue != displayedSource {
+      let sourceParagraphStyle = NSMutableParagraphStyle()
+      sourceParagraphStyle.minimumLineHeight = Layout.sourceLineHeight
+      sourceParagraphStyle.maximumLineHeight = Layout.sourceLineHeight
+      sourceParagraphStyle.lineBreakMode = .byWordWrapping
+      sourceTextField.attributedStringValue = NSAttributedString(
+        string: displayedSource,
+        attributes: [
+          .font: CidaDesign.appKitBody(13),
+          .foregroundColor: Self.tertiaryTextColor,
+          .paragraphStyle: sourceParagraphStyle,
+        ]
+      )
+      invalidateSourceLayout()
+    }
     sourceTextField.isSelectable = !isLongEntry
     sourceTextField.setAccessibilityIdentifier("history-source-\(identifierSuffix)")
     sourceTextField.setAccessibilityValue(displayedSource)
@@ -1494,8 +1520,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     }
     resultAction.isHidden = false
     resultContainer.isHidden = false
-    sourceTextField.isHidden = !presentation.isLatest
-    sourceFadeLayer.isHidden = !presentation.isLatest
+    sourceTextField.isHidden = !presentation.isLatest || displayedSource.isEmpty
     resultCoordinator.scheduleLayout(of: resultContainer)
     updatePresentationAccessibility()
     needsLayout = true
@@ -1565,12 +1590,14 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     entries.first { $0.id == entryID }
   }
 
-  func preferredHeight(for _: CGFloat) -> CGFloat {
+  func preferredHeight(for width: CGFloat) -> CGFloat {
     switch presentation {
     case .folded:
       return Layout.foldedPreferredHeight
     case .expanded(let isLatest):
-      let sourceHeight = isLatest ? Layout.sourceHeight + Layout.contentSpacing : 0
+      let sourceLayout = isLatest ? sourcePresentationLayout(for: width) : .hidden
+      let sourceHeight =
+        sourceLayout.height > 0 ? sourceLayout.height + Layout.contentSpacing : 0
       let resultHeight =
         resultContainer?.naturalTextHeight ?? HistoryResultTextContainer.minimumHeight
       return Layout.expandedVerticalPadding * 2
@@ -1690,9 +1717,13 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
 
   private func layoutExpandedContent(headerY: CGFloat) {
     let sourceY = headerY + Layout.headerHeight + Layout.contentSpacing
+    let sourceLayout =
+      presentation.isLatest ? sourcePresentationLayout(for: bounds.width) : .hidden
+    let sourceSpacing = sourceLayout.height > 0 ? Layout.contentSpacing : 0
     let resultY =
       sourceY
-      + (presentation.isLatest ? Layout.sourceHeight + Layout.contentSpacing : 0)
+      + sourceLayout.height
+      + sourceSpacing
     let resultHeight =
       resultContainer?.naturalTextHeight ?? HistoryResultTextContainer.minimumHeight
     let textWidth = max(0, bounds.width - Layout.actionColumnWidth)
@@ -1701,9 +1732,12 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       x: 0,
       y: sourceY,
       width: textWidth,
-      height: Layout.sourceHeight
+      height: sourceLayout.height
     )
     sourceFadeLayer.frame = sourceTextField.bounds
+    sourceTextField.isHidden = sourceLayout.height == 0
+    sourceFadeLayer.isHidden = !sourceLayout.usesFade
+    sourceTextField.layer?.mask = sourceLayout.usesFade ? sourceFadeLayer : nil
     resultContainer?.frame = NSRect(
       x: 0,
       y: resultY,
@@ -1720,6 +1754,37 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     if let resultCoordinator, let resultContainer {
       resultCoordinator.scheduleLayout(of: resultContainer)
     }
+  }
+
+  private func invalidateSourceLayout() {
+    measuredSourceWidth = nil
+    measuredSourceLayout = .hidden
+  }
+
+  private func sourcePresentationLayout(for entryWidth: CGFloat) -> SourcePresentationLayout {
+    let textWidth = max(0, entryWidth - Layout.actionColumnWidth)
+    guard presentation.isLatest, !displayedSource.isEmpty, textWidth > 0 else {
+      return .hidden
+    }
+    if let measuredSourceWidth, abs(measuredSourceWidth - textWidth) < 0.5 {
+      return measuredSourceLayout
+    }
+
+    let measuredBounds = sourceTextField.attributedStringValue.boundingRect(
+      with: NSSize(width: textWidth, height: .greatestFiniteMagnitude),
+      options: [.usesLineFragmentOrigin, .usesFontLeading]
+    )
+    #if DEBUG
+      sourceMeasurementCountForTesting += 1
+    #endif
+    let naturalHeight = ceil(max(Layout.sourceLineHeight, measuredBounds.height))
+    let layout = SourcePresentationLayout(
+      height: min(Layout.sourceMaximumHeight, naturalHeight),
+      usesFade: naturalHeight > Layout.sourceMaximumHeight
+    )
+    measuredSourceWidth = textWidth
+    measuredSourceLayout = layout
+    return layout
   }
 
   override func draw(_ dirtyRect: NSRect) {}

@@ -986,6 +986,44 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(HistoryEntryPencilLayout.latestSourceLineLimit, 2)
   }
 
+  func testLatestSingleLineSourceUsesNaturalHeightWithoutFadeOrDeadSpace() throws {
+    let row = HistoryEntryNSView()
+    row.configureExpanded(
+      entryID: UUID(),
+      mode: .improve,
+      metadata: "English · 语气与语法 · 13:50",
+      source: "What's the cost about claude review? We probably should follow the same limit.",
+      preview: "What's the cost for Claude review? We should probably follow the same limit.",
+      resultStorage: HistoryResultStorage(
+        "What's the cost for Claude review? We should probably follow the same limit."
+      ),
+      presentationRevision: 0,
+      latestPresentationDelta: nil,
+      state: .completed,
+      isLatest: true,
+      isLongEntry: false,
+      showsSeparator: false,
+      onCollapse: {},
+      onRedo: {},
+      onCopySource: {},
+      onCopyResult: {}
+    )
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: row.preferredHeight(for: 804))
+    row.layoutSubtreeIfNeeded()
+
+    XCTAssertEqual(row.sourceFrameForTesting.height, 21, accuracy: 0.001)
+    XCTAssertEqual(
+      row.resultFrameForTesting.minY - row.sourceFrameForTesting.maxY,
+      8,
+      accuracy: 0.001
+    )
+    XCTAssertFalse(row.sourceUsesFadeForTesting)
+    for _ in 0..<120 {
+      _ = row.preferredHeight(for: 804)
+    }
+    XCTAssertEqual(row.sourceMeasurementCountForTesting, 1)
+  }
+
   func testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState() throws {
     let pool = HistoryResultTextContainerPool.shared
     let initialLeaseCount = pool.leasedContainerCountForTesting
@@ -1095,6 +1133,7 @@ final class InteractionReproductionTests: XCTestCase {
     )
     XCTAssertEqual(
       row.sourceFadeFrameForTesting, row.sourceFrameForTesting.offsetBy(dx: 0, dy: -40))
+    XCTAssertTrue(row.sourceUsesFadeForTesting)
     XCTAssertEqual(row.resultFrameForTesting.minY, 89, accuracy: 0.001)
     XCTAssertEqual(
       row.resultFrameForTesting.maxY + 16,

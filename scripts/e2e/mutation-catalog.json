@@ -171,18 +171,18 @@
       ]
     },
     {
-      "id": "latest-source-preview-expands-past-pencil-height",
-      "description": "Expand the latest source preview to 164 points so it pushes the result away from the source.",
+      "id": "latest-single-line-source-reserves-two-lines",
+      "description": "Force every latest source preview to reserve its full two-line height.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
-      "file": "Sources/Cida/MainWindowView.swift",
-      "before": "  static let latestSourcePreviewHeight: CGFloat = 41",
-      "after": "  static let latestSourcePreviewHeight: CGFloat = 164",
+      "file": "Sources/Cida/HistoryEntryView.swift",
+      "before": "    let naturalHeight = ceil(max(Layout.sourceLineHeight, measuredBounds.height))",
+      "after": "    let naturalHeight = Layout.sourceMaximumHeight",
       "occurrences": 1,
       "unitTests": [
-        "InteractionReproductionTests/testLatestSourcePreviewUsesThePencilClipAndFadeGeometry"
+        "InteractionReproductionTests/testLatestSingleLineSourceUsesNaturalHeightWithoutFadeOrDeadSpace"
       ],
       "releaseTests": [
-        "HistoryPresentationJourneyTests/testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult"
+        "HistoryPresentationJourneyTests/testExpandedActionsReserveTheirColumnAndNeverLeakIntoAnActiveStream"
       ]
     }
   ]

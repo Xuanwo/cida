@@ -152,6 +152,7 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(result.frame.minX, entry.frame.minX, accuracy: 2)
     XCTAssertEqual(entry.frame.maxX - source.frame.maxX, 24, accuracy: 2)
     XCTAssertEqual(entry.frame.maxX - result.frame.maxX, 24, accuracy: 2)
+    XCTAssertEqual(source.frame.height, 21, accuracy: 1)
     XCTAssertEqual(result.frame.minY - source.frame.maxY, 8, accuracy: 2)
     XCTAssertLessThanOrEqual(result.frame.maxY, entry.frame.maxY - 15)
     result.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()

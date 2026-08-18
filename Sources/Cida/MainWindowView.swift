@@ -27,9 +27,12 @@ enum HistoryEntryPencilLayout {
   static let foldedHeaderHeight: CGFloat = 16
   static let foldedPreviewHeight: CGFloat = 52
   static let foldedContentSpacing: CGFloat = 8
-  static let latestSourcePreviewHeight: CGFloat = 41
-  static let latestSourceFadeHeight: CGFloat = 20
   static let latestSourceLineLimit = 2
+  static let latestSourceLineHeight: CGFloat = 13 * 1.55
+  static let latestSourcePreviewHeight = ceil(
+    latestSourceLineHeight * CGFloat(latestSourceLineLimit)
+  )
+  static let latestSourceFadeHeight: CGFloat = 20
   static let foldedHeight =
     foldedVerticalInset * 2 + foldedHeaderHeight + foldedContentSpacing + foldedPreviewHeight
   static let foldedRowStride = foldedHeight + 1
