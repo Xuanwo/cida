@@ -103,8 +103,8 @@ reintroduced.
   screenshots against the manifest-bound approved images and runs the native semantic accessibility
   audit.
 - The full PR gate output for this refactor is written to
-  `TestResults/gates/unified-history-renderer-20260818/gate-summary.json`. It runs all nine UI suites rather
-  than a hand-maintained subset; `PairwiseManifestTests` fails if any suite is omitted.
+  `TestResults/gates/unified-history-renderer-final-20260818/gate-summary.json`. It runs all nine UI
+  suites rather than a hand-maintained subset; `PairwiseManifestTests` fails if any suite is omitted.
 - Failures retain approved/current/Pencil/diff images in the `.xcresult`; baseline recording is
   never automatic.
 

@@ -69,7 +69,7 @@ The host Swift suite currently contains 142 tests: 50 model/report tests, 7 SQLi
 isolation tests, 70 native interaction/layout tests, 3 mutation invariants, 2 suite/matrix manifest
 tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
 
-The Release XCUI suite contains 21 tests across nine files. It covers signed-artifact smoke,
+The Release XCUI suite contains 23 tests across nine files. It covers signed-artifact smoke,
 composer and copy behavior, controlled and uneven streams, cancellation/error recovery, scroll
 direction and follow, history presentation/actions, persistence, shared state-machine relaunch,
 Main/Settings pixel baselines, accessibility audit, and standard window/Settings behavior.
@@ -86,7 +86,7 @@ The checked-in pairwise manifest provides a stable inventory of light/dark, redu
 scrollbar preference, window size, lifecycle, and content combinations, and its pair coverage is
 mathematically verified. It is not currently executed as eight separate Tart configurations, so it
 must not be presented as a completed environment matrix. The release gate's executable coverage is
-the 21 deterministic journeys above.
+the 23 deterministic journeys above.
 
 ## Isolation contract
 
@@ -105,10 +105,11 @@ are recorded as diagnostics rather than misclassified as test activity.
 - `swift test -Xswiftc -warnings-as-errors`: 142/142 passed.
 - Focused fresh-clone Tart diagnosis reproduced both the source-preview frame overflow and the
   recycled folded-row click failure. After the root repairs, both previously failing journeys passed
-  2/2 with a healthy host-session guard and no host artifact activation.
+  2/2 with a healthy host-session guard and no host artifact activation. The native semantic audit
+  also passes after the result action exposes only its real button rather than a roleless overlay.
 - The complete source mutation catalog validates all 12 exact anchors.
 - The complete clean-checkout PR gate for this refactor writes its machine-readable result to
-  `TestResults/gates/unified-history-renderer-20260818/gate-summary.json`.
+  `TestResults/gates/unified-history-renderer-final-20260818/gate-summary.json`.
 
 ## Performance acceptance boundary
 
