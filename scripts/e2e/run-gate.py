@@ -13,6 +13,7 @@ import time
 SCRIPT_PATH = pathlib.Path(__file__).resolve()
 PROJECT_ROOT = SCRIPT_PATH.parents[2]
 P0_RELEASE_TESTS = (
+    "CidaUITests/HarnessSelfTests,"
     "CidaUITests/CidaReleaseArtifactSmokeTests,"
     "CidaUITests/ComposerJourneyTests,"
     "CidaUITests/CoreTranslationJourneyTests,"
@@ -313,11 +314,18 @@ class GateRun:
         )
         if selected_tests:
             environment["CIDA_UI_TEST_ONLY_TESTING"] = selected_tests
-        return self.run_stage(
+        passed = self.run_stage(
             stage_name,
             [str(PROJECT_ROOT / "scripts/test-ui-in-tart.sh")],
             environment,
         )
+        classification = read_json(
+            self.results_directory / output_name / "failure-classification.json"
+        )
+        if classification is not None:
+            self.stages[-1]["failureClassification"] = classification
+            self.write_summary()
+        return passed
 
     def run_mutations(self):
         mode = "unit" if self.profile == "pr" else "all"
@@ -379,6 +387,20 @@ def main():
 
     if gate.source_dirty:
         gate.record_preflight_failure("gate execution requires a clean source checkout")
+        print(gate.summary_path)
+        return 1
+
+    if not gate.run_stage(
+        "harness-contracts",
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "scripts/e2e/tests",
+        ],
+    ):
         print(gate.summary_path)
         return 1
 

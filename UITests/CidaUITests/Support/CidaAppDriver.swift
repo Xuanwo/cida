@@ -152,19 +152,25 @@ final class CidaAppDriver {
     let source = element(identifier: "history-source-\(suffix)")
     let result = app.textViews["history-result-\(suffix.uppercased())"]
     let foldedCard = element(identifier: "history-expand-\(suffix)")
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      if entry.exists,
-        entry.label.hasPrefix("当前历史记录"),
-        source.exists,
-        result.exists,
-        !foldedCard.exists
-      {
-        return true
+    return wait(
+      description: "current expanded history entry \(identifier)",
+      timeout: timeout,
+      sample: {
+        (
+          entry.exists,
+          entry.label,
+          source.exists,
+          result.exists,
+          foldedCard.exists
+        )
+      },
+      matches: {
+        $0.0 && $0.1.hasPrefix("当前历史记录") && $0.2 && $0.3 && !$0.4
+      },
+      describe: {
+        "entry=\($0.0) label=\($0.1) source=\($0.2) result=\($0.3) folded=\($0.4)"
       }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
-    return false
+    )
   }
 
   func waitForFoldedEntry(
@@ -175,18 +181,17 @@ final class CidaAppDriver {
     let entry = element(identifier: identifier)
     let foldedCard = element(identifier: "history-expand-\(suffix)")
     let result = app.textViews["history-result-\(suffix.uppercased())"]
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      if entry.exists,
-        entry.value as? String == "collapsed",
-        foldedCard.exists,
-        !result.exists
-      {
-        return true
+    return wait(
+      description: "folded history entry \(identifier)",
+      timeout: timeout,
+      sample: {
+        (entry.exists, entry.value as? String, foldedCard.exists, result.exists)
+      },
+      matches: { $0.0 && $0.1 == "collapsed" && $0.2 && !$0.3 },
+      describe: {
+        "entry=\($0.0) value=\($0.1 ?? "nil") folded=\($0.2) result=\($0.3)"
       }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
-    return false
+    )
   }
 
   func result(containing marker: String) -> XCUIElement {
@@ -205,18 +210,22 @@ final class CidaAppDriver {
     excluding previousIdentifier: String?,
     timeout: TimeInterval
   ) -> String? {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      let entry = currentHistoryEntry
-      if entry.exists {
-        let identifier = entry.identifier
-        if identifier != previousIdentifier {
-          return identifier
-        }
-      }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
-    return nil
+    var matchedIdentifier: String?
+    let matched = wait(
+      description: "new current history entry",
+      timeout: timeout,
+      sample: {
+        let entry = self.currentHistoryEntry
+        return entry.exists ? entry.identifier : nil
+      },
+      matches: {
+        guard let identifier = $0, identifier != previousIdentifier else { return false }
+        matchedIdentifier = identifier
+        return true
+      },
+      describe: { $0 ?? "missing" }
+    )
+    return matched ? matchedIdentifier : nil
   }
 
   func visibleHistoryEntryCount() -> Int {
@@ -269,12 +278,13 @@ final class CidaAppDriver {
     in element: XCUIElement,
     timeout: TimeInterval
   ) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      if element.value as? String == expectedValue { return true }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.02))
-    } while Date() < deadline
-    return false
+    wait(
+      description: "value '\(expectedValue)' for \(element.identifier)",
+      timeout: timeout,
+      sample: { element.value as? String },
+      matches: { $0 == expectedValue },
+      describe: { $0 ?? "nil" }
+    )
   }
 
   func textValue(in element: XCUIElement) -> String {
@@ -286,12 +296,13 @@ final class CidaAppDriver {
     in element: XCUIElement,
     timeout: TimeInterval
   ) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      if textValue(in: element) == expectedValue { return true }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
-    return false
+    wait(
+      description: "text '\(expectedValue)' for \(element.identifier)",
+      timeout: timeout,
+      sample: { self.textValue(in: element) },
+      matches: { $0 == expectedValue },
+      describe: { $0 }
+    )
   }
 
   func waitForLabel(
@@ -299,9 +310,13 @@ final class CidaAppDriver {
     in element: XCUIElement,
     timeout: TimeInterval
   ) -> Bool {
-    let predicate = NSPredicate(format: "label == %@", expectedLabel)
-    let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
-    return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    wait(
+      description: "label '\(expectedLabel)' for \(element.identifier)",
+      timeout: timeout,
+      sample: { element.label },
+      matches: { $0 == expectedLabel },
+      describe: { $0 }
+    )
   }
 
   func waitForFrameHeight(
@@ -310,26 +325,26 @@ final class CidaAppDriver {
     in element: XCUIElement,
     timeout: TimeInterval
   ) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      let height = element.frame.height
-      if minimumHeight.map({ height >= $0 }) ?? true,
-        maximumHeight.map({ height <= $0 }) ?? true
-      {
-        return true
-      }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
-    return false
+    wait(
+      description: "frame height for \(element.identifier)",
+      timeout: timeout,
+      sample: { element.frame.height },
+      matches: { height in
+        (minimumHeight.map { height >= $0 } ?? true)
+          && (maximumHeight.map { height <= $0 } ?? true)
+      },
+      describe: { String(format: "%.2f", $0) }
+    )
   }
 
   func waitForPasteboard(_ expected: String, timeout: TimeInterval) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      if NSPasteboard.general.string(forType: .string) == expected { return true }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
-    return false
+    wait(
+      description: "pasteboard value",
+      timeout: timeout,
+      sample: { NSPasteboard.general.string(forType: .string) },
+      matches: { $0 == expected },
+      describe: { $0 ?? "nil" }
+    )
   }
 
   func attachWindowScreenshot(named name: String, to activity: XCTActivity) {
@@ -340,12 +355,43 @@ final class CidaAppDriver {
   }
 
   private func waitForForeground(timeout: TimeInterval) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-      if app.state == .runningForeground { return true }
-      app.activate()
-      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    } while Date() < deadline
+    wait(
+      description: "application foreground state",
+      timeout: timeout,
+      sample: { () -> XCUIApplication.State in
+        if self.app.state != .runningForeground {
+          self.app.activate()
+        }
+        return self.app.state
+      },
+      matches: { (state: XCUIApplication.State) in state == .runningForeground },
+      describe: { (state: XCUIApplication.State) in String(describing: state) }
+    )
+  }
+
+  private func wait<Value>(
+    description: String,
+    timeout: TimeInterval,
+    sample: () -> Value,
+    matches: (Value) -> Bool,
+    describe: (Value) -> String
+  ) -> Bool {
+    let result = PollingWaiter().wait(
+      timeout: timeout,
+      sample: sample,
+      matches: matches,
+      describe: describe
+    )
+    guard !result.matched else { return true }
+
+    XCTContext.runActivity(named: "Timed out waiting for \(description)") { activity in
+      let attachment = XCTAttachment(
+        string: "timeout=\(timeout)s elapsed=\(result.elapsed)s\n\(result.diagnosticDescription)"
+      )
+      attachment.name = "polling-timeline"
+      attachment.lifetime = .keepAlways
+      activity.add(attachment)
+    }
     return false
   }
 }

@@ -12,6 +12,32 @@ swift_test_filter=${CIDA_TART_SWIFT_TEST_FILTER:-}
 guest_timeout_seconds=${CIDA_TART_GUEST_TIMEOUT_SECONDS:-600}
 guest_session_timeout_seconds=${CIDA_TART_GUEST_SESSION_TIMEOUT_SECONDS:-900}
 boot_attempts=${CIDA_TART_BOOT_ATTEMPTS:-2}
+mkdir -p "$results_dir"
+results_dir=${results_dir:A}
+failure_classification_path="$results_dir/failure-classification.json"
+failure_category="infrastructure"
+failure_phase="host-preflight"
+failure_detail="Host Tart orchestration failed."
+
+write_host_failure() {
+  local exit_code=$1
+  if (( exit_code != 0 )) && [[ ! -e "$failure_classification_path" ]]; then
+    /usr/bin/python3 "$project_dir/scripts/e2e/failure_classification.py" \
+      "$failure_classification_path" \
+      "$failure_category" \
+      "$failure_phase" \
+      "$exit_code" \
+      "$failure_detail" || true
+  fi
+}
+
+record_host_failure() {
+  local exit_code=$?
+  write_host_failure "$exit_code"
+  return "$exit_code"
+}
+
+trap record_host_failure EXIT
 
 if (( $# != 0 )); then
   echo "Usage: $0" >&2
@@ -26,9 +52,7 @@ if ! tart list | /usr/bin/grep -q "local  $golden_vm"; then
   exit 66
 fi
 
-mkdir -p "$results_dir"
 project_dir=${project_dir:A}
-results_dir=${results_dir:A}
 artifact_root=${CIDA_RELEASE_ARTIFACT_ROOT:-"$results_dir/ReleaseArtifact"}
 artifact_root=${artifact_root:A}
 shared_artifact_root="$results_dir/ReleaseArtifact"
@@ -99,9 +123,18 @@ finalize_host_guard() {
   return 1
 }
 "$project_dir/scripts/e2e/host-session-snapshot.swift" >"$host_before_path"
-trap 'finalize_host_guard || true' EXIT INT TERM
+cleanup_before_vm() {
+  local exit_code=$?
+  finalize_host_guard || true
+  write_host_failure "$exit_code"
+  return "$exit_code"
+}
+trap cleanup_before_vm EXIT INT TERM
 
 if [[ -n "${CIDA_RELEASE_ARTIFACT_ROOT:-}" ]]; then
+  failure_category="artifact"
+  failure_phase="host-artifact-staging"
+  failure_detail="The external Release artifact could not be staged or verified."
   host_progress "host-external-release-artifact-verification-started"
   if [[ -e "$shared_artifact_root" ]]; then
     echo "External artifact staging path already exists: $shared_artifact_root" >&2
@@ -131,6 +164,9 @@ elif [[ -e "$artifact_root" ]]; then
     "$artifact_root" --require-developer-id >/dev/null
   host_progress "host-release-artifact-reuse-finished"
 else
+  failure_category="build"
+  failure_phase="release-artifact-build"
+  failure_detail="The Release artifact failed to build."
   host_progress "host-release-artifact-build-started"
   "$project_dir/scripts/e2e/build-release-artifact.sh" "$artifact_root" \
     >"$results_dir/release-artifact-build.log" 2>&1
@@ -142,6 +178,7 @@ if ! start_host_monitor; then
   exit 1
 fi
 host_progress "host-artifact-monitor-ready"
+failure_category="infrastructure"
 
 run_vm=""
 run_pid=""
@@ -157,8 +194,11 @@ cleanup_current_vm() {
   fi
 }
 cleanup() {
+  local exit_code=$?
   cleanup_current_vm
   finalize_host_guard || true
+  write_host_failure "$exit_code"
+  return "$exit_code"
 }
 trap cleanup EXIT INT TERM
 
@@ -183,6 +223,8 @@ probe_guest_session() {
 vm_ready=false
 attempt=1
 while (( attempt <= boot_attempts )); do
+  failure_phase="tart-boot"
+  failure_detail="Tart did not reach a healthy guest agent and GUI session."
   run_vm="${run_vm_prefix}-${attempt}"
   host_progress "host-clone-started attempt=${attempt}"
   tart clone "$golden_vm" "$run_vm"
@@ -281,6 +323,8 @@ tart exec "$run_vm" /bin/launchctl asuser 501 \
     "$source_dir/" "$work_dir/"
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) source-copy-finished" >>"$results_dir/vm-progress.log"
 '
+failure_phase="guest-test-execution"
+failure_detail="The guest test command failed without writing a more specific classification."
 tart exec "$run_vm" /bin/launchctl asuser 501 \
   /usr/bin/sudo -H -u admin /bin/zsh -lc '
   set -euo pipefail
@@ -291,6 +335,9 @@ tart exec "$run_vm" /bin/launchctl asuser 501 \
 ' -- "$only_testing" "$swift_test_sanitizer" "$swift_test_filter" \
   "/Volumes/My Shared Files/artifacts/ReleaseArtifact"
 
+failure_category="artifact"
+failure_phase="host-artifact-final-verification"
+failure_detail="The tested artifact changed or failed final host verification."
 "$project_dir/scripts/e2e/verify-release-artifact.sh" \
   "$artifact_root" --require-developer-id >/dev/null
 host_progress "host-release-artifact-reverified"

@@ -70,12 +70,20 @@ The host Swift suite currently contains 144 tests: 50 model/report tests, 7 SQLi
 isolation tests, 72 native interaction/layout tests, 3 mutation invariants, 2 suite/matrix manifest
 tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
 
-The Release XCUI suite contains 23 tests across nine files. It covers signed-artifact smoke,
+The Release XCUI target contains 26 tests across ten files: 23 product journeys and three harness
+self-tests. The product journeys cover signed-artifact smoke,
 composer and copy behavior, controlled and uneven streams, cancellation/error recovery, scroll
 direction and follow, history presentation/actions, persistence, shared state-machine relaunch,
 Main/Settings pixel baselines, accessibility audit, and standard window/Settings behavior.
 
 ## Test-system self-verification
+
+All UI waits use one 20 ms polling primitive that samples immediately, records value transitions,
+and attaches its timeline to the XCResult on timeout. Three deterministic harness tests use an
+injectable clock to prove that 100 ms, 200 ms, and 800 ms transient states are observable and that a
+timeout retains its changed-value history. Tart failures write a machine-readable classification as
+`infrastructure`, `build`, `source-test`, `ui-assertion-or-crash`, or `artifact`; an ambiguous UI
+failure is never automatically labeled as a product regression.
 
 The mutation catalog now contains fourteen source-level faults. Each definition pins an exact source
 anchor and names its unit and/or Release kill tests. Catalog drift fails before an expensive build

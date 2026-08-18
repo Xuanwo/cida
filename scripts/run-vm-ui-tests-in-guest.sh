@@ -19,6 +19,11 @@ server_log="$results_dir/mock-server.log"
 xcresult_path="$results_dir/CidaUITests.xcresult"
 xcresult_summary_path="$results_dir/xcresult-summary.json"
 progress_path="$results_dir/vm-progress.log"
+failure_classification_path="$results_dir/failure-classification.json"
+failure_category="infrastructure"
+failure_phase="guest-preflight"
+failure_detail="Guest UI test orchestration failed."
+server_pid=""
 only_testing=${3:-}
 swift_test_sanitizer=${4:-}
 swift_test_filter=${5:-}
@@ -41,6 +46,24 @@ fi
 progress() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1" >>"$progress_path"
 }
+
+cleanup_guest() {
+  local exit_code=$?
+  if [[ -n "$server_pid" ]]; then
+    /bin/kill "$server_pid" 2>/dev/null || true
+  fi
+  if (( exit_code != 0 )) && [[ ! -e "$failure_classification_path" ]]; then
+    /usr/bin/python3 "$project_dir/scripts/e2e/failure_classification.py" \
+      "$failure_classification_path" \
+      "$failure_category" \
+      "$failure_phase" \
+      "$exit_code" \
+      "$failure_detail" || true
+  fi
+  return "$exit_code"
+}
+
+trap cleanup_guest EXIT
 
 print_failure_log() {
   local log_path=$1
@@ -70,6 +93,9 @@ fi
 mkdir -p "$results_dir"
 /bin/rm -rf "$work_root"
 mkdir -p "$work_root"
+failure_category="artifact"
+failure_phase="guest-artifact-verification"
+failure_detail="The guest could not stage or verify the Release artifact."
 /usr/bin/ditto "$shared_artifact_root" "$artifact_root"
 
 artifact_digest=$(
@@ -80,6 +106,9 @@ progress "release-artifact-verified digest=$artifact_digest"
 
 cd "$project_dir"
 progress "swift-test-started"
+failure_category="source-test"
+failure_phase="swift-test"
+failure_detail="The guest Swift test preflight failed."
 swift_test_log="$results_dir/swift-test.log"
 : >"$swift_test_log"
 swift_test_failed=false
@@ -133,10 +162,12 @@ if [[ "$swift_test_failed" == true ]]; then
 fi
 progress "swift-test-passed"
 
+failure_category="infrastructure"
+failure_phase="local-mock-startup"
+failure_detail="The isolated OpenAI-compatible mock failed to start."
 /usr/bin/python3 "$project_dir/UITests/Fixtures/e2e_scenario_server.py" \
   "$record_path" "$port_path" >"$server_log" 2>&1 &
 server_pid=$!
-trap '/bin/kill "$server_pid" 2>/dev/null || true' EXIT
 
 for attempt in {1..100}; do
   [[ -s "$port_path" ]] && break
@@ -157,6 +188,9 @@ export CIDA_UI_TEST_SOURCE_ROOT="$project_dir"
 /bin/rm -rf "$xcresult_path"
 /bin/rm -f "$xcresult_summary_path"
 progress "xcui-build-for-testing-started"
+failure_category="build"
+failure_phase="xcui-build-for-testing"
+failure_detail="The XCUI runner failed to build."
 if ! xcodebuild build-for-testing \
   -project "$project_dir/UITests/CidaUITests.xcodeproj" \
   -scheme CidaUITests \
@@ -192,6 +226,9 @@ progress "xcui-build-for-testing-passed"
 /usr/bin/killall Terminal >/dev/null 2>&1 || true
 /bin/sleep 1
 
+failure_category="infrastructure"
+failure_phase="xcui-session-readiness"
+failure_detail="The guest testmanagerd service failed to become ready."
 /bin/launchctl kickstart -k "gui/$(/usr/bin/id -u)/com.apple.testmanagerd" >/dev/null
 for attempt in {1..50}; do
   /usr/bin/pgrep -x testmanagerd >/dev/null && break
@@ -203,6 +240,9 @@ if ! /usr/bin/pgrep -x testmanagerd >/dev/null; then
 fi
 
 progress "xcui-test-started"
+failure_category="ui-assertion-or-crash"
+failure_phase="xcui-test"
+failure_detail="The XCUI run failed; inspect the xcresult, polling timeline, and diagnostics before changing product code."
 if ! xcodebuild test-without-building \
   -project "$project_dir/UITests/CidaUITests.xcodeproj" \
   -scheme CidaUITests \
@@ -216,11 +256,19 @@ if ! xcodebuild test-without-building \
 then
   /bin/sleep 2
   collect_diagnostics
+  if [[ -d "$xcresult_path" ]]; then
+    xcrun xcresulttool get test-results summary \
+      --path "$xcresult_path" \
+      --format json >"$xcresult_summary_path" 2>/dev/null || true
+  fi
   print_failure_log "$results_dir/xcodebuild-ui-tests.log"
   exit 1
 fi
 progress "xcui-test-passed"
 
+failure_category="infrastructure"
+failure_phase="xcresult-summary"
+failure_detail="The passing XCUI result could not be summarized."
 if ! xcrun xcresulttool get test-results summary \
   --path "$xcresult_path" \
   --format json >"$xcresult_summary_path"
@@ -229,6 +277,9 @@ then
   exit 1
 fi
 progress "xcui-summary-generated"
+failure_category="artifact"
+failure_phase="release-artifact-final-verification"
+failure_detail="The tested Release artifact failed final verification."
 
 verified_digest=$(
   "$project_dir/scripts/e2e/verify-release-artifact.sh" \
