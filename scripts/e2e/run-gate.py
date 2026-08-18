@@ -178,6 +178,17 @@ class GateRun:
             report["artifactAppTreeSHA256"] == self.artifact_digest
             for report in performance_reports
         )
+        proxy_passed = any(
+            stage["name"] == "performance-proxies" and stage["status"] == "passed"
+            for stage in self.stages
+        )
+        physical_120hz_required = self.profile in ("nightly", "release")
+        physical_120hz_passed = bool(performance_reports) and all(
+            report["passed"] is True
+            and report["frameClock"] == "view-bound-ca-display-link"
+            and (report["displayMaximumFramesPerSecond"] or 0) >= 120
+            for report in performance_reports
+        )
         finished_at = datetime.datetime.now(datetime.timezone.utc)
         summary = {
             "schemaVersion": 1,
@@ -202,10 +213,19 @@ class GateRun:
             "mutationSummaries": mutation_summaries,
             "performanceReports": performance_reports,
             "performanceArtifactsMatch": performance_artifacts_match,
+            "performanceCertification": {
+                "structuralProxyPassed": proxy_passed,
+                "physical120HzRequired": physical_120hz_required,
+                "physical120HzPassed": physical_120hz_passed
+                if physical_120hz_required
+                else None,
+            },
             "passed": required_stages_passed
             and final_verification_passed
             and self.artifact_digest is not None
-            and performance_artifacts_match,
+            and performance_artifacts_match
+            and proxy_passed
+            and (not physical_120hz_required or physical_120hz_passed),
         }
         temporary = self.summary_path.with_suffix(".json.pending")
         temporary.write_text(
@@ -417,6 +437,12 @@ def main():
     if not gate.run_stage(
         "swift-tests",
         ["swift", "test", "-Xswiftc", "-warnings-as-errors"],
+    ):
+        print(gate.summary_path)
+        return 1
+    if not gate.run_stage(
+        "performance-proxies",
+        [str(PROJECT_ROOT / "scripts/e2e/run-performance-proxies.sh")],
     ):
         print(gate.summary_path)
         return 1

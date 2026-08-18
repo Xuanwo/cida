@@ -49,7 +49,8 @@ scripts/e2e/run-nightly-gate.sh
 scripts/e2e/run-release-gate.sh
 ```
 
-Every profile first validates every mutation anchor, then runs the complete Swift suite, builds and
+Every profile first validates every mutation anchor, runs the complete Swift suite, and reruns five
+named structural performance proxies before it builds and
 signs one Release app, binds its manifest to the current commit, and verifies the app-tree digest
 again after all consumers finish. The PR profile
 runs the P0 Release journeys in Tart and the unit mutation contracts. Nightly runs the full Tart suite,
@@ -92,10 +93,12 @@ main-actor callback latencies above the 12.5 ms budget. The focused gates collec
 extreme matrix collects 2,400. The history gate continuously scrolls upward through 1,000
 persisted-shaped records for at least 12,000 points. Production stream pacing and the probe both use
 the app view's native Core Animation display link; the report labels it
-`view-bound-ca-display-link` and records
-native callback cadence separately from main-actor handling latency. A nonactivating fallback only
-keeps an unavailable display link from hanging the process; a 60 Hz or unavailable physical display still
-fails `displayRequirementSatisfied` and cannot produce a passing 120 Hz report.
+`view-bound-ca-display-link` and records native callback cadence separately from main-actor handling
+latency. A nonactivating fallback only keeps an unavailable display link from hanging the process; a
+60 Hz or unavailable physical display still fails `displayRequirementSatisfied` and cannot produce
+a passing 120 Hz report. PR gates report structural proxy coverage without claiming an FPS result;
+nightly and release summaries cannot pass unless at least one physical report confirms a 120 Hz
+display and the view-bound clock.
 
 The extreme matrix has a quick smoke profile and two exact, opt-in profiles: one million persisted
 history rows, and one thousand persisted results containing one million characters each. Every
