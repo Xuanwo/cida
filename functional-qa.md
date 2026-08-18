@@ -23,8 +23,9 @@ The current core experience contract includes:
 6. One outer result/history scroll surface, correct 4 pt custom thumb direction, and sticky result
    actions for long records.
 7. Latest-only automatic expansion, independent manual comparisons, bounded folded previews, full
-   copy from folded records, and no hidden full-result layout. Folded, current, and manually
-   expanded records are states of one native history-entry renderer.
+   source/result restoration after manual expansion, full copy from folded records, and no hidden
+   full-result layout. Folded, current, and manually expanded records are states of one native
+   history-entry renderer.
 8. Native Command-C precedence, hover-only terminal actions, streaming action suppression, and
    copied-state reset.
 9. DeepSeek/OpenAI selection, editable local endpoint and model, Keychain API-key persistence and
@@ -46,7 +47,7 @@ model, storage, window, history, or renderer paths.
 | Old result survives a new submit | Submission now transfers the latest marker and mounts a new empty result in the same accepted event; pooled result views clear TextKit and compositor state before reuse. | Controlled-first-byte Tart journey checks the new current identity, empty output, forbidden old pixels, and prior-row fold. Pool-capacity journey repeats beyond the prewarmed pool. |
 | Composer sometimes remains populated or becomes uneditable | Native reset synchronization is generation-aware: a stale binding echo is cleared, while a genuine edit made after the reset is preserved. Empty macOS AX values are normalized without confusing `nil` with a failed reset. | Native responder-chain tests, real typing/paste/delete XCUI, atomic-submit unit test, and two consecutive-submit journeys. |
 | A passing test only proved an AX string | Current/expanded state is asserted through visible product structure: current semantic label, source and result presence, absence of the folded card; folded state requires the inverse structure. | Shared driver applies the invariant to every submit. Direct mutation of the latest marker is killed by unit and Tart tests. |
-| Folded and expanded records drifted because two layout engines owned the same component | `HistoryEntryNSView` now owns header, source, result, actions, fades, accessibility, and exact geometry for every presentation state. SwiftUI selects a presentation only; it no longer contains a second history-record layout. | Structural hierarchy tests require all three states to resolve to `HistoryEntryNSView`; a real AppKit hit-test and `mouseDown` expands a recycled folded row; identity/geometry tests exercise every state transition; Tart asserts the visible containment and spacing. A source mutation that bypasses the unified presentation contract must be killed. |
+| Folded and expanded records drifted because two layout engines owned the same component | `HistoryEntryNSView` now owns header, source, result, actions, fades, accessibility, and exact geometry for every presentation state. SwiftUI selects a presentation only; it no longer contains a second history-record layout. `CidaWindow` routes native history actions before wrapper hit testing. | Structural hierarchy tests require all three states to resolve to `HistoryEntryNSView`; native window events exercise action routing; identity/geometry tests exercise every state transition; Tart asserts that every expanded record restores its source, preserves spacing, and accepts source/result actions. Source and hit-routing mutations must be killed. |
 | Some UI suites were silently absent from PR | The PR selector names every UI suite, and a source-enumerating unit test fails if a new `*Tests.swift` suite is not selected. | `PairwiseManifestTests/testPRGateIncludesEveryReleaseUITestSuite`. |
 | Settings could open but not work | Stable identifiers now cover provider, endpoint/model, API key, prompt editor/reset, and launch-at-login. Prompt editing, close/reopen, reset, provider switch, local endpoint, and official endpoint reset form one E2E state machine. | `WindowAndSettingsJourneyTests`, persistence relaunch, and Settings pixel baseline. |
 | Improvement followed translation language selectors | Improvement uses `preserve_source` with no source/target translation parameters; UI history and hints derive from detected input language. | English and Chinese improvement journey plus request-body contract tests. |
@@ -65,8 +66,8 @@ model, storage, window, history, or renderer paths.
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite currently contains 143 tests: 50 model/report tests, 7 SQLite tests, 4 host
-isolation tests, 71 native interaction/layout tests, 3 mutation invariants, 2 suite/matrix manifest
+The host Swift suite currently contains 144 tests: 50 model/report tests, 7 SQLite tests, 4 host
+isolation tests, 72 native interaction/layout tests, 3 mutation invariants, 2 suite/matrix manifest
 tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
 
 The Release XCUI suite contains 23 tests across nine files. It covers signed-artifact smoke,
@@ -83,8 +84,8 @@ or VM launch. In addition to submit-reset coverage, the
 folded presentation; native state/geometry tests and the visible Tart history journey reject it.
 The `expanded-history-source-stays-hidden` mutation restores the reported latest-only source gate;
 the same native geometry test and real expanded-history journey must reject it.
-The `history-action-hit-target-swallowed` mutation removes the explicit parent-to-child dispatch;
-the regression must fail before an icon can appear interactive while its parent consumes the click.
+The `history-action-hit-target-swallowed` mutation removes the unified window-to-entry dispatch;
+the regression must fail before an icon can appear interactive while a wrapper consumes the click.
 
 The checked-in pairwise manifest provides a stable inventory of light/dark, reduced motion,
 scrollbar preference, window size, lifecycle, and content combinations, and its pair coverage is
@@ -106,14 +107,14 @@ are recorded as diagnostics rather than misclassified as test activity.
 
 ## Current verification
 
-- `swift test -Xswiftc -warnings-as-errors`: 143/143 passed.
+- `swift test -Xswiftc -warnings-as-errors`: 144/144 passed.
 - Focused fresh-clone Tart diagnosis reproduced both the source-preview frame overflow and the
   recycled folded-row click failure. After the root repairs, both previously failing journeys passed
   2/2 with a healthy host-session guard and no host artifact activation. The native semantic audit
   also passes after the result action exposes only its real button rather than a roleless overlay.
 - The complete source mutation catalog validates all 14 exact anchors.
-- The complete clean-checkout PR gate for this refactor writes its machine-readable result to
-  `TestResults/gates/unified-history-renderer-final-20260818/gate-summary.json`.
+- The complete clean-checkout PR gate for this repair writes its machine-readable result to
+  `TestResults/gates/expanded-history-source-final-20260818/gate-summary.json`.
 
 ## Performance acceptance boundary
 
