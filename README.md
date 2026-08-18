@@ -103,7 +103,7 @@ successfully completed data flow, and a correct data flow never masks a long fra
 
 ## Architecture
 
-- SwiftUI owns composition and observable application state. AppKit owns standard titled windows, the global shortcut, native text controls, keyboard routing, snapshots, and performance instrumentation.
+- SwiftUI owns page composition and observable application state. AppKit owns standard titled windows, the global shortcut, native text controls, keyboard routing, history-record rendering, snapshots, and performance instrumentation. A single `HistoryEntryNSView` renders folded, current, and manually expanded records; state changes never cross layout engines or duplicate header, source, result, action, fade, or accessibility geometry.
 - Model requests keep stable prompt policy, typed runtime parameters, and untrusted source content separate. Translation sends explicit source and target languages; improvement sends `preserve_source` without either translation language, so every source passage stays in its original language. The same contract is used for OpenAI, compatible remote providers, and loopback mock endpoints without requiring provider-specific template syntax.
 - Streamed results use a lightweight TextKit 1 rendering view and materialize a native selection editor only when needed. Presentation storage publishes an append notification, so TextKit appends only the missing UTF-16 suffix without invalidating the SwiftUI history tree. A view-bound `CADisplayLink` adaptive presenter follows the window across displays and smooths uneven network delivery at 30–400 grapheme clusters per second with a maximum of eight grapheme clusters per update.
 - New streamed text uses one bounded 30 pt compositor tail whose 2 pt background blur and 18% cover fade reach zero over the Pencil 120 ms ease-out, plus an inline caret. Results grow naturally inside the history document and never install a second scroll region; the outer history alone follows while the user remains pinned to the bottom. Glyph presentation remains display-paced, while natural-height TextKit layout is coalesced to at most 10 Hz and notifies the history surface directly instead of round-tripping through the observable model.
@@ -113,7 +113,8 @@ successfully completed data flow, and a correct data flow never masks a long fra
 - Production startup loads only the newest 512 history rows and preserves the true SQLite count and
   oldest cursor. Reaching the top loads earlier pages without inserting the complete database into
   SwiftUI's AttributeGraph. Automation uses a bounded 2,000-row page so the exact million-row
-  scenario exercises a real page transition. Folded history is an AppKit viewport recycler: it
+  scenario exercises a real page transition. Folded history reuses the same native entry renderer
+  through an AppKit viewport recycler: it
   materializes only visible rows plus overscan, uses binary-search geometry, resets hover and
   accessibility state before reuse, and reads only each record's cached 420-grapheme preview.
   Append-only submissions retain the existing row pool and height cache and measure exactly the new

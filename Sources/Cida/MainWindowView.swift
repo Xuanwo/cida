@@ -584,16 +584,11 @@ private struct HistoryEntryView: View {
   let model: AppModel
   let animatesTransitions: Bool
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-  @State private var isHovering = false
-  @State private var copiedAction: RecordAction?
-  @State private var copyResetTask: Task<Void, Never>?
-  @State private var retainsAutomaticallyExpandedBody: Bool
 
   init(entry: HistoryEntry, model: AppModel, animatesTransitions: Bool) {
     standaloneEntry = entry
     self.model = model
     self.animatesTransitions = animatesTransitions
-    _retainsAutomaticallyExpandedBody = State(initialValue: entry.isLatestInHistory)
   }
 
   private var entry: HistoryEntry {
@@ -608,207 +603,28 @@ private struct HistoryEntryView: View {
     entry.isLatestInHistory
   }
 
-  private var shouldRenderExpandedBody: Bool {
-    isExpanded || retainsAutomaticallyExpandedBody
-  }
-
   var body: some View {
-    VStack(spacing: 0) {
-      Group {
-        if isExpanded {
-          entryBodies
-        } else {
-          entryBodies.clipped()
-        }
-      }
-      if !isLatestEntry {
-        Hairline()
-      }
-    }
-    .animation(historyTransitionAnimation, value: isExpanded)
-    .task(id: isExpanded) {
-      if isExpanded {
-        retainsAutomaticallyExpandedBody = true
-        return
-      }
-      if animatesTransitions, !accessibilityReduceMotion {
-        try? await Task.sleep(for: .milliseconds(CidaMotion.historyFoldMilliseconds))
-      }
-      guard !Task.isCancelled else { return }
-      retainsAutomaticallyExpandedBody = false
-    }
-  }
+    let presentation: HistoryEntryNSView.Presentation =
+      isExpanded ? .expanded(isLatest: isLatestEntry) : .folded
+    let _ = entry.state
+    let _ = entry.presentationRevision
+    let _ = entry.metadata
 
-  private var entryBodies: some View {
-    ZStack(alignment: .topLeading) {
-      if shouldRenderExpandedBody {
-        expandedBody
-          .opacity(isExpanded ? 1 : 0)
-          .allowsHitTesting(isExpanded)
-          .accessibilityHidden(!isExpanded)
-      }
-
-      foldedBody
-        .opacity(isExpanded ? 0 : 1)
-        .allowsHitTesting(!isExpanded)
-        .accessibilityHidden(isExpanded)
-    }
-    .frame(
-      height: isExpanded ? nil : HistoryEntryPencilLayout.foldedHeight,
-      alignment: .top
-    )
-  }
-
-  private var expandedBody: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 12) {
-        HStack(spacing: 6) {
-          LucideIcon(entry.mode == .translate ? .languages : .sparkles, size: 12)
-          Text(entry.mode.title)
-            .font(CidaDesign.mainUI(11, weight: .semibold))
-          Text(entry.metadata)
-            .font(CidaDesign.mainUI(11))
-            .foregroundStyle(CidaDesign.textTertiary)
-        }
-        .foregroundStyle(CidaDesign.accent)
-        .frame(height: 16)
-
-        Spacer(minLength: 12)
-
-        Color.clear
-          .frame(
-            width: HistoryEntryPencilLayout.actionIconSize,
-            height: HistoryEntryPencilLayout.actionIconSize
-          )
-          .accessibilityHidden(true)
-      }
-      .contentShape(Rectangle())
-      .onTapGesture {
-        guard !isLatestEntry else { return }
-        withAnimation(historyTransitionAnimation) {
-          model.collapseHistoryEntry(entry.id)
-        }
-      }
-      .accessibilityElement(children: .ignore)
-      .accessibilityLabel(
-        "\(isLatestEntry ? "当前记录" : "收起历史记录")，\(entry.mode.title)，\(entry.metadata)"
-      )
-      .accessibilityIdentifier("history-collapse-\(entryIdentifierSuffix)")
-      .accessibilityAddTraits(isLatestEntry ? [] : .isButton)
-      .accessibilityHidden(isLatestEntry)
-      .overlay(alignment: .topTrailing) {
-        if actionsAreVisible {
-          EntryActionButton(
-            icon: .rotateCounterclockwise,
-            label: "重新处理",
-            identifier: actionIdentifier("redo"),
-            isCopied: false
-          ) {
-            model.redo(entry)
-          }
-          .transition(.opacity)
-        }
-      }
-      .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
-
-      if isLatestEntry {
-        HStack(alignment: .top, spacing: HistoryEntryPencilLayout.actionGap) {
-          ZStack(alignment: .bottom) {
-            sourceText
-
-            LinearGradient(
-              colors: [CidaDesign.background.opacity(0), CidaDesign.background],
-              startPoint: .top,
-              endPoint: .bottom
-            )
-            .frame(height: HistoryEntryPencilLayout.latestSourceFadeHeight)
-            .allowsHitTesting(false)
-          }
-          .frame(height: HistoryEntryPencilLayout.latestSourcePreviewHeight, alignment: .top)
-          .clipped()
-          .frame(maxWidth: .infinity, alignment: .leading)
-
-          if actionsAreVisible || copiedAction == .copySource {
-            EntryActionButton(
-              icon: .copy,
-              label: copiedAction == .copySource ? "已复制原文" : "复制原文",
-              identifier: actionIdentifier("copy-source"),
-              isCopied: copiedAction == .copySource
-            ) {
-              model.copySource(entry)
-              showCopiedState(.copySource)
-            }
-            .padding(.top, 4)
-            .transition(.opacity)
-          }
-        }
-        .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
-      }
-
-      expandedResult
-    }
-    .padding(.vertical, 16)
-    .frame(maxWidth: .infinity, alignment: .topLeading)
-    .contentShape(Rectangle())
-    .background {
-      if isExpanded {
-        HistoryEntryHoverTrackingView(isActive: isExpanded, isHovering: $isHovering)
-          .accessibilityHidden(true)
-      }
-    }
-    .onDisappear {
-      isHovering = false
-      copyResetTask?.cancel()
-      copyResetTask = nil
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel(
-      isLatestEntry
-        ? "当前历史记录，\(entry.mode.title)，\(entry.metadata)"
-        : "展开的历史记录"
-    )
-    .accessibilityIdentifier("history-entry-\(entryIdentifierSuffix)")
-    .accessibilityValue("expanded")
-    .accessibilityActions {
-      if !isLatestEntry {
-        Button("收起") {
-          withAnimation(historyTransitionAnimation) {
-            model.collapseHistoryEntry(entry.id)
-          }
-        }
-      }
-
-      if isLatestEntry {
-        Button("复制原文") {
-          model.copySource(entry)
-          showCopiedState(.copySource)
-        }
-      }
-
-      Button("复制结果") {
-        guard entry.resultUTF16Length > 0 else { return }
-        model.copyResult(entry)
-        showCopiedState(.copyResult)
-      }
-
-      Button("重新处理") {
-        guard entry.state != .streaming else { return }
-        model.redo(entry)
-      }
-    }
-  }
-
-  private var foldedBody: some View {
-    FoldedHistoryEntryView(
+    NativeHistoryEntryView(
       entry: entry,
-      isPresentationActive: !isExpanded,
+      presentation: presentation,
+      showsSeparator: !isLatestEntry,
       onExpand: {
-        withAnimation(historyTransitionAnimation) {
-          model.expandHistoryEntry(entry.id)
-        }
+        model.expandHistoryEntry(entry.id)
+      },
+      onCollapse: {
+        model.collapseHistoryEntry(entry.id)
       },
       onRedo: {
         model.redo(entry)
+      },
+      onCopySource: {
+        model.copySource(entry)
       },
       onCopyResult: {
         guard entry.resultUTF16Length > 0 else { return }
@@ -816,68 +632,7 @@ private struct HistoryEntryView: View {
       }
     )
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("history-entry-\(entryIdentifierSuffix)")
-    .accessibilityValue("collapsed")
-    .accessibilityAction(named: "展开") {
-      withAnimation(historyTransitionAnimation) {
-        model.expandHistoryEntry(entry.id)
-      }
-    }
-    .accessibilityAction(named: "复制结果") {
-      guard entry.resultUTF16Length > 0 else { return }
-      model.copyResult(entry)
-      showCopiedState(.copyResult)
-    }
-    .accessibilityAction(named: "重新处理") {
-      guard entry.state != .streaming else { return }
-      model.redo(entry)
-    }
-  }
-
-  private var expandedResult: some View {
-    HistoryResultTextView(
-      entryID: entry.id,
-      resultStorage: entry.resultStorage,
-      presentationRevision: entry.presentationRevision,
-      latestPresentationDelta: entry.latestPresentationDelta,
-      isStreaming: entry.state == .streaming
-    )
-    .frame(maxWidth: .infinity)
-    .padding(.trailing, HistoryEntryPencilLayout.actionColumnWidth)
-    .overlay(alignment: .topTrailing) {
-      if showsResultCopyAction {
-        StickyHistoryResultActionView(
-          identifier: actionIdentifier("copy-result"),
-          isLongEntry: isLongEntry,
-          isVisible: true,
-          isCopied: isResultCopied
-        ) {
-          model.copyResult(entry)
-          showCopiedState(.copyResult)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .transition(.opacity)
-      }
-    }
-    .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: showsResultCopyAction)
-  }
-
-  @ViewBuilder
-  private var sourceText: some View {
-    let text = Text(displayedSource)
-      .font(CidaDesign.body(13))
-      .foregroundStyle(CidaDesign.textTertiary)
-      .lineSpacing(3)
-      .lineLimit(HistoryEntryPencilLayout.latestSourceLineLimit)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityIdentifier("history-source-\(entryIdentifierSuffix)")
-
-    if isLongEntry {
-      text
-    } else {
-      text.textSelection(.enabled)
-    }
+    .animation(historyTransitionAnimation, value: presentation)
   }
 
   private var historyTransitionAnimation: Animation? {
@@ -885,87 +640,6 @@ private struct HistoryEntryView: View {
     return .easeOut(duration: CidaMotion.historyFoldSeconds)
   }
 
-  private var entryIdentifierSuffix: String {
-    entry.id.uuidString.lowercased()
-  }
-
-  private var isLongEntry: Bool {
-    entry.isLongDocument
-  }
-
-  private var displayedSource: String {
-    return String(entry.source.prefix(420))
-  }
-
-  private var actionsAreVisible: Bool {
-    actionPresentationState == .visible
-  }
-
-  private var isResultCopied: Bool {
-    copiedAction == .copyResult
-  }
-
-  private var actionPresentationState: RecordActionPresentationState {
-    HistoryEntryActionPolicy.presentationState(
-      isHovering: isHovering,
-      state: entry.state,
-      copiedAction: copiedAction
-    )
-  }
-
-  private var showsResultCopyAction: Bool {
-    entry.resultUTF16Length > 0 && (actionsAreVisible || isResultCopied)
-  }
-
-  private func actionIdentifier(_ action: String) -> String {
-    "history-action-\(action)-\(entry.id.uuidString.lowercased())"
-  }
-
-  private func showCopiedState(_ action: RecordAction) {
-    copyResetTask?.cancel()
-    copiedAction = action
-    copyResetTask = Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(CidaMotion.copiedHoldMilliseconds))
-      guard !Task.isCancelled, copiedAction == action else { return }
-      copiedAction = nil
-      copyResetTask = nil
-    }
-  }
-}
-
-private struct StickyHistoryResultActionView: NSViewRepresentable {
-  let identifier: String
-  let isLongEntry: Bool
-  let isVisible: Bool
-  let isCopied: Bool
-  let action: @MainActor () -> Void
-
-  func makeNSView(context: Context) -> StickyHistoryResultActionNSView {
-    let view = StickyHistoryResultActionNSView()
-    configure(view)
-    return view
-  }
-
-  func updateNSView(_ view: StickyHistoryResultActionNSView, context: Context) {
-    configure(view)
-  }
-
-  static func dismantleNSView(
-    _ view: StickyHistoryResultActionNSView,
-    coordinator: Void
-  ) {
-    view.detach()
-  }
-
-  private func configure(_ view: StickyHistoryResultActionNSView) {
-    view.configure(
-      identifier: identifier,
-      isLongEntry: isLongEntry,
-      isVisible: isVisible,
-      isCopied: isCopied,
-      action: action
-    )
-  }
 }
 
 @MainActor
@@ -1208,7 +882,7 @@ final class StickyHistoryResultActionNSView: NSView {
   }
 }
 
-private final class StickyHistoryResultActionButton: FoldedHistoryActionButton,
+private final class StickyHistoryResultActionButton: HistoryEntryActionButton,
   @unchecked Sendable
 {
   nonisolated(unsafe) weak var accessibilityOwner: StickyHistoryResultActionNSView?
@@ -1223,37 +897,6 @@ private final class StickyHistoryResultActionButton: FoldedHistoryActionButton,
 
   nonisolated override func accessibilityValue() -> Any? {
     reportedAccessibilityValue
-  }
-}
-
-private struct HistoryEntryHoverTrackingView: NSViewRepresentable {
-  let isActive: Bool
-  @Binding var isHovering: Bool
-
-  func makeNSView(context: Context) -> HistoryEntryHoverTrackingNSView {
-    let view = HistoryEntryHoverTrackingNSView()
-    configure(view)
-    return view
-  }
-
-  func updateNSView(_ view: HistoryEntryHoverTrackingNSView, context: Context) {
-    configure(view)
-  }
-
-  static func dismantleNSView(
-    _ view: HistoryEntryHoverTrackingNSView,
-    coordinator: Void
-  ) {
-    view.detach()
-  }
-
-  private func configure(_ view: HistoryEntryHoverTrackingNSView) {
-    view.onHoverChange = { hovering in
-      guard isHovering != hovering else { return }
-      isHovering = hovering
-    }
-    view.synchronizePublishedHoverState(isHovering)
-    view.setActive(isActive)
   }
 }
 
@@ -1535,29 +1178,6 @@ final class HistoryEntryHoverTrackingNSView: NSView {
       setHovering(hovering)
     }
   #endif
-}
-
-private struct EntryActionButton: View {
-  let icon: LucideIconName
-  let label: String
-  let identifier: String
-  let isCopied: Bool
-  let action: () -> Void
-  var body: some View {
-    Button(action: action) {
-      LucideIcon(isCopied ? .check : icon, size: 12)
-    }
-    .buttonStyle(.plain)
-    .foregroundStyle(
-      isCopied
-        ? CidaDesign.accent
-        : CidaDesign.textSecondary
-    )
-    .contentShape(Rectangle())
-    .accessibilityLabel(label)
-    .accessibilityValue(isCopied ? "copied" : "idle")
-    .accessibilityIdentifier(identifier)
-  }
 }
 
 private struct Composer: View {

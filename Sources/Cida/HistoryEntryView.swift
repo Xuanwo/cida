@@ -2,35 +2,73 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
-struct FoldedHistoryEntryView: NSViewRepresentable {
+struct NativeHistoryEntryView: NSViewRepresentable {
   let entry: HistoryEntry
-  var isPresentationActive = true
+  let presentation: HistoryEntryNSView.Presentation
+  let showsSeparator: Bool
   let onExpand: @MainActor () -> Void
+  let onCollapse: @MainActor () -> Void
   let onRedo: @MainActor () -> Void
+  let onCopySource: @MainActor () -> Void
   let onCopyResult: @MainActor () -> Void
 
-  func makeNSView(context: Context) -> FoldedHistoryEntryNSView {
-    let view = FoldedHistoryEntryNSView()
+  func makeNSView(context: Context) -> HistoryEntryNSView {
+    let view = HistoryEntryNSView()
     configure(view)
     return view
   }
 
-  func updateNSView(_ view: FoldedHistoryEntryNSView, context: Context) {
+  func updateNSView(_ view: HistoryEntryNSView, context: Context) {
     configure(view)
   }
 
-  private func configure(_ view: FoldedHistoryEntryNSView) {
-    view.setPresentationActive(isPresentationActive)
-    view.configure(
-      entryID: entry.id,
-      mode: entry.mode,
-      metadata: entry.metadata,
-      preview: entry.resultStorage.foldedPreview,
-      state: entry.state,
-      onExpand: onExpand,
-      onRedo: onRedo,
-      onCopyResult: onCopyResult
-    )
+  static func dismantleNSView(_ view: HistoryEntryNSView, coordinator: Void) {
+    view.detachStandalonePresentation()
+  }
+
+  func sizeThatFits(
+    _ proposal: ProposedViewSize,
+    nsView view: HistoryEntryNSView,
+    context _: Context
+  ) -> CGSize? {
+    guard let width = proposal.width, width > 0 else { return nil }
+    return CGSize(width: width, height: view.preferredHeight(for: width))
+  }
+
+  private func configure(_ view: HistoryEntryNSView) {
+    switch presentation {
+    case .folded:
+      view.configure(
+        entryID: entry.id,
+        mode: entry.mode,
+        metadata: entry.metadata,
+        preview: entry.resultStorage.foldedPreview,
+        state: entry.state,
+        showsSeparator: showsSeparator,
+        onExpand: onExpand,
+        onRedo: onRedo,
+        onCopyResult: onCopyResult
+      )
+    case .expanded(let isLatest):
+      view.configureExpanded(
+        entryID: entry.id,
+        mode: entry.mode,
+        metadata: entry.metadata,
+        source: entry.source,
+        preview: entry.resultStorage.foldedPreview,
+        resultStorage: entry.resultStorage,
+        presentationRevision: entry.presentationRevision,
+        latestPresentationDelta: entry.latestPresentationDelta,
+        state: entry.state,
+        isLatest: isLatest,
+        isLongEntry: entry.isLongDocument,
+        showsSeparator: showsSeparator,
+        onCollapse: onCollapse,
+        onRedo: onRedo,
+        onCopySource: onCopySource,
+        onCopyResult: onCopyResult
+      )
+    }
   }
 }
 
@@ -321,9 +359,9 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
   private var measuredHeight: CGFloat = 0
   private weak var observedClipView: NSClipView?
   private var activeRange: Range<Int> = 0..<0
-  private var activeRows: [FoldedHistoryEntryNSView] = []
-  private var scratchRows: [FoldedHistoryEntryNSView] = []
-  private var recycledRows: [FoldedHistoryEntryNSView] = []
+  private var activeRows: [HistoryEntryNSView] = []
+  private var scratchRows: [HistoryEntryNSView] = []
+  private var recycledRows: [HistoryEntryNSView] = []
   private var trackingAreaReference: NSTrackingArea?
   private let rowsContainer = FlippedHistoryRowsContainer()
   private var onExpand: ((HistoryEntry) -> Void)?
@@ -340,7 +378,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
 
   var materializedRowCount: Int { activeRows.count }
   #if DEBUG
-    var materializedRowsForTesting: [FoldedHistoryEntryNSView] { activeRows }
+    var materializedRowsForTesting: [HistoryEntryNSView] { activeRows }
     var pooledRowCountForTesting: Int { rowsContainer.subviews.count }
   #endif
   private(set) var configurationCount = 0
@@ -602,8 +640,8 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
     }
   }
 
-  private func dequeueRow(for index: Int) -> FoldedHistoryEntryNSView {
-    let row: FoldedHistoryEntryNSView
+  private func dequeueRow(for index: Int) -> HistoryEntryNSView {
+    let row: HistoryEntryNSView
     if let recycledRow = recycledRows.popLast() {
       row = recycledRow
     } else {
@@ -639,8 +677,8 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
     }
   }
 
-  private func makeRow() -> FoldedHistoryEntryNSView {
-    let row = FoldedHistoryEntryNSView()
+  private func makeRow() -> HistoryEntryNSView {
+    let row = HistoryEntryNSView()
     row.setHoverManagedExternally(true)
     row.setActionHandlers(
       onExpand: { [weak self, weak row] in
@@ -729,7 +767,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
 }
 
 @MainActor
-class FoldedHistoryActionButton: NSButton {
+class HistoryEntryActionButton: NSButton {
   private let iconView = NSImageView()
 
   var iconImage: NSImage? {
@@ -838,7 +876,17 @@ class FoldedHistoryActionButton: NSButton {
   }
 }
 
-private final class FoldedHistoryAccessibilityElement: NSAccessibilityElement,
+private final class HistorySourceTextField: NSTextField, @unchecked Sendable {
+  nonisolated override func accessibilityFrame() -> NSRect {
+    let currentField = self
+    return MainActor.assumeIsolated {
+      guard let window = currentField.window else { return .zero }
+      return window.convertToScreen(currentField.convert(currentField.bounds, to: nil))
+    }
+  }
+}
+
+private final class HistoryEntryAccessibilityElement: NSAccessibilityElement,
   @unchecked Sendable
 {
   enum Region: Sendable {
@@ -846,7 +894,7 @@ private final class FoldedHistoryAccessibilityElement: NSAccessibilityElement,
     case preview
   }
 
-  weak var owner: FoldedHistoryEntryNSView?
+  weak var owner: HistoryEntryNSView?
   var region = Region.entry
 
   nonisolated override func accessibilityFrame() -> NSRect {
@@ -868,16 +916,35 @@ private final class FoldedHistoryAccessibilityElement: NSAccessibilityElement,
 }
 
 @MainActor
-final class FoldedHistoryEntryNSView: NSControl {
+final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
+  enum Presentation: Equatable {
+    case folded
+    case expanded(isLatest: Bool)
+
+    var isExpanded: Bool {
+      if case .expanded = self { return true }
+      return false
+    }
+
+    var isLatest: Bool {
+      if case .expanded(let isLatest) = self { return isLatest }
+      return false
+    }
+  }
+
   private enum Layout {
-    static let contentInset = HistoryEntryPencilLayout.foldedInset
+    static let foldedInset = HistoryEntryPencilLayout.foldedInset
+    static let expandedInset: CGFloat = 0
+    static let expandedVerticalPadding: CGFloat = 16
     static let headerHeight = HistoryEntryPencilLayout.foldedHeaderHeight
     static let contentSpacing = HistoryEntryPencilLayout.foldedContentSpacing
     static let previewHeight = HistoryEntryPencilLayout.foldedPreviewHeight
     static let previewLineSpacing: CGFloat = 9.6
     static let actionSize = HistoryEntryPencilLayout.actionIconSize
     static let actionColumnWidth = HistoryEntryPencilLayout.actionColumnWidth
-    static let preferredHeight = HistoryEntryPencilLayout.foldedHeight
+    static let foldedPreferredHeight = HistoryEntryPencilLayout.foldedHeight
+    static let sourceHeight = HistoryEntryPencilLayout.latestSourcePreviewHeight
+    static let sourceFadeHeight = HistoryEntryPencilLayout.latestSourceFadeHeight
   }
 
   private static let accentColor = NSColor(
@@ -892,10 +959,16 @@ final class FoldedHistoryEntryNSView: NSControl {
     blue: 248 / 255,
     alpha: 1
   )
-  private static let hoverColor = NSColor(
+  private static let foldedBackgroundColor = NSColor(
     srgbRed: 241 / 255,
     green: 241 / 255,
     blue: 236 / 255,
+    alpha: 1
+  )
+  private static let foldedHoverColor = NSColor(
+    srgbRed: 235 / 255,
+    green: 235 / 255,
+    blue: 229 / 255,
     alpha: 1
   )
   private static let primaryTextColor = NSColor(
@@ -941,9 +1014,11 @@ final class FoldedHistoryEntryNSView: NSControl {
   private let metadataTextLayer = CATextLayer()
   private let previewTextLayer = CATextLayer()
   private let fadeLayer = CAGradientLayer()
+  private let sourceTextField = HistorySourceTextField(frame: .zero)
+  private let sourceFadeLayer = CAGradientLayer()
   private let separatorLayer = CALayer()
-  private lazy var expandAccessibilityElement: FoldedHistoryAccessibilityElement = {
-    let element = FoldedHistoryAccessibilityElement()
+  private lazy var expandAccessibilityElement: HistoryEntryAccessibilityElement = {
+    let element = HistoryEntryAccessibilityElement()
     element.owner = self
     element.region = .entry
     element.setAccessibilityRole(.button)
@@ -952,32 +1027,63 @@ final class FoldedHistoryEntryNSView: NSControl {
     element.setAccessibilityParent(self)
     return element
   }()
-  private lazy var previewAccessibilityElement: FoldedHistoryAccessibilityElement = {
-    let element = FoldedHistoryAccessibilityElement()
+  private lazy var previewAccessibilityElement: HistoryEntryAccessibilityElement = {
+    let element = HistoryEntryAccessibilityElement()
     element.owner = self
     element.region = .preview
     return element
   }()
   private var trackingAreaReference: NSTrackingArea?
   private weak var observedClipView: NSClipView?
-  private var redoButton: FoldedHistoryActionButton?
-  private var copyButton: FoldedHistoryActionButton?
+  private var redoButton: HistoryEntryActionButton?
+  private var copyButton: HistoryEntryActionButton?
+  private var copySourceButton: HistoryEntryActionButton?
+  private var stickyResultActionView: StickyHistoryResultActionNSView?
+  private var hoverTrackingView: HistoryEntryHoverTrackingNSView?
+  private var resultContainer: HistoryResultTextContainer?
+  private var resultCoordinator: HistoryResultTextCoordinator?
   private var copyResetWorkItem: DispatchWorkItem?
+  private var sourceCopyResetWorkItem: DispatchWorkItem?
+  private var resultCopyResetWorkItem: DispatchWorkItem?
   private var entryID = UUID()
   private var mode = ProcessingMode.translate
   private var metadata = ""
   private var preview = ""
+  private var displayedSource = ""
+  private var resultStorage: HistoryResultStorage?
+  private var resultPresentationRevision = 0
+  private var latestPresentationDelta: String?
+  private var isLongEntry = false
   private var showsSeparator = false
   private var entryState = HistoryEntryState.completed
+  private(set) var presentation = Presentation.folded
   private var isHovering = false
+  private var isSourceCopied = false
+  private var isResultCopied = false
   private var isPresentationActive = true
   private var isHoverManagedExternally = false
   private var modeAttributedString = NSAttributedString()
   private var metadataAttributedString = NSAttributedString()
   private var previewAttributedString = NSAttributedString()
   private var onExpand: (@MainActor () -> Void)?
+  private var onCollapse: (@MainActor () -> Void)?
   private var onRedo: (@MainActor () -> Void)?
+  private var onCopySource: (@MainActor () -> Void)?
   private var onCopyResult: (@MainActor () -> Void)?
+
+  #if DEBUG
+    var headerModeFrameForTesting: NSRect { modeTextLayer.frame }
+    var foldedPreviewFrameForTesting: NSRect { previewTextLayer.frame }
+    var sourceFrameForTesting: NSRect { sourceTextField.frame }
+    var sourceFadeFrameForTesting: NSRect { sourceFadeLayer.frame }
+    var resultFrameForTesting: NSRect { resultContainer?.frame ?? .zero }
+    var resultContainerForTesting: HistoryResultTextContainer? { resultContainer }
+    var hasExpandHandlerForTesting: Bool { onExpand != nil }
+    private(set) var mouseDownCountForTesting = 0
+    var headerRendererIdentityForTesting: ObjectIdentifier {
+      ObjectIdentifier(modeTextLayer)
+    }
+  #endif
 
   override var isFlipped: Bool { true }
   override var intrinsicContentSize: NSSize {
@@ -1006,6 +1112,7 @@ final class FoldedHistoryEntryNSView: NSControl {
     previewTextLayer.truncationMode = .none
     previewTextLayer.masksToBounds = true
     fadeLayer.actions = Self.disabledLayerActions
+    sourceFadeLayer.actions = Self.disabledLayerActions
     separatorLayer.actions = Self.disabledLayerActions
     separatorLayer.backgroundColor = Self.borderColor.cgColor
     layer?.addSublayer(fadeLayer)
@@ -1016,6 +1123,40 @@ final class FoldedHistoryEntryNSView: NSControl {
     iconView.imageScaling = .scaleProportionallyDown
     iconView.contentTintColor = Self.accentColor
     addSubview(iconView)
+
+    sourceTextField.font = CidaDesign.appKitBody(13)
+    sourceTextField.textColor = Self.tertiaryTextColor
+    sourceTextField.backgroundColor = .clear
+    sourceTextField.drawsBackground = false
+    sourceTextField.isBezeled = false
+    sourceTextField.isEditable = false
+    sourceTextField.isSelectable = true
+    sourceTextField.maximumNumberOfLines = HistoryEntryPencilLayout.latestSourceLineLimit
+    sourceTextField.lineBreakMode = .byWordWrapping
+    sourceTextField.cell?.wraps = true
+    sourceTextField.cell?.isScrollable = false
+    sourceTextField.wantsLayer = true
+    sourceFadeLayer.colors = [
+      NSColor.white.cgColor,
+      NSColor.white.cgColor,
+      NSColor.clear.cgColor,
+    ]
+    sourceFadeLayer.locations = [
+      0,
+      NSNumber(
+        value: Double(
+          (HistoryEntryPencilLayout.latestSourcePreviewHeight
+            - HistoryEntryPencilLayout.latestSourceFadeHeight)
+            / HistoryEntryPencilLayout.latestSourcePreviewHeight
+        )
+      ),
+      1,
+    ]
+    sourceFadeLayer.startPoint = CGPoint(x: 0.5, y: 0)
+    sourceFadeLayer.endPoint = CGPoint(x: 0.5, y: 1)
+    sourceTextField.layer?.mask = sourceFadeLayer
+    sourceTextField.isHidden = true
+    addSubview(sourceTextField)
 
     setAccessibilityElement(true)
     setAccessibilityRole(.group)
@@ -1048,6 +1189,10 @@ final class FoldedHistoryEntryNSView: NSControl {
     }
   }
 
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+    true
+  }
+
   func configure(
     entryID: UUID,
     mode: ProcessingMode,
@@ -1059,6 +1204,7 @@ final class FoldedHistoryEntryNSView: NSControl {
     onRedo: @escaping @MainActor () -> Void,
     onCopyResult: @escaping @MainActor () -> Void
   ) {
+    setHoverManagedExternally(false)
     configureContent(
       entryID: entryID,
       mode: mode,
@@ -1072,6 +1218,47 @@ final class FoldedHistoryEntryNSView: NSControl {
       onRedo: onRedo,
       onCopyResult: onCopyResult
     )
+    setPresentation(.folded)
+  }
+
+  func configureExpanded(
+    entryID: UUID,
+    mode: ProcessingMode,
+    metadata: String,
+    source: String,
+    preview: String,
+    resultStorage: HistoryResultStorage,
+    presentationRevision: Int,
+    latestPresentationDelta: String?,
+    state: HistoryEntryState,
+    isLatest: Bool,
+    isLongEntry: Bool,
+    showsSeparator: Bool,
+    onCollapse: @escaping @MainActor () -> Void,
+    onRedo: @escaping @MainActor () -> Void,
+    onCopySource: @escaping @MainActor () -> Void,
+    onCopyResult: @escaping @MainActor () -> Void
+  ) {
+    configureContent(
+      entryID: entryID,
+      mode: mode,
+      metadata: metadata,
+      preview: preview,
+      state: state,
+      showsSeparator: showsSeparator
+    )
+    displayedSource = String(source.prefix(420))
+    self.resultStorage = resultStorage
+    resultPresentationRevision = presentationRevision
+    self.latestPresentationDelta = latestPresentationDelta
+    self.isLongEntry = isLongEntry
+    self.onCollapse = onCollapse
+    self.onRedo = onRedo
+    self.onCopySource = onCopySource
+    self.onCopyResult = onCopyResult
+    setHoverManagedExternally(true)
+    setPresentation(.expanded(isLatest: isLatest))
+    configureExpandedContent()
   }
 
   func configureContent(
@@ -1116,33 +1303,206 @@ final class FoldedHistoryEntryNSView: NSControl {
       needsLayout = true
     }
 
-    previewAccessibilityElement.setAccessibilityIdentifier(
-      "history-collapsed-result-\(identifierSuffix)"
-    )
-    previewAccessibilityElement.setAccessibilityValue(preview)
-    expandAccessibilityElement.setAccessibilityIdentifier(
-      "history-expand-\(identifierSuffix)"
-    )
-    expandAccessibilityElement.setAccessibilityValue(preview)
-    setAccessibilityIdentifier("history-entry-\(identifierSuffix)")
-    setAccessibilityValue("collapsed")
     redoButton?.setAccessibilityIdentifier("history-action-redo-\(identifierSuffix)")
     copyButton?.setAccessibilityIdentifier("history-action-copy-result-\(identifierSuffix)")
+    copySourceButton?.setAccessibilityIdentifier(
+      "history-action-copy-source-\(identifierSuffix)"
+    )
+    updatePresentationAccessibility()
     updateActionVisibility()
   }
 
   override func prepareForReuse() {
     super.prepareForReuse()
-    guard isHovering || redoButton?.isHidden == false || copyButton?.isHidden == false else {
-      return
-    }
+    copyResetWorkItem?.cancel()
+    sourceCopyResetWorkItem?.cancel()
+    resultCopyResetWorkItem?.cancel()
+    copyResetWorkItem = nil
+    sourceCopyResetWorkItem = nil
+    resultCopyResetWorkItem = nil
+    releaseResultPresentation()
+    stickyResultActionView?.detach()
+    stickyResultActionView?.removeFromSuperview()
+    stickyResultActionView = nil
+    hoverTrackingView?.detach()
+    hoverTrackingView?.removeFromSuperview()
+    hoverTrackingView = nil
+    sourceTextField.stringValue = ""
+    sourceTextField.isHidden = true
     isHovering = false
+    isSourceCopied = false
+    isResultCopied = false
     redoButton?.isHidden = true
     redoButton?.resetHoverState()
     copyButton?.isHidden = true
     copyButton?.resetHoverState()
+    copySourceButton?.isHidden = true
+    copySourceButton?.resetHoverState()
+    presentation = .folded
+    displayedSource = ""
+    resultStorage = nil
+    resultPresentationRevision = 0
+    latestPresentationDelta = nil
+    isLongEntry = false
+    onCollapse = nil
+    onCopySource = nil
     updateAccessibilityChildren()
     updateLayerAppearance()
+    needsLayout = true
+  }
+
+  func detachStandalonePresentation() {
+    prepareForReuse()
+    removeScrollObservation()
+  }
+
+  func historyResultHeightWillChange(by delta: CGFloat) {
+    invalidateIntrinsicContentSize()
+    needsLayout = true
+    var ancestor = superview
+    while let current = ancestor {
+      if let hostingView = current as? any HistoryResultHeightChangeHosting {
+        hostingView.historyResultHeightWillChange(by: delta)
+        break
+      }
+      ancestor = current.superview
+    }
+  }
+
+  private func setPresentation(_ nextPresentation: Presentation) {
+    let changed = presentation != nextPresentation
+    presentation = nextPresentation
+
+    switch nextPresentation {
+    case .folded:
+      releaseResultPresentation()
+      hoverTrackingView?.detach()
+      hoverTrackingView?.removeFromSuperview()
+      hoverTrackingView = nil
+      stickyResultActionView?.detach()
+      stickyResultActionView?.removeFromSuperview()
+      stickyResultActionView = nil
+      sourceTextField.isHidden = true
+      sourceFadeLayer.isHidden = true
+      copySourceButton?.isHidden = true
+      previewTextLayer.isHidden = false
+      fadeLayer.isHidden = preview.isEmpty
+    case .expanded(let isLatest):
+      previewTextLayer.isHidden = true
+      fadeLayer.isHidden = true
+      sourceTextField.isHidden = !isLatest
+      sourceFadeLayer.isHidden = !isLatest
+      hoverTrackingView?.setActive(true)
+      stickyResultActionView?.isHidden = false
+    }
+
+    if changed {
+      invalidateIntrinsicContentSize()
+      needsLayout = true
+    }
+    updateLayerAppearance()
+    updatePresentationAccessibility()
+    updateActionVisibility()
+  }
+
+  private func configureExpandedContent() {
+    guard presentation.isExpanded, let resultStorage else { return }
+    let sourceParagraphStyle = NSMutableParagraphStyle()
+    sourceParagraphStyle.lineSpacing = 3
+    sourceParagraphStyle.lineBreakMode = .byWordWrapping
+    sourceTextField.attributedStringValue = NSAttributedString(
+      string: displayedSource,
+      attributes: [
+        .font: CidaDesign.appKitBody(13),
+        .foregroundColor: Self.tertiaryTextColor,
+        .paragraphStyle: sourceParagraphStyle,
+      ]
+    )
+    sourceTextField.isSelectable = !isLongEntry
+    sourceTextField.setAccessibilityIdentifier("history-source-\(identifierSuffix)")
+
+    let resultContainer: HistoryResultTextContainer
+    let resultCoordinator: HistoryResultTextCoordinator
+    if let existingContainer = self.resultContainer,
+      let existingCoordinator = self.resultCoordinator
+    {
+      resultContainer = existingContainer
+      resultCoordinator = existingCoordinator
+    } else {
+      resultContainer = HistoryResultTextContainerPool.shared.acquire()
+      resultCoordinator = HistoryResultTextCoordinator()
+      self.resultContainer = resultContainer
+      self.resultCoordinator = resultCoordinator
+      addSubview(resultContainer)
+    }
+    resultContainer.setResultAccessibilityIdentifier(
+      "history-result-\(entryID.uuidString)"
+    )
+    #if DEBUG
+      resultContainer.setContentEndAccessibilityIdentifier(
+        "history-result-content-end-\(entryID.uuidString)"
+      )
+    #endif
+    resultContainer.onWidthChange = { [weak resultContainer, weak resultCoordinator] in
+      guard let resultContainer, let resultCoordinator else { return }
+      resultCoordinator.scheduleLayout(of: resultContainer)
+    }
+    resultCoordinator.observeStreamingUpdates(from: resultStorage, in: resultContainer)
+    resultCoordinator.updateText(
+      resultStorage,
+      entryID: entryID,
+      presentationRevision: resultPresentationRevision,
+      latestPresentationDelta: latestPresentationDelta,
+      isStreaming: entryState == .streaming,
+      in: resultContainer
+    )
+
+    let tracker: HistoryEntryHoverTrackingNSView
+    if let existingTracker = hoverTrackingView {
+      tracker = existingTracker
+    } else {
+      tracker = HistoryEntryHoverTrackingNSView()
+      hoverTrackingView = tracker
+      addSubview(tracker)
+    }
+    tracker.onHoverChange = { [weak self] hovering in
+      self?.setHovering(hovering)
+    }
+    tracker.synchronizePublishedHoverState(isHovering)
+    tracker.setActive(true)
+
+    let resultAction: StickyHistoryResultActionNSView
+    if let existingAction = stickyResultActionView {
+      resultAction = existingAction
+    } else {
+      resultAction = StickyHistoryResultActionNSView()
+      stickyResultActionView = resultAction
+      addSubview(resultAction)
+    }
+    resultAction.configure(
+      identifier: "history-action-copy-result-\(identifierSuffix)",
+      isLongEntry: isLongEntry,
+      isVisible: resultStorage.utf16Length > 0 && (showsExpandedActions || isResultCopied),
+      isCopied: isResultCopied
+    ) { [weak self] in
+      self?.performExpandedResultCopy()
+    }
+    resultAction.isHidden = false
+    resultContainer.isHidden = false
+    sourceTextField.isHidden = !presentation.isLatest
+    sourceFadeLayer.isHidden = !presentation.isLatest
+    resultCoordinator.scheduleLayout(of: resultContainer)
+    updatePresentationAccessibility()
+    needsLayout = true
+  }
+
+  private func releaseResultPresentation() {
+    guard let resultContainer else { return }
+    resultCoordinator?.detach(from: resultContainer)
+    resultContainer.removeFromSuperview()
+    HistoryResultTextContainerPool.shared.release(resultContainer)
+    self.resultContainer = nil
+    resultCoordinator = nil
   }
 
   func setPresentationActive(_ active: Bool) {
@@ -1201,7 +1561,20 @@ final class FoldedHistoryEntryNSView: NSControl {
   }
 
   func preferredHeight(for _: CGFloat) -> CGFloat {
-    Layout.preferredHeight
+    switch presentation {
+    case .folded:
+      return Layout.foldedPreferredHeight
+    case .expanded(let isLatest):
+      let sourceHeight = isLatest ? Layout.sourceHeight + Layout.contentSpacing : 0
+      let resultHeight =
+        resultContainer?.naturalTextHeight ?? HistoryResultTextContainer.minimumHeight
+      return Layout.expandedVerticalPadding * 2
+        + Layout.headerHeight
+        + Layout.contentSpacing
+        + sourceHeight
+        + resultHeight
+        + (showsSeparator ? 1 : 0)
+    }
   }
 
   private var showsVisibleActions: Bool {
@@ -1209,19 +1582,19 @@ final class FoldedHistoryEntryNSView: NSControl {
   }
 
   private func previewContentRect(contentHeight: CGFloat) -> NSRect {
-    let originY = Layout.contentInset + Layout.headerHeight + Layout.contentSpacing
-    let innerWidth = max(0, bounds.width - Layout.contentInset * 2)
+    let originY = Layout.foldedInset + Layout.headerHeight + Layout.contentSpacing
+    let innerWidth = max(0, bounds.width - Layout.foldedInset * 2)
     let width = max(
       0,
       innerWidth - (showsVisibleActions ? Layout.actionColumnWidth : 0)
     )
     return NSRect(
-      x: Layout.contentInset,
+      x: Layout.foldedInset,
       y: originY,
       width: width,
       height: max(
         0,
-        min(Layout.previewHeight, contentHeight - originY - Layout.contentInset)
+        min(Layout.previewHeight, contentHeight - originY - Layout.foldedInset)
       )
     )
   }
@@ -1229,41 +1602,47 @@ final class FoldedHistoryEntryNSView: NSControl {
   override func layout() {
     super.layout()
     let contentHeight = max(0, bounds.height - (showsSeparator ? 1 : 0))
-    let previewRect = previewContentRect(contentHeight: contentHeight)
+    let contentInset = presentation.isExpanded ? Layout.expandedInset : Layout.foldedInset
+    let headerY = presentation.isExpanded ? Layout.expandedVerticalPadding : Layout.foldedInset
     iconView.frame = NSRect(
-      x: Layout.contentInset,
-      y: Layout.contentInset + 2,
+      x: contentInset,
+      y: headerY + 2,
       width: 12,
       height: 12
     )
-    let modeX = Layout.contentInset + 18
+    let modeX = contentInset + 18
     let modeWidth = ceil(modeAttributedString.size().width)
     let headerRight = max(
       modeX,
-      bounds.width - Layout.contentInset
-        - (showsVisibleActions ? Layout.actionColumnWidth : 0)
+      bounds.width - contentInset
+        - (presentation.isExpanded || showsVisibleActions ? Layout.actionColumnWidth : 0)
     )
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     modeTextLayer.frame = NSRect(
       x: modeX,
-      y: Layout.contentInset,
+      y: headerY,
       width: modeWidth,
       height: Layout.headerHeight
     )
     metadataTextLayer.frame = NSRect(
       x: modeX + modeWidth + 6,
-      y: Layout.contentInset,
+      y: headerY,
       width: max(0, headerRight - modeX - modeWidth - 6),
       height: Layout.headerHeight
     )
-    previewTextLayer.frame = previewRect
-    fadeLayer.frame = NSRect(
-      x: previewRect.minX,
-      y: max(previewRect.minY, previewRect.maxY - 25),
-      width: previewRect.width,
-      height: min(25, previewRect.height)
-    )
+    if presentation.isExpanded {
+      layoutExpandedContent(headerY: headerY)
+    } else {
+      let previewRect = previewContentRect(contentHeight: contentHeight)
+      previewTextLayer.frame = previewRect
+      fadeLayer.frame = NSRect(
+        x: previewRect.minX,
+        y: max(previewRect.minY, previewRect.maxY - 25),
+        width: previewRect.width,
+        height: min(25, previewRect.height)
+      )
+    }
     separatorLayer.frame = NSRect(
       x: 0,
       y: bounds.maxY - 1,
@@ -1272,38 +1651,90 @@ final class FoldedHistoryEntryNSView: NSControl {
     )
     CATransaction.commit()
     let actionX = max(
-      Layout.contentInset,
-      bounds.width - Layout.contentInset - Layout.actionSize
+      contentInset,
+      bounds.width - contentInset - Layout.actionSize
     )
     redoButton?.frame = NSRect(
       x: actionX,
-      y: Layout.contentInset + 2,
+      y: headerY + 2,
       width: Layout.actionSize,
       height: Layout.actionSize
     )
-    copyButton?.frame = NSRect(
-      x: actionX,
-      y: Layout.contentInset + Layout.headerHeight + Layout.contentSpacing + 4,
-      width: Layout.actionSize,
-      height: Layout.actionSize
-    )
+    if presentation.isExpanded {
+      copySourceButton?.frame = NSRect(
+        x: actionX,
+        y: headerY + Layout.headerHeight + Layout.contentSpacing + 4,
+        width: Layout.actionSize,
+        height: Layout.actionSize
+      )
+    } else {
+      copyButton?.frame = NSRect(
+        x: actionX,
+        y: Layout.foldedInset + Layout.headerHeight + Layout.contentSpacing + 4,
+        width: Layout.actionSize,
+        height: Layout.actionSize
+      )
+    }
     if window != nil {
       installScrollObservationIfNeeded()
       refreshHoverState()
     }
   }
 
+  private func layoutExpandedContent(headerY: CGFloat) {
+    let sourceY = headerY + Layout.headerHeight + Layout.contentSpacing
+    let resultY =
+      sourceY
+      + (presentation.isLatest ? Layout.sourceHeight + Layout.contentSpacing : 0)
+    let resultHeight =
+      resultContainer?.naturalTextHeight ?? HistoryResultTextContainer.minimumHeight
+    let textWidth = max(0, bounds.width - Layout.actionColumnWidth)
+
+    sourceTextField.frame = NSRect(
+      x: 0,
+      y: sourceY,
+      width: textWidth,
+      height: Layout.sourceHeight
+    )
+    sourceFadeLayer.frame = sourceTextField.bounds
+    resultContainer?.frame = NSRect(
+      x: 0,
+      y: resultY,
+      width: textWidth,
+      height: resultHeight
+    )
+    stickyResultActionView?.frame = NSRect(
+      x: 0,
+      y: resultY,
+      width: bounds.width,
+      height: resultHeight
+    )
+    hoverTrackingView?.frame = bounds
+    if let resultCoordinator, let resultContainer {
+      resultCoordinator.scheduleLayout(of: resultContainer)
+    }
+  }
+
   override func draw(_ dirtyRect: NSRect) {}
 
   fileprivate func accessibilityFrame(
-    for region: FoldedHistoryAccessibilityElement.Region
+    for region: HistoryEntryAccessibilityElement.Region
   ) -> NSRect {
     guard let window else { return .zero }
     let contentHeight = max(0, bounds.height - (showsSeparator ? 1 : 0))
     let localFrame: NSRect
     switch region {
     case .entry:
-      localFrame = NSRect(x: 0, y: 0, width: bounds.width, height: contentHeight)
+      if presentation.isExpanded {
+        localFrame = NSRect(
+          x: 0,
+          y: Layout.expandedVerticalPadding,
+          width: bounds.width,
+          height: Layout.headerHeight
+        )
+      } else {
+        localFrame = NSRect(x: 0, y: 0, width: bounds.width, height: contentHeight)
+      }
     case .preview:
       localFrame = previewContentRect(contentHeight: contentHeight)
     }
@@ -1318,9 +1749,16 @@ final class FoldedHistoryEntryNSView: NSControl {
   }
 
   private func updateLayerAppearance() {
-    let backgroundColor = isHovering ? Self.hoverColor : Self.backgroundColor
+    let backgroundColor: NSColor
+    switch presentation {
+    case .folded:
+      backgroundColor = isHovering ? Self.foldedHoverColor : Self.foldedBackgroundColor
+    case .expanded:
+      backgroundColor = Self.backgroundColor
+    }
     CATransaction.begin()
     CATransaction.setDisableActions(true)
+    layer?.cornerRadius = presentation.isExpanded ? 0 : 8
     layer?.backgroundColor = backgroundColor.cgColor
     fadeLayer.colors = [
       backgroundColor.withAlphaComponent(0).cgColor,
@@ -1329,7 +1767,7 @@ final class FoldedHistoryEntryNSView: NSControl {
     fadeLayer.locations = [0, 1]
     fadeLayer.startPoint = CGPoint(x: 0.5, y: 0)
     fadeLayer.endPoint = CGPoint(x: 0.5, y: 1)
-    fadeLayer.isHidden = preview.isEmpty
+    fadeLayer.isHidden = presentation.isExpanded || preview.isEmpty
     CATransaction.commit()
   }
 
@@ -1425,16 +1863,41 @@ final class FoldedHistoryEntryNSView: NSControl {
     needsLayout = true
   }
 
-  override func mouseUp(with event: NSEvent) {
+  override func mouseDown(with event: NSEvent) {
+    #if DEBUG
+      mouseDownCountForTesting &+= 1
+    #endif
     guard isPresentationActive else { return }
-    guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
-    onExpand?()
+    let location = convert(event.locationInWindow, from: nil)
+    guard bounds.contains(location) else { return }
+    switch presentation {
+    case .folded:
+      onExpand?()
+    case .expanded(let isLatest):
+      let headerY = Layout.expandedVerticalPadding
+      let headerRect = NSRect(
+        x: 0,
+        y: headerY,
+        width: bounds.width,
+        height: Layout.headerHeight
+      )
+      if !isLatest, headerRect.contains(location) {
+        onCollapse?()
+      }
+    }
   }
 
   override func accessibilityPerformPress() -> Bool {
     guard isPresentationActive else { return false }
-    onExpand?()
-    return true
+    switch presentation {
+    case .folded:
+      onExpand?()
+      return true
+    case .expanded(let isLatest):
+      guard !isLatest else { return false }
+      onCollapse?()
+      return true
+    }
   }
 
   private func makeModeAttributedString() -> NSAttributedString {
@@ -1480,25 +1943,48 @@ final class FoldedHistoryEntryNSView: NSControl {
       isHovering: isPresentationActive && isHovering,
       state: entryState
     )
-    guard showsActions else {
-      redoButton?.isHidden = true
-      redoButton?.resetHoverState()
-      copyButton?.isHidden = true
-      copyButton?.resetHoverState()
-      updateAccessibilityChildren()
-      needsLayout = true
-      return
-    }
     let buttons = ensureActionButtons()
-    buttons.redo.isHidden = false
-    buttons.copy.isHidden = preview.isEmpty
+    buttons.redo.isHidden = !showsActions
+    buttons.redo.resetHoverState()
+
+    switch presentation {
+    case .folded:
+      buttons.copy.isHidden = !showsActions || preview.isEmpty
+      buttons.copy.resetHoverState()
+      copySourceButton?.isHidden = true
+      stickyResultActionView?.isHidden = true
+    case .expanded(let isLatest):
+      buttons.copy.isHidden = true
+      buttons.copy.resetHoverState()
+      let sourceButton = isLatest ? ensureCopySourceButton() : nil
+      sourceButton?.isHidden = !showsActions && !isSourceCopied
+      sourceButton?.resetHoverState()
+      if let stickyResultActionView, let resultStorage {
+        stickyResultActionView.isHidden = false
+        stickyResultActionView.configure(
+          identifier: "history-action-copy-result-\(identifierSuffix)",
+          isLongEntry: isLongEntry,
+          isVisible: resultStorage.utf16Length > 0 && (showsActions || isResultCopied),
+          isCopied: isResultCopied
+        ) { [weak self] in
+          self?.performExpandedResultCopy()
+        }
+      }
+    }
     updateAccessibilityChildren()
     needsLayout = true
   }
 
+  private var showsExpandedActions: Bool {
+    HistoryEntryActionPolicy.showsActions(
+      isHovering: isPresentationActive && isHovering,
+      state: entryState
+    )
+  }
+
   private func ensureActionButtons() -> (
-    redo: FoldedHistoryActionButton,
-    copy: FoldedHistoryActionButton
+    redo: HistoryEntryActionButton,
+    copy: HistoryEntryActionButton
   ) {
     if let redoButton, let copyButton {
       return (redoButton, copyButton)
@@ -1525,19 +2011,84 @@ final class FoldedHistoryEntryNSView: NSControl {
     return (redo, copy)
   }
 
+  private func ensureCopySourceButton() -> HistoryEntryActionButton {
+    if let copySourceButton { return copySourceButton }
+    let button = makeActionButton(
+      icon: .copy,
+      label: "复制原文",
+      identifier: "history-action-copy-source-\(identifierSuffix)",
+      action: #selector(copySource(_:))
+    )
+    addSubview(button)
+    copySourceButton = button
+    return button
+  }
+
   private func updateAccessibilityChildren() {
     guard isPresentationActive else {
       setAccessibilityChildren([])
       return
     }
-    var children: [Any] = [expandAccessibilityElement, previewAccessibilityElement]
+    var children: [Any]
+    switch presentation {
+    case .folded:
+      children = [expandAccessibilityElement, previewAccessibilityElement]
+    case .expanded(let isLatest):
+      children = isLatest ? [] : [expandAccessibilityElement]
+      if isLatest {
+        children.append(sourceTextField)
+      }
+      if let resultContainer {
+        children.append(resultContainer)
+      }
+    }
     if let redoButton, !redoButton.isHidden {
       children.append(redoButton)
     }
     if let copyButton, !copyButton.isHidden {
       children.append(copyButton)
     }
+    if let copySourceButton, !copySourceButton.isHidden {
+      children.append(copySourceButton)
+    }
+    if let stickyResultActionView, !stickyResultActionView.isHidden {
+      children.append(stickyResultActionView)
+    }
     setAccessibilityChildren(children)
+  }
+
+  private func updatePresentationAccessibility() {
+    previewAccessibilityElement.setAccessibilityIdentifier(
+      "history-collapsed-result-\(identifierSuffix)"
+    )
+    previewAccessibilityElement.setAccessibilityValue(preview)
+    setAccessibilityIdentifier("history-entry-\(identifierSuffix)")
+
+    switch presentation {
+    case .folded:
+      setAccessibilityLabel("历史记录，\(mode.title)，\(metadata)")
+      setAccessibilityValue("collapsed")
+      expandAccessibilityElement.setAccessibilityIdentifier(
+        "history-expand-\(identifierSuffix)"
+      )
+      expandAccessibilityElement.setAccessibilityLabel("展开历史记录")
+      expandAccessibilityElement.setAccessibilityHelp("显示完整结果")
+      expandAccessibilityElement.setAccessibilityValue(preview)
+    case .expanded(let isLatest):
+      setAccessibilityLabel(
+        isLatest
+          ? "当前历史记录，\(mode.title)，\(metadata)"
+          : "展开的历史记录，\(mode.title)，\(metadata)"
+      )
+      setAccessibilityValue("expanded")
+      expandAccessibilityElement.setAccessibilityIdentifier(
+        "history-collapse-\(identifierSuffix)"
+      )
+      expandAccessibilityElement.setAccessibilityLabel("收起历史记录")
+      expandAccessibilityElement.setAccessibilityHelp("隐藏完整结果")
+      expandAccessibilityElement.setAccessibilityValue(metadata)
+    }
+    updateAccessibilityChildren()
   }
 
   private func makeActionButton(
@@ -1545,8 +2096,8 @@ final class FoldedHistoryEntryNSView: NSControl {
     label: String,
     identifier: String,
     action: Selector
-  ) -> FoldedHistoryActionButton {
-    let button = FoldedHistoryActionButton(frame: .zero)
+  ) -> HistoryEntryActionButton {
+    let button = HistoryEntryActionButton(frame: .zero)
     button.target = self
     button.action = action
     button.normalTintColor = Self.tertiaryTextColor
@@ -1554,9 +2105,11 @@ final class FoldedHistoryEntryNSView: NSControl {
     button.setAccessibilityElement(true)
     button.setAccessibilityRole(.button)
     let accessibilityDescription =
-      label == "重新处理"
-      ? "重新处理这条历史记录"
-      : "复制这条历史记录的完整结果"
+      switch label {
+      case "重新处理": "重新处理这条历史记录"
+      case "复制原文": "复制这条历史记录的完整原文"
+      default: "复制这条历史记录的完整结果"
+      }
     let describedIcon = LucideIconAsset.image(for: icon)?.copy() as? NSImage
     describedIcon?.isTemplate = true
     describedIcon?.accessibilityDescription = accessibilityDescription
@@ -1577,8 +2130,8 @@ final class FoldedHistoryEntryNSView: NSControl {
   private func copyResult(_ sender: NSButton) {
     onCopyResult?()
     copyResetWorkItem?.cancel()
-    (sender as? FoldedHistoryActionButton)?.iconImage = LucideIconAsset.image(for: .check)
-    (sender as? FoldedHistoryActionButton)?.setFeedbackTint(Self.accentColor)
+    (sender as? HistoryEntryActionButton)?.iconImage = LucideIconAsset.image(for: .check)
+    (sender as? HistoryEntryActionButton)?.setFeedbackTint(Self.accentColor)
     sender.setAccessibilityLabel("已复制这条历史记录的完整结果")
     let entryID = self.entryID
     let workItem = DispatchWorkItem { [weak self] in
@@ -1593,9 +2146,59 @@ final class FoldedHistoryEntryNSView: NSControl {
     )
   }
 
+  @objc
+  private func copySource(_ sender: NSButton) {
+    onCopySource?()
+    sourceCopyResetWorkItem?.cancel()
+    isSourceCopied = true
+    (sender as? HistoryEntryActionButton)?.iconImage = LucideIconAsset.image(for: .check)
+    (sender as? HistoryEntryActionButton)?.setFeedbackTint(Self.accentColor)
+    sender.setAccessibilityLabel("已复制这条历史记录的完整原文")
+    updateActionVisibility()
+    let entryID = self.entryID
+    let workItem = DispatchWorkItem { [weak self] in
+      guard let self, self.entryID == entryID else { return }
+      self.isSourceCopied = false
+      self.resetSourceCopyFeedback()
+      self.updateActionVisibility()
+      self.sourceCopyResetWorkItem = nil
+    }
+    sourceCopyResetWorkItem = workItem
+    DispatchQueue.main.asyncAfter(
+      deadline: .now() + .milliseconds(CidaMotion.copiedHoldMilliseconds),
+      execute: workItem
+    )
+  }
+
+  private func performExpandedResultCopy() {
+    guard (resultStorage?.utf16Length ?? 0) > 0 else { return }
+    onCopyResult?()
+    resultCopyResetWorkItem?.cancel()
+    isResultCopied = true
+    updateActionVisibility()
+    let entryID = self.entryID
+    let workItem = DispatchWorkItem { [weak self] in
+      guard let self, self.entryID == entryID else { return }
+      self.isResultCopied = false
+      self.updateActionVisibility()
+      self.resultCopyResetWorkItem = nil
+    }
+    resultCopyResetWorkItem = workItem
+    DispatchQueue.main.asyncAfter(
+      deadline: .now() + .milliseconds(CidaMotion.copiedHoldMilliseconds),
+      execute: workItem
+    )
+  }
+
   private func resetCopyFeedback() {
     copyButton?.iconImage = LucideIconAsset.image(for: .copy)
     copyButton?.setFeedbackTint(nil)
     copyButton?.setAccessibilityLabel("复制这条历史记录的完整结果")
+  }
+
+  private func resetSourceCopyFeedback() {
+    copySourceButton?.iconImage = LucideIconAsset.image(for: .copy)
+    copySourceButton?.setFeedbackTint(nil)
+    copySourceButton?.setAccessibilityLabel("复制这条历史记录的完整原文")
   }
 }

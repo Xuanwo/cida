@@ -61,6 +61,9 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     let firstResult = driver.app.textViews["history-result-\(firstID.uuidString)"]
     XCTAssertTrue(firstResult.waitForExistence(timeout: 3))
     XCTAssertFalse(driver.element(identifier: "history-source-\(firstSuffix)").exists)
+    XCTAssertEqual(firstResult.frame.minX, entry.frame.minX, accuracy: 2)
+    XCTAssertEqual(entry.frame.maxX - firstResult.frame.maxX, 24, accuracy: 2)
+    XCTAssertLessThanOrEqual(firstResult.frame.maxY, entry.frame.maxY - 15)
     firstResult.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
     XCTAssertTrue(
       driver.app.buttons["history-action-redo-\(firstSuffix)"].waitForExistence(timeout: 3)
@@ -142,6 +145,12 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(entry.waitForExistence(timeout: 5))
     XCTAssertTrue(source.waitForExistence(timeout: 3))
     XCTAssertTrue(result.waitForExistence(timeout: 3))
+    XCTAssertEqual(source.frame.minX, entry.frame.minX, accuracy: 2)
+    XCTAssertEqual(result.frame.minX, entry.frame.minX, accuracy: 2)
+    XCTAssertEqual(entry.frame.maxX - source.frame.maxX, 24, accuracy: 2)
+    XCTAssertEqual(entry.frame.maxX - result.frame.maxX, 24, accuracy: 2)
+    XCTAssertEqual(result.frame.minY - source.frame.maxY, 8, accuracy: 2)
+    XCTAssertLessThanOrEqual(result.frame.maxY, entry.frame.maxY - 15)
     result.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
 
     let redo = driver.app.buttons["history-action-redo-\(suffix)"]

@@ -56,6 +56,11 @@ inside a disposable headless Tart macOS session. Neither path activates the test
 - Only the newest record is automatically expanded. Older records use a two-line cached result
   preview without mounting their complete TextKit result. Manual comparisons can remain expanded
   independently.
+- Folded, latest-expanded, and manually expanded records are presentation states of the same
+  `HistoryEntryNSView`. One AppKit coordinate system owns their header, source preview, result,
+  actions, fades, clipping, and accessibility frames. SwiftUI chooses the state but does not provide
+  an alternate record layout. The folded card keeps its intentional 10 pt inset; expanded content
+  keeps the Pencil 24 pt action column and 8 pt source-to-result gap.
 - Results contribute their natural height to one outer history scroll surface. There is no nested
   output scroller. Long-result copy actions follow the visible result intersection without changing
   text width.
@@ -88,12 +93,17 @@ reintroduced.
 
 ## Executable evidence
 
-- `swift test -Xswiftc -warnings-as-errors`: 136 tests, 0 failures.
+- `swift test -Xswiftc -warnings-as-errors`: 142 tests, 0 failures.
+- Native renderer tests prove all three history presentations use the same concrete view, preserve
+  the header renderer identity across transitions, release expanded-only resources when folding,
+  and expand a recycled row through a real AppKit hit-test and mouse event.
+- Fresh-clone Tart history journeys assert exact latest-source/result containment and spacing, and
+  retain WindowServer screenshots for both source and folded-result fades.
 - `VisualAndAccessibilityJourneyTests` compares the Main Translate and Settings WindowServer
   screenshots against the manifest-bound approved images and runs the native semantic accessibility
   audit.
 - The full PR gate output for this refactor is written to
-  `TestResults/gates/refactor-final-20260818/gate-summary.json`. It runs all nine UI suites rather
+  `TestResults/gates/unified-history-renderer-20260818/gate-summary.json`. It runs all nine UI suites rather
   than a hand-maintained subset; `PairwiseManifestTests` fails if any suite is omitted.
 - Failures retain approved/current/Pencil/diff images in the `.xcresult`; baseline recording is
   never automatic.

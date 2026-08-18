@@ -522,6 +522,156 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
+  func testEveryHistoryPresentationUsesOneNativeEntryRenderer() async throws {
+    let foldedID = UUID()
+    let expandedID = UUID()
+    let latestID = UUID()
+    let model = AppModel(
+      entries: [
+        HistoryEntry(
+          id: foldedID,
+          mode: .translate,
+          source: "Folded source",
+          result: "Folded result",
+          detail: "中文 → English",
+          timestamp: "17:58"
+        ),
+        HistoryEntry(
+          id: expandedID,
+          mode: .improve,
+          source: "Expanded source",
+          result: "Expanded result",
+          detail: "English · 语气与语法",
+          timestamp: "17:59"
+        ),
+        HistoryEntry(
+          id: latestID,
+          mode: .translate,
+          source: "Latest source",
+          result: "Latest result",
+          detail: "中文 → English",
+          timestamp: "18:00"
+        ),
+      ]
+    )
+    model.expandHistoryEntry(expandedID)
+    let (window, hostingView) = makeHiddenWindow(
+      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
+      size: CGSize(width: 860, height: 640)
+    )
+
+    try await waitUntil(timeout: .seconds(2)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return self.firstHistoryResultContainer(
+        in: hostingView,
+        identifier: "history-result-\(expandedID.uuidString)"
+      ) != nil
+        && self.firstHistoryResultContainer(
+          in: hostingView,
+          identifier: "history-result-\(latestID.uuidString)"
+        ) != nil
+        && (self.firstVirtualizedHistoryList(in: hostingView)?.materializedRowCount ?? 0) > 0
+    }
+
+    let expandedResult = try XCTUnwrap(
+      firstHistoryResultContainer(
+        in: hostingView,
+        identifier: "history-result-\(expandedID.uuidString)"
+      )
+    )
+    let latestResult = try XCTUnwrap(
+      firstHistoryResultContainer(
+        in: hostingView,
+        identifier: "history-result-\(latestID.uuidString)"
+      )
+    )
+    let foldedRow = try XCTUnwrap(
+      firstVirtualizedHistoryList(in: hostingView)?.materializedRowsForTesting.first
+    )
+
+    let expandedRenderer = try XCTUnwrap(nativeHistoryEntryAncestor(of: expandedResult))
+    let latestRenderer = try XCTUnwrap(nativeHistoryEntryAncestor(of: latestResult))
+    XCTAssertEqual(foldedRow.presentation, .folded)
+    XCTAssertEqual(expandedRenderer.presentation, .expanded(isLatest: false))
+    XCTAssertEqual(latestRenderer.presentation, .expanded(isLatest: true))
+    assertTestProcessIsNotFrontmost()
+    withExtendedLifetime(window) {}
+  }
+
+  func testRealClickOnVirtualizedFoldedRowMountsTheExpandedNativeResult() async throws {
+    let foldedID = UUID()
+    let latestID = UUID()
+    let model = AppModel(
+      entries: [
+        HistoryEntry(
+          id: foldedID,
+          mode: .translate,
+          source: "Folded source",
+          result: "Folded result",
+          detail: "中文 → English",
+          timestamp: "17:59"
+        ),
+        HistoryEntry(
+          id: latestID,
+          mode: .translate,
+          source: "Latest source",
+          result: "Latest result",
+          detail: "中文 → English",
+          timestamp: "18:00"
+        ),
+      ]
+    )
+    let (window, hostingView) = makeHiddenWindow(
+      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
+      size: CGSize(width: 860, height: 640)
+    )
+    window.alphaValue = 0
+    window.orderBack(nil)
+
+    try await waitUntil(timeout: .seconds(2)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return self.firstVirtualizedHistoryList(in: hostingView)?.materializedRowsForTesting
+        .contains(where: {
+          $0.accessibilityIdentifier() == "history-entry-\(foldedID.uuidString.lowercased())"
+        }) == true
+    }
+    let row = try XCTUnwrap(
+      firstVirtualizedHistoryList(in: hostingView)?.materializedRowsForTesting.first(where: {
+        $0.accessibilityIdentifier() == "history-entry-\(foldedID.uuidString.lowercased())"
+      })
+    )
+    let clickPoint = row.convert(
+      NSPoint(x: row.bounds.midX, y: row.bounds.midY),
+      to: nil
+    )
+    let hitView = window.contentView?.hitTest(clickPoint)
+    XCTAssertTrue(
+      hitView === row,
+      "Expected the unified row to own the click, got \(String(describing: hitView))"
+    )
+    XCTAssertTrue(row.hasExpandHandlerForTesting)
+    click(window: window, at: clickPoint)
+    XCTAssertEqual(row.mouseDownCountForTesting, 1)
+
+    try await waitUntil(timeout: .seconds(2)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return model.isHistoryEntryManuallyExpanded(foldedID)
+        && self.firstHistoryResultContainer(
+          in: hostingView,
+          identifier: "history-result-\(foldedID.uuidString)"
+        ) != nil
+    }
+    XCTAssertTrue(model.isHistoryEntryManuallyExpanded(foldedID))
+    XCTAssertNotNil(
+      firstHistoryResultContainer(
+        in: hostingView,
+        identifier: "history-result-\(foldedID.uuidString)"
+      )
+    )
+    assertTestProcessIsNotFrontmost()
+    withExtendedLifetime(window) {}
+  }
+
   func testScrollingUpThroughLargeFoldedHistoryDoesNotReadCompleteResults() async throws {
     let largeResult = String(
       repeating: "A persisted result should stay out of the scrolling hot path. ",
@@ -680,7 +830,7 @@ final class InteractionReproductionTests: XCTestCase {
   func testRecycledFoldedHistoryRowDoesNotLeakHoverActions() throws {
     var redoCount = 0
     var copyCount = 0
-    let row = FoldedHistoryEntryNSView()
+    let row = HistoryEntryNSView()
     row.frame = NSRect(x: 0, y: 0, width: 720, height: 100)
     row.configure(
       entryID: UUID(),
@@ -738,7 +888,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   func testFoldedHistoryRowMatchesThePencilCardAndActionGeometry() throws {
-    let row = FoldedHistoryEntryNSView()
+    let row = HistoryEntryNSView()
     row.configure(
       entryID: UUID(),
       mode: .translate,
@@ -778,7 +928,7 @@ final class InteractionReproductionTests: XCTestCase {
 
   func testFoldedHistoryRowAlwaysFadesItsSecondLineAndClipsToTheCard() throws {
     let line = String(repeating: "M", count: 32)
-    let row = FoldedHistoryEntryNSView()
+    let row = HistoryEntryNSView()
     row.configure(
       entryID: UUID(),
       mode: .translate,
@@ -813,8 +963,124 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(HistoryEntryPencilLayout.latestSourceLineLimit, 2)
   }
 
+  func testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState() throws {
+    let pool = HistoryResultTextContainerPool.shared
+    let initialLeaseCount = pool.leasedContainerCountForTesting
+    let entryID = UUID()
+    let resultStorage = HistoryResultStorage("A complete result")
+    let row = HistoryEntryNSView()
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
+    row.configure(
+      entryID: entryID,
+      mode: .improve,
+      metadata: "English · 语气与语法 · 09:14",
+      preview: "A complete result",
+      state: .completed,
+      onExpand: {},
+      onRedo: {},
+      onCopyResult: {}
+    )
+    row.layoutSubtreeIfNeeded()
+    let sharedHeaderRenderer = row.headerRendererIdentityForTesting
+
+    XCTAssertEqual(row.presentation, .folded)
+    XCTAssertEqual(row.preferredHeight(for: 804), 96, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minX, 28, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minY, 10, accuracy: 0.001)
+    XCTAssertEqual(
+      row.foldedPreviewFrameForTesting,
+      NSRect(x: 10, y: 34, width: 784, height: 52)
+    )
+    XCTAssertNil(row.resultContainerForTesting)
+    XCTAssertEqual(pool.leasedContainerCountForTesting, initialLeaseCount)
+
+    row.configureExpanded(
+      entryID: entryID,
+      mode: .improve,
+      metadata: "English · 语气与语法 · 09:14",
+      source: "Original source",
+      preview: "A complete result",
+      resultStorage: resultStorage,
+      presentationRevision: 0,
+      latestPresentationDelta: nil,
+      state: .completed,
+      isLatest: false,
+      isLongEntry: false,
+      showsSeparator: false,
+      onCollapse: {},
+      onRedo: {},
+      onCopySource: {},
+      onCopyResult: {}
+    )
+    row.frame.size.height = row.preferredHeight(for: 804)
+    row.layoutSubtreeIfNeeded()
+    let expandedResultContainer = try XCTUnwrap(row.resultContainerForTesting)
+
+    XCTAssertEqual(row.presentation, .expanded(isLatest: false))
+    XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
+    XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minY, 16, accuracy: 0.001)
+    XCTAssertEqual(row.resultFrameForTesting.minY, 40, accuracy: 0.001)
+    XCTAssertEqual(
+      row.resultFrameForTesting.maxY + 16,
+      row.preferredHeight(for: 804),
+      accuracy: 0.001
+    )
+    XCTAssertEqual(pool.leasedContainerCountForTesting, initialLeaseCount + 1)
+
+    row.configureExpanded(
+      entryID: entryID,
+      mode: .improve,
+      metadata: "English · 语气与语法 · 09:14",
+      source: "First source line\nSecond source line\nHidden source line",
+      preview: "A complete result",
+      resultStorage: resultStorage,
+      presentationRevision: 0,
+      latestPresentationDelta: nil,
+      state: .completed,
+      isLatest: true,
+      isLongEntry: false,
+      showsSeparator: false,
+      onCollapse: {},
+      onRedo: {},
+      onCopySource: {},
+      onCopyResult: {}
+    )
+    row.frame.size.height = row.preferredHeight(for: 804)
+    row.layoutSubtreeIfNeeded()
+
+    XCTAssertEqual(row.presentation, .expanded(isLatest: true))
+    XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
+    XCTAssertTrue(row.resultContainerForTesting === expandedResultContainer)
+    XCTAssertEqual(row.sourceFrameForTesting, NSRect(x: 0, y: 40, width: 780, height: 41))
+    XCTAssertEqual(
+      row.sourceFadeFrameForTesting, row.sourceFrameForTesting.offsetBy(dx: 0, dy: -40))
+    XCTAssertEqual(row.resultFrameForTesting.minY, 89, accuracy: 0.001)
+    XCTAssertEqual(
+      row.resultFrameForTesting.maxY + 16,
+      row.preferredHeight(for: 804),
+      accuracy: 0.001
+    )
+
+    row.configure(
+      entryID: entryID,
+      mode: .improve,
+      metadata: "English · 语气与语法 · 09:14",
+      preview: "A complete result",
+      state: .completed,
+      onExpand: {},
+      onRedo: {},
+      onCopyResult: {}
+    )
+    XCTAssertEqual(row.presentation, .folded)
+    XCTAssertNil(row.resultContainerForTesting)
+    XCTAssertFalse(row.subviews.contains { $0 is StickyHistoryResultActionNSView })
+    XCTAssertFalse(row.subviews.contains { $0 is HistoryEntryHoverTrackingNSView })
+    XCTAssertEqual(pool.leasedContainerCountForTesting, initialLeaseCount)
+  }
+
   func testFoldedHistoryAccessibilityFramesFollowAncestorMovement() throws {
-    let row = FoldedHistoryEntryNSView(
+    let row = HistoryEntryNSView(
       frame: NSRect(x: 0, y: 0, width: 320, height: 96)
     )
     row.configure(
@@ -859,7 +1125,7 @@ final class InteractionReproductionTests: XCTestCase {
 
   func testFoldedHistoryAccessibilityExpandElementPerformsItsPressAction() throws {
     var expansionCount = 0
-    let row = FoldedHistoryEntryNSView(
+    let row = HistoryEntryNSView(
       frame: NSRect(x: 0, y: 0, width: 320, height: 96)
     )
     row.configure(
@@ -884,7 +1150,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   func testFoldedHistoryActionInkStaysInsideThePencilIconBounds() throws {
-    let row = FoldedHistoryEntryNSView()
+    let row = HistoryEntryNSView()
     row.configure(
       entryID: UUID(),
       mode: .translate,
@@ -969,7 +1235,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   func testInactiveFoldedHistoryPresentationCannotLeakHoverActions() throws {
-    let row = FoldedHistoryEntryNSView()
+    let row = HistoryEntryNSView()
     row.configure(
       entryID: UUID(),
       mode: .translate,
@@ -1003,7 +1269,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   func testFoldedHistoryTrackingFollowsExplicitRowBounds() throws {
-    let row = FoldedHistoryEntryNSView()
+    let row = HistoryEntryNSView()
     row.frame = NSRect(x: 0, y: 0, width: 720, height: 96)
     row.updateTrackingAreas()
 
@@ -1021,7 +1287,7 @@ final class InteractionReproductionTests: XCTestCase {
 
   func testVirtualHistoryResolvesHoverToOnlyOneRecycledRow() {
     let rows = (0..<2).map { index in
-      let row = FoldedHistoryEntryNSView()
+      let row = HistoryEntryNSView()
       row.configure(
         entryID: UUID(),
         mode: .translate,
@@ -1070,7 +1336,7 @@ final class InteractionReproductionTests: XCTestCase {
       blue: 79 / 255,
       alpha: 1
     )
-    let button = FoldedHistoryActionButton()
+    let button = HistoryEntryActionButton()
     button.normalTintColor = normal
     button.hoverTintColor = hover
     XCTAssertTrue(try XCTUnwrap(button.contentTintColor).isEqual(normal))
@@ -1510,7 +1776,7 @@ final class InteractionReproductionTests: XCTestCase {
     let resultView = HistoryResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 720, height: HistoryResultTextContainer.minimumHeight)
     )
-    let coordinator = HistoryResultTextView.Coordinator()
+    let coordinator = HistoryResultTextCoordinator()
 
     coordinator.replaceText(
       storage.string,
@@ -1709,7 +1975,7 @@ final class InteractionReproductionTests: XCTestCase {
     let resultView = HistoryResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 720, height: HistoryResultTextContainer.minimumHeight)
     )
-    let coordinator = HistoryResultTextView.Coordinator()
+    let coordinator = HistoryResultTextCoordinator()
     resultView.onWidthChange = { [weak resultView, weak coordinator] in
       guard let resultView, let coordinator else { return }
       coordinator.scheduleLayout(of: resultView)
@@ -1958,7 +2224,7 @@ final class InteractionReproductionTests: XCTestCase {
     let resultView = HistoryResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 720, height: HistoryResultTextContainer.minimumHeight)
     )
-    let coordinator = HistoryResultTextView.Coordinator()
+    let coordinator = HistoryResultTextCoordinator()
 
     coordinator.replaceText(
       storage.string,
@@ -2165,7 +2431,7 @@ final class InteractionReproductionTests: XCTestCase {
 
     guard
       let actionButton = actionView.subviews.compactMap({
-        $0 as? FoldedHistoryActionButton
+        $0 as? HistoryEntryActionButton
       }).first
     else {
       XCTFail("The sticky result view must expose its native action button.")
@@ -3174,6 +3440,17 @@ final class InteractionReproductionTests: XCTestCase {
       if let result = firstHistoryResultContainer(in: child, identifier: identifier) {
         return result
       }
+    }
+    return nil
+  }
+
+  private func nativeHistoryEntryAncestor(of view: NSView) -> HistoryEntryNSView? {
+    var ancestor = view.superview
+    while let current = ancestor {
+      if let historyEntry = current as? HistoryEntryNSView {
+        return historyEntry
+      }
+      ancestor = current.superview
     }
     return nil
   }

@@ -1,147 +1,105 @@
 import AppKit
 import CoreImage
 import QuartzCore
-import SwiftUI
 
 @MainActor
 protocol HistoryResultHeightChangeHosting: AnyObject {
   func historyResultHeightWillChange(by delta: CGFloat)
 }
 
-struct HistoryResultTextView: View {
-  let entryID: UUID
-  let resultStorage: HistoryResultStorage
-  let presentationRevision: Int
-  let latestPresentationDelta: String?
-  let isStreaming: Bool
+@MainActor
+final class HistoryResultTextCoordinator: NSObject {
+  private var entryID: UUID?
+  private var renderedPresentationRevision = 0
+  private var pendingPresentationRevision = 0
+  private var renderedUTF16Length = 0
+  private weak var pendingLayoutContainer: HistoryResultTextContainer?
+  private var layoutTask: Task<Void, Never>?
+  private var lastLayoutUptime = 0.0
+  private weak var observedResultStorage: HistoryResultStorage?
+  private weak var observedContainer: HistoryResultTextContainer?
 
-  var body: some View {
-    NativeHistoryResultTextView(
-      entryID: entryID,
-      resultStorage: resultStorage,
-      presentationRevision: presentationRevision,
-      latestPresentationDelta: latestPresentationDelta,
-      isStreaming: isStreaming
+  private static let minimumLayoutInterval = 0.1
+
+  override init() {
+    super.init()
+  }
+
+  deinit {
+    layoutTask?.cancel()
+    NotificationCenter.default.removeObserver(self)
+  }
+
+  func detach(from container: HistoryResultTextContainer) {
+    layoutTask?.cancel()
+    layoutTask = nil
+    pendingLayoutContainer = nil
+    NotificationCenter.default.removeObserver(
+      self,
+      name: .cidaHistoryResultStorageDidAppend,
+      object: observedResultStorage
+    )
+    observedResultStorage = nil
+    if observedContainer === container {
+      observedContainer = nil
+    }
+    entryID = nil
+    renderedPresentationRevision = 0
+    pendingPresentationRevision = 0
+    renderedUTF16Length = 0
+    lastLayoutUptime = 0
+    container.onWidthChange = nil
+  }
+
+  func observeStreamingUpdates(
+    from resultStorage: HistoryResultStorage,
+    in container: HistoryResultTextContainer
+  ) {
+    observedContainer = container
+    guard observedResultStorage !== resultStorage else { return }
+
+    NotificationCenter.default.removeObserver(
+      self,
+      name: .cidaHistoryResultStorageDidAppend,
+      object: observedResultStorage
+    )
+    observedResultStorage = resultStorage
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(resultStorageDidAppend(_:)),
+      name: .cidaHistoryResultStorageDidAppend,
+      object: resultStorage
     )
   }
 
-  @MainActor
-  final class Coordinator: NSObject {
-    private var entryID: UUID?
-    private var renderedPresentationRevision = 0
-    private var pendingPresentationRevision = 0
-    private var renderedUTF16Length = 0
-    private weak var pendingLayoutContainer: HistoryResultTextContainer?
-    private var layoutTask: Task<Void, Never>?
-    private var lastLayoutUptime = 0.0
-    private weak var observedResultStorage: HistoryResultStorage?
-    private weak var observedContainer: HistoryResultTextContainer?
-
-    private static let minimumLayoutInterval = 0.1
-
-    override init() {
-      super.init()
+  @objc
+  private func resultStorageDidAppend(_ notification: Notification) {
+    guard
+      let resultStorage = notification.object as? HistoryResultStorage,
+      resultStorage === observedResultStorage,
+      let container = observedContainer
+    else {
+      return
     }
 
-    deinit {
-      layoutTask?.cancel()
-      NotificationCenter.default.removeObserver(self)
+    if let revision = notification.userInfo?[
+      HistoryResultStorageNotificationKey.presentationRevision
+    ] as? Int {
+      pendingPresentationRevision = max(pendingPresentationRevision, revision)
     }
+    container.setStreaming(true)
+    scheduleStreamingLayout(of: container)
+  }
 
-    func detach(from container: HistoryResultTextContainer) {
-      layoutTask?.cancel()
-      layoutTask = nil
-      pendingLayoutContainer = nil
-      NotificationCenter.default.removeObserver(
-        self,
-        name: .cidaHistoryResultStorageDidAppend,
-        object: observedResultStorage
-      )
-      observedResultStorage = nil
-      if observedContainer === container {
-        observedContainer = nil
-      }
-      entryID = nil
-      renderedPresentationRevision = 0
-      pendingPresentationRevision = 0
-      renderedUTF16Length = 0
-      lastLayoutUptime = 0
-      container.onWidthChange = nil
-    }
-
-    func observeStreamingUpdates(
-      from resultStorage: HistoryResultStorage,
-      in container: HistoryResultTextContainer
-    ) {
-      observedContainer = container
-      guard observedResultStorage !== resultStorage else { return }
-
-      NotificationCenter.default.removeObserver(
-        self,
-        name: .cidaHistoryResultStorageDidAppend,
-        object: observedResultStorage
-      )
-      observedResultStorage = resultStorage
-      NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(resultStorageDidAppend(_:)),
-        name: .cidaHistoryResultStorageDidAppend,
-        object: resultStorage
-      )
-    }
-
-    @objc
-    private func resultStorageDidAppend(_ notification: Notification) {
-      guard
-        let resultStorage = notification.object as? HistoryResultStorage,
-        resultStorage === observedResultStorage,
-        let container = observedContainer
-      else {
-        return
-      }
-
-      if let revision = notification.userInfo?[
-        HistoryResultStorageNotificationKey.presentationRevision
-      ] as? Int {
-        pendingPresentationRevision = max(pendingPresentationRevision, revision)
-      }
-      container.setStreaming(true)
-      scheduleStreamingLayout(of: container)
-    }
-
-    func updateText(
-      _ resultStorage: HistoryResultStorage,
-      entryID: UUID,
-      presentationRevision: Int,
-      latestPresentationDelta: String?,
-      isStreaming: Bool,
-      in container: HistoryResultTextContainer
-    ) {
-      guard self.entryID == entryID else {
-        replaceText(
-          resultStorage.string,
-          entryID: entryID,
-          presentationRevision: presentationRevision,
-          isStreaming: isStreaming,
-          in: container
-        )
-        return
-      }
-
-      if presentationRevision > renderedPresentationRevision,
-        let pendingSuffix = resultStorage.suffix(fromUTF16Offset: renderedUTF16Length)
-      {
-        container.append(pendingSuffix, isStreaming: isStreaming)
-        renderedPresentationRevision = presentationRevision
-        renderedUTF16Length = resultStorage.utf16Length
-        container.setStreaming(isStreaming)
-        return
-      }
-
-      if presentationRevision == renderedPresentationRevision {
-        container.setStreaming(isStreaming)
-        return
-      }
+  func updateText(
+    _ resultStorage: HistoryResultStorage,
+    entryID: UUID,
+    presentationRevision: Int,
+    latestPresentationDelta: String?,
+    isStreaming: Bool,
+    in container: HistoryResultTextContainer
+  ) {
+    guard self.entryID == entryID else {
       replaceText(
         resultStorage.string,
         entryID: entryID,
@@ -149,177 +107,105 @@ struct HistoryResultTextView: View {
         isStreaming: isStreaming,
         in: container
       )
+      return
     }
 
-    func replaceText(
-      _ text: String,
-      entryID: UUID,
-      presentationRevision: Int,
-      isStreaming: Bool,
-      in container: HistoryResultTextContainer
-    ) {
-      self.entryID = entryID
+    if presentationRevision > renderedPresentationRevision,
+      let pendingSuffix = resultStorage.suffix(fromUTF16Offset: renderedUTF16Length)
+    {
+      container.append(pendingSuffix, isStreaming: isStreaming)
       renderedPresentationRevision = presentationRevision
-      pendingPresentationRevision = presentationRevision
-      renderedUTF16Length = (text as NSString).length
-      container.replaceText(text)
+      renderedUTF16Length = resultStorage.utf16Length
       container.setStreaming(isStreaming)
+      return
     }
 
-    func scheduleLayout(of container: HistoryResultTextContainer) {
-      guard container.hasPendingDocumentLayout else { return }
-      pendingLayoutContainer = container
-      guard layoutTask == nil else { return }
-
-      let elapsed = ProcessInfo.processInfo.systemUptime - lastLayoutUptime
-      let delay = max(0, Self.minimumLayoutInterval - elapsed)
-      layoutTask = Task { @MainActor [weak self] in
-        if delay > 0 {
-          try? await Task.sleep(for: .milliseconds(Int64(ceil(delay * 1_000))))
-        }
-        guard !Task.isCancelled, let self else { return }
-        self.layoutTask = nil
-        self.performPendingLayout()
-      }
+    if presentationRevision == renderedPresentationRevision {
+      container.setStreaming(isStreaming)
+      return
     }
-
-    private func scheduleStreamingLayout(of container: HistoryResultTextContainer) {
-      pendingLayoutContainer = container
-      guard layoutTask == nil else { return }
-
-      let elapsed = ProcessInfo.processInfo.systemUptime - lastLayoutUptime
-      guard lastLayoutUptime == 0 || elapsed >= Self.minimumLayoutInterval else {
-        return
-      }
-      performPendingLayout()
-    }
-
-    private func performPendingLayout() {
-      guard let container = pendingLayoutContainer else { return }
-      pendingLayoutContainer = nil
-      flushPendingResult(to: container)
-      guard container.hasPendingDocumentLayout else { return }
-      lastLayoutUptime = ProcessInfo.processInfo.systemUptime
-      let previousHeight = container.naturalTextHeight
-      let height = container.updateDocumentLayout()
-      if abs(previousHeight - height) > 0.5 {
-        container.scheduleNaturalHeightPublication(heightDelta: height - previousHeight)
-      }
-      container.updateStreamingCaretFrame()
-    }
-
-    private func flushPendingResult(to container: HistoryResultTextContainer) {
-      guard
-        let resultStorage = observedResultStorage,
-        let pendingSuffix = resultStorage.suffix(fromUTF16Offset: renderedUTF16Length)
-      else {
-        return
-      }
-      if !pendingSuffix.isEmpty {
-        container.append(pendingSuffix, isStreaming: true)
-        renderedUTF16Length = resultStorage.utf16Length
-      }
-      renderedPresentationRevision = max(
-        renderedPresentationRevision,
-        pendingPresentationRevision
-      )
-    }
-  }
-}
-
-private struct NativeHistoryResultTextView: NSViewRepresentable {
-  let entryID: UUID
-  let resultStorage: HistoryResultStorage
-  let presentationRevision: Int
-  let latestPresentationDelta: String?
-  let isStreaming: Bool
-
-  func makeCoordinator() -> HistoryResultTextView.Coordinator {
-    HistoryResultTextView.Coordinator()
-  }
-
-  func makeNSView(context: Context) -> HistoryResultTextContainer {
-    let container = HistoryResultTextContainerPool.shared.acquire()
-    container.setResultAccessibilityIdentifier("history-result-\(entryID.uuidString)")
-    #if DEBUG
-      container.setContentEndAccessibilityIdentifier(
-        "history-result-content-end-\(entryID.uuidString)"
-      )
-    #endif
-    installWidthRelayout(
-      on: container,
-      coordinator: context.coordinator
-    )
-    context.coordinator.replaceText(
+    replaceText(
       resultStorage.string,
       entryID: entryID,
       presentationRevision: presentationRevision,
       isStreaming: isStreaming,
       in: container
     )
-    context.coordinator.observeStreamingUpdates(
-      from: resultStorage,
-      in: container
-    )
-    context.coordinator.scheduleLayout(of: container)
-    return container
   }
 
-  func updateNSView(_ container: HistoryResultTextContainer, context: Context) {
-    container.setResultAccessibilityIdentifier("history-result-\(entryID.uuidString)")
-    #if DEBUG
-      container.setContentEndAccessibilityIdentifier(
-        "history-result-content-end-\(entryID.uuidString)"
-      )
-    #endif
-    installWidthRelayout(
-      on: container,
-      coordinator: context.coordinator
-    )
-    context.coordinator.observeStreamingUpdates(
-      from: resultStorage,
-      in: container
-    )
-    context.coordinator.updateText(
-      resultStorage,
-      entryID: entryID,
-      presentationRevision: presentationRevision,
-      latestPresentationDelta: latestPresentationDelta,
-      isStreaming: isStreaming,
-      in: container
-    )
-    if !isStreaming {
-      context.coordinator.scheduleLayout(of: container)
+  func replaceText(
+    _ text: String,
+    entryID: UUID,
+    presentationRevision: Int,
+    isStreaming: Bool,
+    in container: HistoryResultTextContainer
+  ) {
+    self.entryID = entryID
+    renderedPresentationRevision = presentationRevision
+    pendingPresentationRevision = presentationRevision
+    renderedUTF16Length = (text as NSString).length
+    container.replaceText(text)
+    container.setStreaming(isStreaming)
+  }
+
+  func scheduleLayout(of container: HistoryResultTextContainer) {
+    guard container.hasPendingDocumentLayout else { return }
+    pendingLayoutContainer = container
+    guard layoutTask == nil else { return }
+
+    let elapsed = ProcessInfo.processInfo.systemUptime - lastLayoutUptime
+    let delay = max(0, Self.minimumLayoutInterval - elapsed)
+    layoutTask = Task { @MainActor [weak self] in
+      if delay > 0 {
+        try? await Task.sleep(for: .milliseconds(Int64(ceil(delay * 1_000))))
+      }
+      guard !Task.isCancelled, let self else { return }
+      self.layoutTask = nil
+      self.performPendingLayout()
     }
   }
 
-  static func dismantleNSView(
-    _ container: HistoryResultTextContainer,
-    coordinator: HistoryResultTextView.Coordinator
-  ) {
-    coordinator.detach(from: container)
-    HistoryResultTextContainerPool.shared.release(container)
-  }
+  private func scheduleStreamingLayout(of container: HistoryResultTextContainer) {
+    pendingLayoutContainer = container
+    guard layoutTask == nil else { return }
 
-  func sizeThatFits(
-    _ proposal: ProposedViewSize,
-    nsView container: HistoryResultTextContainer,
-    context _: Context
-  ) -> CGSize? {
-    guard let width = proposal.width, width > 0 else { return nil }
-    return CGSize(width: width, height: container.naturalTextHeight)
-  }
-
-  private func installWidthRelayout(
-    on container: HistoryResultTextContainer,
-    coordinator: HistoryResultTextView.Coordinator
-  ) {
-    container.onWidthChange = { [weak container, weak coordinator] in
-      guard let container, let coordinator else { return }
-      coordinator.scheduleLayout(of: container)
+    let elapsed = ProcessInfo.processInfo.systemUptime - lastLayoutUptime
+    guard lastLayoutUptime == 0 || elapsed >= Self.minimumLayoutInterval else {
+      return
     }
+    performPendingLayout()
   }
 
+  private func performPendingLayout() {
+    guard let container = pendingLayoutContainer else { return }
+    pendingLayoutContainer = nil
+    flushPendingResult(to: container)
+    guard container.hasPendingDocumentLayout else { return }
+    lastLayoutUptime = ProcessInfo.processInfo.systemUptime
+    let previousHeight = container.naturalTextHeight
+    let height = container.updateDocumentLayout()
+    if abs(previousHeight - height) > 0.5 {
+      container.scheduleNaturalHeightPublication(heightDelta: height - previousHeight)
+    }
+    container.updateStreamingCaretFrame()
+  }
+
+  private func flushPendingResult(to container: HistoryResultTextContainer) {
+    guard
+      let resultStorage = observedResultStorage,
+      let pendingSuffix = resultStorage.suffix(fromUTF16Offset: renderedUTF16Length)
+    else {
+      return
+    }
+    if !pendingSuffix.isEmpty {
+      container.append(pendingSuffix, isStreaming: true)
+      renderedUTF16Length = resultStorage.utf16Length
+    }
+    renderedPresentationRevision = max(
+      renderedPresentationRevision,
+      pendingPresentationRevision
+    )
+  }
 }
 
 struct StreamGlyphFadeStyle: Equatable, Sendable {
