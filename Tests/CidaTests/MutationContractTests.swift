@@ -9,10 +9,14 @@ final class MutationContractTests: XCTestCase {
     let container = HistoryResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 320, height: 80)
     )
+    container.setResultAccessibilityIdentifier("mutation-streaming-renderer")
     let renderer = try XCTUnwrap(
-      container.subviews.first(where: { $0.accessibilityRole() == .textArea })
+      container.subviews.first(where: {
+        $0.accessibilityIdentifier() == "mutation-streaming-renderer"
+      })
     )
 
+    XCTAssertEqual(renderer.accessibilityRole(), .staticText)
     XCTAssertTrue(renderer.wantsLayer)
     XCTAssertEqual(renderer.layerContentsRedrawPolicy, .onSetNeedsDisplay)
   }
