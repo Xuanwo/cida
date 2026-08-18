@@ -1241,6 +1241,80 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(pool.leasedContainerCountForTesting, initialLeaseCount)
   }
 
+  func testExpandedHistorySourceCopyUsesWindowMouseDispatch() throws {
+    let entryID = UUID()
+    let row = HistoryEntryNSView()
+    var didCopySource = false
+    row.configureExpanded(
+      entryID: entryID,
+      mode: .improve,
+      metadata: "English · 09:14",
+      source: "Original source",
+      preview: "Complete result",
+      resultStorage: HistoryResultStorage("Complete result"),
+      presentationRevision: 0,
+      latestPresentationDelta: nil,
+      state: .completed,
+      isLatest: false,
+      isLongEntry: false,
+      showsSeparator: false,
+      onCollapse: {},
+      onRedo: {},
+      onCopySource: { didCopySource = true },
+      onCopyResult: {}
+    )
+    row.frame = NSRect(
+      x: 0,
+      y: 0,
+      width: 804,
+      height: row.preferredHeight(for: 804)
+    )
+    let window = CidaWindow(
+      contentRect: row.frame,
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.isReleasedWhenClosed = false
+    window.alphaValue = 0
+    window.contentView = row
+    retainedTestWindows.append(window)
+    window.orderBack(nil)
+    row.layoutSubtreeIfNeeded()
+    row.setResolvedHoverState(true)
+    row.layoutSubtreeIfNeeded()
+
+    let sourceAction = try XCTUnwrap(
+      row.subviews.compactMap { $0 as? HistoryEntryActionButton }.first {
+        $0.accessibilityIdentifier()
+          == "history-action-copy-source-\(entryID.uuidString.lowercased())"
+      }
+    )
+    XCTAssertFalse(sourceAction.isHidden)
+    XCTAssertTrue(row.hasLocalActionMouseDownMonitorForTesting)
+    let actionPoint = NSPoint(x: sourceAction.frame.midX, y: sourceAction.frame.midY)
+    guard
+      let clickEvent = NSEvent.mouseEvent(
+        with: .leftMouseDown,
+        location: row.convert(actionPoint, to: nil),
+        modifierFlags: [],
+        timestamp: 0,
+        windowNumber: window.windowNumber,
+        context: nil,
+        eventNumber: 1,
+        clickCount: 1,
+        pressure: 1
+      )
+    else {
+      XCTFail("The source action must accept a native pointer event.")
+      return
+    }
+    NSApp.sendEvent(clickEvent)
+
+    XCTAssertTrue(didCopySource)
+    XCTAssertEqual(sourceAction.accessibilityValue() as? String, "copied")
+  }
+
   func testFoldedHistoryAccessibilityFramesFollowAncestorMovement() throws {
     let row = HistoryEntryNSView(
       frame: NSRect(x: 0, y: 0, width: 320, height: 96)

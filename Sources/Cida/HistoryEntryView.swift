@@ -1093,6 +1093,9 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     var resultFrameForTesting: NSRect { resultContainer?.frame ?? .zero }
     var resultContainerForTesting: HistoryResultTextContainer? { resultContainer }
     var hasExpandHandlerForTesting: Bool { onExpand != nil }
+    var hasLocalActionMouseDownMonitorForTesting: Bool {
+      localActionMouseDownMonitor != nil
+    }
     private(set) var mouseDownCountForTesting = 0
     var headerRendererIdentityForTesting: ObjectIdentifier {
       ObjectIdentifier(modeTextLayer)
@@ -1997,8 +2000,15 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     guard localActionMouseDownMonitor == nil else { return }
     localActionMouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) {
       [weak self] event in
-      guard let self, event.window === self.window else { return event }
-      let localPoint = self.convert(event.locationInWindow, from: nil)
+      guard let self, let targetWindow = self.window else { return event }
+      guard event.windowNumber == 0 || event.windowNumber == targetWindow.windowNumber else {
+        return event
+      }
+      let windowPoint =
+        event.window == nil
+        ? targetWindow.convertPoint(fromScreen: event.locationInWindow)
+        : event.locationInWindow
+      let localPoint = self.convert(windowPoint, from: nil)
       return self.performVisibleAction(at: localPoint) ? nil : event
     }
   }

@@ -194,7 +194,8 @@
       "after": "    guard case .expanded(isLatest: true) = presentation, !displayedSource.isEmpty, textWidth > 0 else {",
       "occurrences": 1,
       "unitTests": [
-        "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState"
+        "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState",
+        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesWindowMouseDispatch"
       ],
       "releaseTests": [
         "HistoryPresentationJourneyTests/testFoldedRowsExpandIndependentlyCopyFullResultsAndMatchPencilGeometry"
@@ -209,7 +210,8 @@
       "after": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    _ = location\n    return false\n  }",
       "occurrences": 1,
       "unitTests": [
-        "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState"
+        "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState",
+        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesWindowMouseDispatch"
       ],
       "releaseTests": [
         "HistoryPresentationJourneyTests/testFoldedRowsExpandIndependentlyCopyFullResultsAndMatchPencilGeometry"
