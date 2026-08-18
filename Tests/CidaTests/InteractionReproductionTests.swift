@@ -1041,6 +1041,12 @@ final class InteractionReproductionTests: XCTestCase {
 
     XCTAssertEqual(row.presentation, .expanded(isLatest: false))
     XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
+    XCTAssertEqual(
+      expandedResultContainer.subviews.first {
+        $0.accessibilityIdentifier() == "history-result-\(entryID.uuidString)"
+      }?.accessibilityRole(),
+      .staticText
+    )
     XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
     XCTAssertEqual(row.headerModeFrameForTesting.minY, 16, accuracy: 0.001)
     XCTAssertEqual(row.resultFrameForTesting.minY, 40, accuracy: 0.001)

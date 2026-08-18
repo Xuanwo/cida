@@ -369,6 +369,7 @@ final class HistoryResultTextContainer: NSView {
     renderingView.setAccessibilityLabel("处理结果")
     renderingView.isHidden = false
     renderingView.setAccessibilityElement(true)
+    renderingView.setAccessibilityRole(.staticText)
     addSubview(renderingView)
 
     tailRevealLayer.colors = [
