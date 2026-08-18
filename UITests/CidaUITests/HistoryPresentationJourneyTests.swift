@@ -60,11 +60,21 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     card.click()
     let firstResult = driver.app.textViews["history-result-\(firstID.uuidString)"]
     XCTAssertTrue(firstResult.waitForExistence(timeout: 3))
+    XCTAssertFalse(driver.element(identifier: "history-source-\(firstSuffix)").exists)
+    firstResult.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+    XCTAssertTrue(
+      driver.app.buttons["history-action-redo-\(firstSuffix)"].waitForExistence(timeout: 3)
+    )
+    XCTAssertTrue(
+      driver.app.buttons["history-action-copy-result-\(firstSuffix)"].waitForExistence(timeout: 3)
+    )
+    XCTAssertFalse(driver.app.buttons["history-action-copy-source-\(firstSuffix)"].exists)
     let secondExpand = driver.element(identifier: "history-expand-\(secondSuffix)")
     XCTAssertTrue(secondExpand.waitForExistence(timeout: 3))
     secondExpand.click()
     XCTAssertTrue(firstResult.exists)
     XCTAssertTrue(driver.app.textViews["history-result-\(secondID.uuidString)"].exists)
+    XCTAssertFalse(driver.element(identifier: "history-source-\(secondSuffix)").exists)
     driver.element(identifier: "history-collapse-\(firstSuffix)").click()
     XCTAssertTrue(card.waitForExistence(timeout: 3))
     XCTAssertTrue(firstResult.waitForNonExistence(timeout: 3))

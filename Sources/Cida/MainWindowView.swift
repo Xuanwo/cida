@@ -708,37 +708,39 @@ private struct HistoryEntryView: View {
       }
       .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
 
-      HStack(alignment: .top, spacing: HistoryEntryPencilLayout.actionGap) {
-        ZStack(alignment: .bottom) {
-          sourceText
+      if isLatestEntry {
+        HStack(alignment: .top, spacing: HistoryEntryPencilLayout.actionGap) {
+          ZStack(alignment: .bottom) {
+            sourceText
 
-          if isLongEntry {
-            LinearGradient(
-              colors: [CidaDesign.background.opacity(0), CidaDesign.background],
-              startPoint: .top,
-              endPoint: .bottom
-            )
-            .frame(height: 20)
-            .allowsHitTesting(false)
+            if isLongEntry {
+              LinearGradient(
+                colors: [CidaDesign.background.opacity(0), CidaDesign.background],
+                startPoint: .top,
+                endPoint: .bottom
+              )
+              .frame(height: 20)
+              .allowsHitTesting(false)
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+
+          if actionsAreVisible || copiedAction == .copySource {
+            EntryActionButton(
+              icon: .copy,
+              label: copiedAction == .copySource ? "已复制原文" : "复制原文",
+              identifier: actionIdentifier("copy-source"),
+              isCopied: copiedAction == .copySource
+            ) {
+              model.copySource(entry)
+              showCopiedState(.copySource)
+            }
+            .padding(.top, 4)
+            .transition(.opacity)
           }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-
-        if actionsAreVisible || copiedAction == .copySource {
-          EntryActionButton(
-            icon: .copy,
-            label: copiedAction == .copySource ? "已复制原文" : "复制原文",
-            identifier: actionIdentifier("copy-source"),
-            isCopied: copiedAction == .copySource
-          ) {
-            model.copySource(entry)
-            showCopiedState(.copySource)
-          }
-          .padding(.top, 4)
-          .transition(.opacity)
-        }
+        .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
       }
-      .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: actionsAreVisible)
 
       expandedResult
     }
@@ -764,24 +766,32 @@ private struct HistoryEntryView: View {
     )
     .accessibilityIdentifier("history-entry-\(entryIdentifierSuffix)")
     .accessibilityValue("expanded")
-    .accessibilityAction(named: "收起") {
-      guard !isLatestEntry else { return }
-      withAnimation(historyTransitionAnimation) {
-        model.collapseHistoryEntry(entry.id)
+    .accessibilityActions {
+      if !isLatestEntry {
+        Button("收起") {
+          withAnimation(historyTransitionAnimation) {
+            model.collapseHistoryEntry(entry.id)
+          }
+        }
       }
-    }
-    .accessibilityAction(named: "复制原文") {
-      model.copySource(entry)
-      showCopiedState(.copySource)
-    }
-    .accessibilityAction(named: "复制结果") {
-      guard entry.resultUTF16Length > 0 else { return }
-      model.copyResult(entry)
-      showCopiedState(.copyResult)
-    }
-    .accessibilityAction(named: "重新处理") {
-      guard entry.state != .streaming else { return }
-      model.redo(entry)
+
+      if isLatestEntry {
+        Button("复制原文") {
+          model.copySource(entry)
+          showCopiedState(.copySource)
+        }
+      }
+
+      Button("复制结果") {
+        guard entry.resultUTF16Length > 0 else { return }
+        model.copyResult(entry)
+        showCopiedState(.copyResult)
+      }
+
+      Button("重新处理") {
+        guard entry.state != .streaming else { return }
+        model.redo(entry)
+      }
     }
   }
 

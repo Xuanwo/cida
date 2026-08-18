@@ -951,7 +951,7 @@ final class FoldedHistoryEntryNSView: NSControl {
     element.region = .entry
     element.setAccessibilityRole(.button)
     element.setAccessibilityLabel("展开历史记录")
-    element.setAccessibilityHelp("显示原文和完整结果")
+    element.setAccessibilityHelp("显示完整结果")
     element.setAccessibilityParent(self)
     return element
   }()
