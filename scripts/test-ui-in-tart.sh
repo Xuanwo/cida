@@ -71,6 +71,8 @@ host_before_path="$results_dir/host-session-before.json"
 host_after_path="$results_dir/host-session-after.json"
 host_guard_path="$results_dir/host-session-guard.json"
 host_monitor_path="$results_dir/host-session-observations.jsonl"
+host_monitor_primary_path="$results_dir/host-session-observations-primary.jsonl"
+host_monitor_secondary_path="$results_dir/host-session-observations-secondary.jsonl"
 if [[ ! -d "$project_dir" || ! -d "$results_dir" ]]; then
   echo "Tart directory shares must resolve to existing directories" >&2
   exit 66
@@ -80,31 +82,48 @@ fi
 host_progress() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1" >>"$progress_log"
 }
-host_monitor_pid=""
+host_monitor_primary_pid=""
+host_monitor_secondary_pid=""
 host_monitor_healthy=false
 start_host_monitor() {
   : >"$host_monitor_path"
+  : >"$host_monitor_primary_path"
+  : >"$host_monitor_secondary_path"
   "$project_dir/scripts/e2e/host-session-snapshot.swift" \
     --monitor 0.1 "$artifact_root/Cida.app" "$shared_artifact_root/Cida.app" \
-    >"$host_monitor_path" &
-  host_monitor_pid=$!
+    >"$host_monitor_primary_path" &
+  host_monitor_primary_pid=$!
+  /bin/sleep 0.05
+  "$project_dir/scripts/e2e/host-session-snapshot.swift" \
+    --monitor 0.1 "$artifact_root/Cida.app" "$shared_artifact_root/Cida.app" \
+    >"$host_monitor_secondary_path" &
+  host_monitor_secondary_pid=$!
   for _ in {1..200}; do
-    [[ -s "$host_monitor_path" ]] && return 0
-    kill -0 "$host_monitor_pid" 2>/dev/null || return 1
+    [[ -s "$host_monitor_primary_path" && -s "$host_monitor_secondary_path" ]] && return 0
+    kill -0 "$host_monitor_primary_pid" 2>/dev/null || return 1
+    kill -0 "$host_monitor_secondary_pid" 2>/dev/null || return 1
     /bin/sleep 0.05
   done
   return 1
 }
 stop_host_monitor() {
-  [[ -z "$host_monitor_pid" ]] && return 0
-  if kill -0 "$host_monitor_pid" 2>/dev/null; then
-    host_monitor_healthy=true
-    /bin/kill "$host_monitor_pid" 2>/dev/null || true
-    wait "$host_monitor_pid" 2>/dev/null || true
-  else
-    host_monitor_healthy=false
+  if [[ -z "$host_monitor_primary_pid" && -z "$host_monitor_secondary_pid" ]]; then
+    return 0
   fi
-  host_monitor_pid=""
+  host_monitor_healthy=true
+  for monitor_pid in "$host_monitor_primary_pid" "$host_monitor_secondary_pid"; do
+    if [[ -z "$monitor_pid" ]] || ! kill -0 "$monitor_pid" 2>/dev/null; then
+      host_monitor_healthy=false
+      continue
+    fi
+    /bin/kill "$monitor_pid" 2>/dev/null || true
+    wait "$monitor_pid" 2>/dev/null || true
+  done
+  host_monitor_primary_pid=""
+  host_monitor_secondary_pid=""
+  /usr/bin/python3 "$project_dir/scripts/e2e/merge-host-monitor-observations.py" \
+    "$host_monitor_path" "$host_monitor_primary_path" "$host_monitor_secondary_path" || \
+    host_monitor_healthy=false
 }
 host_guard_finalized=false
 finalize_host_guard() {
@@ -364,6 +383,9 @@ if [[ "$staged_digest" != "$source_digest" ]]; then
 fi
 host_progress "host-staged-release-artifact-reverified"
 
+failure_category="infrastructure"
+failure_phase="host-session-guard"
+failure_detail="The host isolation monitor lost coverage or observed the test artifact on the host."
 if ! finalize_host_guard; then
   echo "Headless E2E launched the exact artifact on the host or lost its isolation monitor" >&2
   exit 1
