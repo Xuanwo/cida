@@ -2,19 +2,59 @@ import AppKit
 import CoreText
 import SwiftUI
 
+struct CidaColorToken: Sendable {
+  let hex: UInt32
+  let alpha: CGFloat
+
+  init(_ hex: UInt32, alpha: CGFloat = 1) {
+    self.hex = hex
+    self.alpha = alpha
+  }
+
+  var swiftUI: Color {
+    Color(hex: hex, alpha: Double(alpha))
+  }
+
+  var appKit: NSColor {
+    NSColor(
+      srgbRed: CGFloat((hex >> 16) & 0xff) / 255,
+      green: CGFloat((hex >> 8) & 0xff) / 255,
+      blue: CGFloat(hex & 0xff) / 255,
+      alpha: alpha
+    )
+  }
+}
+
 enum CidaDesign {
-  static let background = Color(hex: 0xFAFAF8)
-  static let surface = Color.white
-  static let surfaceDim = Color(hex: 0xF4F4F1)
-  static let surfaceFold = Color(hex: 0xF1F1EC)
-  static let border = Color(hex: 0xE8E8E3)
-  static let textPrimary = Color(hex: 0x1A1A18)
-  static let textSecondary = Color(hex: 0x8A8A83)
-  static let textTertiary = Color(hex: 0xB5B5AE)
-  static let accent = Color(hex: 0x2E6B4F)
-  static let accentSoft = Color(hex: 0xEAF2EE)
-  static let accentForeground = Color.white
-  static let toggleOff = Color(hex: 0xDBDBD5)
+  enum Palette {
+    static let background = CidaColorToken(0xFAFAF8)
+    static let surface = CidaColorToken(0xFFFFFF)
+    static let surfaceDim = CidaColorToken(0xF4F4F1)
+    static let surfaceFold = CidaColorToken(0xF1F1EC)
+    static let border = CidaColorToken(0xE8E8E3)
+    static let textPrimary = CidaColorToken(0x1A1A18)
+    static let textSecondary = CidaColorToken(0x8A8A83)
+    static let textTertiary = CidaColorToken(0xB5B5AE)
+    static let accent = CidaColorToken(0x2E6B4F)
+    static let accentSoft = CidaColorToken(0xEAF2EE)
+    static let accentForeground = CidaColorToken(0xFFFFFF)
+    static let toggleOff = CidaColorToken(0xDBDBD5)
+    static let placeholder = CidaColorToken(0xB5B7B0, alpha: 0.22)
+    static let placeholderSeparator = CidaColorToken(0xE1E1DC, alpha: 0.7)
+  }
+
+  static let background = Palette.background.swiftUI
+  static let surface = Palette.surface.swiftUI
+  static let surfaceDim = Palette.surfaceDim.swiftUI
+  static let surfaceFold = Palette.surfaceFold.swiftUI
+  static let border = Palette.border.swiftUI
+  static let textPrimary = Palette.textPrimary.swiftUI
+  static let textSecondary = Palette.textSecondary.swiftUI
+  static let textTertiary = Palette.textTertiary.swiftUI
+  static let accent = Palette.accent.swiftUI
+  static let accentSoft = Palette.accentSoft.swiftUI
+  static let accentForeground = Palette.accentForeground.swiftUI
+  static let toggleOff = Palette.toggleOff.swiftUI
 
   enum Radius {
     static let window: CGFloat = 14

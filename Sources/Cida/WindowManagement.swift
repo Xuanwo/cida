@@ -24,12 +24,7 @@ enum CidaWindowFactory {
     window.titlebarAppearsTransparent = true
     window.toolbarStyle = .unifiedCompact
     window.isOpaque = true
-    window.backgroundColor = NSColor(
-      red: 250 / 255,
-      green: 250 / 255,
-      blue: 248 / 255,
-      alpha: 1
-    )
+    window.backgroundColor = CidaDesign.Palette.background.appKit
     window.hasShadow = true
     window.isMovableByWindowBackground = false
     window.isReleasedWhenClosed = false

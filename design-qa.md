@@ -61,6 +61,10 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   actions, fades, clipping, and accessibility frames. SwiftUI chooses the state but does not provide
   an alternate record layout. The folded card keeps its intentional 10 pt inset; expanded content
   keeps the Pencil 24 pt action column and 8 pt source-to-result gap.
+- SwiftUI and AppKit resolve every shared surface, text, border, and accent color from
+  `CidaDesign.Palette`, while every history renderer resolves sizing from
+  `HistoryEntryPencilLayout`. Token tests pin the approved sRGB values and layout measurements so a
+  framework-specific literal cannot silently drift from the design.
 - Results contribute their natural height to one outer history scroll surface. There is no nested
   output scroller. Long-result copy actions follow the visible result intersection without changing
   text width.

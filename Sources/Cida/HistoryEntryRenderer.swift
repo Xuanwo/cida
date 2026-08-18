@@ -185,54 +185,14 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     let usesFade: Bool
   }
 
-  private static let accentColor = NSColor(
-    srgbRed: 46 / 255,
-    green: 107 / 255,
-    blue: 79 / 255,
-    alpha: 1
-  )
-  private static let backgroundColor = NSColor(
-    srgbRed: 250 / 255,
-    green: 250 / 255,
-    blue: 248 / 255,
-    alpha: 1
-  )
-  private static let foldedBackgroundColor = NSColor(
-    srgbRed: 250 / 255,
-    green: 250 / 255,
-    blue: 248 / 255,
-    alpha: 1
-  )
-  private static let foldedHoverColor = NSColor(
-    srgbRed: 241 / 255,
-    green: 241 / 255,
-    blue: 236 / 255,
-    alpha: 1
-  )
-  private static let primaryTextColor = NSColor(
-    srgbRed: 26 / 255,
-    green: 26 / 255,
-    blue: 24 / 255,
-    alpha: 1
-  )
-  private static let tertiaryTextColor = NSColor(
-    srgbRed: 181 / 255,
-    green: 181 / 255,
-    blue: 174 / 255,
-    alpha: 1
-  )
-  private static let secondaryTextColor = NSColor(
-    srgbRed: 138 / 255,
-    green: 138 / 255,
-    blue: 131 / 255,
-    alpha: 1
-  )
-  private static let borderColor = NSColor(
-    srgbRed: 232 / 255,
-    green: 232 / 255,
-    blue: 227 / 255,
-    alpha: 1
-  )
+  private static let accentColor = CidaDesign.Palette.accent.appKit
+  private static let backgroundColor = CidaDesign.Palette.background.appKit
+  private static let foldedBackgroundColor = CidaDesign.Palette.background.appKit
+  private static let foldedHoverColor = CidaDesign.Palette.surfaceFold.appKit
+  private static let primaryTextColor = CidaDesign.Palette.textPrimary.appKit
+  private static let tertiaryTextColor = CidaDesign.Palette.textTertiary.appKit
+  private static let secondaryTextColor = CidaDesign.Palette.textSecondary.appKit
+  private static let borderColor = CidaDesign.Palette.border.appKit
   private static let disabledLayerActions: [String: CAAction] = [
     "bounds": NSNull(),
     "contents": NSNull(),

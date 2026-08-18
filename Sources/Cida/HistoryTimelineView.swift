@@ -460,24 +460,9 @@ private struct HistoryEntryView: View {
 
 @MainActor
 final class StickyHistoryResultActionNSView: NSView {
-  private static let normalTint = NSColor(
-    srgbRed: 138 / 255,
-    green: 138 / 255,
-    blue: 131 / 255,
-    alpha: 1
-  )
-  private static let hoverTint = NSColor(
-    srgbRed: 26 / 255,
-    green: 26 / 255,
-    blue: 24 / 255,
-    alpha: 1
-  )
-  private static let copiedTint = NSColor(
-    srgbRed: 46 / 255,
-    green: 107 / 255,
-    blue: 79 / 255,
-    alpha: 1
-  )
+  private static let normalTint = CidaDesign.Palette.textSecondary.appKit
+  private static let hoverTint = CidaDesign.Palette.textPrimary.appKit
+  private static let copiedTint = CidaDesign.Palette.accent.appKit
 
   private let actionButton = StickyHistoryResultActionButton()
   private weak var observedClipView: NSClipView?

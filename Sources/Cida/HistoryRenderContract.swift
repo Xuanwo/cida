@@ -1,3 +1,20 @@
+enum HistoryEntryActionPolicy {
+  static func presentationState(
+    isHovering: Bool,
+    state: HistoryEntryState,
+    copiedAction: RecordAction? = nil
+  ) -> RecordActionPresentationState {
+    if let copiedAction {
+      return .copied(copiedAction)
+    }
+    return isHovering && state != .streaming ? .visible : .hidden
+  }
+
+  static func showsActions(isHovering: Bool, state: HistoryEntryState) -> Bool {
+    presentationState(isHovering: isHovering, state: state) == .visible
+  }
+}
+
 enum HistoryPresentation: Equatable, Sendable {
   case folded
   case current

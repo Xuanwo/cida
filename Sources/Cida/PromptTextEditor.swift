@@ -63,12 +63,7 @@ struct PromptTextEditor: NSViewRepresentable {
 
     let attributes: [NSAttributedString.Key: Any] = [
       .font: CidaDesign.appKitBody(12.5),
-      .foregroundColor: NSColor(
-        red: 26 / 255,
-        green: 26 / 255,
-        blue: 24 / 255,
-        alpha: 1
-      ),
+      .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
       .paragraphStyle: paragraphStyle,
     ]
 

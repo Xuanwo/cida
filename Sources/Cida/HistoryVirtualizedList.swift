@@ -97,27 +97,9 @@ final class HistoryPlaceholderRunwayNSView: NSView {
     super.init(frame: frameRect)
     wantsLayer = true
     layerContentsRedrawPolicy = .never
-    layer?.backgroundColor =
-      NSColor(
-        srgbRed: 250 / 255,
-        green: 250 / 255,
-        blue: 248 / 255,
-        alpha: 1
-      ).cgColor
-    placeholderLayer.fillColor =
-      NSColor(
-        srgbRed: 181 / 255,
-        green: 183 / 255,
-        blue: 176 / 255,
-        alpha: 0.22
-      ).cgColor
-    separatorLayer.fillColor =
-      NSColor(
-        srgbRed: 225 / 255,
-        green: 225 / 255,
-        blue: 220 / 255,
-        alpha: 0.7
-      ).cgColor
+    layer?.backgroundColor = CidaDesign.Palette.background.appKit.cgColor
+    placeholderLayer.fillColor = CidaDesign.Palette.placeholder.appKit.cgColor
+    separatorLayer.fillColor = CidaDesign.Palette.placeholderSeparator.appKit.cgColor
     for shapeLayer in [placeholderLayer, separatorLayer] {
       shapeLayer.actions = [
         "bounds": NSNull(),

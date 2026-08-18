@@ -387,13 +387,7 @@ final class HistoryResultTextContainer: NSView {
     tailRevealLayer.opacity = 0
     renderingView.layer?.addSublayer(tailRevealLayer)
 
-    caretLayer.backgroundColor =
-      NSColor(
-        red: 46 / 255,
-        green: 107 / 255,
-        blue: 79 / 255,
-        alpha: 1
-      ).cgColor
+    caretLayer.backgroundColor = CidaDesign.Palette.accent.appKit.cgColor
     caretLayer.cornerRadius = 1
     caretLayer.opacity = 0
     renderingView.layer?.addSublayer(caretLayer)
@@ -771,7 +765,7 @@ final class HistoryResultTextContainer: NSView {
   }
 
   private var glyphRevealColor: NSColor {
-    NSColor(srgbRed: 250 / 255, green: 250 / 255, blue: 248 / 255, alpha: 1)
+    CidaDesign.Palette.background.appKit
   }
 
   private var textStorage: NSTextStorage? {
@@ -784,12 +778,7 @@ final class HistoryResultTextContainer: NSView {
     paragraphStyle.maximumLineHeight = 26
     return [
       .font: CidaDesign.appKitBody(16),
-      .foregroundColor: NSColor(
-        calibratedRed: 26 / 255,
-        green: 26 / 255,
-        blue: 24 / 255,
-        alpha: 1
-      ),
+      .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
       .paragraphStyle: paragraphStyle.copy() as! NSParagraphStyle,
     ]
   }()
