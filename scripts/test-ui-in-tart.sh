@@ -56,7 +56,7 @@ if ! command -v tart >/dev/null 2>&1; then
   echo "OpenAI Tart is required: brew install openai/tools/tart" >&2
   exit 69
 fi
-if ! tart list | /usr/bin/grep -q "local  $golden_vm"; then
+if ! "$project_dir/scripts/e2e/tart-vm-exists.sh" "$golden_vm"; then
   echo "Tart golden VM is missing: $golden_vm" >&2
   exit 66
 fi
