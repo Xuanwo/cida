@@ -945,8 +945,8 @@ final class InteractionReproductionTests: XCTestCase {
     let actions = row.subviews.compactMap { $0 as? NSButton }.filter { !$0.isHidden }
       .sorted { $0.frame.minY < $1.frame.minY }
     XCTAssertEqual(actions.count, 2)
-    XCTAssertEqual(actions[0].frame, NSRect(x: 782, y: 12, width: 12, height: 12))
-    XCTAssertEqual(actions[1].frame, NSRect(x: 782, y: 38, width: 12, height: 12))
+    XCTAssertEqual(actions[0].frame, NSRect(x: 792, y: 12, width: 12, height: 12))
+    XCTAssertEqual(actions[1].frame, NSRect(x: 792, y: 38, width: 12, height: 12))
   }
 
   func testFoldedHistoryRowAlwaysFadesItsSecondLineAndClipsToTheCard() throws {
@@ -1008,12 +1008,14 @@ final class InteractionReproductionTests: XCTestCase {
 
     XCTAssertEqual(row.presentation, .folded)
     XCTAssertEqual(row.preferredHeight(for: 804), 96, accuracy: 0.001)
-    XCTAssertEqual(row.headerModeFrameForTesting.minX, 28, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
     XCTAssertEqual(row.headerModeFrameForTesting.minY, 10, accuracy: 0.001)
     XCTAssertEqual(
       row.foldedPreviewFrameForTesting,
-      NSRect(x: 10, y: 34, width: 784, height: 52)
+      NSRect(x: 0, y: 34, width: 804, height: 52)
     )
+    let foldedHeaderMinX = row.headerModeFrameForTesting.minX
+    let foldedResultMinX = row.foldedPreviewFrameForTesting.minX
     XCTAssertNil(row.resultContainerForTesting)
     XCTAssertEqual(pool.leasedContainerCountForTesting, initialLeaseCount)
 
@@ -1041,6 +1043,8 @@ final class InteractionReproductionTests: XCTestCase {
 
     XCTAssertEqual(row.presentation, .expanded(isLatest: false))
     XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
+    XCTAssertEqual(row.headerModeFrameForTesting.minX, foldedHeaderMinX, accuracy: 0.001)
+    XCTAssertEqual(row.resultFrameForTesting.minX, foldedResultMinX, accuracy: 0.001)
     XCTAssertEqual(expandedResultContainer.accessibilityRole(), .group)
     XCTAssertEqual(
       expandedResultContainer.subviews.first {
@@ -1048,7 +1052,6 @@ final class InteractionReproductionTests: XCTestCase {
       }?.accessibilityRole(),
       .textArea
     )
-    XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
     XCTAssertEqual(row.headerModeFrameForTesting.minY, 16, accuracy: 0.001)
     XCTAssertEqual(row.resultFrameForTesting.minY, 40, accuracy: 0.001)
     XCTAssertEqual(

@@ -54,8 +54,11 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse(driver.element(identifier: "history-source-\(firstSuffix)").exists)
     XCTAssertFalse(driver.element(identifier: "history-expand-\(latestSuffix)").exists)
     XCTAssertEqual(card.frame.height, 96, accuracy: 1)
-    XCTAssertEqual(preview.frame.minX - card.frame.minX, 10, accuracy: 1)
+    XCTAssertEqual(preview.frame.minX, card.frame.minX, accuracy: 1)
     XCTAssertEqual(preview.frame.height, 52, accuracy: 1)
+    let latestResult = driver.app.textViews["history-result-\(latestID.uuidString)"]
+    XCTAssertTrue(latestResult.waitForExistence(timeout: 3))
+    XCTAssertEqual(preview.frame.minX, latestResult.frame.minX, accuracy: 1)
 
     card.click()
     let firstResult = driver.app.textViews["history-result-\(firstID.uuidString)"]
@@ -92,7 +95,7 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
       XCTAssertLessThanOrEqual(action.frame.width, 14)
       XCTAssertGreaterThanOrEqual(action.frame.height, 12)
       XCTAssertLessThanOrEqual(action.frame.height, 14)
-      XCTAssertEqual(card.frame.maxX - action.frame.maxX, 10, accuracy: 2)
+      XCTAssertEqual(card.frame.maxX, action.frame.maxX, accuracy: 2)
     }
     XCTAssertEqual(redo.frame.minY - card.frame.minY, 12, accuracy: 2)
     XCTAssertEqual(copy.frame.minY - card.frame.minY, 38, accuracy: 2)

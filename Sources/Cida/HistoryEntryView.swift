@@ -933,7 +933,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   }
 
   private enum Layout {
-    static let foldedInset = HistoryEntryPencilLayout.foldedInset
+    static let foldedHorizontalInset = HistoryEntryPencilLayout.foldedHorizontalInset
+    static let foldedVerticalInset = HistoryEntryPencilLayout.foldedVerticalInset
     static let expandedInset: CGFloat = 0
     static let expandedVerticalPadding: CGFloat = 16
     static let headerHeight = HistoryEntryPencilLayout.foldedHeaderHeight
@@ -1586,19 +1587,19 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   }
 
   private func previewContentRect(contentHeight: CGFloat) -> NSRect {
-    let originY = Layout.foldedInset + Layout.headerHeight + Layout.contentSpacing
-    let innerWidth = max(0, bounds.width - Layout.foldedInset * 2)
+    let originY = Layout.foldedVerticalInset + Layout.headerHeight + Layout.contentSpacing
+    let innerWidth = max(0, bounds.width - Layout.foldedHorizontalInset * 2)
     let width = max(
       0,
       innerWidth - (showsVisibleActions ? Layout.actionColumnWidth : 0)
     )
     return NSRect(
-      x: Layout.foldedInset,
+      x: Layout.foldedHorizontalInset,
       y: originY,
       width: width,
       height: max(
         0,
-        min(Layout.previewHeight, contentHeight - originY - Layout.foldedInset)
+        min(Layout.previewHeight, contentHeight - originY - Layout.foldedVerticalInset)
       )
     )
   }
@@ -1606,8 +1607,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   override func layout() {
     super.layout()
     let contentHeight = max(0, bounds.height - (showsSeparator ? 1 : 0))
-    let contentInset = presentation.isExpanded ? Layout.expandedInset : Layout.foldedInset
-    let headerY = presentation.isExpanded ? Layout.expandedVerticalPadding : Layout.foldedInset
+    let contentInset =
+      presentation.isExpanded ? Layout.expandedInset : Layout.foldedHorizontalInset
+    let headerY =
+      presentation.isExpanded ? Layout.expandedVerticalPadding : Layout.foldedVerticalInset
     iconView.frame = NSRect(
       x: contentInset,
       y: headerY + 2,
@@ -1674,7 +1677,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     } else {
       copyButton?.frame = NSRect(
         x: actionX,
-        y: Layout.foldedInset + Layout.headerHeight + Layout.contentSpacing + 4,
+        y: Layout.foldedVerticalInset + Layout.headerHeight + Layout.contentSpacing + 4,
         width: Layout.actionSize,
         height: Layout.actionSize
       )
