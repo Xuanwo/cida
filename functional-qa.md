@@ -114,7 +114,7 @@ are recorded as diagnostics rather than misclassified as test activity.
   also passes after the result action exposes only its real button rather than a roleless overlay.
 - The complete source mutation catalog validates all 14 exact anchors.
 - The complete clean-checkout PR gate for this repair writes its machine-readable result to
-  `TestResults/gates/expanded-history-source-final-20260818/gate-summary.json`.
+  `TestResults/gates/expanded-history-source-final-rerun-20260818/gate-summary.json`.
 
 ## Performance acceptance boundary
 
