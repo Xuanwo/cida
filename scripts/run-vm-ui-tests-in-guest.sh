@@ -98,7 +98,7 @@ else
   interaction_filters=(
     'InteractionReproductionTests/test[A-H]' \
     'InteractionReproductionTests/test[I-P]' \
-    'InteractionReproductionTests/test(Record|Recycled|Scrolling|Settings|Staged)' \
+    'InteractionReproductionTests/test(Real|Record|Recycled|Scrolling|Settings|Staged)' \
     'InteractionReproductionTests/testStreaming' \
     'InteractionReproductionTests/test(Submit|Virtual|Window)'
   )
