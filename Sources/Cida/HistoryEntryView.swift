@@ -801,6 +801,11 @@ class HistoryEntryActionButton: NSButton {
     iconView.frame = bounds
   }
 
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    guard !isHidden, isEnabled, bounds.contains(point) else { return nil }
+    return self
+  }
+
   override func updateTrackingAreas() {
     super.updateTrackingAreas()
     if let trackingAreaReference {
@@ -1775,6 +1780,17 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     measuredSourceWidth = textWidth
     measuredSourceLayout = layout
     return layout
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })
+    where !button.isHidden {
+      let buttonPoint = button.convert(point, from: self)
+      if let actionHit = button.hitTest(buttonPoint) {
+        return actionHit
+      }
+    }
+    return super.hitTest(point)
   }
 
   override func draw(_ dirtyRect: NSRect) {}

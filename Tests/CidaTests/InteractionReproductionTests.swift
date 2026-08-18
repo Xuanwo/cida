@@ -1030,6 +1030,7 @@ final class InteractionReproductionTests: XCTestCase {
     let entryID = UUID()
     let resultStorage = HistoryResultStorage("A complete result")
     let row = HistoryEntryNSView()
+    var didCopyExpandedSource = false
     row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
     row.configure(
       entryID: entryID,
@@ -1072,7 +1073,7 @@ final class InteractionReproductionTests: XCTestCase {
       showsSeparator: false,
       onCollapse: {},
       onRedo: {},
-      onCopySource: {},
+      onCopySource: { didCopyExpandedSource = true },
       onCopyResult: {}
     )
     row.frame.size.height = row.preferredHeight(for: 804)
@@ -1104,6 +1105,24 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(row.sourceFrameForTesting, NSRect(x: 0, y: 40, width: 780, height: 21))
     XCTAssertFalse(row.sourceUsesFadeForTesting)
     XCTAssertEqual(row.resultFrameForTesting.minY, 69, accuracy: 0.001)
+    row.setResolvedHoverState(true)
+    let expandedSourceAction = try XCTUnwrap(
+      row.subviews.compactMap { $0 as? NSButton }.first {
+        $0.accessibilityIdentifier()
+          == "history-action-copy-source-\(entryID.uuidString.lowercased())"
+      }
+    )
+    let expandedSourceHitView = row.hitTest(
+      NSPoint(x: expandedSourceAction.frame.midX, y: expandedSourceAction.frame.midY)
+    )
+    XCTAssertFalse(expandedSourceAction.isHidden)
+    XCTAssertTrue(row.bounds.contains(expandedSourceAction.frame))
+    XCTAssertTrue(
+      expandedSourceHitView === expandedSourceAction,
+      "Expected source action hit, received \(String(describing: expandedSourceHitView))"
+    )
+    expandedSourceAction.performClick(nil)
+    XCTAssertTrue(didCopyExpandedSource)
     XCTAssertEqual(
       row.resultFrameForTesting.maxY + 16,
       row.preferredHeight(for: 804),
