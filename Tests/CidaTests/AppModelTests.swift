@@ -475,19 +475,15 @@ final class AppModelTests: XCTestCase {
 
     XCTAssertEqual(storage.foldedPreview, String(initial.prefix(420)))
     XCTAssertTrue(storage.foldedPreview.hasSuffix(family))
-    XCTAssertTrue(storage.foldedPreviewNeedsFade)
 
     storage.replace(with: String(repeating: "B", count: 120))
     XCTAssertEqual(storage.foldedPreview, String(repeating: "B", count: 120))
-    XCTAssertFalse(storage.foldedPreviewNeedsFade)
 
     storage.append(family)
     XCTAssertEqual(storage.foldedPreview, String(repeating: "B", count: 120) + family)
-    XCTAssertTrue(storage.foldedPreviewNeedsFade)
 
     storage.replace(with: "first\nsecond\nthird")
     XCTAssertEqual(storage.foldedPreview, "first\nsecond\nthird")
-    XCTAssertTrue(storage.foldedPreviewNeedsFade)
   }
 
   func testStrictSmoothStreamingReportCarriesPresentationMetrics() {

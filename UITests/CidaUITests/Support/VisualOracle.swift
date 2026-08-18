@@ -3,6 +3,82 @@ import XCTest
 
 enum VisualOracle {
   @MainActor
+  static func assertSecondLineUsesPencilFade(
+    _ element: XCUIElement,
+    attachmentName: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let screenshot = element.screenshot()
+    let attachment = XCTAttachment(screenshot: screenshot)
+    attachment.name = attachmentName
+    attachment.lifetime = .keepAlways
+    XCTContext.runActivity(named: attachmentName) { activity in
+      activity.add(attachment)
+    }
+
+    guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation) else {
+      XCTFail("Could not decode the text-fade screenshot", file: file, line: line)
+      return
+    }
+
+    let backgroundSampleWidth = max(1, bitmap.pixelsWide / 12)
+    var backgroundLuminance = 0.0
+    var backgroundSamples = 0
+    for y in 0..<bitmap.pixelsHigh {
+      for x in (bitmap.pixelsWide - backgroundSampleWidth)..<bitmap.pixelsWide {
+        guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+          continue
+        }
+        backgroundLuminance += luminance(of: color)
+        backgroundSamples += 1
+      }
+    }
+    guard backgroundSamples > 0 else {
+      XCTFail("Could not sample the text-fade background", file: file, line: line)
+      return
+    }
+    backgroundLuminance /= Double(backgroundSamples)
+
+    let midpoint = bitmap.pixelsHigh / 2
+    let horizontalInset = max(1, bitmap.pixelsWide / 100)
+    let topContrast = totalInkContrast(
+      in: bitmap,
+      xRange: horizontalInset..<(bitmap.pixelsWide - horizontalInset),
+      yRange: 0..<midpoint,
+      backgroundLuminance: backgroundLuminance
+    )
+    let bottomContrast = totalInkContrast(
+      in: bitmap,
+      xRange: horizontalInset..<(bitmap.pixelsWide - horizontalInset),
+      yRange: midpoint..<bitmap.pixelsHigh,
+      backgroundLuminance: backgroundLuminance
+    )
+
+    XCTAssertGreaterThan(
+      topContrast,
+      50,
+      "The first preview line must remain legible",
+      file: file,
+      line: line
+    )
+    XCTAssertGreaterThan(
+      bottomContrast,
+      5,
+      "The second preview line must remain perceptible",
+      file: file,
+      line: line
+    )
+    XCTAssertLessThan(
+      bottomContrast / max(1, topContrast),
+      0.78,
+      "The second preview line must visibly fade toward the card background",
+      file: file,
+      line: line
+    )
+  }
+
+  @MainActor
   static func assertActionIconInkFitsPencilBounds(
     _ action: XCUIElement,
     in window: XCUIElement,
@@ -165,5 +241,29 @@ enum VisualOracle {
     XCTAssertGreaterThanOrEqual(height, 80)
     XCTAssertLessThanOrEqual(height, 100)
     return CGFloat(maximumStart + maximumEnd + 1) / (2 * scale)
+  }
+
+  private static func totalInkContrast(
+    in bitmap: NSBitmapImageRep,
+    xRange: Range<Int>,
+    yRange: Range<Int>,
+    backgroundLuminance: Double
+  ) -> Double {
+    var contrast = 0.0
+    for y in yRange {
+      for x in xRange {
+        guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+          continue
+        }
+        contrast += max(0, backgroundLuminance - luminance(of: color))
+      }
+    }
+    return contrast
+  }
+
+  private static func luminance(of color: NSColor) -> Double {
+    0.2126 * Double(color.redComponent)
+      + 0.7152 * Double(color.greenComponent)
+      + 0.0722 * Double(color.blueComponent)
   }
 }

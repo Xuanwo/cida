@@ -57,9 +57,7 @@ struct ProcessingRequest: Equatable, Sendable {
 final class HistoryResultStorage: @unchecked Sendable {
   private let value: NSMutableString
   private var foldedPreviewValue: String
-  private var foldedPreviewNeedsFadeValue: Bool
   private var foldedPreviewCharacterCount: Int
-  private var foldedPreviewNewlineCount: Int
   #if DEBUG
     private(set) var fullStringReadCount = 0
     private(set) var foldedPreviewReadCount = 0
@@ -69,9 +67,7 @@ final class HistoryResultStorage: @unchecked Sendable {
     self.value = NSMutableString(string: value)
     let foldedPresentation = Self.makeFoldedPresentation(value)
     foldedPreviewValue = foldedPresentation.preview
-    foldedPreviewNeedsFadeValue = foldedPresentation.needsFade
     foldedPreviewCharacterCount = foldedPresentation.characterCount
-    foldedPreviewNewlineCount = foldedPresentation.newlineCount
   }
 
   var string: String {
@@ -99,10 +95,6 @@ final class HistoryResultStorage: @unchecked Sendable {
     return foldedPreviewValue
   }
 
-  var foldedPreviewNeedsFade: Bool {
-    foldedPreviewNeedsFadeValue
-  }
-
   func append(_ suffix: String) {
     value.append(suffix)
     appendToFoldedPresentation(suffix)
@@ -112,9 +104,7 @@ final class HistoryResultStorage: @unchecked Sendable {
     value.setString(string)
     let foldedPresentation = Self.makeFoldedPresentation(string)
     foldedPreviewValue = foldedPresentation.preview
-    foldedPreviewNeedsFadeValue = foldedPresentation.needsFade
     foldedPreviewCharacterCount = foldedPresentation.characterCount
-    foldedPreviewNewlineCount = foldedPresentation.newlineCount
   }
 
   func suffix(fromUTF16Offset offset: Int) -> String? {
@@ -129,35 +119,20 @@ final class HistoryResultStorage: @unchecked Sendable {
       guard foldedPreviewCharacterCount < 420 else { break }
       foldedPreviewValue.append(character)
       foldedPreviewCharacterCount += 1
-      if character == "\n" {
-        foldedPreviewNewlineCount = min(2, foldedPreviewNewlineCount + 1)
-      }
-      if foldedPreviewCharacterCount > 120 || foldedPreviewNewlineCount >= 2 {
-        foldedPreviewNeedsFadeValue = true
-      }
     }
   }
 
   private static func makeFoldedPresentation(
     _ string: String
-  ) -> (preview: String, needsFade: Bool, characterCount: Int, newlineCount: Int) {
+  ) -> (preview: String, characterCount: Int) {
     var preview = ""
     var characterCount = 0
-    var newlineCount = 0
     for character in string {
       guard characterCount < 420 else { break }
       preview.append(character)
       characterCount += 1
-      if character == "\n" {
-        newlineCount = min(2, newlineCount + 1)
-      }
     }
-    return (
-      preview,
-      characterCount > 120 || newlineCount >= 2,
-      characterCount,
-      newlineCount
-    )
+    return (preview, characterCount)
   }
 }
 

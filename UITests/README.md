@@ -37,7 +37,7 @@ comes from `CIDA_UI_TEST_APP_PATH`; Debug-only preview fixtures are not an E2E e
 | `ComposerJourneyTests.swift` | responder-chain typing, multiline growth/shrink, paste, submit, source-language-preserving improvement, and Command-C precedence |
 | `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, follow, reuse, cancel, failure, and recovery |
 | `HistoryAndScrollingJourneyTests.swift` | one outer scroll surface, Pencil thumb direction, detach, and reattach |
-| `HistoryPresentationJourneyTests.swift` | fold/expand, full copy, action geometry, streaming action policy, and sticky long-result action |
+| `HistoryPresentationJourneyTests.swift` | fold/expand, full copy, Pencil preview fade and clipping, action geometry, streaming action policy, and sticky long-result action |
 | `PersistenceJourneyTests.swift` | SQLite relaunch and OpenAI endpoint/model/API-key persistence and clearing |
 | `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, scroll, and relaunch invariants |
 | `WindowAndSettingsJourneyTests.swift` | native close/minimize/zoom/resize and editable settings |

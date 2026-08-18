@@ -687,7 +687,6 @@ final class InteractionReproductionTests: XCTestCase {
       mode: .translate,
       metadata: "中文 → English · 18:00",
       preview: "A completed result exposes actions only while its row is hovered.",
-      previewNeedsFade: false,
       state: .completed,
       onExpand: {},
       onRedo: { redoCount += 1 },
@@ -746,7 +745,6 @@ final class InteractionReproductionTests: XCTestCase {
       metadata: "中文 → English · 09:14 · 1,846 → 3,214 字",
       preview:
         "Designing distributed systems has never been a matter of simply picking technologies. When we discuss consistency, availability, and partition tolerance, the second line must remain visible.",
-      previewNeedsFade: true,
       state: .completed,
       onExpand: {},
       onRedo: {},
@@ -778,6 +776,43 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(actions[1].frame, NSRect(x: 782, y: 38, width: 12, height: 12))
   }
 
+  func testFoldedHistoryRowAlwaysFadesItsSecondLineAndClipsToTheCard() throws {
+    let line = String(repeating: "M", count: 32)
+    let row = FoldedHistoryEntryNSView()
+    row.configure(
+      entryID: UUID(),
+      mode: .translate,
+      metadata: "中文 → English · 09:14",
+      preview: "\(line)\n\(line)",
+      state: .completed,
+      onExpand: {},
+      onRedo: {},
+      onCopyResult: {}
+    )
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
+    row.layoutSubtreeIfNeeded()
+
+    let textLayers = try XCTUnwrap(row.layer?.sublayers?.compactMap { $0 as? CATextLayer })
+    let previewLayer = try XCTUnwrap(textLayers.first(where: \.isWrapped))
+    let fadeLayer = try XCTUnwrap(
+      row.layer?.sublayers?.compactMap { $0 as? CAGradientLayer }.first
+    )
+
+    XCTAssertTrue(row.layer?.masksToBounds == true)
+    XCTAssertEqual(previewLayer.truncationMode, .none)
+    XCTAssertEqual(previewLayer.frame.height, 52, accuracy: 0.001)
+    XCTAssertLessThanOrEqual(previewLayer.frame.maxY, row.bounds.maxY)
+    XCTAssertFalse(fadeLayer.isHidden)
+    XCTAssertEqual(fadeLayer.frame.height, 25, accuracy: 0.001)
+    XCTAssertEqual(fadeLayer.frame.maxY, previewLayer.frame.maxY, accuracy: 0.001)
+  }
+
+  func testLatestSourcePreviewUsesThePencilClipAndFadeGeometry() {
+    XCTAssertEqual(HistoryEntryPencilLayout.latestSourcePreviewHeight, 41)
+    XCTAssertEqual(HistoryEntryPencilLayout.latestSourceFadeHeight, 20)
+    XCTAssertEqual(HistoryEntryPencilLayout.latestSourceLineLimit, 2)
+  }
+
   func testFoldedHistoryAccessibilityFramesFollowAncestorMovement() throws {
     let row = FoldedHistoryEntryNSView(
       frame: NSRect(x: 0, y: 0, width: 320, height: 96)
@@ -787,7 +822,6 @@ final class InteractionReproductionTests: XCTestCase {
       mode: .translate,
       metadata: "中文 → English · 09:14",
       preview: "Accessibility hit targets must follow the real folded card.",
-      previewNeedsFade: false,
       state: .completed,
       onExpand: {},
       onRedo: {},
@@ -833,7 +867,6 @@ final class InteractionReproductionTests: XCTestCase {
       mode: .translate,
       metadata: "中文 → English · 09:14",
       preview: "The accessible expand button must invoke the same action as a pointer click.",
-      previewNeedsFade: false,
       state: .completed,
       onExpand: { expansionCount += 1 },
       onRedo: {},
@@ -857,7 +890,6 @@ final class InteractionReproductionTests: XCTestCase {
       mode: .translate,
       metadata: "中文 → English · 09:14 · 1,846 → 3,214 字",
       preview: "A folded result keeps two preview lines visible.",
-      previewNeedsFade: false,
       state: .completed,
       onExpand: {},
       onRedo: {},
@@ -943,7 +975,6 @@ final class InteractionReproductionTests: XCTestCase {
       mode: .translate,
       metadata: "中文 → English · 18:00",
       preview: "Completed result",
-      previewNeedsFade: false,
       state: .completed,
       onExpand: {},
       onRedo: {},
@@ -996,7 +1027,6 @@ final class InteractionReproductionTests: XCTestCase {
         mode: .translate,
         metadata: "中文 → English · 18:0\(index)",
         preview: "Completed result \(index)",
-        previewNeedsFade: false,
         state: .completed,
         onExpand: {},
         onRedo: {},

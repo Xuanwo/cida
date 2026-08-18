@@ -26,7 +26,6 @@ struct FoldedHistoryEntryView: NSViewRepresentable {
       mode: entry.mode,
       metadata: entry.metadata,
       preview: entry.resultStorage.foldedPreview,
-      previewNeedsFade: entry.resultStorage.foldedPreviewNeedsFade,
       state: entry.state,
       onExpand: onExpand,
       onRedo: onRedo,
@@ -618,7 +617,6 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
       mode: entry.mode,
       metadata: entry.metadata,
       preview: entry.resultStorage.foldedPreview,
-      previewNeedsFade: entry.resultStorage.foldedPreviewNeedsFade,
       state: entry.state,
       showsSeparator: true
     )
@@ -635,7 +633,6 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
         mode: entry.mode,
         metadata: entry.metadata,
         preview: entry.resultStorage.foldedPreview,
-        previewNeedsFade: entry.resultStorage.foldedPreviewNeedsFade,
         state: entry.state,
         showsSeparator: true
       )
@@ -970,7 +967,6 @@ final class FoldedHistoryEntryNSView: NSControl {
   private var mode = ProcessingMode.translate
   private var metadata = ""
   private var preview = ""
-  private var previewNeedsFade = false
   private var showsSeparator = false
   private var entryState = HistoryEntryState.completed
   private var isHovering = false
@@ -997,6 +993,7 @@ final class FoldedHistoryEntryNSView: NSControl {
     wantsLayer = true
     layerContentsRedrawPolicy = .onSetNeedsDisplay
     layer?.cornerRadius = 8
+    layer?.masksToBounds = true
 
     for textLayer in [modeTextLayer, metadataTextLayer, previewTextLayer] {
       textLayer.alignmentMode = .left
@@ -1006,6 +1003,7 @@ final class FoldedHistoryEntryNSView: NSControl {
       layer?.addSublayer(textLayer)
     }
     previewTextLayer.isWrapped = true
+    previewTextLayer.truncationMode = .none
     previewTextLayer.masksToBounds = true
     fadeLayer.actions = Self.disabledLayerActions
     separatorLayer.actions = Self.disabledLayerActions
@@ -1055,7 +1053,6 @@ final class FoldedHistoryEntryNSView: NSControl {
     mode: ProcessingMode,
     metadata: String,
     preview: String,
-    previewNeedsFade: Bool,
     state: HistoryEntryState,
     showsSeparator: Bool = false,
     onExpand: @escaping @MainActor () -> Void,
@@ -1067,7 +1064,6 @@ final class FoldedHistoryEntryNSView: NSControl {
       mode: mode,
       metadata: metadata,
       preview: preview,
-      previewNeedsFade: previewNeedsFade,
       state: state,
       showsSeparator: showsSeparator
     )
@@ -1083,14 +1079,13 @@ final class FoldedHistoryEntryNSView: NSControl {
     mode: ProcessingMode,
     metadata: String,
     preview: String,
-    previewNeedsFade: Bool,
     state: HistoryEntryState,
     showsSeparator: Bool = false
   ) {
     let identityChanged = self.entryID != entryID
     let contentChanged =
       self.mode != mode || self.metadata != metadata
-      || self.preview != preview || self.previewNeedsFade != previewNeedsFade
+      || self.preview != preview
       || self.showsSeparator != showsSeparator
 
     if identityChanged {
@@ -1103,7 +1098,6 @@ final class FoldedHistoryEntryNSView: NSControl {
     self.mode = mode
     self.metadata = metadata
     self.preview = preview
-    self.previewNeedsFade = previewNeedsFade
     self.showsSeparator = showsSeparator
     entryState = state
 
@@ -1207,14 +1201,6 @@ final class FoldedHistoryEntryNSView: NSControl {
   }
 
   func preferredHeight(for _: CGFloat) -> CGFloat {
-    Layout.preferredHeight
-  }
-
-  static func preferredHeight(
-    preview _: String,
-    previewNeedsFade _: Bool,
-    width _: CGFloat
-  ) -> CGFloat {
     Layout.preferredHeight
   }
 
@@ -1343,7 +1329,7 @@ final class FoldedHistoryEntryNSView: NSControl {
     fadeLayer.locations = [0, 1]
     fadeLayer.startPoint = CGPoint(x: 0.5, y: 0)
     fadeLayer.endPoint = CGPoint(x: 0.5, y: 1)
-    fadeLayer.isHidden = !previewNeedsFade
+    fadeLayer.isHidden = preview.isEmpty
     CATransaction.commit()
   }
 

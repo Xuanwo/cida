@@ -175,6 +175,66 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 5))
   }
 
+  func testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult() throws {
+    let foldedID = UUID(uuidString: "50000000-0000-0000-0000-000000000001")!
+    let latestID = UUID(uuidString: "50000000-0000-0000-0000-000000000002")!
+    let foldedLine = String(repeating: "M", count: 32)
+    let sourceLine = String(repeating: "W", count: 28)
+    let latestSource = Array(repeating: sourceLine, count: 6).joined(separator: "\n")
+    let latestResult = "LATEST_MEDIUM_SOURCE_RESULT_MUST_REMAIN_VISIBLE"
+    XCTAssertLessThan(latestSource.count, 800)
+    XCTAssertLessThan("\(foldedLine)\n\(foldedLine)".count, 120)
+
+    try seed(
+      [
+        HistoryFixtureEntry(
+          id: foldedID,
+          sortOrder: 0,
+          source: "The folded source stays hidden.",
+          result: "\(foldedLine)\n\(foldedLine)",
+          detail: "English",
+          timestamp: "09:14"
+        ),
+        HistoryFixtureEntry(
+          id: latestID,
+          sortOrder: 1,
+          source: latestSource,
+          result: latestResult,
+          detail: "English",
+          timestamp: "09:15"
+        ),
+      ]
+    )
+    driver.launch()
+
+    let foldedSuffix = foldedID.uuidString.lowercased()
+    let latestSuffix = latestID.uuidString.lowercased()
+    let foldedCard = driver.element(identifier: "history-expand-\(foldedSuffix)")
+    let foldedPreview = driver.element(identifier: "history-collapsed-result-\(foldedSuffix)")
+    let source = driver.element(identifier: "history-source-\(latestSuffix)")
+    let result = driver.app.textViews["history-result-\(latestID.uuidString)"]
+    XCTAssertTrue(foldedCard.waitForExistence(timeout: 5))
+    XCTAssertTrue(foldedPreview.waitForExistence(timeout: 3))
+    XCTAssertTrue(source.waitForExistence(timeout: 3))
+    XCTAssertTrue(result.waitForExistence(timeout: 3))
+
+    XCTAssertEqual(foldedCard.frame.height, 96, accuracy: 1)
+    XCTAssertEqual(foldedPreview.frame.height, 52, accuracy: 1)
+    XCTAssertLessThanOrEqual(foldedPreview.frame.maxY, foldedCard.frame.maxY - 9)
+    XCTAssertGreaterThanOrEqual(source.frame.height, 35)
+    XCTAssertLessThanOrEqual(source.frame.height, 41)
+    XCTAssertLessThanOrEqual(result.frame.minY - source.frame.maxY, 30)
+    XCTAssertGreaterThan(result.frame.intersection(driver.history.frame).height, 20)
+    VisualOracle.assertSecondLineUsesPencilFade(
+      foldedPreview,
+      attachmentName: "Folded result Pencil fade"
+    )
+    VisualOracle.assertSecondLineUsesPencilFade(
+      source,
+      attachmentName: "Latest source Pencil fade"
+    )
+  }
+
   func testLongResultUsesTheOuterHistoryScrollAndKeepsItsCopyActionSticky() throws {
     let longID = UUID(uuidString: "20000000-0000-0000-0000-000000000001")!
     let paragraph =

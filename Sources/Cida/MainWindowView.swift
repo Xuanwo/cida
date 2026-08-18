@@ -26,6 +26,9 @@ enum HistoryEntryPencilLayout {
   static let foldedHeaderHeight: CGFloat = 16
   static let foldedPreviewHeight: CGFloat = 52
   static let foldedContentSpacing: CGFloat = 8
+  static let latestSourcePreviewHeight: CGFloat = 41
+  static let latestSourceFadeHeight: CGFloat = 20
+  static let latestSourceLineLimit = 2
   static let foldedHeight =
     foldedInset * 2 + foldedHeaderHeight + foldedContentSpacing + foldedPreviewHeight
   static let foldedRowStride = foldedHeight + 1
@@ -713,16 +716,16 @@ private struct HistoryEntryView: View {
           ZStack(alignment: .bottom) {
             sourceText
 
-            if isLongEntry {
-              LinearGradient(
-                colors: [CidaDesign.background.opacity(0), CidaDesign.background],
-                startPoint: .top,
-                endPoint: .bottom
-              )
-              .frame(height: 20)
-              .allowsHitTesting(false)
-            }
+            LinearGradient(
+              colors: [CidaDesign.background.opacity(0), CidaDesign.background],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+            .frame(height: HistoryEntryPencilLayout.latestSourceFadeHeight)
+            .allowsHitTesting(false)
           }
+          .frame(height: HistoryEntryPencilLayout.latestSourcePreviewHeight, alignment: .top)
+          .clipped()
           .frame(maxWidth: .infinity, alignment: .leading)
 
           if actionsAreVisible || copiedAction == .copySource {
@@ -866,7 +869,7 @@ private struct HistoryEntryView: View {
       .font(CidaDesign.body(13))
       .foregroundStyle(CidaDesign.textTertiary)
       .lineSpacing(3)
-      .lineLimit(isLongEntry ? 2 : nil)
+      .lineLimit(HistoryEntryPencilLayout.latestSourceLineLimit)
       .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityIdentifier("history-source-\(entryIdentifierSuffix)")
 
@@ -891,7 +894,6 @@ private struct HistoryEntryView: View {
   }
 
   private var displayedSource: String {
-    guard isLongEntry else { return entry.source }
     return String(entry.source.prefix(420))
   }
 

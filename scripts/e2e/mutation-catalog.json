@@ -139,6 +139,36 @@
       "releaseTests": [
         "ComposerJourneyTests/testImprovementPreservesEnglishAndChineseSourceLanguages"
       ]
+    },
+    {
+      "id": "folded-result-fade-hidden",
+      "description": "Hide the Pencil fade from every non-empty folded result preview.",
+      "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
+      "file": "Sources/Cida/FoldedHistoryEntryView.swift",
+      "before": "    fadeLayer.isHidden = preview.isEmpty",
+      "after": "    fadeLayer.isHidden = true",
+      "occurrences": 1,
+      "unitTests": [
+        "InteractionReproductionTests/testFoldedHistoryRowAlwaysFadesItsSecondLineAndClipsToTheCard"
+      ],
+      "releaseTests": [
+        "HistoryPresentationJourneyTests/testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult"
+      ]
+    },
+    {
+      "id": "latest-source-preview-expands-past-pencil-height",
+      "description": "Expand the latest source preview to 164 points so it pushes the result away from the source.",
+      "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
+      "file": "Sources/Cida/MainWindowView.swift",
+      "before": "  static let latestSourcePreviewHeight: CGFloat = 41",
+      "after": "  static let latestSourcePreviewHeight: CGFloat = 164",
+      "occurrences": 1,
+      "unitTests": [
+        "InteractionReproductionTests/testLatestSourcePreviewUsesThePencilClipAndFadeGeometry"
+      ],
+      "releaseTests": [
+        "HistoryPresentationJourneyTests/testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult"
+      ]
     }
   ]
 }
