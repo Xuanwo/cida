@@ -903,6 +903,17 @@ final class InteractionReproductionTests: XCTestCase {
 
     XCTAssertEqual(row.preferredHeight(for: 804), 96, accuracy: 0.001)
     row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
+    let restingBackground = try XCTUnwrap(row.layer?.backgroundColor)
+    XCTAssertTrue(
+      try XCTUnwrap(NSColor(cgColor: restingBackground)).isEqual(
+        NSColor(
+          srgbRed: 250 / 255,
+          green: 250 / 255,
+          blue: 248 / 255,
+          alpha: 1
+        )
+      )
+    )
     let entered = try XCTUnwrap(
       NSEvent.mouseEvent(
         with: .mouseMoved,
@@ -918,6 +929,18 @@ final class InteractionReproductionTests: XCTestCase {
     )
     row.mouseEntered(with: entered)
     row.layoutSubtreeIfNeeded()
+
+    let hoverBackground = try XCTUnwrap(row.layer?.backgroundColor)
+    XCTAssertTrue(
+      try XCTUnwrap(NSColor(cgColor: hoverBackground)).isEqual(
+        NSColor(
+          srgbRed: 241 / 255,
+          green: 241 / 255,
+          blue: 236 / 255,
+          alpha: 1
+        )
+      )
+    )
 
     let actions = row.subviews.compactMap { $0 as? NSButton }.filter { !$0.isHidden }
       .sorted { $0.frame.minY < $1.frame.minY }
@@ -1053,6 +1076,13 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
     XCTAssertTrue(row.resultContainerForTesting === expandedResultContainer)
     XCTAssertEqual(row.sourceFrameForTesting, NSRect(x: 0, y: 40, width: 780, height: 41))
+    XCTAssertEqual(
+      row.subviews.first {
+        $0.accessibilityIdentifier() == "history-source-\(entryID.uuidString.lowercased())"
+      }?
+      .accessibilityRole(),
+      .staticText
+    )
     XCTAssertEqual(
       row.sourceFadeFrameForTesting, row.sourceFrameForTesting.offsetBy(dx: 0, dy: -40))
     XCTAssertEqual(row.resultFrameForTesting.minY, 89, accuracy: 0.001)

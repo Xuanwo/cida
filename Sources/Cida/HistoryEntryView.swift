@@ -960,15 +960,15 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     alpha: 1
   )
   private static let foldedBackgroundColor = NSColor(
-    srgbRed: 241 / 255,
-    green: 241 / 255,
-    blue: 236 / 255,
+    srgbRed: 250 / 255,
+    green: 250 / 255,
+    blue: 248 / 255,
     alpha: 1
   )
   private static let foldedHoverColor = NSColor(
-    srgbRed: 235 / 255,
-    green: 235 / 255,
-    blue: 229 / 255,
+    srgbRed: 241 / 255,
+    green: 241 / 255,
+    blue: 236 / 255,
     alpha: 1
   )
   private static let primaryTextColor = NSColor(
@@ -1131,6 +1131,9 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     sourceTextField.isBezeled = false
     sourceTextField.isEditable = false
     sourceTextField.isSelectable = true
+    sourceTextField.setAccessibilityElement(true)
+    sourceTextField.setAccessibilityRole(.staticText)
+    sourceTextField.setAccessibilityLabel("原文")
     sourceTextField.maximumNumberOfLines = HistoryEntryPencilLayout.latestSourceLineLimit
     sourceTextField.lineBreakMode = .byWordWrapping
     sourceTextField.cell?.wraps = true
@@ -1420,6 +1423,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     )
     sourceTextField.isSelectable = !isLongEntry
     sourceTextField.setAccessibilityIdentifier("history-source-\(identifierSuffix)")
+    sourceTextField.setAccessibilityValue(displayedSource)
 
     let resultContainer: HistoryResultTextContainer
     let resultCoordinator: HistoryResultTextCoordinator
