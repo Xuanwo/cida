@@ -1076,6 +1076,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private var previewAttributedString = NSAttributedString()
   private var measuredSourceWidth: CGFloat?
   private var measuredSourceLayout = SourcePresentationLayout.hidden
+  nonisolated(unsafe) private var localActionMouseDownMonitor: Any?
   private var onExpand: (@MainActor () -> Void)?
   private var onCollapse: (@MainActor () -> Void)?
   private var onRedo: (@MainActor () -> Void)?
@@ -1183,6 +1184,9 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
 
   deinit {
     NotificationCenter.default.removeObserver(self)
+    if let localActionMouseDownMonitor {
+      NSEvent.removeMonitor(localActionMouseDownMonitor)
+    }
   }
 
   @available(*, unavailable)
@@ -1195,11 +1199,14 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     updateLayerScale()
     guard window != nil else {
       removeScrollObservation()
+      removeLocalActionMouseDownMonitor()
       setHovering(false)
       return
     }
+    updateLocalActionMouseDownMonitor()
     DispatchQueue.main.async { [weak self] in
       self?.installScrollObservationIfNeeded()
+      self?.updateLocalActionMouseDownMonitor()
       self?.refreshHoverState()
     }
   }
@@ -1359,6 +1366,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     copyButton?.resetHoverState()
     copySourceButton?.isHidden = true
     copySourceButton?.resetHoverState()
+    removeLocalActionMouseDownMonitor()
     presentation = .folded
     displayedSource = ""
     invalidateSourceLayout()
@@ -1541,6 +1549,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     }
     if !active {
       removeScrollObservation()
+      removeLocalActionMouseDownMonitor()
       isHovering = false
       redoButton?.isHidden = true
       redoButton?.resetHoverState()
@@ -1552,6 +1561,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       installScrollObservationIfNeeded()
     }
     updateLayerAppearance()
+    updateLocalActionMouseDownMonitor()
   }
 
   func setActionHandlers(
@@ -1969,11 +1979,34 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   @discardableResult
   func performVisibleAction(at location: NSPoint) -> Bool {
     for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })
-    where !button.isHidden && button.frame.contains(location) {
+    where !button.isHidden && button.frame.insetBy(dx: -6, dy: -6).contains(location) {
       button.performClick(nil)
       return true
     }
     return false
+  }
+
+  private func updateLocalActionMouseDownMonitor() {
+    let hasVisibleAction = [redoButton, copyButton, copySourceButton]
+      .compactMap({ $0 })
+      .contains { !$0.isHidden }
+    guard isPresentationActive, window != nil, hasVisibleAction else {
+      removeLocalActionMouseDownMonitor()
+      return
+    }
+    guard localActionMouseDownMonitor == nil else { return }
+    localActionMouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) {
+      [weak self] event in
+      guard let self, event.window === self.window else { return event }
+      let localPoint = self.convert(event.locationInWindow, from: nil)
+      return self.performVisibleAction(at: localPoint) ? nil : event
+    }
+  }
+
+  private func removeLocalActionMouseDownMonitor() {
+    guard let localActionMouseDownMonitor else { return }
+    NSEvent.removeMonitor(localActionMouseDownMonitor)
+    self.localActionMouseDownMonitor = nil
   }
 
   override func accessibilityPerformPress() -> Bool {
@@ -2061,6 +2094,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       }
     }
     updateAccessibilityChildren()
+    updateLocalActionMouseDownMonitor()
     needsLayout = true
   }
 

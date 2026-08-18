@@ -205,7 +205,7 @@
       "description": "Disable explicit action dispatch so the parent history control swallows clicks on its icon buttons.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-ACTIONS"],
       "file": "Sources/Cida/HistoryEntryView.swift",
-      "before": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })\n    where !button.isHidden && button.frame.contains(location) {\n      button.performClick(nil)\n      return true\n    }\n    return false\n  }",
+      "before": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })\n    where !button.isHidden && button.frame.insetBy(dx: -6, dy: -6).contains(location) {\n      button.performClick(nil)\n      return true\n    }\n    return false\n  }",
       "after": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    _ = location\n    return false\n  }",
       "occurrences": 1,
       "unitTests": [
