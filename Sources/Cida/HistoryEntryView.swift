@@ -2055,8 +2055,11 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     if let copySourceButton, !copySourceButton.isHidden {
       children.append(copySourceButton)
     }
-    if let stickyResultActionView, !stickyResultActionView.isHidden {
-      children.append(stickyResultActionView)
+    if let stickyResultActionView,
+      !stickyResultActionView.isHidden,
+      let actionButton = stickyResultActionView.accessibilityActionButton
+    {
+      children.append(actionButton)
     }
     setAccessibilityChildren(children)
   }

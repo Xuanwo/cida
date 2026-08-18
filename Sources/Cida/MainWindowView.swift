@@ -677,6 +677,10 @@ final class StickyHistoryResultActionNSView: NSView {
     localMouseDownMonitor != nil
   }
 
+  var accessibilityActionButton: NSButton? {
+    isActionVisible ? actionButton : nil
+  }
+
   override var isFlipped: Bool { true }
 
   override init(frame frameRect: NSRect) {

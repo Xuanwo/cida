@@ -1099,6 +1099,53 @@ final class InteractionReproductionTests: XCTestCase {
       accuracy: 0.001
     )
 
+    row.configureExpanded(
+      entryID: entryID,
+      mode: .improve,
+      metadata: "English · 语气与语法 · 09:14",
+      source: "First source line\nSecond source line\nHidden source line",
+      preview: "A complete result",
+      resultStorage: resultStorage,
+      presentationRevision: 0,
+      latestPresentationDelta: nil,
+      state: .completed,
+      isLatest: true,
+      isLongEntry: false,
+      showsSeparator: false,
+      onCollapse: {},
+      onRedo: {},
+      onCopySource: {},
+      onCopyResult: {}
+    )
+    let entered = try XCTUnwrap(
+      NSEvent.mouseEvent(
+        with: .mouseMoved,
+        location: .zero,
+        modifierFlags: [],
+        timestamp: 0,
+        windowNumber: 0,
+        context: nil,
+        eventNumber: 0,
+        clickCount: 0,
+        pressure: 0
+      )
+    )
+    row.mouseEntered(with: entered)
+    let accessibilityChildren = row.accessibilityChildren() ?? []
+    XCTAssertFalse(accessibilityChildren.contains { $0 is StickyHistoryResultActionNSView })
+    let resultAction = try XCTUnwrap(
+      accessibilityChildren.compactMap { $0 as? NSButton }.first {
+        $0.accessibilityIdentifier()
+          == "history-action-copy-result-\(entryID.uuidString.lowercased())"
+      }
+    )
+    XCTAssertEqual(resultAction.accessibilityRole(), .button)
+    XCTAssertTrue(
+      accessibilityChildren.compactMap { $0 as? NSView }.allSatisfy {
+        $0.isAccessibilityElement() && $0.accessibilityRole() != nil
+      }
+    )
+
     row.configure(
       entryID: entryID,
       mode: .improve,
