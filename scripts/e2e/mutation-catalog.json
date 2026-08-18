@@ -164,8 +164,7 @@
       "after": "      .folded",
       "occurrences": 1,
       "unitTests": [
-        "InteractionReproductionTests/testEveryHistoryPresentationUsesOneNativeEntryRenderer",
-        "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState"
+        "InteractionReproductionTests/testEveryHistoryPresentationUsesOneNativeEntryRenderer"
       ],
       "releaseTests": [
         "HistoryPresentationJourneyTests/testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult"
