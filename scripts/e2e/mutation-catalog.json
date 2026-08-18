@@ -202,11 +202,11 @@
     },
     {
       "id": "history-action-hit-target-swallowed",
-      "description": "Remove explicit action hit routing so the parent history control swallows clicks on its icon buttons.",
+      "description": "Disable explicit action dispatch so the parent history control swallows clicks on its icon buttons.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-ACTIONS"],
       "file": "Sources/Cida/HistoryEntryView.swift",
-      "before": "  override func hitTest(_ point: NSPoint) -> NSView? {\n    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })\n    where !button.isHidden {\n      let buttonPoint = button.convert(point, from: self)\n      if let actionHit = button.hitTest(buttonPoint) {\n        return actionHit\n      }\n    }\n    return super.hitTest(point)\n  }",
-      "after": "  override func hitTest(_ point: NSPoint) -> NSView? {\n    super.hitTest(point)\n  }",
+      "before": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })\n    where !button.isHidden && button.frame.contains(location) {\n      button.performClick(nil)\n      return true\n    }\n    return false\n  }",
+      "after": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    _ = location\n    return false\n  }",
       "occurrences": 1,
       "unitTests": [
         "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState"

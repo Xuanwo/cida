@@ -1948,6 +1948,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     guard isPresentationActive else { return }
     let location = convert(event.locationInWindow, from: nil)
     guard bounds.contains(location) else { return }
+    if performVisibleAction(at: location) { return }
     switch presentation {
     case .folded:
       onExpand?()
@@ -1963,6 +1964,16 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         onCollapse?()
       }
     }
+  }
+
+  @discardableResult
+  func performVisibleAction(at location: NSPoint) -> Bool {
+    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })
+    where !button.isHidden && button.frame.contains(location) {
+      button.performClick(nil)
+      return true
+    }
+    return false
   }
 
   override func accessibilityPerformPress() -> Bool {

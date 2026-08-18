@@ -83,7 +83,7 @@ or VM launch. In addition to submit-reset coverage, the
 folded presentation; native state/geometry tests and the visible Tart history journey reject it.
 The `expanded-history-source-stays-hidden` mutation restores the reported latest-only source gate;
 the same native geometry test and real expanded-history journey must reject it.
-The `history-action-hit-target-swallowed` mutation removes the explicit child-action hit route;
+The `history-action-hit-target-swallowed` mutation removes the explicit parent-to-child dispatch;
 the regression must fail before an icon can appear interactive while its parent consumes the click.
 
 The checked-in pairwise manifest provides a stable inventory of light/dark, reduced motion,

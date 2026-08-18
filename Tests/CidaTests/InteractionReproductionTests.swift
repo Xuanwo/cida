@@ -1121,7 +1121,11 @@ final class InteractionReproductionTests: XCTestCase {
       expandedSourceHitView === expandedSourceAction,
       "Expected source action hit, received \(String(describing: expandedSourceHitView))"
     )
-    expandedSourceAction.performClick(nil)
+    XCTAssertTrue(
+      row.performVisibleAction(
+        at: NSPoint(x: expandedSourceAction.frame.midX, y: expandedSourceAction.frame.midY)
+      )
+    )
     XCTAssertTrue(didCopyExpandedSource)
     XCTAssertEqual(expandedSourceAction.accessibilityValue() as? String, "copied")
     XCTAssertEqual(
