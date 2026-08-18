@@ -4,7 +4,7 @@ import SwiftUI
 
 struct NativeHistoryEntryView: NSViewRepresentable {
   let entry: HistoryEntry
-  let presentation: HistoryEntryNSView.Presentation
+  let presentation: HistoryPresentation
   let showsSeparator: Bool
   let onExpand: @MainActor () -> Void
   let onCollapse: @MainActor () -> Void
@@ -49,7 +49,7 @@ struct NativeHistoryEntryView: NSViewRepresentable {
         onRedo: onRedo,
         onCopyResult: onCopyResult
       )
-    case .expanded(let isLatest):
+    case .current, .manuallyExpanded:
       view.configureExpanded(
         entryID: entry.id,
         mode: entry.mode,
@@ -60,7 +60,7 @@ struct NativeHistoryEntryView: NSViewRepresentable {
         presentationRevision: entry.presentationRevision,
         latestPresentationDelta: entry.latestPresentationDelta,
         state: entry.state,
-        isLatest: isLatest,
+        presentation: presentation,
         isLongEntry: entry.isLongDocument,
         showsSeparator: showsSeparator,
         onCollapse: onCollapse,
@@ -924,16 +924,6 @@ private final class HistoryEntryAccessibilityElement: NSAccessibilityElement,
 final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
   CidaWindowMouseDownRouting
 {
-  enum Presentation: Equatable {
-    case folded
-    case expanded(isLatest: Bool)
-
-    var isExpanded: Bool {
-      if case .expanded = self { return true }
-      return false
-    }
-  }
-
   private enum Layout {
     static let foldedHorizontalInset = HistoryEntryPencilLayout.foldedHorizontalInset
     static let foldedVerticalInset = HistoryEntryPencilLayout.foldedVerticalInset
@@ -1067,7 +1057,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
   private var isLongEntry = false
   private var showsSeparator = false
   private var entryState = HistoryEntryState.completed
-  private(set) var presentation = Presentation.folded
+  private(set) var presentation = HistoryPresentation.folded
   private var isHovering = false
   private var isSourceCopied = false
   private var isResultCopied = false
@@ -1248,7 +1238,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     presentationRevision: Int,
     latestPresentationDelta: String?,
     state: HistoryEntryState,
-    isLatest: Bool,
+    presentation: HistoryPresentation,
     isLongEntry: Bool,
     showsSeparator: Bool,
     onCollapse: @escaping @MainActor () -> Void,
@@ -1256,6 +1246,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     onCopySource: @escaping @MainActor () -> Void,
     onCopyResult: @escaping @MainActor () -> Void
   ) {
+    precondition(presentation.isExpanded)
     configureContent(
       entryID: entryID,
       mode: mode,
@@ -1278,7 +1269,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     self.onCopySource = onCopySource
     self.onCopyResult = onCopyResult
     setHoverManagedExternally(true)
-    setPresentation(.expanded(isLatest: isLatest))
+    setPresentation(presentation)
     configureExpandedContent()
   }
 
@@ -1393,7 +1384,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     }
   }
 
-  private func setPresentation(_ nextPresentation: Presentation) {
+  private func setPresentation(_ nextPresentation: HistoryPresentation) {
     let changed = presentation != nextPresentation
     presentation = nextPresentation
 
@@ -1412,7 +1403,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
       copySourceButton?.isHidden = true
       previewTextLayer.isHidden = false
       fadeLayer.isHidden = preview.isEmpty
-    case .expanded:
+    case .current, .manuallyExpanded:
       previewTextLayer.isHidden = true
       fadeLayer.isHidden = true
       sourceTextField.isHidden = displayedSource.isEmpty
@@ -1592,7 +1583,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     switch presentation {
     case .folded:
       return Layout.foldedPreferredHeight
-    case .expanded:
+    case .current, .manuallyExpanded:
       let sourceLayout = sourcePresentationLayout(for: width)
       let sourceHeight =
         sourceLayout.height > 0 ? sourceLayout.height + Layout.contentSpacing : 0
@@ -1833,7 +1824,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     switch presentation {
     case .folded:
       backgroundColor = isHovering ? Self.foldedHoverColor : Self.foldedBackgroundColor
-    case .expanded:
+    case .current, .manuallyExpanded:
       backgroundColor = Self.backgroundColor
     }
     CATransaction.begin()
@@ -1951,10 +1942,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     let location = convert(event.locationInWindow, from: nil)
     guard bounds.contains(location) else { return }
     if performVisibleAction(at: location) { return }
-    switch presentation {
-    case .folded:
+    switch HistoryRenderContract(presentation: presentation).disclosureAction {
+    case .expand:
       onExpand?()
-    case .expanded(let isLatest):
+    case .collapse:
       let headerY = Layout.expandedVerticalPadding
       let headerRect = NSRect(
         x: 0,
@@ -1962,9 +1953,11 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
         width: bounds.width,
         height: Layout.headerHeight
       )
-      if !isLatest, headerRect.contains(location) {
+      if headerRect.contains(location) {
         onCollapse?()
       }
+    case .none:
+      break
     }
   }
 
@@ -1987,14 +1980,15 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
 
   override func accessibilityPerformPress() -> Bool {
     guard isPresentationActive else { return false }
-    switch presentation {
-    case .folded:
+    switch HistoryRenderContract(presentation: presentation).disclosureAction {
+    case .expand:
       onExpand?()
       return true
-    case .expanded(let isLatest):
-      guard !isLatest else { return false }
+    case .collapse:
       onCollapse?()
       return true
+    case .none:
+      return false
     }
   }
 
@@ -2051,7 +2045,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
       buttons.copy.resetHoverState()
       copySourceButton?.isHidden = true
       stickyResultActionView?.isHidden = true
-    case .expanded:
+    case .current, .manuallyExpanded:
       buttons.copy.isHidden = true
       buttons.copy.resetHoverState()
       let sourceButton = ensureCopySourceButton()
@@ -2129,11 +2123,12 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
       return
     }
     var children: [Any]
-    switch presentation {
-    case .folded:
+    let contract = HistoryRenderContract(presentation: presentation)
+    switch contract.content {
+    case .foldedPreview:
       children = [expandAccessibilityElement, previewAccessibilityElement]
-    case .expanded(let isLatest):
-      children = isLatest ? [] : [expandAccessibilityElement]
+    case .sourceAndResult:
+      children = contract.disclosureAction == .collapse ? [expandAccessibilityElement] : []
       if !displayedSource.isEmpty {
         children.append(sourceTextField)
       }
@@ -2166,23 +2161,19 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     previewAccessibilityElement.setAccessibilityValue(preview)
     setAccessibilityIdentifier("history-entry-\(identifierSuffix)")
 
-    switch presentation {
-    case .folded:
-      setAccessibilityLabel("历史记录，\(mode.title)，\(metadata)")
-      setAccessibilityValue("collapsed")
+    let contract = HistoryRenderContract(presentation: presentation)
+    setAccessibilityLabel("\(contract.accessibilityLabelPrefix)，\(mode.title)，\(metadata)")
+    setAccessibilityValue(contract.accessibilityValue)
+
+    switch contract.disclosureAction {
+    case .expand:
       expandAccessibilityElement.setAccessibilityIdentifier(
         "history-expand-\(identifierSuffix)"
       )
       expandAccessibilityElement.setAccessibilityLabel("展开历史记录")
       expandAccessibilityElement.setAccessibilityHelp("显示完整结果")
       expandAccessibilityElement.setAccessibilityValue(preview)
-    case .expanded(let isLatest):
-      setAccessibilityLabel(
-        isLatest
-          ? "当前历史记录，\(mode.title)，\(metadata)"
-          : "展开的历史记录，\(mode.title)，\(metadata)"
-      )
-      setAccessibilityValue("expanded")
+    case .collapse, .none:
       expandAccessibilityElement.setAccessibilityIdentifier(
         "history-collapse-\(identifierSuffix)"
       )

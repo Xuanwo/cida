@@ -592,8 +592,8 @@ final class InteractionReproductionTests: XCTestCase {
     let expandedRenderer = try XCTUnwrap(nativeHistoryEntryAncestor(of: expandedResult))
     let latestRenderer = try XCTUnwrap(nativeHistoryEntryAncestor(of: latestResult))
     XCTAssertEqual(foldedRow.presentation, .folded)
-    XCTAssertEqual(expandedRenderer.presentation, .expanded(isLatest: false))
-    XCTAssertEqual(latestRenderer.presentation, .expanded(isLatest: true))
+    XCTAssertEqual(expandedRenderer.presentation, .manuallyExpanded)
+    XCTAssertEqual(latestRenderer.presentation, .current)
     assertTestProcessIsNotFrontmost()
     withExtendedLifetime(window) {}
   }
@@ -1000,7 +1000,7 @@ final class InteractionReproductionTests: XCTestCase {
       presentationRevision: 0,
       latestPresentationDelta: nil,
       state: .completed,
-      isLatest: true,
+      presentation: .current,
       isLongEntry: false,
       showsSeparator: false,
       onCollapse: {},
@@ -1068,7 +1068,7 @@ final class InteractionReproductionTests: XCTestCase {
       presentationRevision: 0,
       latestPresentationDelta: nil,
       state: .completed,
-      isLatest: false,
+      presentation: .manuallyExpanded,
       isLongEntry: false,
       showsSeparator: false,
       onCollapse: {},
@@ -1080,7 +1080,7 @@ final class InteractionReproductionTests: XCTestCase {
     row.layoutSubtreeIfNeeded()
     let expandedResultContainer = try XCTUnwrap(row.resultContainerForTesting)
 
-    XCTAssertEqual(row.presentation, .expanded(isLatest: false))
+    XCTAssertEqual(row.presentation, .manuallyExpanded)
     XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
     XCTAssertEqual(row.headerModeFrameForTesting.minX, foldedHeaderMinX, accuracy: 0.001)
     XCTAssertEqual(row.resultFrameForTesting.minX, foldedResultMinX, accuracy: 0.001)
@@ -1145,7 +1145,7 @@ final class InteractionReproductionTests: XCTestCase {
       presentationRevision: 0,
       latestPresentationDelta: nil,
       state: .completed,
-      isLatest: true,
+      presentation: .current,
       isLongEntry: false,
       showsSeparator: false,
       onCollapse: {},
@@ -1156,7 +1156,7 @@ final class InteractionReproductionTests: XCTestCase {
     row.frame.size.height = row.preferredHeight(for: 804)
     row.layoutSubtreeIfNeeded()
 
-    XCTAssertEqual(row.presentation, .expanded(isLatest: true))
+    XCTAssertEqual(row.presentation, .current)
     XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
     XCTAssertTrue(row.resultContainerForTesting === expandedResultContainer)
     XCTAssertEqual(row.sourceFrameForTesting, NSRect(x: 0, y: 40, width: 780, height: 41))
@@ -1187,7 +1187,7 @@ final class InteractionReproductionTests: XCTestCase {
       presentationRevision: 0,
       latestPresentationDelta: nil,
       state: .completed,
-      isLatest: true,
+      presentation: .current,
       isLongEntry: false,
       showsSeparator: false,
       onCollapse: {},
@@ -1255,7 +1255,7 @@ final class InteractionReproductionTests: XCTestCase {
       presentationRevision: 0,
       latestPresentationDelta: nil,
       state: .completed,
-      isLatest: false,
+      presentation: .manuallyExpanded,
       isLongEntry: false,
       showsSeparator: false,
       onCollapse: {},

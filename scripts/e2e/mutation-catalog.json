@@ -160,8 +160,8 @@
       "description": "Force every standalone history record through the folded presentation instead of the shared native state renderer.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
       "file": "Sources/Cida/MainWindowView.swift",
-      "before": "      isExpanded ? .expanded(isLatest: isLatestEntry) : .folded",
-      "after": "      .folded",
+      "before": "    let presentation: HistoryPresentation =\n      if !isExpanded {\n        .folded\n      } else if isLatestEntry {\n        .current\n      } else {\n        .manuallyExpanded\n      }",
+      "after": "    let presentation: HistoryPresentation = .folded",
       "occurrences": 1,
       "unitTests": [
         "InteractionReproductionTests/testEveryHistoryPresentationUsesOneNativeEntryRenderer"
@@ -191,7 +191,7 @@
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-EXPANDED-SOURCE"],
       "file": "Sources/Cida/HistoryEntryView.swift",
       "before": "    guard presentation.isExpanded, !displayedSource.isEmpty, textWidth > 0 else {",
-      "after": "    guard case .expanded(isLatest: true) = presentation, !displayedSource.isEmpty, textWidth > 0 else {",
+      "after": "    guard presentation == .current, !displayedSource.isEmpty, textWidth > 0 else {",
       "occurrences": 1,
       "unitTests": [
         "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState",

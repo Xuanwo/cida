@@ -608,8 +608,14 @@ private struct HistoryEntryView: View {
   }
 
   var body: some View {
-    let presentation: HistoryEntryNSView.Presentation =
-      isExpanded ? .expanded(isLatest: isLatestEntry) : .folded
+    let presentation: HistoryPresentation =
+      if !isExpanded {
+        .folded
+      } else if isLatestEntry {
+        .current
+      } else {
+        .manuallyExpanded
+      }
     let _ = entry.state
     let _ = entry.presentationRevision
     let _ = entry.metadata
