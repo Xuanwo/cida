@@ -1123,6 +1123,7 @@ final class InteractionReproductionTests: XCTestCase {
     )
     expandedSourceAction.performClick(nil)
     XCTAssertTrue(didCopyExpandedSource)
+    XCTAssertEqual(expandedSourceAction.accessibilityValue() as? String, "copied")
     XCTAssertEqual(
       row.resultFrameForTesting.maxY + 16,
       row.preferredHeight(for: 804),

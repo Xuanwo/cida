@@ -82,6 +82,7 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     let copyFirstSource = driver.app.buttons["history-action-copy-source-\(firstSuffix)"]
     XCTAssertTrue(copyFirstSource.waitForExistence(timeout: 3))
     copyFirstSource.click()
+    XCTAssertTrue(driver.waitForValue("copied", in: copyFirstSource, timeout: 2))
     XCTAssertTrue(driver.waitForPasteboard("FOLDING_FIRST_SOURCE_MUST_START_HIDDEN", timeout: 2))
     let secondExpand = driver.element(identifier: "history-expand-\(secondSuffix)")
     XCTAssertTrue(secondExpand.waitForExistence(timeout: 3))

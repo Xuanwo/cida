@@ -2097,6 +2097,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       identifier: "history-action-copy-source-\(identifierSuffix)",
       action: #selector(copySource(_:))
     )
+    button.setAccessibilityValue("idle")
     addSubview(button)
     copySourceButton = button
     return button
@@ -2235,6 +2236,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     (sender as? HistoryEntryActionButton)?.iconImage = LucideIconAsset.image(for: .check)
     (sender as? HistoryEntryActionButton)?.setFeedbackTint(Self.accentColor)
     sender.setAccessibilityLabel("已复制这条历史记录的完整原文")
+    sender.setAccessibilityValue("copied")
     updateActionVisibility()
     let entryID = self.entryID
     let workItem = DispatchWorkItem { [weak self] in
@@ -2281,5 +2283,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     copySourceButton?.iconImage = LucideIconAsset.image(for: .copy)
     copySourceButton?.setFeedbackTint(nil)
     copySourceButton?.setAccessibilityLabel("复制这条历史记录的完整原文")
+    copySourceButton?.setAccessibilityValue("idle")
   }
 }
