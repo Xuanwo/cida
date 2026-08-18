@@ -1997,6 +1997,9 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       removeLocalActionMouseDownMonitor()
       return
     }
+    if ProcessInfo.processInfo.arguments.contains("--e2e-testing") {
+      copySourceButton?.setAccessibilityValue("monitor-installed")
+    }
     guard localActionMouseDownMonitor == nil else { return }
     localActionMouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) {
       [weak self] event in
@@ -2009,6 +2012,11 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         ? targetWindow.convertPoint(fromScreen: event.locationInWindow)
         : event.locationInWindow
       let localPoint = self.convert(windowPoint, from: nil)
+      if ProcessInfo.processInfo.arguments.contains("--e2e-testing") {
+        self.copySourceButton?.setAccessibilityValue(
+          "event-received-\(Int(localPoint.x))-\(Int(localPoint.y))"
+        )
+      }
       return self.performVisibleAction(at: localPoint) ? nil : event
     }
   }
