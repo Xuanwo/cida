@@ -61,9 +61,14 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(preview.frame.minX, latestResult.frame.minX, accuracy: 1)
 
     card.click()
+    let firstSource = driver.element(identifier: "history-source-\(firstSuffix)")
     let firstResult = driver.app.textViews["history-result-\(firstID.uuidString)"]
+    XCTAssertTrue(firstSource.waitForExistence(timeout: 3))
     XCTAssertTrue(firstResult.waitForExistence(timeout: 3))
-    XCTAssertFalse(driver.element(identifier: "history-source-\(firstSuffix)").exists)
+    XCTAssertEqual(firstSource.frame.minX, entry.frame.minX, accuracy: 2)
+    XCTAssertEqual(entry.frame.maxX - firstSource.frame.maxX, 24, accuracy: 2)
+    XCTAssertEqual(firstSource.frame.height, 21, accuracy: 1)
+    XCTAssertEqual(firstResult.frame.minY - firstSource.frame.maxY, 8, accuracy: 2)
     XCTAssertEqual(firstResult.frame.minX, entry.frame.minX, accuracy: 2)
     XCTAssertEqual(entry.frame.maxX - firstResult.frame.maxX, 24, accuracy: 2)
     XCTAssertLessThanOrEqual(firstResult.frame.maxY, entry.frame.maxY - 15)
@@ -74,15 +79,21 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(
       driver.app.buttons["history-action-copy-result-\(firstSuffix)"].waitForExistence(timeout: 3)
     )
-    XCTAssertFalse(driver.app.buttons["history-action-copy-source-\(firstSuffix)"].exists)
+    let copyFirstSource = driver.app.buttons["history-action-copy-source-\(firstSuffix)"]
+    XCTAssertTrue(copyFirstSource.waitForExistence(timeout: 3))
+    copyFirstSource.click()
+    XCTAssertTrue(driver.waitForPasteboard("FOLDING_FIRST_SOURCE_MUST_START_HIDDEN", timeout: 2))
     let secondExpand = driver.element(identifier: "history-expand-\(secondSuffix)")
     XCTAssertTrue(secondExpand.waitForExistence(timeout: 3))
     secondExpand.click()
     XCTAssertTrue(firstResult.exists)
     XCTAssertTrue(driver.app.textViews["history-result-\(secondID.uuidString)"].exists)
-    XCTAssertFalse(driver.element(identifier: "history-source-\(secondSuffix)").exists)
+    XCTAssertTrue(
+      driver.element(identifier: "history-source-\(secondSuffix)").waitForExistence(timeout: 3)
+    )
     driver.element(identifier: "history-collapse-\(firstSuffix)").click()
     XCTAssertTrue(card.waitForExistence(timeout: 3))
+    XCTAssertTrue(firstSource.waitForNonExistence(timeout: 3))
     XCTAssertTrue(firstResult.waitForNonExistence(timeout: 3))
 
     card.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).hover()

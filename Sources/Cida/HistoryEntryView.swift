@@ -925,11 +925,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       if case .expanded = self { return true }
       return false
     }
-
-    var isLatest: Bool {
-      if case .expanded(let isLatest) = self { return isLatest }
-      return false
-    }
   }
 
   private enum Layout {
@@ -1410,14 +1405,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       copySourceButton?.isHidden = true
       previewTextLayer.isHidden = false
       fadeLayer.isHidden = preview.isEmpty
-    case .expanded(let isLatest):
+    case .expanded:
       previewTextLayer.isHidden = true
       fadeLayer.isHidden = true
-      sourceTextField.isHidden = !isLatest
-      if !isLatest {
-        sourceTextField.layer?.mask = nil
-        sourceFadeLayer.isHidden = true
-      }
+      sourceTextField.isHidden = displayedSource.isEmpty
       hoverTrackingView?.setActive(true)
       stickyResultActionView?.isHidden = false
     }
@@ -1520,7 +1511,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     }
     resultAction.isHidden = false
     resultContainer.isHidden = false
-    sourceTextField.isHidden = !presentation.isLatest || displayedSource.isEmpty
+    sourceTextField.isHidden = displayedSource.isEmpty
     resultCoordinator.scheduleLayout(of: resultContainer)
     updatePresentationAccessibility()
     needsLayout = true
@@ -1594,8 +1585,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     switch presentation {
     case .folded:
       return Layout.foldedPreferredHeight
-    case .expanded(let isLatest):
-      let sourceLayout = isLatest ? sourcePresentationLayout(for: width) : .hidden
+    case .expanded:
+      let sourceLayout = sourcePresentationLayout(for: width)
       let sourceHeight =
         sourceLayout.height > 0 ? sourceLayout.height + Layout.contentSpacing : 0
       let resultHeight =
@@ -1717,8 +1708,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
 
   private func layoutExpandedContent(headerY: CGFloat) {
     let sourceY = headerY + Layout.headerHeight + Layout.contentSpacing
-    let sourceLayout =
-      presentation.isLatest ? sourcePresentationLayout(for: bounds.width) : .hidden
+    let sourceLayout = sourcePresentationLayout(for: bounds.width)
     let sourceSpacing = sourceLayout.height > 0 ? Layout.contentSpacing : 0
     let resultY =
       sourceY
@@ -1763,7 +1753,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
 
   private func sourcePresentationLayout(for entryWidth: CGFloat) -> SourcePresentationLayout {
     let textWidth = max(0, entryWidth - Layout.actionColumnWidth)
-    guard presentation.isLatest, !displayedSource.isEmpty, textWidth > 0 else {
+    guard presentation.isExpanded, !displayedSource.isEmpty, textWidth > 0 else {
       return .hidden
     }
     if let measuredSourceWidth, abs(measuredSourceWidth - textWidth) < 0.5 {
@@ -2025,12 +2015,12 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       buttons.copy.resetHoverState()
       copySourceButton?.isHidden = true
       stickyResultActionView?.isHidden = true
-    case .expanded(let isLatest):
+    case .expanded:
       buttons.copy.isHidden = true
       buttons.copy.resetHoverState()
-      let sourceButton = isLatest ? ensureCopySourceButton() : nil
-      sourceButton?.isHidden = !showsActions && !isSourceCopied
-      sourceButton?.resetHoverState()
+      let sourceButton = ensureCopySourceButton()
+      sourceButton.isHidden = displayedSource.isEmpty || (!showsActions && !isSourceCopied)
+      sourceButton.resetHoverState()
       if let stickyResultActionView, let resultStorage {
         stickyResultActionView.isHidden = false
         stickyResultActionView.configure(
@@ -2107,7 +2097,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       children = [expandAccessibilityElement, previewAccessibilityElement]
     case .expanded(let isLatest):
       children = isLatest ? [] : [expandAccessibilityElement]
-      if isLatest {
+      if !displayedSource.isEmpty {
         children.append(sourceTextField)
       }
       if let resultContainer {
@@ -2160,7 +2150,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         "history-collapse-\(identifierSuffix)"
       )
       expandAccessibilityElement.setAccessibilityLabel("收起历史记录")
-      expandAccessibilityElement.setAccessibilityHelp("隐藏完整结果")
+      expandAccessibilityElement.setAccessibilityHelp("隐藏原文和完整结果")
       expandAccessibilityElement.setAccessibilityValue(metadata)
     }
     updateAccessibilityChildren()

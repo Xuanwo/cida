@@ -1084,6 +1084,16 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(row.headerModeFrameForTesting.minX, foldedHeaderMinX, accuracy: 0.001)
     XCTAssertEqual(row.resultFrameForTesting.minX, foldedResultMinX, accuracy: 0.001)
     XCTAssertEqual(expandedResultContainer.accessibilityRole(), .group)
+    let expandedSource = try XCTUnwrap(
+      row.subviews.first {
+        $0.accessibilityIdentifier() == "history-source-\(entryID.uuidString.lowercased())"
+      }
+    )
+    XCTAssertFalse(expandedSource.isHidden)
+    XCTAssertEqual(expandedSource.accessibilityRole(), .staticText)
+    XCTAssertTrue(
+      (row.accessibilityChildren() ?? []).contains { ($0 as AnyObject) === expandedSource }
+    )
     XCTAssertEqual(
       expandedResultContainer.subviews.first {
         $0.accessibilityIdentifier() == "history-result-\(entryID.uuidString)"
@@ -1091,7 +1101,9 @@ final class InteractionReproductionTests: XCTestCase {
       .textArea
     )
     XCTAssertEqual(row.headerModeFrameForTesting.minY, 16, accuracy: 0.001)
-    XCTAssertEqual(row.resultFrameForTesting.minY, 40, accuracy: 0.001)
+    XCTAssertEqual(row.sourceFrameForTesting, NSRect(x: 0, y: 40, width: 780, height: 21))
+    XCTAssertFalse(row.sourceUsesFadeForTesting)
+    XCTAssertEqual(row.resultFrameForTesting.minY, 69, accuracy: 0.001)
     XCTAssertEqual(
       row.resultFrameForTesting.maxY + 16,
       row.preferredHeight(for: 804),

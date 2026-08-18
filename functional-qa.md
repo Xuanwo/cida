@@ -65,8 +65,8 @@ model, storage, window, history, or renderer paths.
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite currently contains 142 tests: 50 model/report tests, 7 SQLite tests, 4 host
-isolation tests, 70 native interaction/layout tests, 3 mutation invariants, 2 suite/matrix manifest
+The host Swift suite currently contains 143 tests: 50 model/report tests, 7 SQLite tests, 4 host
+isolation tests, 71 native interaction/layout tests, 3 mutation invariants, 2 suite/matrix manifest
 tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
 
 The Release XCUI suite contains 23 tests across nine files. It covers signed-artifact smoke,
@@ -76,11 +76,13 @@ Main/Settings pixel baselines, accessibility audit, and standard window/Settings
 
 ## Test-system self-verification
 
-The mutation catalog now contains twelve source-level faults. Each definition pins an exact source
+The mutation catalog now contains thirteen source-level faults. Each definition pins an exact source
 anchor and names its unit and/or Release kill tests. Catalog drift fails before an expensive build
 or VM launch. In addition to submit-reset coverage, the
 `history-presentations-bypass-unified-renderer` mutation forces every standalone record into the
 folded presentation; native state/geometry tests and the visible Tart history journey reject it.
+The `expanded-history-source-stays-hidden` mutation restores the reported latest-only source gate;
+the same native geometry test and real expanded-history journey must reject it.
 
 The checked-in pairwise manifest provides a stable inventory of light/dark, reduced motion,
 scrollbar preference, window size, lifecycle, and content combinations, and its pair coverage is
@@ -102,12 +104,12 @@ are recorded as diagnostics rather than misclassified as test activity.
 
 ## Current verification
 
-- `swift test -Xswiftc -warnings-as-errors`: 142/142 passed.
+- `swift test -Xswiftc -warnings-as-errors`: 143/143 passed.
 - Focused fresh-clone Tart diagnosis reproduced both the source-preview frame overflow and the
   recycled folded-row click failure. After the root repairs, both previously failing journeys passed
   2/2 with a healthy host-session guard and no host artifact activation. The native semantic audit
   also passes after the result action exposes only its real button rather than a roleless overlay.
-- The complete source mutation catalog validates all 12 exact anchors.
+- The complete source mutation catalog validates all 13 exact anchors.
 - The complete clean-checkout PR gate for this refactor writes its machine-readable result to
   `TestResults/gates/unified-history-renderer-final-20260818/gate-summary.json`.
 
