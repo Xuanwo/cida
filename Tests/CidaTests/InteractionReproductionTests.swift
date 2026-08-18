@@ -1241,7 +1241,7 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(pool.leasedContainerCountForTesting, initialLeaseCount)
   }
 
-  func testExpandedHistorySourceCopyUsesWindowMouseDispatch() throws {
+  func testExpandedHistorySourceCopyUsesStandardAppKitHitTesting() throws {
     let entryID = UUID()
     let row = HistoryEntryNSView()
     var didCopySource = false

@@ -902,6 +902,10 @@ private final class HistoryEntryAccessibilityElement: NSAccessibilityElement,
   weak var owner: HistoryEntryNSView?
   var region = Region.entry
 
+  nonisolated override func accessibilityParent() -> Any? {
+    owner
+  }
+
   nonisolated override func accessibilityFrame() -> NSRect {
     let currentOwner = owner
     let currentRegion = region
@@ -921,9 +925,7 @@ private final class HistoryEntryAccessibilityElement: NSAccessibilityElement,
 }
 
 @MainActor
-final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
-  CidaWindowMouseDownRouting
-{
+final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private enum Layout {
     static let foldedHorizontalInset = HistoryEntryPencilLayout.foldedHorizontalInset
     static let foldedVerticalInset = HistoryEntryPencilLayout.foldedVerticalInset
@@ -1025,7 +1027,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     element.setAccessibilityRole(.button)
     element.setAccessibilityLabel("展开历史记录")
     element.setAccessibilityHelp("显示完整结果")
-    element.setAccessibilityParent(self)
     return element
   }()
   private lazy var previewAccessibilityElement: HistoryEntryAccessibilityElement = {
@@ -1169,12 +1170,14 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
     setAccessibilityRole(.group)
     setAccessibilityLabel("历史记录")
     previewAccessibilityElement.setAccessibilityRole(.staticText)
-    previewAccessibilityElement.setAccessibilityParent(self)
     updateAccessibilityChildren()
   }
 
   deinit {
     NotificationCenter.default.removeObserver(self)
+    MainActor.assumeIsolated {
+      releaseResultPresentation()
+    }
   }
 
   @available(*, unavailable)
@@ -1969,13 +1972,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting,
       return true
     }
     return false
-  }
-
-  func routeWindowMouseDown(atWindowPoint point: NSPoint) -> Bool {
-    guard isPresentationActive, !isHidden else { return false }
-    let localPoint = convert(point, from: nil)
-    guard bounds.contains(localPoint) else { return false }
-    return performVisibleAction(at: localPoint)
   }
 
   override func accessibilityPerformPress() -> Bool {

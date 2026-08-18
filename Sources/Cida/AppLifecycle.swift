@@ -439,42 +439,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   }
 }
 
-@MainActor
-protocol CidaWindowMouseDownRouting: AnyObject {
-  func routeWindowMouseDown(atWindowPoint point: NSPoint) -> Bool
-}
-
 final class CidaWindow: NSWindow {
   override var canBecomeKey: Bool { true }
   override var canBecomeMain: Bool { true }
-
-  override func sendEvent(_ event: NSEvent) {
-    if event.type == .leftMouseDown,
-      routeMouseDown(atWindowPoint: event.locationInWindow, through: contentView)
-    {
-      return
-    }
-    super.sendEvent(event)
-  }
-
-  private func routeMouseDown(
-    atWindowPoint point: NSPoint,
-    through view: NSView?
-  ) -> Bool {
-    guard let view, !view.isHidden else { return false }
-    let localPoint = view.convert(point, from: nil)
-    guard view.bounds.contains(localPoint) else { return false }
-    if let router = view as? any CidaWindowMouseDownRouting,
-      router.routeWindowMouseDown(atWindowPoint: point)
-    {
-      return true
-    }
-    for subview in view.subviews.reversed()
-    where routeMouseDown(atWindowPoint: point, through: subview) {
-      return true
-    }
-    return false
-  }
 }
 
 @MainActor

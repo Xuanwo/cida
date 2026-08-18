@@ -195,7 +195,7 @@
       "occurrences": 1,
       "unitTests": [
         "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState",
-        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesWindowMouseDispatch"
+        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesStandardAppKitHitTesting"
       ],
       "releaseTests": [
         "HistoryPresentationJourneyTests/testFoldedRowsExpandIndependentlyCopyFullResultsAndMatchPencilGeometry"
@@ -203,7 +203,7 @@
     },
     {
       "id": "history-action-hit-target-swallowed",
-      "description": "Disable unified window action dispatch so a SwiftUI wrapper can swallow history icon clicks.",
+      "description": "Disable the history control's local action fallback so wrapper hit routing can swallow icon clicks.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-ACTIONS"],
       "file": "Sources/Cida/HistoryEntryView.swift",
       "before": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })\n    where !button.isHidden && button.frame.insetBy(dx: -6, dy: -6).contains(location) {\n      button.performClick(nil)\n      return true\n    }\n    return false\n  }",
@@ -211,7 +211,7 @@
       "occurrences": 1,
       "unitTests": [
         "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState",
-        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesWindowMouseDispatch"
+        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesStandardAppKitHitTesting"
       ],
       "releaseTests": [
         "HistoryPresentationJourneyTests/testFoldedRowsExpandIndependentlyCopyFullResultsAndMatchPencilGeometry"
