@@ -269,9 +269,12 @@ final class CidaAppDriver {
     in element: XCUIElement,
     timeout: TimeInterval
   ) -> Bool {
-    let predicate = NSPredicate(format: "value == %@", expectedValue)
-    let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
-    return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if element.value as? String == expectedValue { return true }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+    } while Date() < deadline
+    return false
   }
 
   func textValue(in element: XCUIElement) -> String {
