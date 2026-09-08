@@ -16,8 +16,9 @@ The current core experience contract includes:
    record, creates an empty current waiting result, and force-pins history.
 3. Delayed-first-byte, bursty, character-at-a-time, paused, cancelled, failed, and recovered
    OpenAI-compatible streaming.
-4. Display-linked smoothing, bounded grapheme batches, 120 ms tail blur/fade, waiting caret, and
-   coalesced TextKit natural-height publication.
+4. Display-linked smoothing, bounded grapheme batches, per-run 120 ms glyph reveal (fade plus
+   2 pt unblur) behind the caret, waiting caret, coalesced TextKit natural-height publication, and
+   the 150 ms height slide for streaming growth.
 5. Automatic follow through terminal completion, deliberate user detachment, and reattachment on a
    new accepted submission.
 6. One outer result/history scroll surface, correct 4 pt custom thumb direction, and sticky result
@@ -52,7 +53,7 @@ model, storage, window, history, or renderer paths.
 | Some UI suites were silently absent from PR | The PR selector names every UI suite, and a source-enumerating unit test fails if a new `*Tests.swift` suite is not selected. | `PairwiseManifestTests/testPRGateIncludesEveryReleaseUITestSuite`. |
 | Settings could open but not work | Stable identifiers now cover provider, endpoint/model, API key, prompt editor/reset, and launch-at-login. Prompt editing, close/reopen, reset, provider switch, local endpoint, and official endpoint reset form one E2E state machine. | `WindowAndSettingsJourneyTests`, persistence relaunch, and Settings pixel baseline. |
 | Improvement followed translation language selectors | Improvement uses `preserve_source` with no source/target translation parameters; UI history and hints derive from detected input language. | English and Chinese improvement journey plus request-body contract tests. |
-| Backend timing was visually abrupt | Network arrival is decoupled from presentation by a view-bound display link and adaptive buffer. A single bounded tail layer implements Pencil blur/fade without per-character layers or whole-document filtering. | Bursty/character stream tests, real uneven SSE journey, layer/animation token tests, and performance probe. |
+| Backend timing was visually abrupt | Network arrival is decoupled from presentation by a view-bound display link and adaptive buffer. Each presented run is laid out on its pulse and painted by a short-lived fragment view that fades in and unblurs over the Pencil 120 ms ease-out; the record renderer skips those glyphs until the fade completes, so there is no whole-document filtering and nothing shifts on commit. | Bursty/character stream tests, real uneven SSE journey, fragment/animation token tests, and performance probe. |
 | Streaming growth lost follow or caused layout churn | Native result storage notifies the existing TextKit view directly; suffix append and natural-height updates avoid rebuilding folded history. Force-pin and terminal revisions bypass stream throttling when required. | Detached/follow integration, uneven stream journey, layout-coalescing tests, and no-reconfiguration tests. |
 | Large history scroll rebuilt full results | SQLite loads bounded pages; AppKit recycles only viewport folded rows and reads cached grapheme-safe previews. | 5,000-row recycler tests, 1,000-row sustained scroll, and exact extreme workflows. |
 | A PR could pass without naming the hot-path invariants it relied on | Every gate reruns a dedicated proxy stage for bounded history reads, viewport-only materialization, incremental result layout, layout coalescing, and large-document virtualization. PR summaries explicitly stop at proxy coverage; nightly/release summaries additionally require physical view-bound reports from a 120 Hz display. | `performance-proxies` gate stage plus physical streaming, million-paste, history-scroll, and extreme reports. |

@@ -13,7 +13,7 @@ comparison_renderer="$script_dir/compose-qa.swift"
 mkdir -p "$implementation_dir" "$qa_dir"
 swift build --package-path "$project_dir"
 
-for state in translate improve large-input settings; do
+for state in translate improve large-input history-folded settings; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
     --snapshot-output "$implementation_dir/$state.png"
@@ -54,6 +54,9 @@ done
 /usr/bin/sips --resampleHeightWidth 640 860 \
   "$implementation_dir/streaming.png" \
   --out "$qa_dir/implementation-streaming.png" >/dev/null
+/usr/bin/sips --resampleHeightWidth 640 860 \
+  "$implementation_dir/history-folded.png" \
+  --out "$qa_dir/implementation-history-folded.png" >/dev/null
 /usr/bin/sips --resampleHeightWidth 660 560 \
   "$implementation_dir/settings.png" \
   --out "$qa_dir/implementation-settings.png" >/dev/null
