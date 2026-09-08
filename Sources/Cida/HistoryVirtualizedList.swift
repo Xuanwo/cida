@@ -24,7 +24,7 @@ struct VirtualizedFoldedHistoryList: NSViewRepresentable {
     guard let width = proposal.width, width > 0 else { return nil }
     return CGSize(
       width: width,
-      height: CGFloat(entries.count) * HistoryEntryPencilLayout.foldedRowStride
+      height: HistoryEntryPencilLayout.foldedListHeight(rowCount: entries.count)
     )
   }
 
@@ -68,6 +68,8 @@ struct HistoryPlaceholderRunway: NSViewRepresentable {
     return CGSize(width: width, height: Self.height(for: entryCount))
   }
 
+  /// Placeholder cards keep the folded stride, including the gap before the
+  /// first loaded card.
   static func height(for entryCount: Int) -> CGFloat {
     min(
       maximumHeight,
@@ -80,8 +82,8 @@ struct HistoryPlaceholderRunway: NSViewRepresentable {
 final class HistoryPlaceholderRunwayNSView: NSView {
   private var entryCount = 0
   private weak var observedClipView: NSClipView?
+  private let cardLayer = CAShapeLayer()
   private let placeholderLayer = CAShapeLayer()
-  private let separatorLayer = CAShapeLayer()
   private var renderedRowRange: Range<Int> = 0..<0
   private var renderedWidth: CGFloat = 0
 
@@ -98,9 +100,9 @@ final class HistoryPlaceholderRunwayNSView: NSView {
     wantsLayer = true
     layerContentsRedrawPolicy = .never
     layer?.backgroundColor = CidaDesign.Palette.background.appKit.cgColor
+    cardLayer.fillColor = CidaDesign.Palette.surfaceFold.appKit.cgColor
     placeholderLayer.fillColor = CidaDesign.Palette.placeholder.appKit.cgColor
-    separatorLayer.fillColor = CidaDesign.Palette.placeholderSeparator.appKit.cgColor
-    for shapeLayer in [placeholderLayer, separatorLayer] {
+    for shapeLayer in [cardLayer, placeholderLayer] {
       shapeLayer.actions = [
         "bounds": NSNull(),
         "position": NSNull(),
@@ -168,8 +170,8 @@ final class HistoryPlaceholderRunwayNSView: NSView {
 
   private func updatePlaceholderLayers() {
     guard entryCount > 0, bounds.width > 0, bounds.height > 0 else {
+      cardLayer.path = nil
       placeholderLayer.path = nil
-      separatorLayer.path = nil
       renderedRowRange = 0..<0
       return
     }
@@ -199,8 +201,8 @@ final class HistoryPlaceholderRunwayNSView: NSView {
       Int(ceil(targetRect.maxY / stride)) + 1
     )
     guard firstRow < lastRow else {
+      cardLayer.path = nil
       placeholderLayer.path = nil
-      separatorLayer.path = nil
       renderedRowRange = 0..<0
       return
     }
@@ -211,18 +213,29 @@ final class HistoryPlaceholderRunwayNSView: NSView {
     renderedRowRange = rowRange
     renderedWidth = bounds.width
 
+    let inset = HistoryEntryPencilLayout.foldedInset
+    let cardPath = CGMutablePath()
     let placeholderPath = CGMutablePath()
-    let separatorPath = CGMutablePath()
     for row in rowRange {
       let originY = CGFloat(row) * stride
+      cardPath.addRoundedRect(
+        in: CGRect(
+          x: 0,
+          y: originY,
+          width: bounds.width,
+          height: HistoryEntryPencilLayout.foldedHeight
+        ),
+        cornerWidth: HistoryEntryPencilLayout.foldedCornerRadius,
+        cornerHeight: HistoryEntryPencilLayout.foldedCornerRadius
+      )
       placeholderPath.addRoundedRect(
-        in: CGRect(x: 10, y: originY + 15, width: 108, height: 6),
+        in: CGRect(x: inset, y: originY + inset + 5, width: 108, height: 6),
         cornerWidth: 3,
         cornerHeight: 3
       )
       placeholderPath.addRoundedRect(
         in: CGRect(
-          x: 10,
+          x: inset,
           y: originY + 43,
           width: max(80, min(360, bounds.width * 0.42)),
           height: 7
@@ -232,7 +245,7 @@ final class HistoryPlaceholderRunwayNSView: NSView {
       )
       placeholderPath.addRoundedRect(
         in: CGRect(
-          x: 10,
+          x: inset,
           y: originY + 66,
           width: max(60, min(260, bounds.width * 0.3)),
           height: 7
@@ -240,12 +253,9 @@ final class HistoryPlaceholderRunwayNSView: NSView {
         cornerWidth: 3.5,
         cornerHeight: 3.5
       )
-      separatorPath.addRect(
-        CGRect(x: 0, y: originY + stride - 1, width: bounds.width, height: 1)
-      )
     }
+    cardLayer.path = cardPath
     placeholderLayer.path = placeholderPath
-    separatorLayer.path = separatorPath
   }
 }
 
@@ -433,7 +443,10 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
     rowHeights.reserveCapacity(entries.count)
 
     var offset: CGFloat = 0
-    for entry in entries {
+    for (index, entry) in entries.enumerated() {
+      if index > 0 {
+        offset += HistoryEntryPencilLayout.foldedCardGap
+      }
       rowOffsets.append(offset)
       let height = measuredRowHeight(for: entry, width: width)
       rowHeights.append(height)
@@ -456,16 +469,19 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
     rowOffsets.reserveCapacity(entries.count)
     rowHeights.reserveCapacity(entries.count)
     for _ in entries[index...] {
+      if !rowOffsets.isEmpty {
+        offset += HistoryEntryPencilLayout.foldedCardGap
+      }
       rowOffsets.append(offset)
-      rowHeights.append(HistoryEntryPencilLayout.foldedRowStride)
-      offset += HistoryEntryPencilLayout.foldedRowStride
+      rowHeights.append(HistoryEntryPencilLayout.foldedHeight)
+      offset += HistoryEntryPencilLayout.foldedHeight
     }
     measuredHeight = offset
   }
 
   private func measuredRowHeight(for _: HistoryEntry, width _: CGFloat) -> CGFloat {
     rowMeasurementCount += 1
-    return HistoryEntryPencilLayout.foldedRowStride
+    return HistoryEntryPencilLayout.foldedHeight
   }
 
   private func updateVisibleRows() {
@@ -568,7 +584,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
       metadata: entry.metadata,
       preview: entry.resultStorage.foldedPreview,
       state: entry.state,
-      showsSeparator: true
+      showsSeparator: false
     )
     return row
   }
@@ -584,7 +600,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
         metadata: entry.metadata,
         preview: entry.resultStorage.foldedPreview,
         state: entry.state,
-        showsSeparator: true
+        showsSeparator: false
       )
     }
   }

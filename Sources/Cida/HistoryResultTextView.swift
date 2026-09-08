@@ -4,7 +4,23 @@ import QuartzCore
 
 @MainActor
 protocol HistoryResultHeightChangeHosting: AnyObject {
-  func historyResultHeightWillChange(by delta: CGFloat)
+  func historyResultHeightWillChange(by delta: CGFloat, animated: Bool)
+}
+
+/// The Pencil `Entry Result` text style shared by the expanded result renderer
+/// and the folded preview, so folding never changes glyph placement.
+@MainActor
+enum HistoryResultTextStyle {
+  static let attributes: [NSAttributedString.Key: Any] = {
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.minimumLineHeight = HistoryEntryPencilLayout.resultLineHeight
+    paragraphStyle.maximumLineHeight = HistoryEntryPencilLayout.resultLineHeight
+    return [
+      .font: CidaDesign.appKitBody(16),
+      .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
+      .paragraphStyle: paragraphStyle.copy() as! NSParagraphStyle,
+    ]
+  }()
 }
 
 @MainActor
@@ -15,6 +31,7 @@ final class HistoryResultTextCoordinator: NSObject {
   private var renderedUTF16Length = 0
   private weak var pendingLayoutContainer: HistoryResultTextContainer?
   private var layoutTask: Task<Void, Never>?
+  private var isPerformingLayout = false
   private var lastLayoutUptime = 0.0
   private weak var observedResultStorage: HistoryResultStorage?
   private weak var observedContainer: HistoryResultTextContainer?
@@ -49,6 +66,7 @@ final class HistoryResultTextCoordinator: NSObject {
     renderedUTF16Length = 0
     lastLayoutUptime = 0
     container.onWidthChange = nil
+    container.onLineWrap = nil
   }
 
   func observeStreamingUpdates(
@@ -56,6 +74,10 @@ final class HistoryResultTextCoordinator: NSObject {
     in container: HistoryResultTextContainer
   ) {
     observedContainer = container
+    container.onLineWrap = { [weak self, weak container] in
+      guard let self, let container else { return }
+      self.layoutNow(of: container)
+    }
     guard observedResultStorage !== resultStorage else { return }
 
     NotificationCenter.default.removeObserver(
@@ -88,6 +110,9 @@ final class HistoryResultTextCoordinator: NSObject {
       pendingPresentationRevision = max(pendingPresentationRevision, revision)
     }
     container.setStreaming(true)
+    // Glyphs are presented on this display pulse; only the natural-height
+    // document layout stays coalesced.
+    flushPendingResult(to: container)
     scheduleStreamingLayout(of: container)
   }
 
@@ -113,9 +138,11 @@ final class HistoryResultTextCoordinator: NSObject {
     if presentationRevision > renderedPresentationRevision,
       let pendingSuffix = resultStorage.suffix(fromUTF16Offset: renderedUTF16Length)
     {
-      container.append(pendingSuffix, isStreaming: isStreaming)
+      // Record the rendered range before appending: a wrapped line lays out
+      // synchronously and re-enters the coordinator through `layoutNow`.
       renderedPresentationRevision = presentationRevision
       renderedUTF16Length = resultStorage.utf16Length
+      container.append(pendingSuffix, isStreaming: isStreaming)
       container.setStreaming(isStreaming)
       return
     }
@@ -165,6 +192,18 @@ final class HistoryResultTextCoordinator: NSObject {
     }
   }
 
+  /// Bypasses the coalescing interval, e.g. when a streamed line wraps and the
+  /// record must grow on this pulse rather than up to 100 ms later.
+  func layoutNow(of container: HistoryResultTextContainer, publishesHeight: Bool = true) {
+    layoutTask?.cancel()
+    layoutTask = nil
+    pendingLayoutContainer = container
+    // A wrap detected while this coordinator is already flushing is covered by
+    // the layout pass that is in progress.
+    guard !isPerformingLayout else { return }
+    performPendingLayout(publishesHeight: publishesHeight)
+  }
+
   private func scheduleStreamingLayout(of container: HistoryResultTextContainer) {
     pendingLayoutContainer = container
     guard layoutTask == nil else { return }
@@ -176,15 +215,20 @@ final class HistoryResultTextCoordinator: NSObject {
     performPendingLayout()
   }
 
-  private func performPendingLayout() {
-    guard let container = pendingLayoutContainer else { return }
+  private func performPendingLayout(publishesHeight: Bool = true) {
+    guard !isPerformingLayout, let container = pendingLayoutContainer else { return }
+    isPerformingLayout = true
+    defer { isPerformingLayout = false }
     pendingLayoutContainer = nil
     flushPendingResult(to: container)
-    guard container.hasPendingDocumentLayout else { return }
+    guard container.hasPendingDocumentLayout else {
+      container.commitCompletedGlyphReveals()
+      return
+    }
     lastLayoutUptime = ProcessInfo.processInfo.systemUptime
     let previousHeight = container.naturalTextHeight
     let height = container.updateDocumentLayout()
-    if abs(previousHeight - height) > 0.5 {
+    if publishesHeight, abs(previousHeight - height) > 0.5 {
       container.scheduleNaturalHeightPublication(heightDelta: height - previousHeight)
     }
     container.updateStreamingCaretFrame()
@@ -197,14 +241,14 @@ final class HistoryResultTextCoordinator: NSObject {
     else {
       return
     }
-    if !pendingSuffix.isEmpty {
-      container.append(pendingSuffix, isStreaming: true)
-      renderedUTF16Length = resultStorage.utf16Length
-    }
     renderedPresentationRevision = max(
       renderedPresentationRevision,
       pendingPresentationRevision
     )
+    if !pendingSuffix.isEmpty {
+      renderedUTF16Length = resultStorage.utf16Length
+      container.append(pendingSuffix, isStreaming: true)
+    }
   }
 }
 
@@ -213,6 +257,8 @@ struct StreamGlyphFadeStyle: Equatable, Sendable {
   let blurRadius: CGFloat
 }
 
+/// Pencil `motion-char-in-ms`: each presented glyph run fades in from
+/// transparent and unblurs from `motion-blur-char-px` over one ease-out.
 enum StreamGlyphFadeAnimation {
   static let duration = CidaMotion.characterInSeconds
 
@@ -220,7 +266,7 @@ enum StreamGlyphFadeAnimation {
     let progress = min(1, max(0, elapsed / duration))
     let easedProgress = 1 - pow(1 - progress, 3)
     return StreamGlyphFadeStyle(
-      opacity: CGFloat(0.82 + 0.18 * easedProgress),
+      opacity: CGFloat(easedProgress),
       blurRadius: CidaMotion.characterBlurRadius * CGFloat(1 - easedProgress)
     )
   }
@@ -272,7 +318,7 @@ final class HistoryResultTextContainerPool {
 
 @MainActor
 final class HistoryResultTextContainer: NSView {
-  static let minimumHeight: CGFloat = 26
+  static let minimumHeight = HistoryEntryPencilLayout.resultLineHeight
   private static let minimumStreamingTextViewCapacity: CGFloat = 1_024
 
   private let renderingView: StreamingResultRenderingView
@@ -281,23 +327,22 @@ final class HistoryResultTextContainer: NSView {
   private var selectionLayoutManager: NSLayoutManager?
   private var selectionTextContainer: NSTextContainer?
   var onWidthChange: (() -> Void)?
+  /// Called when an appended run started a new line, so the record can grow on
+  /// the same display pulse.
+  var onLineWrap: (() -> Void)?
   private(set) var naturalTextHeight = HistoryResultTextContainer.minimumHeight
   private(set) var contentTextHeight = HistoryResultTextContainer.minimumHeight
 
   private let caretLayer = CALayer()
-  private let tailRevealLayer = CAGradientLayer()
-  private let tailRevealBlurFilter: CIFilter = {
-    let filter = CIFilter(name: "CIGaussianBlur")!
-    filter.name = "glyphRevealBlur"
-    filter.setValue(0, forKey: kCIInputRadiusKey)
-    return filter
-  }()
   private let contentEndLayoutView = ResultContentEndLayoutView()
+  private var revealFragments: [GlyphRevealFragmentView] = []
+  private var revealCompletionWorkItem: DispatchWorkItem?
   private var isStreaming = false
   private var needsFullTextLayout = true
   private var pendingTextLayoutRange: NSRange?
   private var intrinsicSizeInvalidationIsScheduled = false
   private var pendingNaturalHeightDelta: CGFloat = 0
+  private var pendingNaturalHeightAnimated = false
   private var naturalHeightPublicationGeneration = 0
   private var streamingTextViewHeightCapacity: CGFloat = 0
   private var selectionIsActive = false
@@ -328,19 +373,25 @@ final class HistoryResultTextContainer: NSView {
   }
 
   #if DEBUG
-    var glyphRevealLayerCountForTesting: Int {
-      tailRevealLayer.animation(forKey: "glyph-reveal") == nil ? 0 : 1
+    var glyphRevealFragmentCountForTesting: Int {
+      revealFragments.count
     }
     var glyphRevealAnimationForTesting: CABasicAnimation? {
-      tailRevealLayer.animation(forKey: "glyph-reveal") as? CABasicAnimation
+      revealFragments.last?.layer?.animation(forKey: GlyphRevealFragmentView.opacityAnimationKey)
+        as? CABasicAnimation
     }
     var glyphRevealBlurAnimationForTesting: CABasicAnimation? {
-      tailRevealLayer.animation(forKey: "glyph-reveal-blur") as? CABasicAnimation
+      revealFragments.last?.layer?.animation(forKey: GlyphRevealFragmentView.blurAnimationKey)
+        as? CABasicAnimation
     }
     var glyphRevealBlurRadiusForTesting: CGFloat {
-      CGFloat(
-        (tailRevealBlurFilter.value(forKey: kCIInputRadiusKey) as? NSNumber)?.doubleValue ?? 0
-      )
+      revealFragments.last?.modelBlurRadius ?? 0
+    }
+    var glyphRevealCommittedLengthForTesting: Int {
+      renderingView.revealCommittedUTF16Length ?? renderingView.textStorage.length
+    }
+    var glyphRevealFragmentFramesForTesting: [CGRect] {
+      revealFragments.map(\.frame)
     }
     var streamingVisibleFragmentFramesForTesting: [CGRect] {
       renderingView.visibleFragmentFramesForTesting
@@ -364,6 +415,8 @@ final class HistoryResultTextContainer: NSView {
   override init(frame frameRect: NSRect) {
     renderingView = StreamingResultRenderingView()
     super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.masksToBounds = true
 
     renderingView.autoresizingMask = [.width]
     renderingView.setAccessibilityLabel("处理结果")
@@ -374,18 +427,6 @@ final class HistoryResultTextContainer: NSView {
     setAccessibilityElement(true)
     setAccessibilityRole(.group)
     setAccessibilityLabel("处理结果区域")
-
-    tailRevealLayer.colors = [
-      glyphRevealColor.withAlphaComponent(0).cgColor,
-      glyphRevealColor.cgColor,
-    ]
-    tailRevealLayer.locations = [0, 0.35]
-    tailRevealLayer.startPoint = CGPoint(x: 0.5, y: 0)
-    tailRevealLayer.endPoint = CGPoint(x: 0.5, y: 1)
-    tailRevealLayer.masksToBounds = true
-    tailRevealLayer.backgroundFilters = [tailRevealBlurFilter]
-    tailRevealLayer.opacity = 0
-    renderingView.layer?.addSublayer(tailRevealLayer)
 
     caretLayer.backgroundColor = CidaDesign.Palette.accent.appKit.cgColor
     caretLayer.cornerRadius = 1
@@ -417,10 +458,7 @@ final class HistoryResultTextContainer: NSView {
     guard !suffix.isEmpty else { return }
     guard let textStorage else { return }
     let appendedRange = NSRange(location: textStorage.length, length: suffix.utf16.count)
-    let shouldAnimate =
-      isStreaming
-      && window != nil
-      && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    let previousLastLine = renderingView.lastTextLineFrame()
     let attributedSuffix = NSAttributedString(string: suffix, attributes: textAttributes())
     renderingView.append(attributedSuffix)
     if selectionIsActive {
@@ -432,8 +470,34 @@ final class HistoryResultTextContainer: NSView {
         NSUnionRange($0, appendedRange)
       } ?? appendedRange
 
-    if shouldAnimate {
-      restartTailReveal()
+    guard isStreaming else { return }
+
+    // Streamed glyphs are laid out on the pulse that presents them so the
+    // caret, the reveal fragments, and any wrap are visible immediately.
+    renderingView.ensureLayout(forCharacterRange: appendedRange)
+    let lastLine = renderingView.lastTextLineFrame()
+    let wrapped =
+      previousLastLine.map { previous in
+        lastLine.map { abs($0.minY - previous.minY) > 0.5 } ?? false
+      } ?? false
+    let animates =
+      window != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    if animates {
+      beginGlyphReveal(characterRange: appendedRange)
+    } else {
+      renderingView.setNeedsDisplay(
+        renderingView.boundingRect(forCharacterRange: appendedRange).insetBy(dx: -2, dy: -2)
+      )
+    }
+    if wrapped {
+      repositionGlyphReveals()
+      if let previousLastLine, let lastLine {
+        renderingView.setNeedsDisplay(previousLastLine.union(lastLine).insetBy(dx: -2, dy: -2))
+      }
+    }
+    updateStreamingCaretFrame()
+    if wrapped {
+      onLineWrap?()
     }
   }
 
@@ -463,9 +527,11 @@ final class HistoryResultTextContainer: NSView {
   override func prepareForReuse() {
     super.prepareForReuse()
     onWidthChange = nil
+    onLineWrap = nil
     naturalHeightPublicationGeneration &+= 1
     intrinsicSizeInvalidationIsScheduled = false
     pendingNaturalHeightDelta = 0
+    pendingNaturalHeightAnimated = false
     isStreaming = false
     needsFullTextLayout = true
     pendingTextLayoutRange = nil
@@ -484,6 +550,7 @@ final class HistoryResultTextContainer: NSView {
     selectionTextStorage = nil
     selectionLayoutManager = nil
     selectionTextContainer = nil
+    cancelGlyphReveals()
     renderingView.replaceText(with: NSAttributedString())
     renderingView.isHidden = false
     renderingView.setAccessibilityElement(true)
@@ -494,8 +561,6 @@ final class HistoryResultTextContainer: NSView {
     #endif
     caretLayer.removeAllAnimations()
     caretLayer.opacity = 0
-    tailRevealLayer.removeAllAnimations()
-    tailRevealLayer.opacity = 0
     contentEndLayoutView.frame = .zero
     fullReplacementCount = 0
     incrementalAppendCount = 0
@@ -512,7 +577,9 @@ final class HistoryResultTextContainer: NSView {
       caretLayer.opacity = 1
       updateCaretPulse()
     } else {
-      cancelGlyphReveals()
+      // Pencil T3: the caret fades over motion-cursor-out-ms while the last
+      // revealed glyphs finish their own fade.
+      scheduleFinalGlyphRevealCommit()
       caretLayer.removeAnimation(forKey: "waiting-pulse")
       if window == nil || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
         caretLayer.opacity = 0
@@ -582,7 +649,10 @@ final class HistoryResultTextContainer: NSView {
       width: 2,
       height: 2
     )
-    updateTailRevealFrame()
+    if requiresFullRedraw {
+      repositionGlyphReveals()
+    }
+    commitCompletedGlyphReveals()
     return naturalTextHeight
   }
 
@@ -650,6 +720,12 @@ final class HistoryResultTextContainer: NSView {
 
   func scheduleNaturalHeightPublication(heightDelta: CGFloat) {
     pendingNaturalHeightDelta += heightDelta
+    // Pencil `motion-height-ms`: a streaming record grows with the height
+    // transition; width relayouts and completed records resize immediately.
+    pendingNaturalHeightAnimated =
+      pendingNaturalHeightAnimated
+      || (isStreaming && window != nil
+        && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
     guard !intrinsicSizeInvalidationIsScheduled else { return }
     intrinsicSizeInvalidationIsScheduled = true
     let generation = naturalHeightPublicationGeneration
@@ -658,11 +734,13 @@ final class HistoryResultTextContainer: NSView {
       guard self.naturalHeightPublicationGeneration == generation else { return }
       self.intrinsicSizeInvalidationIsScheduled = false
       let publishedHeightDelta = self.pendingNaturalHeightDelta
+      let animated = self.pendingNaturalHeightAnimated
       self.pendingNaturalHeightDelta = 0
+      self.pendingNaturalHeightAnimated = false
       var ancestor = self.superview
       while let current = ancestor {
         if let hostingView = current as? any HistoryResultHeightChangeHosting {
-          hostingView.historyResultHeightWillChange(by: publishedHeightDelta)
+          hostingView.historyResultHeightWillChange(by: publishedHeightDelta, animated: animated)
           break
         }
         ancestor = current.superview
@@ -680,19 +758,22 @@ final class HistoryResultTextContainer: NSView {
     } else if let lastLineFrame = renderingView.lastTextLineFrame() {
       origin = CGPoint(
         x: lastLineFrame.maxX + 3,
-        y: lastLineFrame.minY + max(0, (lastLineFrame.height - 20) / 2)
+        y: lastLineFrame.minY + max(0, (lastLineFrame.height - CidaMotion.cursorHeight) / 2)
       )
     } else {
       let usageBounds = renderingView.usageBounds
       origin = CGPoint(
         x: usageBounds.maxX + 3,
-        y: max(0, usageBounds.maxY - 20)
+        y: max(0, usageBounds.maxY - CidaMotion.cursorHeight)
       )
     }
 
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    caretLayer.frame = CGRect(origin: origin, size: CGSize(width: 2, height: 20))
+    caretLayer.frame = CGRect(
+      origin: origin,
+      size: CGSize(width: CidaMotion.cursorWidth, height: CidaMotion.cursorHeight)
+    )
     caretLayer.opacity = 1
     CATransaction.commit()
     updateCaretPulse()
@@ -718,73 +799,90 @@ final class HistoryResultTextContainer: NSView {
     }
   }
 
-  private func restartTailReveal() {
-    updateTailRevealFrame()
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    tailRevealLayer.removeAnimation(forKey: "glyph-reveal")
-    tailRevealLayer.opacity = 0
-    CATransaction.commit()
+  // MARK: - Glyph reveal
 
-    let animation = CABasicAnimation(keyPath: "opacity")
-    animation.fromValue = 1 - StreamGlyphFadeAnimation.style(elapsed: 0).opacity
-    animation.toValue = 0
-    animation.duration = StreamGlyphFadeAnimation.duration
-    animation.timingFunction = CAMediaTimingFunction(controlPoints: 0.33, 1, 0.68, 1)
-    tailRevealLayer.add(animation, forKey: "glyph-reveal")
-
-    let blurAnimation = CABasicAnimation(
-      keyPath: "backgroundFilters.glyphRevealBlur.inputRadius"
+  private func beginGlyphReveal(characterRange: NSRange) {
+    let fragment = GlyphRevealFragmentView(
+      renderingView: renderingView,
+      characterRange: characterRange,
+      completesAt: CACurrentMediaTime() + StreamGlyphFadeAnimation.duration
     )
-    blurAnimation.fromValue = StreamGlyphFadeAnimation.style(elapsed: 0).blurRadius
-    blurAnimation.toValue = 0
-    blurAnimation.duration = StreamGlyphFadeAnimation.duration
-    blurAnimation.timingFunction = animation.timingFunction
-    tailRevealLayer.add(blurAnimation, forKey: "glyph-reveal-blur")
+    if renderingView.revealCommittedUTF16Length == nil {
+      renderingView.revealCommittedUTF16Length = characterRange.location
+    }
+    renderingView.addSubview(fragment)
+    fragment.updateFrame()
+    fragment.startReveal(duration: StreamGlyphFadeAnimation.duration)
+    revealFragments.append(fragment)
   }
 
-  private func updateTailRevealFrame() {
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    tailRevealLayer.frame = CGRect(
-      x: 0,
-      y: max(0, contentTextHeight - 30),
-      width: max(0, renderingView.frame.width),
-      height: min(30, contentTextHeight)
-    )
-    CATransaction.commit()
+  private func repositionGlyphReveals() {
+    for fragment in revealFragments {
+      fragment.updateFrame()
+    }
+  }
+
+  /// Fragments whose fade finished draw exactly what the rendering view would,
+  /// so committing them is invisible and can ride the coalesced layout tick.
+  func commitCompletedGlyphReveals(now: CFTimeInterval = CACurrentMediaTime()) {
+    guard !revealFragments.isEmpty else { return }
+    var committedLength = renderingView.revealCommittedUTF16Length ?? 0
+    var dirtyRect = CGRect.null
+    while let fragment = revealFragments.first, fragment.completesAt <= now + 0.000_5 {
+      committedLength = max(committedLength, NSMaxRange(fragment.characterRange))
+      dirtyRect = dirtyRect.union(fragment.frame)
+      fragment.removeFromSuperview()
+      revealFragments.removeFirst()
+    }
+    if revealFragments.isEmpty {
+      renderingView.revealCommittedUTF16Length = nil
+    } else {
+      renderingView.revealCommittedUTF16Length = committedLength
+    }
+    if !dirtyRect.isNull {
+      renderingView.setNeedsDisplay(dirtyRect)
+    }
+  }
+
+  private func scheduleFinalGlyphRevealCommit() {
+    revealCompletionWorkItem?.cancel()
+    revealCompletionWorkItem = nil
+    guard let last = revealFragments.last else { return }
+    let delay = max(0, last.completesAt - CACurrentMediaTime())
+    let workItem = DispatchWorkItem { [weak self] in
+      guard let self else { return }
+      self.revealCompletionWorkItem = nil
+      self.commitCompletedGlyphReveals(now: .greatestFiniteMagnitude)
+    }
+    revealCompletionWorkItem = workItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
   }
 
   private func cancelGlyphReveals() {
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    tailRevealLayer.removeAllAnimations()
-    tailRevealBlurFilter.setValue(0, forKey: kCIInputRadiusKey)
-    tailRevealLayer.opacity = 0
-    CATransaction.commit()
-  }
-
-  private var glyphRevealColor: NSColor {
-    CidaDesign.Palette.background.appKit
+    revealCompletionWorkItem?.cancel()
+    revealCompletionWorkItem = nil
+    guard !revealFragments.isEmpty else {
+      renderingView.revealCommittedUTF16Length = nil
+      return
+    }
+    var dirtyRect = CGRect.null
+    for fragment in revealFragments {
+      dirtyRect = dirtyRect.union(fragment.frame)
+      fragment.removeFromSuperview()
+    }
+    revealFragments.removeAll()
+    renderingView.revealCommittedUTF16Length = nil
+    if !dirtyRect.isNull {
+      renderingView.setNeedsDisplay(dirtyRect)
+    }
   }
 
   private var textStorage: NSTextStorage? {
     renderingView.textStorage
   }
 
-  private static let resultTextAttributes: [NSAttributedString.Key: Any] = {
-    let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.minimumLineHeight = 26
-    paragraphStyle.maximumLineHeight = 26
-    return [
-      .font: CidaDesign.appKitBody(16),
-      .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
-      .paragraphStyle: paragraphStyle.copy() as! NSParagraphStyle,
-    ]
-  }()
-
   private func textAttributes() -> [NSAttributedString.Key: Any] {
-    Self.resultTextAttributes
+    HistoryResultTextStyle.attributes
   }
 
   private func materializeSelectionTextView() -> StreamingResultTextView {
@@ -827,7 +925,10 @@ final class HistoryResultTextContainer: NSView {
     textView.enabledTextCheckingTypes = 0
     textView.isHorizontallyResizable = false
     textView.isVerticallyResizable = false
-    textView.textContainerInset = NSSize(width: 0, height: 2)
+    textView.textContainerInset = NSSize(
+      width: 0,
+      height: StreamingResultRenderingView.verticalTextInset
+    )
     textView.minSize = NSSize(width: 0, height: Self.minimumHeight)
     textView.maxSize = NSSize(
       width: CGFloat.greatestFiniteMagnitude,
@@ -855,15 +956,105 @@ final class HistoryResultTextContainer: NSView {
   }
 }
 
+/// One presented glyph run during streaming. It paints its glyphs with the
+/// shared layout manager at their document positions, so the rendering view can
+/// skip them until the fade completes and then take over without any shift.
+@MainActor
+private final class GlyphRevealFragmentView: NSView {
+  static let opacityAnimationKey = "glyph-reveal"
+  static let blurAnimationKey = "glyph-reveal-blur"
+  /// Room for the blur to spread beyond the glyph bounds.
+  private static let margin: CGFloat = 6
+
+  let characterRange: NSRange
+  let completesAt: CFTimeInterval
+  private weak var renderingView: StreamingResultRenderingView?
+  private let blurFilter: CIFilter
+  private(set) var modelBlurRadius: CGFloat = 0
+
+  override var isFlipped: Bool { true }
+
+  init(
+    renderingView: StreamingResultRenderingView,
+    characterRange: NSRange,
+    completesAt: CFTimeInterval
+  ) {
+    self.renderingView = renderingView
+    self.characterRange = characterRange
+    self.completesAt = completesAt
+    let filter = CIFilter(name: "CIGaussianBlur")!
+    filter.name = "glyphRevealBlur"
+    filter.setValue(CidaMotion.characterBlurRadius, forKey: kCIInputRadiusKey)
+    blurFilter = filter
+    super.init(frame: .zero)
+    wantsLayer = true
+    layerContentsRedrawPolicy = .onSetNeedsDisplay
+    setAccessibilityElement(false)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  func updateFrame() {
+    guard let renderingView else { return }
+    let bounding = renderingView.boundingRect(forCharacterRange: characterRange)
+    let nextFrame = bounding.insetBy(dx: -Self.margin, dy: -Self.margin).integral
+    guard frame != nextFrame else { return }
+    frame = nextFrame
+    needsDisplay = true
+  }
+
+  func startReveal(duration: TimeInterval) {
+    guard let layer else { return }
+    contentFilters = [blurFilter]
+    layer.setValue(CidaMotion.characterBlurRadius, forKeyPath: "filters.glyphRevealBlur.inputRadius")
+    let initial = StreamGlyphFadeAnimation.style(elapsed: 0)
+
+    let opacity = CABasicAnimation(keyPath: "opacity")
+    opacity.fromValue = Float(initial.opacity)
+    opacity.toValue = 1
+    opacity.duration = duration
+    opacity.timingFunction = CidaMotion.easeOut
+    layer.add(opacity, forKey: Self.opacityAnimationKey)
+    alphaValue = 1
+
+    let blur = CABasicAnimation(keyPath: "filters.glyphRevealBlur.inputRadius")
+    blur.fromValue = initial.blurRadius
+    blur.toValue = 0
+    blur.duration = duration
+    blur.timingFunction = CidaMotion.easeOut
+    layer.add(blur, forKey: Self.blurAnimationKey)
+    layer.setValue(0, forKeyPath: "filters.glyphRevealBlur.inputRadius")
+    modelBlurRadius = 0
+  }
+
+  override func draw(_ dirtyRect: NSRect) {
+    guard let renderingView else { return }
+    renderingView.drawGlyphs(
+      forCharacterRange: characterRange,
+      at: CGPoint(x: -frame.origin.x, y: -frame.origin.y)
+    )
+  }
+}
+
 @MainActor
 private final class StreamingResultRenderingView: NSView {
-  static let verticalTextInset: CGFloat = 2
+  static let verticalTextInset: CGFloat = 0
 
   let textStorage: NSTextStorage
   private let layoutManager: NSLayoutManager
 
   private let textContainer: NSTextContainer
   private var lastDrawnFragmentFrames: [CGRect] = []
+  /// While reveal fragments are alive, only glyphs before this UTF-16 offset
+  /// are painted here; `nil` paints everything.
+  var revealCommittedUTF16Length: Int?
 
   var usageBounds: CGRect {
     layoutManager.usedRect(for: textContainer)
@@ -920,7 +1111,7 @@ private final class StreamingResultRenderingView: NSView {
   override func draw(_ dirtyRect: NSRect) {
     super.draw(dirtyRect)
     let visibleTextRect = dirtyRect.offsetBy(dx: 0, dy: -Self.verticalTextInset)
-    let glyphRange = layoutManager.glyphRange(
+    var glyphRange = layoutManager.glyphRange(
       forBoundingRect: visibleTextRect,
       in: textContainer
     )
@@ -932,6 +1123,17 @@ private final class StreamingResultRenderingView: NSView {
         self.lastDrawnFragmentFrames.append(frame)
       }
     }
+    if let revealCommittedUTF16Length, revealCommittedUTF16Length < textStorage.length {
+      let committedGlyphCount =
+        revealCommittedUTF16Length <= 0
+        ? 0
+        : layoutManager.glyphIndexForCharacter(at: revealCommittedUTF16Length)
+      glyphRange = NSIntersectionRange(
+        glyphRange,
+        NSRange(location: 0, length: committedGlyphCount)
+      )
+    }
+    guard glyphRange.length > 0 else { return }
     let origin = CGPoint(x: 0, y: Self.verticalTextInset)
     layoutManager.drawBackground(forGlyphRange: glyphRange, at: origin)
     layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: origin)
@@ -980,6 +1182,23 @@ private final class StreamingResultRenderingView: NSView {
       forGlyphAt: glyphCount - 1,
       effectiveRange: nil
     ).offsetBy(dx: 0, dy: Self.verticalTextInset)
+  }
+
+  func boundingRect(forCharacterRange range: NSRange) -> CGRect {
+    guard range.length > 0, NSMaxRange(range) <= textStorage.length else { return .zero }
+    let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+    guard glyphRange.length > 0 else { return .zero }
+    return layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+      .offsetBy(dx: 0, dy: Self.verticalTextInset)
+  }
+
+  func drawGlyphs(forCharacterRange range: NSRange, at origin: CGPoint) {
+    guard range.length > 0, NSMaxRange(range) <= textStorage.length else { return }
+    let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+    guard glyphRange.length > 0 else { return }
+    let textOrigin = CGPoint(x: origin.x, y: origin.y + Self.verticalTextInset)
+    layoutManager.drawBackground(forGlyphRange: glyphRange, at: textOrigin)
+    layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: textOrigin)
   }
 
   func invalidateTextLayout(

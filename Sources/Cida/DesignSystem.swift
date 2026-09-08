@@ -1,5 +1,6 @@
 import AppKit
 import CoreText
+import QuartzCore
 import SwiftUI
 
 struct CidaColorToken: Sendable {
@@ -31,6 +32,9 @@ enum CidaDesign {
     static let surface = CidaColorToken(0xFFFFFF)
     static let surfaceDim = CidaColorToken(0xF4F4F1)
     static let surfaceFold = CidaColorToken(0xF1F1EC)
+    /// The Pencil folded card only specifies a "slight" hover highlight; this
+    /// sits halfway between `surface-fold` and `border`.
+    static let surfaceFoldHover = CidaColorToken(0xECECE7)
     static let border = CidaColorToken(0xE8E8E3)
     static let textPrimary = CidaColorToken(0x1A1A18)
     static let textSecondary = CidaColorToken(0x8A8A83)
@@ -40,13 +44,13 @@ enum CidaDesign {
     static let accentForeground = CidaColorToken(0xFFFFFF)
     static let toggleOff = CidaColorToken(0xDBDBD5)
     static let placeholder = CidaColorToken(0xB5B7B0, alpha: 0.22)
-    static let placeholderSeparator = CidaColorToken(0xE1E1DC, alpha: 0.7)
   }
 
   static let background = Palette.background.swiftUI
   static let surface = Palette.surface.swiftUI
   static let surfaceDim = Palette.surfaceDim.swiftUI
   static let surfaceFold = Palette.surfaceFold.swiftUI
+  static let surfaceFoldHover = Palette.surfaceFoldHover.swiftUI
   static let border = Palette.border.swiftUI
   static let textPrimary = Palette.textPrimary.swiftUI
   static let textSecondary = Palette.textSecondary.swiftUI
@@ -138,6 +142,22 @@ enum CidaMotion {
   static let cursorMinimumOpacity: Float = 0.3
   static let cursorWidth: CGFloat = 2
   static let cursorHeight: CGFloat = 20
+
+  /// `motion-ease-char-in`, `motion-ease-height`, and `motion-ease-fold` are all
+  /// the Pencil ease-out curve.
+  static var easeOut: CAMediaTimingFunction {
+    CAMediaTimingFunction(controlPoints: 0.33, 1, 0.68, 1)
+  }
+
+  /// Motion is dropped when the system reduces motion or the view is not in a
+  /// window; static durations keep the same end state.
+  @MainActor
+  static func resolvedDuration(_ seconds: TimeInterval, in window: NSWindow?) -> TimeInterval {
+    guard window != nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+      return 0
+    }
+    return seconds
+  }
 }
 
 extension Color {

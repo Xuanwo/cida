@@ -314,7 +314,9 @@ final class AppModel {
   var historyScrollRevision = 0
   private(set) var historyForcePinRevision = 0
   private var manuallyExpandedHistoryEntryIDs: Set<UUID> = []
-  private(set) var automaticallyFoldingHistoryEntryID: UUID?
+  /// Records that keep their standalone renderer while the Pencil fold
+  /// transition runs; afterwards they join the virtualized folded list.
+  private(set) var foldingHistoryEntryIDs: Set<UUID> = []
 
   private let service: any TextProcessingService
   private let streamPresentationPolicy: StreamPresentationPolicy
@@ -324,7 +326,7 @@ final class AppModel {
   private let saveSettings: @MainActor (CidaSettings) -> Void
   private let clearPersistedAPIKey: @MainActor () -> Void
   private var processingTask: Task<Void, Never>?
-  @ObservationIgnored private var automaticFoldCleanupTask: Task<Void, Never>?
+  @ObservationIgnored private var foldCleanupTasks: [UUID: Task<Void, Never>] = [:]
   private var settingsSaveTask: Task<Void, Never>?
   private var olderHistoryLoadTask: Task<Void, Never>?
   @ObservationIgnored private var olderHistoryLoadRequestTask: Task<Void, Never>?
@@ -543,16 +545,47 @@ final class AppModel {
     manuallyExpandedHistoryEntryIDs.contains(entryID)
   }
 
+  func isHistoryEntryFolding(_ entryID: UUID) -> Bool {
+    foldingHistoryEntryIDs.contains(entryID)
+  }
+
   func expandHistoryEntry(_ entryID: UUID) {
     guard entryID != entries.last?.id, entries.contains(where: { $0.id == entryID }) else {
       return
     }
+    cancelFold(of: entryID)
     manuallyExpandedHistoryEntryIDs.insert(entryID)
   }
 
   func collapseHistoryEntry(_ entryID: UUID) {
     guard entryID != entries.last?.id else { return }
-    manuallyExpandedHistoryEntryIDs.remove(entryID)
+    guard manuallyExpandedHistoryEntryIDs.remove(entryID) != nil else { return }
+    beginFold(of: entryID)
+  }
+
+  private func beginFold(of entryID: UUID) {
+    foldingHistoryEntryIDs.insert(entryID)
+    foldCleanupTasks[entryID]?.cancel()
+    foldCleanupTasks[entryID] = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: .milliseconds(CidaMotion.historyFoldMilliseconds))
+      guard !Task.isCancelled, let self else { return }
+      self.foldingHistoryEntryIDs.remove(entryID)
+      self.foldCleanupTasks[entryID] = nil
+    }
+  }
+
+  private func cancelFold(of entryID: UUID) {
+    foldCleanupTasks[entryID]?.cancel()
+    foldCleanupTasks[entryID] = nil
+    foldingHistoryEntryIDs.remove(entryID)
+  }
+
+  private func cancelAllFolds() {
+    for task in foldCleanupTasks.values {
+      task.cancel()
+    }
+    foldCleanupTasks.removeAll()
+    foldingHistoryEntryIDs.removeAll()
   }
 
   private func copyToPasteboard(_ value: String) {
@@ -801,8 +834,7 @@ final class AppModel {
     olderHistoryLoadRequestTask?.cancel()
     olderHistoryLoadWasRequested = false
     isHistoryLiveScrolling = false
-    automaticFoldCleanupTask?.cancel()
-    automaticallyFoldingHistoryEntryID = nil
+    cancelAllFolds()
     suppressesEntrySynchronization = true
     self.entries = entries
     suppressesEntrySynchronization = false
@@ -948,8 +980,7 @@ final class AppModel {
         previous === current
       }
     guard preservesExistingPrefix else {
-      automaticFoldCleanupTask?.cancel()
-      automaticallyFoldingHistoryEntryID = nil
+      cancelAllFolds()
       persistedHistoryEntries = entries
       persistedHistoryPages = entries.isEmpty ? [] : [HistoryRenderPage(entries: entries)]
       sessionHistoryEntries = []
@@ -988,17 +1019,8 @@ final class AppModel {
     // these mutations happen in the opposite order SwiftUI briefly replaces
     // the expanded entry with a virtualized row, only to rebuild it again in
     // the same submission preflight.
-    automaticallyFoldingHistoryEntryID = entry.id
+    beginFold(of: entry.id)
     entry.isLatestInHistory = false
-    automaticFoldCleanupTask?.cancel()
-    automaticFoldCleanupTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(CidaMotion.historyFoldMilliseconds))
-      guard !Task.isCancelled, self?.automaticallyFoldingHistoryEntryID == entry.id else {
-        return
-      }
-      self?.automaticallyFoldingHistoryEntryID = nil
-      self?.automaticFoldCleanupTask = nil
-    }
   }
 
   private func persistState(_ state: HistoryEntryState, for entryID: UUID) {

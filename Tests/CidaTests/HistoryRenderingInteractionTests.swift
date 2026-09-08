@@ -706,21 +706,35 @@ extension InteractionReproductionTests {
     XCTAssertEqual(resultView.streamingCaretFrame.height, 20)
 
     resultView.append("平滑输出", isStreaming: true)
-    XCTAssertEqual(resultView.glyphRevealLayerCountForTesting, 1)
+    XCTAssertEqual(resultView.glyphRevealFragmentCountForTesting, 1)
     let revealAnimation = try XCTUnwrap(resultView.glyphRevealAnimationForTesting)
     XCTAssertEqual(revealAnimation.duration, 0.12, accuracy: 0.001)
     XCTAssertEqual(
       try XCTUnwrap(revealAnimation.fromValue as? NSNumber).doubleValue,
-      0.18,
-      accuracy: 0.001
+      0,
+      accuracy: 0.001,
+      "Pencil T2: glyphs fade in behind the caret from fully transparent"
     )
+    XCTAssertEqual(
+      resultView.glyphRevealCommittedLengthForTesting,
+      0,
+      "The rendering view must not paint glyphs that a fragment is still revealing"
+    )
+    // The caret already follows the presented glyphs on the same pulse.
+    XCTAssertGreaterThan(resultView.streamingCaretFrame.minX, 0)
     _ = resultView.updateDocumentLayout()
     resultView.updateStreamingCaretFrame()
     XCTAssertGreaterThan(resultView.streamingCaretFrame.minX, 0)
 
     resultView.setStreaming(false)
     XCTAssertFalse(resultView.streamingCaretIsVisible)
-    XCTAssertEqual(resultView.glyphRevealLayerCountForTesting, 0)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    XCTAssertEqual(
+      resultView.glyphRevealFragmentCountForTesting,
+      0,
+      "Completion lets the last glyphs finish their fade, then commits them"
+    )
+    XCTAssertEqual(resultView.glyphRevealCommittedLengthForTesting, 4)
   }
 
   func testGlyphFadeMatchesThePencilOneHundredTwentyMillisecondEaseOut() {
@@ -728,16 +742,16 @@ extension InteractionReproductionTests {
     let midpoint = StreamGlyphFadeAnimation.style(elapsed: 0.06)
     let complete = StreamGlyphFadeAnimation.style(elapsed: 0.12)
 
-    XCTAssertEqual(initial.opacity, 0.82, accuracy: 0.001)
+    XCTAssertEqual(initial.opacity, 0, accuracy: 0.001)
     XCTAssertEqual(initial.blurRadius, 2, accuracy: 0.001)
     XCTAssertGreaterThan(midpoint.opacity, initial.opacity)
-    XCTAssertEqual(midpoint.opacity, 0.9775, accuracy: 0.001)
+    XCTAssertEqual(midpoint.opacity, 0.875, accuracy: 0.001)
     XCTAssertEqual(midpoint.blurRadius, 0.25, accuracy: 0.001)
     XCTAssertEqual(complete.opacity, 1, accuracy: 0.001)
     XCTAssertEqual(complete.blurRadius, 0, accuracy: 0.001)
   }
 
-  func testStreamingLineGrowthReusesTheSingleCompositorTailReveal() throws {
+  func testEachPresentedGlyphRunGetsItsOwnPencilRevealAndCommitsInOrder() throws {
     let resultView = HistoryResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 320, height: HistoryResultTextContainer.minimumHeight)
     )
@@ -754,11 +768,12 @@ extension InteractionReproductionTests {
     resultView.setStreaming(true)
     _ = resultView.updateDocumentLayout()
 
-    resultView.append("First line grows.\nSecond line grows.", isStreaming: true)
+    resultView.append("First line grows.\n", isStreaming: true)
+    resultView.append("Second line grows.", isStreaming: true)
     let expandedHeight = resultView.updateDocumentLayout()
 
     XCTAssertGreaterThan(expandedHeight, HistoryResultTextContainer.minimumHeight)
-    XCTAssertEqual(resultView.glyphRevealLayerCountForTesting, 1)
+    XCTAssertEqual(resultView.glyphRevealFragmentCountForTesting, 2)
     XCTAssertEqual(resultView.glyphRevealAnimationForTesting?.duration, 0.12)
     let blurAnimation = try XCTUnwrap(resultView.glyphRevealBlurAnimationForTesting)
     XCTAssertEqual(blurAnimation.duration, 0.12)
@@ -773,6 +788,95 @@ extension InteractionReproductionTests {
       accuracy: 0.001
     )
     XCTAssertEqual(resultView.glyphRevealBlurRadiusForTesting, 0, accuracy: 0.001)
+    let fragmentFrames = resultView.glyphRevealFragmentFramesForTesting
+    XCTAssertEqual(fragmentFrames.count, 2)
+    XCTAssertGreaterThan(
+      fragmentFrames[1].minY,
+      fragmentFrames[0].minY,
+      "The second run must be positioned on the wrapped second line"
+    )
+    XCTAssertEqual(resultView.glyphRevealCommittedLengthForTesting, 0)
+
+    // Committing is invisible, so it rides the coalesced layout tick; nothing
+    // commits before a fragment's fade has finished.
+    resultView.commitCompletedGlyphReveals(now: 0)
+    XCTAssertEqual(resultView.glyphRevealFragmentCountForTesting, 2)
+    resultView.commitCompletedGlyphReveals(now: .greatestFiniteMagnitude)
+    XCTAssertEqual(resultView.glyphRevealFragmentCountForTesting, 0)
+    XCTAssertEqual(
+      resultView.glyphRevealCommittedLengthForTesting,
+      "First line grows.\nSecond line grows.".utf16.count
+    )
+  }
+
+  func testRecordActionsFadeInOverThePencilIconDurations() throws {
+    try XCTSkipIf(
+      NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+      "Reduced motion reveals actions without a fade"
+    )
+    let entryID = UUID()
+    let row = HistoryEntryNSView()
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
+    let window = CidaWindow(
+      contentRect: row.frame,
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.isReleasedWhenClosed = false
+    window.contentView = row
+    retainedTestWindows.append(window)
+    row.configure(
+      entryID: entryID,
+      mode: .translate,
+      metadata: "中文 → English · 生成中",
+      preview: "Streaming preview",
+      state: .streaming,
+      onExpand: {},
+      onRedo: {},
+      onCopyResult: {}
+    )
+    row.setHoverManagedExternally(true)
+    row.layoutSubtreeIfNeeded()
+
+    row.setResolvedHoverState(true)
+    XCTAssertTrue(
+      row.actionButtonsForTesting.allSatisfy(\.isHidden),
+      "A streaming record never shows actions"
+    )
+
+    // Pencil T3: completing under the pointer reveals the icons over
+    // motion-icon-swap-ms.
+    row.configureContent(
+      entryID: entryID,
+      mode: .translate,
+      metadata: "中文 → English · 14:05",
+      preview: "Streaming preview",
+      state: .completed
+    )
+    let revealedOnCompletion = row.actionButtonsForTesting.filter { !$0.isHidden }
+    XCTAssertEqual(revealedOnCompletion.count, 2)
+    for button in revealedOnCompletion {
+      let reveal = try XCTUnwrap(button.revealAnimationForTesting)
+      XCTAssertEqual(reveal.duration, 0.15, accuracy: 0.001)
+      XCTAssertEqual(try XCTUnwrap(reveal.fromValue as? NSNumber).doubleValue, 0, accuracy: 0.001)
+      XCTAssertEqual(try XCTUnwrap(reveal.toValue as? NSNumber).doubleValue, 1, accuracy: 0.001)
+    }
+
+    // Leaving hides the icons immediately; hovering again fades them in over
+    // motion-icon-in-ms.
+    row.setResolvedHoverState(false)
+    XCTAssertTrue(row.actionButtonsForTesting.allSatisfy(\.isHidden))
+    row.setResolvedHoverState(true)
+    let revealedOnHover = row.actionButtonsForTesting.filter { !$0.isHidden }
+    XCTAssertEqual(revealedOnHover.count, 2)
+    for button in revealedOnHover {
+      XCTAssertEqual(
+        try XCTUnwrap(button.revealAnimationForTesting).duration,
+        0.12,
+        accuracy: 0.001
+      )
+    }
   }
 
   func testRecordActionsRequireHoverAndACompletedOrTerminalEntry() {

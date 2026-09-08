@@ -128,6 +128,44 @@ final class AppModelTests: XCTestCase {
     )
   }
 
+  func testCollapsingKeepsTheRecordStandaloneForThePencilFoldTransition() async throws {
+    let firstID = UUID()
+    let secondID = UUID()
+    let model = AppModel(
+      entries: [
+        historyEntry(id: firstID, source: "First"),
+        historyEntry(id: secondID, source: "Second"),
+      ]
+    )
+
+    model.expandHistoryEntry(firstID)
+    XCTAssertFalse(model.isHistoryEntryFolding(firstID))
+
+    model.collapseHistoryEntry(firstID)
+    XCTAssertFalse(model.isHistoryEntryExpanded(firstID))
+    XCTAssertTrue(
+      model.isHistoryEntryFolding(firstID),
+      "A collapsing record keeps its standalone renderer while the 200 ms fold runs"
+    )
+
+    model.expandHistoryEntry(firstID)
+    XCTAssertTrue(model.isHistoryEntryExpanded(firstID))
+    XCTAssertFalse(model.isHistoryEntryFolding(firstID), "Re-expanding cancels the pending fold")
+
+    model.collapseHistoryEntry(firstID)
+    try await waitUntil { !model.isHistoryEntryFolding(firstID) }
+    XCTAssertFalse(model.isHistoryEntryExpanded(firstID))
+
+    let thirdID = UUID()
+    model.entries.append(historyEntry(id: thirdID, source: "Third"))
+    XCTAssertTrue(
+      model.isHistoryEntryFolding(secondID),
+      "A new submission folds the former focus through the same transition"
+    )
+    XCTAssertFalse(model.isHistoryEntryExpanded(secondID))
+    try await waitUntil { !model.isHistoryEntryFolding(secondID) }
+  }
+
   func testStagedVirtualDocumentKeepsItsPreparedUTF16Count() {
     let model = AppModel(inputText: "Visible tail")
 

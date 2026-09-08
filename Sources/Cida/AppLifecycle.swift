@@ -465,6 +465,8 @@ private enum DesignState: String {
   case improve
   case largeInput = "large-input"
   case streaming
+  /// Pencil `Motion — 历史折叠` T0: one folded long card above the focus record.
+  case historyFolded = "history-folded"
   case settings
   case settingsOpenAI = "settings-openai"
 
@@ -554,6 +556,8 @@ private struct LaunchOptions {
         return [HistoryEntry.designSamples[1]]
       case .largeInput:
         return HistoryEntry.longDesignSamples
+      case .historyFolded:
+        return [HistoryEntry.longDesignSamples[0], HistoryEntry.designSamples[2]]
       case .translate, .improve, .settings, .settingsOpenAI:
         return HistoryEntry.designSamples
       }
@@ -571,7 +575,7 @@ private struct LaunchOptions {
         HistoryEntry.designLongInput
       case .streaming:
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
-      case .translate, .settings, .settingsOpenAI:
+      case .translate, .historyFolded, .settings, .settingsOpenAI:
         ""
       }
     #else

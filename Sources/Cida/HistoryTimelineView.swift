@@ -60,6 +60,9 @@ private struct NativeHistoryScrollView: NSViewRepresentable {
     private var measuredNaturalContentHeight: CGFloat?
     private var allocatedHostingHeight: CGFloat = 0
     private var installedRootIdentity: ObjectIdentifier?
+    private var hostingBaseOriginY: CGFloat = 0
+    private var slideOffset: CGFloat = 0
+    private var slideStartUptime: CFTimeInterval = 0
 
     func install(
       in scrollView: HistoryNativeScrollView,
@@ -76,8 +79,8 @@ private struct NativeHistoryScrollView: NSViewRepresentable {
       hostingView.onIntrinsicSizeInvalidation = { [weak self] in
         self?.scheduleResize()
       }
-      hostingView.onResultHeightChange = { [weak self] delta in
-        self?.applyResultHeightChange(delta)
+      hostingView.onResultHeightChange = { [weak self] delta, animated in
+        self?.applyResultHeightChange(delta, animated: animated)
       }
       documentView.setAccessibilityElement(false)
       hostingView.setAccessibilityLabel("历史记录内容")
@@ -125,7 +128,7 @@ private struct NativeHistoryScrollView: NSViewRepresentable {
       applyContentHeight(naturalContentHeight, width: width, in: scrollView)
     }
 
-    private func applyResultHeightChange(_ delta: CGFloat) {
+    private func applyResultHeightChange(_ delta: CGFloat, animated: Bool) {
       guard let scrollView, let measuredNaturalContentHeight else {
         scheduleResize()
         return
@@ -135,15 +138,20 @@ private struct NativeHistoryScrollView: NSViewRepresentable {
       applyContentHeight(
         updatedHeight,
         width: max(1, scrollView.contentSize.width),
-        in: scrollView
+        in: scrollView,
+        slideDelta: animated && delta > 0 ? delta : 0
       )
     }
 
     private func applyContentHeight(
       _ naturalContentHeight: CGFloat,
       width: CGFloat,
-      in scrollView: HistoryNativeScrollView
+      in scrollView: HistoryNativeScrollView,
+      slideDelta: CGFloat = 0
     ) {
+      let clipView = scrollView.contentView
+      let wasPinnedToBottom =
+        clipView.documentVisibleRect.maxY >= documentView.bounds.maxY - 24
       let documentHeight = max(
         scrollView.contentSize.height + HistoryNativeScrollView.scrollGeometryRunway,
         ceil(naturalContentHeight)
@@ -164,10 +172,54 @@ private struct NativeHistoryScrollView: NSViewRepresentable {
       if hostingView.frame.size != hostingSize {
         hostingView.setFrameSize(hostingSize)
       }
-      hostingView.setFrameOrigin(
-        NSPoint(x: 0, y: documentHeight - allocatedHostingHeight)
-      )
+      let baseOriginY = documentHeight - allocatedHostingHeight
+      if slideDelta > 0 {
+        slideHostingContent(by: slideDelta, baseOriginY: baseOriginY)
+        if wasPinnedToBottom {
+          let originY = max(documentView.bounds.minY, documentHeight - clipView.bounds.height)
+          if abs(clipView.documentVisibleRect.minY - originY) > 0.5 {
+            clipView.scroll(to: NSPoint(x: clipView.documentVisibleRect.minX, y: originY))
+            scrollView.reflectScrolledClipView(clipView)
+          }
+        }
+      } else if abs(hostingBaseOriginY - baseOriginY) > 0.5 || slideOffset == 0 {
+        hostingBaseOriginY = baseOriginY
+        slideOffset = 0
+        hostingView.setFrameOrigin(NSPoint(x: 0, y: baseOriginY))
+      }
       CidaScrollIndicator.installed(in: scrollView)?.refresh()
+    }
+
+    /// Pencil `motion-height-ms`: a streaming record grows by `delta`, but the
+    /// visible content first stays put and then slides up over the ease-out.
+    /// The hosting view is bottom-anchored, so offsetting its origin by the
+    /// growth and animating it back keeps every visible glyph continuous
+    /// without re-laying out the SwiftUI history tree per frame.
+    private func slideHostingContent(by delta: CGFloat, baseOriginY: CGFloat) {
+      let now = CACurrentMediaTime()
+      let remaining = remainingSlideOffset(at: now)
+      let startOffset = remaining + delta
+      hostingBaseOriginY = baseOriginY
+      slideOffset = startOffset
+      slideStartUptime = now
+      hostingView.setFrameOrigin(NSPoint(x: 0, y: baseOriginY + startOffset))
+      NSAnimationContext.runAnimationGroup { context in
+        context.duration = CidaMotion.heightSeconds
+        context.timingFunction = CidaMotion.easeOut
+        context.allowsImplicitAnimation = true
+        hostingView.animator().setFrameOrigin(NSPoint(x: 0, y: baseOriginY))
+      }
+    }
+
+    private func remainingSlideOffset(at now: CFTimeInterval) -> CGFloat {
+      guard slideOffset != 0 else { return 0 }
+      let progress = min(1, max(0, (now - slideStartUptime) / CidaMotion.heightSeconds))
+      guard progress < 1 else {
+        slideOffset = 0
+        return 0
+      }
+      let eased = 1 - pow(1 - progress, 3)
+      return slideOffset * CGFloat(1 - eased)
     }
 
   }
@@ -208,12 +260,12 @@ private final class FlippedHistoryDocumentView: NSView {
 @MainActor
 final class ResizingHistoryHostingView: NSHostingView<AnyView>, HistoryResultHeightChangeHosting {
   var onIntrinsicSizeInvalidation: (() -> Void)?
-  var onResultHeightChange: ((CGFloat) -> Void)?
+  var onResultHeightChange: ((CGFloat, Bool) -> Void)?
   private var suppressesNextIntrinsicResize = false
 
-  func historyResultHeightWillChange(by delta: CGFloat) {
+  func historyResultHeightWillChange(by delta: CGFloat, animated: Bool) {
     suppressesNextIntrinsicResize = true
-    onResultHeightChange?(delta)
+    onResultHeightChange?(delta, animated)
   }
 
   override func invalidateIntrinsicContentSize() {
@@ -226,6 +278,14 @@ final class ResizingHistoryHostingView: NSHostingView<AnyView>, HistoryResultHei
   }
 }
 
+/// Which records render standalone, which expanded records are followed by a
+/// Pencil `Entry Divider`, and which folded cards need the card gap before them.
+private struct HistoryPagePlan: Equatable {
+  var standaloneEntryIDs: Set<UUID> = []
+  var separatorEntryIDs: Set<UUID> = []
+  var leadingGapEntryIDs: Set<UUID> = []
+}
+
 private struct HistoryEntriesDocument: View {
   @Bindable var model: AppModel
   let animatesTransitions: Bool
@@ -233,6 +293,7 @@ private struct HistoryEntriesDocument: View {
   var body: some View {
     let persistedPages = model.persistedHistoryPages
     let sessionEntries = model.sessionHistoryEntries
+    let plans = makePagePlans(pages: persistedPages.map(\.entries) + [sessionEntries])
 
     VStack(spacing: 0) {
       Spacer(minLength: 0)
@@ -240,10 +301,10 @@ private struct HistoryEntriesDocument: View {
         HistoryPlaceholderRunway(entryCount: model.unloadedHistoryEntryCount)
         olderHistoryLoader
         longDocumentScrollRunway
-        ForEach(persistedPages) { page in
+        ForEach(Array(persistedPages.enumerated()), id: \.element.id) { index, page in
           HistoryEntryPageDocument(
             entries: page.entries,
-            standaloneEntryIDs: standaloneEntryIDs(in: page.entries),
+            plan: plans[index],
             model: model,
             animatesTransitions: animatesTransitions
           )
@@ -251,7 +312,7 @@ private struct HistoryEntriesDocument: View {
         }
         HistoryEntryPageDocument(
           entries: sessionEntries,
-          standaloneEntryIDs: standaloneEntryIDs(in: sessionEntries),
+          plan: plans[persistedPages.count],
           model: model,
           animatesTransitions: animatesTransitions
         )
@@ -269,16 +330,32 @@ private struct HistoryEntriesDocument: View {
     }
   }
 
-  private func standaloneEntryIDs(in entries: [HistoryEntry]) -> Set<UUID> {
-    var entryIDs = Set(
-      entries.lazy.filter { model.isHistoryEntryManuallyExpanded($0.id) }.map(\.id)
-    )
-    entryIDs.formUnion(
-      entries.lazy.filter {
-        $0.isLatestInHistory || $0.id == model.automaticallyFoldingHistoryEntryID
-      }.map(\.id)
-    )
-    return entryIDs
+  /// Dividers only separate two expanded records (Pencil `mlf3o`); folded cards
+  /// separate themselves with their fill and keep one gap between neighbours
+  /// (`Motion — 历史折叠` T0/T2 show no divider next to a card).
+  private func makePagePlans(pages: [[HistoryEntry]]) -> [HistoryPagePlan] {
+    var plans = pages.map { _ in HistoryPagePlan() }
+    var previousWasExpanded: Bool?
+    var pendingSeparator: (pageIndex: Int, entryID: UUID)?
+    for (pageIndex, entries) in pages.enumerated() {
+      for entry in entries {
+        let isExpanded =
+          entry.isLatestInHistory || model.isHistoryEntryManuallyExpanded(entry.id)
+        let isStandalone = isExpanded || model.isHistoryEntryFolding(entry.id)
+        if isStandalone {
+          plans[pageIndex].standaloneEntryIDs.insert(entry.id)
+        }
+        if let pendingSeparator, isExpanded {
+          plans[pendingSeparator.pageIndex].separatorEntryIDs.insert(pendingSeparator.entryID)
+        }
+        pendingSeparator = isExpanded ? (pageIndex, entry.id) : nil
+        if !isExpanded, let previousWasExpanded, !previousWasExpanded {
+          plans[pageIndex].leadingGapEntryIDs.insert(entry.id)
+        }
+        previousWasExpanded = isExpanded
+      }
+    }
+    return plans
   }
 
   private var longDocumentScrollRunway: some View {
@@ -308,8 +385,8 @@ private struct HistoryEntriesDocument: View {
 private struct HistoryEntryPageDocument: View, Equatable {
   private struct Segment: Identifiable {
     enum Content {
-      case folded([HistoryEntry])
-      case standalone(HistoryEntry)
+      case folded([HistoryEntry], leadingGap: Bool)
+      case standalone(HistoryEntry, showsSeparator: Bool, leadingGapWhenFolded: Bool)
     }
 
     let id: UUID
@@ -317,7 +394,7 @@ private struct HistoryEntryPageDocument: View, Equatable {
   }
 
   let entries: [HistoryEntry]
-  let standaloneEntryIDs: Set<UUID>
+  let plan: HistoryPagePlan
   let model: AppModel
   let animatesTransitions: Bool
 
@@ -325,7 +402,7 @@ private struct HistoryEntryPageDocument: View, Equatable {
     lhs.entries.count == rhs.entries.count
       && lhs.entries.first?.id == rhs.entries.first?.id
       && lhs.entries.last?.id == rhs.entries.last?.id
-      && lhs.standaloneEntryIDs == rhs.standaloneEntryIDs
+      && lhs.plan == rhs.plan
       && lhs.animatesTransitions == rhs.animatesTransitions
   }
 
@@ -334,22 +411,31 @@ private struct HistoryEntryPageDocument: View, Equatable {
     VStack(spacing: 0) {
       ForEach(segments) { segment in
         switch segment.content {
-        case .folded(let foldedEntries):
+        case .folded(let foldedEntries, let leadingGap):
           VirtualizedFoldedHistoryList(entries: foldedEntries, model: model)
             .frame(maxWidth: .infinity)
             .frame(
-              height: CGFloat(foldedEntries.count) * HistoryEntryPencilLayout.foldedRowStride
+              height: HistoryEntryPencilLayout.foldedListHeight(rowCount: foldedEntries.count)
             )
-        case .standalone(let entry):
+            .padding(.top, leadingGap ? HistoryEntryPencilLayout.foldedCardGap : 0)
+            .animation(historyTransitionAnimation, value: leadingGap)
+        case .standalone(let entry, let showsSeparator, let leadingGapWhenFolded):
           HistoryEntryView(
             entry: entry,
             model: model,
-            animatesTransitions: animatesTransitions
+            animatesTransitions: animatesTransitions,
+            showsSeparator: showsSeparator,
+            leadingGapWhenFolded: leadingGapWhenFolded
           )
           .id(entry.id)
         }
       }
     }
+  }
+
+  private var historyTransitionAnimation: Animation? {
+    guard animatesTransitions else { return nil }
+    return .easeOut(duration: CidaMotion.historyFoldSeconds)
   }
 
   private func makeSegments() -> [Segment] {
@@ -358,14 +444,31 @@ private struct HistoryEntryPageDocument: View, Equatable {
 
     func flushFoldedEntries() {
       guard let first = foldedEntries.first else { return }
-      segments.append(Segment(id: first.id, content: .folded(foldedEntries)))
+      segments.append(
+        Segment(
+          id: first.id,
+          content: .folded(
+            foldedEntries,
+            leadingGap: plan.leadingGapEntryIDs.contains(first.id)
+          )
+        )
+      )
       foldedEntries.removeAll(keepingCapacity: true)
     }
 
     for entry in entries {
-      if standaloneEntryIDs.contains(entry.id) {
+      if plan.standaloneEntryIDs.contains(entry.id) {
         flushFoldedEntries()
-        segments.append(Segment(id: entry.id, content: .standalone(entry)))
+        segments.append(
+          Segment(
+            id: entry.id,
+            content: .standalone(
+              entry,
+              showsSeparator: plan.separatorEntryIDs.contains(entry.id),
+              leadingGapWhenFolded: plan.leadingGapEntryIDs.contains(entry.id)
+            )
+          )
+        )
       } else {
         foldedEntries.append(entry)
       }
@@ -393,12 +496,25 @@ private struct HistoryEntryView: View {
   private let standaloneEntry: HistoryEntry?
   let model: AppModel
   let animatesTransitions: Bool
+  let showsSeparator: Bool
+  let leadingGapWhenFolded: Bool
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+  /// A record that was just expanded from a virtualized card first renders as
+  /// that card, then animates open in place (Pencil `Motion — 历史折叠` T2).
+  @State private var hasSettledInitialPresentation = false
 
-  init(entry: HistoryEntry, model: AppModel, animatesTransitions: Bool) {
+  init(
+    entry: HistoryEntry,
+    model: AppModel,
+    animatesTransitions: Bool,
+    showsSeparator: Bool,
+    leadingGapWhenFolded: Bool
+  ) {
     standaloneEntry = entry
     self.model = model
     self.animatesTransitions = animatesTransitions
+    self.showsSeparator = showsSeparator
+    self.leadingGapWhenFolded = leadingGapWhenFolded
   }
 
   private var entry: HistoryEntry {
@@ -413,6 +529,10 @@ private struct HistoryEntryView: View {
     entry.isLatestInHistory
   }
 
+  private var animatesPresentation: Bool {
+    animatesTransitions && !accessibilityReduceMotion
+  }
+
   var body: some View {
     let presentation: HistoryPresentation =
       if !isExpanded {
@@ -422,14 +542,23 @@ private struct HistoryEntryView: View {
       } else {
         .manuallyExpanded
       }
+    let displayedPresentation: HistoryPresentation =
+      presentation == .manuallyExpanded && animatesPresentation && !hasSettledInitialPresentation
+      ? .folded
+      : presentation
+    let leadingGap: CGFloat =
+      displayedPresentation == .folded && leadingGapWhenFolded
+      ? HistoryEntryPencilLayout.foldedCardGap
+      : 0
     let _ = entry.state
     let _ = entry.presentationRevision
     let _ = entry.metadata
 
     NativeHistoryEntryView(
       entry: entry,
-      presentation: presentation,
-      showsSeparator: !isLatestEntry,
+      presentation: displayedPresentation,
+      showsSeparator: showsSeparator,
+      animatesTransitions: animatesPresentation,
       onExpand: {
         model.expandHistoryEntry(entry.id)
       },
@@ -448,11 +577,17 @@ private struct HistoryEntryView: View {
       }
     )
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .animation(historyTransitionAnimation, value: presentation)
+    .padding(.top, leadingGap)
+    .animation(historyTransitionAnimation, value: displayedPresentation)
+    .animation(historyTransitionAnimation, value: leadingGap)
+    .onAppear {
+      guard !hasSettledInitialPresentation else { return }
+      hasSettledInitialPresentation = true
+    }
   }
 
   private var historyTransitionAnimation: Animation? {
-    guard animatesTransitions, !accessibilityReduceMotion else { return nil }
+    guard animatesPresentation else { return nil }
     return .easeOut(duration: CidaMotion.historyFoldSeconds)
   }
 
@@ -548,6 +683,7 @@ final class StickyHistoryResultActionNSView: NSView {
     isLongEntry: Bool,
     isVisible: Bool,
     isCopied: Bool,
+    revealDuration: TimeInterval = CidaMotion.iconInSeconds,
     action: @escaping @MainActor () -> Void
   ) {
     if configuredIdentifier != identifier {
@@ -559,7 +695,7 @@ final class StickyHistoryResultActionNSView: NSView {
     requestedVisibility = isVisible
     actionButton.setAccessibilityIdentifier(identifier)
     updateCopyFeedback(isCopied)
-    applyVisibility()
+    applyVisibility(revealDuration: revealDuration)
     updateActionFrame()
   }
 
@@ -669,7 +805,7 @@ final class StickyHistoryResultActionNSView: NSView {
     updateCopyFeedback(false)
   }
 
-  private func applyVisibility() {
+  private func applyVisibility(revealDuration: TimeInterval) {
     let pointerIsOverAction: Bool
     if let window {
       let pointer = convert(window.mouseLocationOutsideOfEventStream, from: nil)
@@ -679,7 +815,11 @@ final class StickyHistoryResultActionNSView: NSView {
     }
     let visible = requestedVisibility || isShowingCopyFeedback || pointerIsOverAction
     isActionVisible = visible
-    actionButton.isHidden = !visible
+    if visible {
+      actionButton.reveal(duration: revealDuration)
+    } else {
+      actionButton.conceal()
+    }
     actionButton.setAccessibilityElement(visible)
     if visible {
       actionButton.setAccessibilityRole(.button)

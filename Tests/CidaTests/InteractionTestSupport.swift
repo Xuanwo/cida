@@ -314,9 +314,11 @@ extension InteractionReproductionTests {
 
 final class HistoryResultHeightProbeView: NSView, HistoryResultHeightChangeHosting {
   private(set) var publishedHeightDeltas: [CGFloat] = []
+  private(set) var publishedAnimatedFlags: [Bool] = []
 
-  func historyResultHeightWillChange(by delta: CGFloat) {
+  func historyResultHeightWillChange(by delta: CGFloat, animated: Bool) {
     publishedHeightDeltas.append(delta)
+    publishedAnimatedFlags.append(animated)
   }
 }
 
