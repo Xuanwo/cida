@@ -3,7 +3,7 @@
 ## Source of truth
 
 The current source is `Design/cida.pen` (SHA-256
-`a48191b1eae0245acc643129b507e57faaee776a1ed6bafc1675a9dda007ee2e`). The aligned
+`dbe535eb50ee22a22579d5311a56a9f63ba382ef93083ab91cbaa850509566e3`). The aligned
 Pencil nodes are:
 
 | State or contract | Node |
@@ -14,17 +14,18 @@ Pencil nodes are:
 | Long input | `r2rxd9` |
 | Streaming | `J9Vlmv` |
 | Record actions | `BBKsI` |
-| History focus and folding | `Sol2d` |
-| Action behavior | `UVmdQ` |
+| History folding rules | `Sol2d` |
+| Record action rules | `UVmdQ` |
 | Streaming motion | `NdsRA` |
 | Long record at rest (860) | `rOC5t` |
 | Reading column (1280) | `JoW8q` |
-| History fold v2 states | `T6tMl` |
-| History fold v2 rules | `mJm8R` |
+| History fold states | `T6tMl` |
 
-Exports are retained under `Design/LatestReferenceExport`; `l98qna.png` and `cRhyz.png` are the
-`Motion — 历史折叠` T0 and T1 viewports as they were before the v2 rule (kept for the fold
-transition keyframes). Current native captures,
+The Pencil document is the first source: each topic has one Spec note (`Sol2d`, `UVmdQ`,
+`NdsRA`), and a rule change edits that note and its States or Motion board instead of adding a
+versioned copy. Exports of the screens, the States boards, and the Spec notes are retained under
+`Design/LatestReferenceExport`; `l98qna.png` and `cRhyz.png` are the `Motion — 历史折叠` T0 and T1
+viewports (kept for the fold transition keyframes). Current native captures,
 normalized references, and side-by-side review images are under `Design/ImplementationCurrent` and
 `Design/QACurrent`. The `history-folded` and `wide-reading-column` design states
 (`scripts/capture-design-states.sh`) render one long record at rest above the focus record and
@@ -64,7 +65,7 @@ inside a disposable headless Tart macOS session. Neither path activates the test
 - Only the newest record is automatically expanded. Older records use their cached result preview
   without mounting the complete TextKit result. Manual comparisons can remain expanded
   independently.
-- History fold v2 (`Sol2d`, `mJm8R`, `T6tMl`): a historical record at rest is the Pencil `Entry`
+- History folding (`Sol2d`, `T6tMl`): a historical record at rest is the Pencil `Entry`
   without its source row, so its text shares the expanded records' left rail, the 24 pt action
   column, and 1 px dividers; there is no card fill or inset. A result that fits one line takes the
   82 pt row, two lines take 108 pt in full, and a longer result keeps the 108 pt row with the second
