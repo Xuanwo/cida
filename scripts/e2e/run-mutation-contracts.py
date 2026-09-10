@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -84,9 +85,39 @@ def apply_mutation(clone, mutation):
     }
 
 
-def has_test_failure(log_path):
+def unit_test_outcome(return_code, log_path):
+    """Classify one targeted `swift test --filter` run.
+
+    A filter that matches no test case exits 0 and prints no `Test Case` lines;
+    that must never count as a survived or killed mutation, because the kill
+    contract simply did not execute.
+    """
     text = log_path.read_text(encoding="utf-8", errors="replace")
-    return "Test Case '" in text and "' failed (" in text
+    if "Test Case '" not in text:
+        return "Missing"
+    if return_code != 0 and "' failed (" in text:
+        return "Failed"
+    return "PassedOrInvalid"
+
+
+TEST_METHOD_PATTERN = re.compile(r"^\s*func\s+(test\w+)\s*\(", re.MULTILINE)
+
+
+def declared_test_methods(directory):
+    methods = set()
+    for path in sorted(directory.rglob("*.swift")):
+        methods.update(TEST_METHOD_PATTERN.findall(path.read_text(encoding="utf-8")))
+    return methods
+
+
+def missing_kill_tests(mutation, unit_methods, release_methods):
+    missing = []
+    for key, methods in (("unitTests", unit_methods), ("releaseTests", release_methods)):
+        for test_name in mutation[key]:
+            method = test_name.rsplit("/", 1)[-1]
+            if method not in methods:
+                missing.append(test_name)
+    return missing
 
 
 def run_unit_contracts(clone, mutation, result_directory):
@@ -114,7 +145,6 @@ def run_unit_contracts(clone, mutation, result_directory):
         result["reason"] = "mutated source did not compile"
         return result
 
-    all_failed = True
     for index, test_name in enumerate(mutation["unitTests"]):
         test_log = result_directory / f"unit-test-{index + 1}.log"
         return_code, duration = run(
@@ -130,18 +160,23 @@ def run_unit_contracts(clone, mutation, result_directory):
             cwd=clone,
             log_path=test_log,
         )
-        failed_by_assertion = return_code != 0 and has_test_failure(test_log)
         result["tests"].append(
             {
                 "name": test_name,
                 "exitCode": return_code,
                 "durationSeconds": round(duration, 3),
-                "result": "Failed" if failed_by_assertion else "PassedOrInvalid",
+                "result": unit_test_outcome(return_code, test_log),
                 "log": test_log.name,
             }
         )
-        all_failed = all_failed and failed_by_assertion
-    result["status"] = "killed" if all_failed else "survived"
+    outcomes = [test["result"] for test in result["tests"]]
+    if "Missing" in outcomes:
+        result["status"] = "infrastructure"
+        result["reason"] = "one or more unit kill tests did not execute"
+    elif all(outcome == "Failed" for outcome in outcomes):
+        result["status"] = "killed"
+    else:
+        result["status"] = "survived"
     return result
 
 
@@ -242,9 +277,16 @@ def validate_catalog(catalog, selected_ids):
     unknown = sorted(set(selected_ids) - set(ids))
     if unknown:
         raise RuntimeError(f"unknown mutations: {', '.join(unknown)}")
+    unit_methods = declared_test_methods(PROJECT_ROOT / "Tests")
+    release_methods = declared_test_methods(PROJECT_ROOT / "UITests")
     for mutation in mutations:
         if not mutation["unitTests"] or not mutation["releaseTests"]:
             raise RuntimeError(f"{mutation['id']}: unit and Release kill tests are required")
+        missing = missing_kill_tests(mutation, unit_methods, release_methods)
+        if missing:
+            raise RuntimeError(
+                f"{mutation['id']}: catalog drift, kill tests are not declared: {', '.join(missing)}"
+            )
         source = (PROJECT_ROOT / mutation["file"]).read_text(encoding="utf-8")
         actual = source.count(mutation["before"])
         if actual != mutation["occurrences"]:
