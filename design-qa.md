@@ -88,8 +88,13 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   the former focus record standalone while its source collapses and its result rises and, for a
   long record, clips under the fade; a short record only gains its divider. A clicked row first
   renders as that row and then opens in place to show its source (and, for a long record, its
-  complete result), and collapsing runs the same transition in reverse before the record rejoins
-  the virtualized list. The resting preview and the expanded result share one TextKit style, so
+  complete result); the switch waits for the run-loop turn in which the native row has its frame
+  and window, because SwiftUI's `onAppear` precedes both and an unsized view would measure its
+  result at a 1 pt width and skip the transition. Measuring a record never lays its result out:
+  SwiftUI probes 1 pt and 10 pt widths while sizing the column, so the result keeps the height of
+  its last real layout. Collapsing runs the same transition in reverse
+  before the record rejoins the virtualized list. SwiftUI animates the record's frame with the
+  same ease-out control points AppKit uses for its content. The resting preview and the expanded result share one TextKit style, so
   the swap at the start of a transition never changes line height.
 - SwiftUI and AppKit resolve every shared surface, text, border, and accent color from
   `CidaDesign.Palette`, while every history renderer resolves sizing from
@@ -138,7 +143,7 @@ reintroduced.
 
 ## Executable evidence
 
-- `swift test -Xswiftc -warnings-as-errors`: 156 tests, 0 failures.
+- `swift test -Xswiftc -warnings-as-errors`: 158 tests, 0 failures.
 - Native renderer tests prove all three history presentations use the same concrete view, preserve
   the header renderer identity across transitions, release expanded-only resources when folding,
   expand a recycled row through a real AppKit hit-test and mouse event, run the fold and expand
@@ -153,10 +158,10 @@ reintroduced.
   audit. The Main Translate approval was re-recorded from the isolated nonactivating capture after
   the history rows moved to the v2 rule; the Settings approval is unchanged.
 - `scripts/test-ui-in-tart.sh` from this tree: all 28 XCUI journeys passed in a fresh headless
-  Tart clone (`TestResults/vm-ui-icons-run2`), including the row geometry assertions (108 pt
-  long record, 40 pt preview offset, chevron beside ↺), the re-approved Main Translate baseline,
-  the native accessibility audit with the described but undrawn action-button images, and the
-  host-session guard.
+  Tart clone (`TestResults/vm-ui-expand-run2`), including the row geometry assertions (108 pt
+  long record, 40 pt preview offset, chevron beside ↺), the expanded action column of the latest
+  record, the re-approved Main Translate baseline, the native accessibility audit with the
+  described but undrawn action-button images, and the host-session guard.
 - `scripts/e2e/run-mutation-contracts.sh --mode unit` on a scratch clone of this tree: 13 of the
   14 mutations were killed on the first run (`TestResults/mutations-unit-pencil-v2-20260910`). The
   re-anchored `folded-result-fade-hidden` mutation, which empties the Pencil fade frame, survived

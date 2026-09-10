@@ -58,6 +58,7 @@ model, storage, window, history, or renderer paths.
 | Large history scroll rebuilt full results | SQLite loads bounded pages; AppKit recycles only viewport folded rows and reads cached grapheme-safe previews. | 5,000-row recycler tests, 1,000-row sustained scroll, and exact extreme workflows. |
 | A PR could pass without naming the hot-path invariants it relied on | Every gate reruns a dedicated proxy stage for bounded history reads, viewport-only materialization, incremental result layout, layout coalescing, and large-document virtualization. PR summaries explicitly stop at proxy coverage; nightly/release summaries additionally require physical view-bound reports from a 120 Hz display. | `performance-proxies` gate stage plus physical streaming, million-paste, history-scroll, and extreme reports. |
 | Scrollbar direction or duplicate system thumb regressed | Custom indicators use top-origin normalized geometry and suppress reinstalled AppKit overlay scrollers while retaining native scroll behavior. | Native direction/reinstallation tests and two-position WindowServer pixel assertions. |
+| Expanding a record ballooned and snapped back | SwiftUI switched a freshly created standalone record to its expanded presentation before the native view had a frame or a window, so the result was measured at a 1 pt width and the in-place transition was skipped. The switch now waits for the layout turn, an animated expand lays the result out at the row's real width before SwiftUI measures it, measuring never lays text out (SwiftUI probes 1 pt and 10 pt widths), and an unsized view never starts a transition. | Probe-width measurement test (`preferredHeight` at 1, 10, 400, and 1,280 pt leaves the live layout untouched) and a hosted expand journey sampled every frame: the record never exceeds its final height, the rows above stay in the viewport, and the transition runs. |
 
 ## Test layers
 
@@ -69,8 +70,8 @@ model, storage, window, history, or renderer paths.
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite currently contains 156 tests: 51 model/report tests, 7 SQLite tests, 4 host
-isolation tests, 83 native interaction, layout, and design-token tests, 3 mutation invariants,
+The host Swift suite currently contains 158 tests: 51 model/report tests, 7 SQLite tests, 4 host
+isolation tests, 85 native interaction, layout, and design-token tests, 3 mutation invariants,
 2 suite/matrix manifest tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
 
 The Release XCUI target contains 28 tests across ten files: 23 product journeys and five harness
@@ -123,7 +124,7 @@ are recorded as diagnostics rather than misclassified as test activity.
 
 ## Current verification
 
-- `swift test -Xswiftc -warnings-as-errors`: 156/156 passed.
+- `swift test -Xswiftc -warnings-as-errors`: 158/158 passed.
 - Focused fresh-clone Tart diagnosis reproduced both the source-preview frame overflow and the
   recycled folded-row click failure. After the root repairs, both previously failing journeys passed
   2/2 with a healthy host-session guard and no host artifact activation. The native semantic audit

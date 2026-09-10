@@ -961,6 +961,48 @@ extension InteractionReproductionTests {
     XCTAssertEqual(row.sourceMeasurementCountForTesting, 1)
   }
 
+  func testMeasuringAnExpandedRecordAtProbeWidthsNeverDisturbsItsLayout() throws {
+    // SwiftUI probes `sizeThatFits` at 1 pt and 10 pt while it sizes the
+    // column. Laying the result out at those widths left the live container
+    // 1 pt wide, so the expanded record's text column collapsed.
+    let entry = HistoryEntry.designSamples[1]
+    let row = HistoryEntryNSView()
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 82)
+    row.configureExpanded(
+      entryID: entry.id,
+      mode: entry.mode,
+      metadata: entry.metadata,
+      source: entry.source,
+      preview: entry.resultStorage.foldedPreview,
+      resultStorage: entry.resultStorage,
+      presentationRevision: 0,
+      latestPresentationDelta: nil,
+      state: .completed,
+      presentation: .manuallyExpanded,
+      isLongEntry: entry.isLongDocument,
+      showsSeparator: true,
+      onCollapse: {},
+      onRedo: {},
+      onCopySource: {},
+      onCopyResult: {}
+    )
+    row.layoutSubtreeIfNeeded()
+    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+    let laidOut = row.resultFrameForTesting
+    XCTAssertEqual(laidOut.width, 780, accuracy: 0.001)
+    // 16 + 16 header + 8 + 21 source + 8 + 26 result + 16 + 1 separator.
+    XCTAssertEqual(row.preferredHeight(for: 804), 112, accuracy: 0.001)
+
+    for probeWidth: CGFloat in [1, 10, 400, 1_280] {
+      _ = row.preferredHeight(for: probeWidth)
+      XCTAssertEqual(
+        row.resultFrameForTesting, laidOut,
+        "Measuring at \(probeWidth) pt must leave the live result layout alone"
+      )
+    }
+    XCTAssertEqual(row.preferredHeight(for: 804), 112, accuracy: 0.001)
+  }
+
   func testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState() throws {
     let pool = HistoryResultTextContainerPool.shared
     let initialLeaseCount = pool.leasedContainerCountForTesting

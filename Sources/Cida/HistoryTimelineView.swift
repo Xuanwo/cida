@@ -525,13 +525,20 @@ private struct HistoryEntryView: View {
     .animation(historyTransitionAnimation, value: displayedPresentation)
     .onAppear {
       guard !hasSettledInitialPresentation else { return }
-      hasSettledInitialPresentation = true
+      // SwiftUI runs `onAppear` before the native view has a frame or a
+      // window. Switching the presentation in that state would measure the
+      // result at a 1 pt width and skip the in-place transition, so the switch
+      // waits for the run loop turn in which the row has been laid out: the
+      // record shows as its row for that frame (Pencil T2) and then opens.
+      DispatchQueue.main.async {
+        hasSettledInitialPresentation = true
+      }
     }
   }
 
   private var historyTransitionAnimation: Animation? {
     guard animatesPresentation else { return nil }
-    return .easeOut(duration: CidaMotion.historyFoldSeconds)
+    return CidaMotion.easeOutAnimation(duration: CidaMotion.historyFoldSeconds)
   }
 
 }

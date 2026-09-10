@@ -945,8 +945,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     }
     let changed = previousPresentation != nextPresentation
     presentation = nextPresentation
+    // A view without a width has no geometry to animate from; it takes the
+    // end state and lets the next layout place it.
     let duration =
-      changed && animated
+      changed && animated && bounds.width > 0
       ? CidaMotion.resolvedDuration(CidaMotion.historyFoldSeconds, in: window)
       : 0
 
@@ -1163,13 +1165,17 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       isStreaming: entryState == .streaming,
       in: resultContainer
     )
-    if layoutImmediately {
+    if layoutImmediately, bounds.width > 0 {
       // The expand transition needs the natural height now so SwiftUI can
       // animate the frame to it; SwiftUI measures that height itself, so the
-      // layout must not also publish it as a delta.
+      // layout must not also publish it as a delta. The row already has its
+      // real width here (the presentation switch waits for its layout), so
+      // this is the layout `layout()` would otherwise schedule.
       let textWidth = max(1, bounds.width - Layout.actionColumnWidth)
       if abs(resultContainer.frame.width - textWidth) > 0.5 {
-        resultContainer.setFrameSize(NSSize(width: textWidth, height: resultContainer.frame.height))
+        resultContainer.setFrameSize(
+          NSSize(width: textWidth, height: resultContainer.frame.height)
+        )
       }
       resultCoordinator.layoutNow(of: resultContainer, publishesHeight: false)
     }
@@ -1273,6 +1279,12 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     entries.first { $0.id == entryID }
   }
 
+  /// The height SwiftUI should give this record at `width`. Measuring never
+  /// lays text out: SwiftUI probes arbitrary widths (1 pt, 10 pt) while it
+  /// sizes the column, and laying the result out at those widths would
+  /// destroy the live layout. The result keeps the height of its last real
+  /// layout, which `layout()` refreshes at the row's actual width and which an
+  /// animated expand computes up front in `configureExpandedContent`.
   func preferredHeight(for width: CGFloat) -> CGFloat {
     let separator = showsSeparator ? Layout.separatorHeight : 0
     switch presentation {

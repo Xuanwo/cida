@@ -140,9 +140,22 @@ enum CidaMotion {
   static let cursorHeight: CGFloat = 20
 
   /// `motion-ease-char-in`, `motion-ease-height`, and `motion-ease-fold` are all
-  /// the Pencil ease-out curve.
+  /// the Pencil ease-out curve. Core Animation and SwiftUI read the same
+  /// control points, so a frame that SwiftUI animates and the content that
+  /// AppKit animates inside it stay in step.
+  static let easeOutControlPoints: (x1: Float, y1: Float, x2: Float, y2: Float) = (0.33, 1, 0.68, 1)
+
   static var easeOut: CAMediaTimingFunction {
-    CAMediaTimingFunction(controlPoints: 0.33, 1, 0.68, 1)
+    let points = easeOutControlPoints
+    return CAMediaTimingFunction(controlPoints: points.x1, points.y1, points.x2, points.y2)
+  }
+
+  static func easeOutAnimation(duration: TimeInterval) -> Animation {
+    let points = easeOutControlPoints
+    return .timingCurve(
+      Double(points.x1), Double(points.y1), Double(points.x2), Double(points.y2),
+      duration: duration
+    )
   }
 
   /// Motion is dropped when the system reduces motion or the view is not in a

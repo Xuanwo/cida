@@ -1015,6 +1015,66 @@ extension InteractionReproductionTests {
     XCTAssertNil(row.hitTest(NSPoint(x: copy.frame.midX, y: copy.frame.midY)) as? HistoryEntryActionButton)
   }
 
+  func testExpandingAVirtualizedRecordOpensInPlaceWithoutOvershooting() throws {
+    // The reported defect: SwiftUI switched a fresh standalone record to its
+    // expanded presentation before the native view had a frame or a window,
+    // so the result was measured at a 1 pt width (1,742 pt for one line), the
+    // frame animated toward that, the rows above shot off screen, and the
+    // in-place transition was skipped.
+    let entries = [HistoryEntry.longDesignSamples[0]] + HistoryEntry.designSamples
+    let model = AppModel(inputText: "", entries: entries, settings: .designPreview)
+    let (_, hostingView) = makeHiddenWindow(
+      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
+      size: CGSize(width: 860, height: 640)
+    )
+    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    hostingView.layoutSubtreeIfNeeded()
+
+    func entryViews() -> [HistoryEntryNSView] {
+      var found: [HistoryEntryNSView] = []
+      func walk(_ view: NSView) {
+        if let entry = view as? HistoryEntryNSView { found.append(entry) }
+        view.subviews.forEach(walk)
+      }
+      walk(hostingView)
+      return found
+    }
+    let target = entries[2]
+    let targetIdentifier = "history-entry-\(target.id.uuidString.lowercased())"
+    let expandedHeight: CGFloat = 112
+
+    model.expandHistoryEntry(target.id)
+    var sawTransition = false
+    var maximumHeight: CGFloat = 0
+    var minimumRowY: CGFloat = .greatestFiniteMagnitude
+    for _ in 0..<24 {
+      RunLoop.current.run(until: Date().addingTimeInterval(0.016))
+      for view in entryViews() {
+        let frame = view.convert(view.bounds, to: hostingView)
+        minimumRowY = min(minimumRowY, frame.minY)
+        guard view.accessibilityIdentifier() == targetIdentifier else { continue }
+        maximumHeight = max(maximumHeight, frame.height)
+        sawTransition = sawTransition || view.isTransitioningForTesting
+      }
+    }
+    let expanded = try XCTUnwrap(
+      entryViews().first { $0.accessibilityIdentifier() == targetIdentifier }
+    )
+    XCTAssertEqual(expanded.presentation, .manuallyExpanded)
+    XCTAssertEqual(expanded.frame.height, expandedHeight, accuracy: 0.5)
+    XCTAssertLessThanOrEqual(
+      maximumHeight, expandedHeight + 0.5,
+      "The record must grow to its final height, never past it"
+    )
+    XCTAssertGreaterThanOrEqual(
+      minimumRowY, 0,
+      "Rows above the record stay in the viewport instead of shooting off screen"
+    )
+    if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+      XCTAssertTrue(sawTransition, "The record opens with the in-place transition")
+    }
+  }
+
   func testRecordActionsRequireHoverAndACompletedOrTerminalEntry() {
     XCTAssertFalse(
       HistoryEntryActionPolicy.showsActions(isHovering: false, state: .completed)
