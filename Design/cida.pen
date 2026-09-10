@@ -1210,7 +1210,7 @@
       "name": "Spec — 操作图标",
       "width": 860,
       "height": 0,
-      "content": "操作图标 hover 浮现:默认隐藏,悬停记录时 120ms(motion-icon-in-ms)淡入;悬停图标本身颜色加深;复制成功后图标变 ✓(accent 色)保持 800ms(motion-copied-hold-ms)。⌘C 始终复制最新一条结果。生成中的记录不显示图标。超长文本:copy 图标在所属文本块的可见范围内粘性跟随视口(见 States 板 ③),↺ 固定于 meta 行不跟随。量值以变量面板 motion-* token 为准。"
+      "content": "操作图标 hover 浮现:默认隐藏,悬停记录时 120ms(motion-icon-in-ms)淡入;悬停图标本身颜色加深;复制成功后图标变 ✓(accent 色)保持 800ms(motion-copied-hold-ms)。⌘C 始终复制最新一条结果。生成中的记录不显示图标。超长文本:copy 图标在所属文本块的可见范围内粘性跟随视口(见 States 板 ③),↺ 固定于 meta 行不跟随。悬停任一历史记录时整行以 surface-fold 微高亮(120ms 淡入),高亮向左右各外扩 10pt(space-hover-bleed)、圆角 8,文字不动;可展开的记录在 meta 行末(↺ 左侧)显示 chevron-down,已展开的记录显示 chevron-up,与图标同步淡入;最新一条与展开中的记录不做整行高亮。量值以变量面板 motion-* token 为准。"
     },
     {
       "type": "frame",
@@ -1447,27 +1447,24 @@
           "id": "XN2w5",
           "name": "Caption",
           "fill": "$text-secondary",
-          "content": "④ 历史记录 — 折叠为 meta + 结果前 2 行渐隐;点击展开,点击 meta 收起;hover 整条微高亮",
+          "content": "④ 长记录(结果 > 2 行)— 折叠为 meta + 结果前 2 行渐隐到底色,无卡片填充;短记录不折叠;点击展开,点击 meta 收起;hover 整行微高亮(外扩 10pt)",
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-label",
           "fontWeight": "500"
         },
         {
-          "id": "zOpwo",
+          "id": "wfBeo",
           "type": "ref",
           "ref": "B2Cx3",
           "name": "Demo — 历史折叠",
           "width": "fill_container",
-          "fill": "$surface-fold",
-          "cornerRadius": "$radius-card",
-          "padding": 10,
           "descendants": {
             "SCbl4": {
               "content": "中文 → English · 09:14 · 1,846 → 3,214 字"
             },
             "tzszR": {
               "type": "frame",
-              "id": "jiDGV",
+              "id": "fvs6v",
               "name": "Folded Clip",
               "clip": true,
               "width": "fill_container",
@@ -1476,7 +1473,7 @@
               "children": [
                 {
                   "type": "text",
-                  "id": "JfUxt",
+                  "id": "mg2rZ",
                   "name": "Folded Result",
                   "fill": "$text-primary",
                   "textGrowth": "fixed-width",
@@ -1489,7 +1486,7 @@
                 },
                 {
                   "type": "rectangle",
-                  "id": "D5UPn",
+                  "id": "tKRJy",
                   "layoutPosition": "absolute",
                   "x": 0,
                   "y": 27,
@@ -1504,16 +1501,16 @@
                     },
                     "colors": [
                       {
-                        "color": "$surface-fold",
+                        "color": "$bg",
                         "position": 0
                       },
                       {
-                        "color": "#F1F1EC00",
+                        "color": "#FAFAF800",
                         "position": 1
                       }
                     ]
                   },
-                  "width": 784,
+                  "width": 804,
                   "height": 25
                 }
               ]
@@ -1530,7 +1527,7 @@
       "name": "Spec — 历史折叠",
       "width": 860,
       "height": 0,
-      "content": "焦点模型:仅最新一条完全展开(原文 2 行渐隐 + 结果全平铺);所有历史条折叠为 meta + 结果前 2 行渐隐,原文隐藏。点击历史条任意处原位展开(可多条同开,便于对比),点击其 meta 行收起。新记录提交时,原焦点条以 200ms(motion-fold-ms)高度过渡折叠,流保持贴底。copy / ⌘C 始终复制全文,不受折叠影响。过渡关键帧见 Motion — 历史折叠板;量值以变量面板 motion-* token 为准。"
+      "content": "焦点模型 v2:仅最新一条完全展开(原文 2 行渐隐 + 结果全平铺)。历史记录按内容分两类:短记录(结果在当前列宽下 ≤ 2 行)始终完整显示 meta + 结果、不显示原文;长记录(结果 > 2 行,或原文 ≥ 800 字 / 结果 ≥ 1,200 字)折叠为 meta + 结果前 2 行 + 25pt 渐隐到窗口底色 bg。折叠与紧凑记录都没有卡片填充,记录之间只有 1px 分割线,文字左轨与最新记录对齐;行高由内容决定(短记录 82 / 108pt,折叠长记录 108pt),不再固定。点击任意处原位展开:短记录展开后显示原文行,长记录展开后显示原文(2 行渐隐)与完整结果,可多条同开;点击 meta 行收起。展开 / 收起与新记录提交时前一条长记录的折叠都用 200ms(motion-fold-ms)高度过渡;前一条是短记录时几何不变,只在其下方出现分割线。阅读列宽:Stream 与 composer 的内容列最大 804pt(reading-width),窗口更宽时列居中、两侧留白;标题栏与 composer 底色仍通栏。copy / ⌘C 始终复制全文,不受折叠影响。状态见 States — 历史折叠 v2,过渡关键帧见 Motion — 历史折叠板;量值以变量面板 token 为准。"
     },
     {
       "type": "frame",
@@ -2158,7 +2155,7 @@
       "name": "Guide — 画布导读",
       "width": 860,
       "height": 0,
-      "content": "画布结构(自上而下)\n· Components 行:Titlebar / Composer / Entry / Mode Seg / Lang Chip / Send Button / Settings Row / Motion Label。所有屏幕由这些组件的实例组成;状态差异只通过实例覆盖(descendants overrides)表达,查看某屏与基准的差异,直接看该实例的覆盖列表即可。\n· Screens 行:Main — 翻译(基准态)、改进中文、长文本处理、生成中、Settings。\n· States & Motion 行:States — 记录操作(悬停 / 复制成功 / 粘性 copy / 历史折叠)、Motion — 流式输出(T0–T4 过渡关键帧)、Motion — 历史折叠(T0–T2 过渡关键帧)+ 三张 Spec note(操作图标、历史折叠、流式输出动效)。\n\n动效约定\n· 所有动效量值(时长 / 曲线 / 速率 / 呼吸参数)是变量面板的 motion-* token,与颜色字号同级;spec note 与 Motion 板中的数值后均标注 token 名,数值冲突时以变量面板为准。\n· Motion 板每帧 = 一个稳定状态;帧间标注 = 过渡的触发条件、变化属性与 token。行为逻辑(速率平滑、滚动锚定、字素簇粒度)见 Spec — 流式输出动效。\n· 实现侧应将 motion-* token 一比一映射为常量(如 MotionTokens.swift),reduced-motion 降级行为见流式板 T4。\n\n开发对接\n· 变量面板即 design token,与实现一一映射:颜色 11 个(无 Dark);字号 4 档 caption 11 / label 11.5 / secondary 13 / body 16;行高 body 1.6 / source 1.55;圆角 window 14 / card 8 / seg 7 / chip 6 / seg-item 5;间距 window-x 28 / entry-y 16;动效 motion-* 19 个。设置页少量专用字号(10.5/12/12.5/13.5)保持字面值。\n· QA 截图对比所用的顶层节点 id 未变(design-qa.md 中的清单继续有效)。"
+      "content": "画布结构(自上而下)\n· Components 行:Titlebar / Composer / Entry / Mode Seg / Lang Chip / Send Button / Settings Row / Motion Label。所有屏幕由这些组件的实例组成;状态差异只通过实例覆盖(descendants overrides)表达,查看某屏与基准的差异,直接看该实例的覆盖列表即可。\n· Screens 行:Main — 翻译(基准态)、改进中文、长文本处理、生成中、Settings。\n· States & Motion 行:States — 记录操作(悬停 / 复制成功 / 粘性 copy / 历史折叠)、Motion — 流式输出(T0–T4 过渡关键帧)、Motion — 历史折叠(T0–T2 过渡关键帧)+ 三张 Spec note(操作图标、历史折叠、流式输出动效)。\n· 历史折叠 v2 行(2026-09-10 确认):Main — 翻译 · 长记录折叠(860,只折叠长记录、无底色)、Main — 宽窗口 1280 · 阅读列宽、States — 历史折叠 v2(短记录 / 长记录的静止、hover、展开与提交)、Spec — 历史折叠 v2(实现细则)。\n\n动效约定\n· 所有动效量值(时长 / 曲线 / 速率 / 呼吸参数)是变量面板的 motion-* token,与颜色字号同级;spec note 与 Motion 板中的数值后均标注 token 名,数值冲突时以变量面板为准。\n· Motion 板每帧 = 一个稳定状态;帧间标注 = 过渡的触发条件、变化属性与 token。行为逻辑(速率平滑、滚动锚定、字素簇粒度)见 Spec — 流式输出动效。\n· 实现侧应将 motion-* token 一比一映射为常量(如 MotionTokens.swift),reduced-motion 降级行为见流式板 T4。\n\n开发对接\n· 变量面板即 design token,与实现一一映射:颜色 11 个(无 Dark);字号 4 档 caption 11 / label 11.5 / secondary 13 / body 16;行高 body 1.6 / source 1.55;圆角 window 14 / card 8 / seg 7 / chip 6 / seg-item 5;间距 window-x 28 / entry-y 16 / hover-bleed 10;阅读列宽 reading-width 804;动效 motion-* 19 个。设置页少量专用字号(10.5/12/12.5/13.5)保持字面值。\n· QA 截图对比所用的顶层节点 id 未变(design-qa.md 中的清单继续有效)。"
     },
     {
       "type": "frame",
@@ -2733,7 +2730,7 @@
           "id": "NgqDA",
           "name": "Frame Caption",
           "fill": "$text-secondary",
-          "content": "T0 — 稳态 · 焦点模型:仅最新一条完全展开(原文 2 行渐隐 + 结果全平铺),历史条折叠为 meta + 结果前 2 行渐隐",
+          "content": "T0 — 稳态 · 焦点模型:仅最新一条完全展开(原文 2 行渐隐 + 结果全平铺);短记录完整显示 meta + 结果;长记录折叠为 meta + 结果前 2 行渐隐,无底色",
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-label",
           "fontWeight": "600"
@@ -2755,21 +2752,18 @@
           ],
           "children": [
             {
-              "id": "y5afn",
+              "id": "V2xGh",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "历史条 — 折叠",
+              "name": "历史条 — 长记录折叠",
               "width": "fill_container",
-              "fill": "$surface-fold",
-              "cornerRadius": "$radius-card",
-              "padding": 10,
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 09:14 · 1,846 → 3,214 字"
                 },
                 "tzszR": {
                   "type": "frame",
-                  "id": "D1Yk1R",
+                  "id": "AcLQI",
                   "name": "Folded Clip",
                   "clip": true,
                   "width": "fill_container",
@@ -2778,7 +2772,7 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "gRfH4",
+                      "id": "lwJ96",
                       "name": "Folded Result",
                       "fill": "$text-primary",
                       "textGrowth": "fixed-width",
@@ -2791,7 +2785,7 @@
                     },
                     {
                       "type": "rectangle",
-                      "id": "iUkU9",
+                      "id": "QRT8B",
                       "layoutPosition": "absolute",
                       "x": 0,
                       "y": 27,
@@ -2806,16 +2800,16 @@
                         },
                         "colors": [
                           {
-                            "color": "$surface-fold",
+                            "color": "$surface",
                             "position": 0
                           },
                           {
-                            "color": "#F1F1EC00",
+                            "color": "#FFFFFF00",
                             "position": 1
                           }
                         ]
                       },
-                      "width": 750,
+                      "width": 772,
                       "height": 25
                     }
                   ]
@@ -2908,7 +2902,7 @@
           "width": "fill_container",
           "descendants": {
             "gRIbr": {
-              "content": "历史条:原文隐藏,结果 clip 至前 2 行 + 渐隐;焦点条:原文渐隐 2 行、结果全平铺"
+              "content": "长记录折叠:原文隐藏,结果 clip 至前 2 行 + 渐隐到底色;短记录(≤ 2 行)不折叠,与折叠行同为无底色、分割线分隔;焦点条:原文渐隐 2 行、结果全平铺"
             }
           }
         },
@@ -2925,7 +2919,7 @@
           "id": "zywRa",
           "name": "Frame Caption",
           "fill": "$text-secondary",
-          "content": "T1 — 新记录提交 · 原焦点条折叠",
+          "content": "T1 — 新记录提交 · 原焦点条为长记录时折叠",
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-label",
           "fontWeight": "600"
@@ -2947,21 +2941,18 @@
           ],
           "children": [
             {
-              "id": "E2Rl0",
+              "id": "y4Mgs0",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "原焦点条 — 折叠中",
+              "name": "原焦点条 — 折叠中(长记录)",
               "width": "fill_container",
-              "fill": "$surface-fold",
-              "cornerRadius": "$radius-card",
-              "padding": 10,
               "descendants": {
                 "SCbl4": {
-                  "content": "中文 → English · 14:05"
+                  "content": "中文 → English · 14:05 · 1,846 → 3,214 字"
                 },
                 "tzszR": {
                   "type": "frame",
-                  "id": "INTDF",
+                  "id": "RuS84",
                   "name": "Folded Clip",
                   "clip": true,
                   "width": "fill_container",
@@ -2970,12 +2961,12 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "QnC6v",
+                      "id": "Azr39",
                       "name": "Folded Result",
                       "fill": "$text-primary",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.",
+                      "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency. The new engine batches writes, keeps a compact index in memory, and verifies every page before it is made visible to readers.",
                       "lineHeight": "$line-height-body",
                       "fontFamily": "$font-body",
                       "fontSize": "$font-size-body",
@@ -2983,7 +2974,7 @@
                     },
                     {
                       "type": "rectangle",
-                      "id": "ESH0J",
+                      "id": "vouMH",
                       "layoutPosition": "absolute",
                       "x": 0,
                       "y": 27,
@@ -2998,16 +2989,16 @@
                         },
                         "colors": [
                           {
-                            "color": "$surface-fold",
+                            "color": "$surface",
                             "position": 0
                           },
                           {
-                            "color": "#F1F1EC00",
+                            "color": "#FFFFFF00",
                             "position": 1
                           }
                         ]
                       },
-                      "width": 750,
+                      "width": 772,
                       "height": 25
                     }
                   ]
@@ -3059,7 +3050,7 @@
           "width": "fill_container",
           "descendants": {
             "gRIbr": {
-              "content": "新记录提交时,原焦点条以 200ms(motion-fold-ms)高度过渡折叠(原文收起、结果 clip 至 2 行),流保持贴底;新条按流式板 T1 起流"
+              "content": "新记录提交时,原焦点条若为长记录,以 200ms(motion-fold-ms)高度过渡折叠(原文收起、结果 clip 至 2 行、渐隐淡入),流保持贴底;若为短记录则几何不变,只在其下方出现分割线;新条按流式板 T1 起流"
             }
           }
         },
@@ -3076,7 +3067,7 @@
           "id": "Ulqgk",
           "name": "Frame Caption",
           "fill": "$text-secondary",
-          "content": "T2 — 点击历史条 · 原位展开",
+          "content": "T2 — 点击记录 · 原位展开",
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-label",
           "fontWeight": "600"
@@ -3113,21 +3104,18 @@
               }
             },
             {
-              "id": "ZmCX4",
+              "id": "KXaEu",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "历史条 — 折叠",
+              "name": "历史条 — 长记录折叠",
               "width": "fill_container",
-              "fill": "$surface-fold",
-              "cornerRadius": "$radius-card",
-              "padding": 10,
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 09:14 · 1,846 → 3,214 字"
                 },
                 "tzszR": {
                   "type": "frame",
-                  "id": "q9m4A",
+                  "id": "T5eEGW",
                   "name": "Folded Clip",
                   "clip": true,
                   "width": "fill_container",
@@ -3136,7 +3124,7 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "hbsGy",
+                      "id": "Deos3",
                       "name": "Folded Result",
                       "fill": "$text-primary",
                       "textGrowth": "fixed-width",
@@ -3149,7 +3137,1031 @@
                     },
                     {
                       "type": "rectangle",
-                      "id": "pSfAc",
+                      "id": "I2JYr",
+                      "layoutPosition": "absolute",
+                      "x": 0,
+                      "y": 27,
+                      "name": "Folded Fade",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 0,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "$surface",
+                            "position": 0
+                          },
+                          {
+                            "color": "#FFFFFF00",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 772,
+                      "height": 25
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "Lpb1u",
+          "type": "ref",
+          "ref": "pn8Ym",
+          "name": "Motion Note",
+          "width": "fill_container",
+          "descendants": {
+            "gRIbr": {
+              "content": "点击任意历史记录原位展开(200ms):短记录展开后显示原文行,长记录展开后显示原文(2 行渐隐)与完整结果,可多条同开;点击其 meta 行收起;copy / ⌘C 始终复制全文,不受折叠影响"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "rOC5t",
+      "x": 1120,
+      "y": 2480,
+      "name": "Main — 翻译 · 长记录折叠",
+      "clip": true,
+      "width": 860,
+      "height": 640,
+      "fill": "$bg",
+      "cornerRadius": "$radius-window",
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "effect": {
+        "type": "shadow",
+        "shadowType": "outer",
+        "color": "#00000014",
+        "offset": {
+          "x": 0,
+          "y": 24
+        },
+        "blur": 60
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "fS2jS",
+          "type": "ref",
+          "ref": "YdbKP",
+          "name": "Titlebar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "aLYfy",
+          "name": "Stream",
+          "clip": true,
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "padding": [
+            8,
+            "$space-window-x",
+            "$space-entry-y",
+            "$space-window-x"
+          ],
+          "justifyContent": "end",
+          "children": [
+            {
+              "id": "z1Yv2",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry — 改进 短",
+              "width": "fill_container",
+              "descendants": {
+                "iRSPY": {
+                  "icon": "sparkles"
+                },
+                "Bw7O0": {
+                  "content": "改进"
+                },
+                "SCbl4": {
+                  "content": "English · 语气与语法 · 13:06"
+                },
+                "EDAjf": {
+                  "content": "Tried something new last night: https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
+                }
+              }
+            },
+            {
+              "type": "rectangle",
+              "id": "uPXqX",
+              "name": "Entry Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "id": "iO7eU",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry — 翻译 短",
+              "width": "fill_container",
+              "descendants": {
+                "SCbl4": {
+                  "content": "English → 中文 · 13:07"
+                },
+                "EDAjf": {
+                  "content": "昨晚尝试了一些新东西：https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
+                }
+              }
+            },
+            {
+              "type": "rectangle",
+              "id": "X4S89",
+              "name": "Entry Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "id": "r1MFbo",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry — 翻译 长 折叠",
+              "width": "fill_container",
+              "descendants": {
+                "SCbl4": {
+                  "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
+                },
+                "tzszR": {
+                  "type": "frame",
+                  "id": "H95eJJ",
+                  "name": "Folded Clip",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": 52,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sNYUk",
+                      "name": "Folded Result",
+                      "fill": "$text-primary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure.",
+                      "lineHeight": "$line-height-body",
+                      "fontFamily": "$font-body",
+                      "fontSize": "$font-size-body",
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "z6qTz",
+                      "layoutPosition": "absolute",
+                      "x": 0,
+                      "y": 27,
+                      "name": "Folded Fade",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 0,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "$bg",
+                            "position": 0
+                          },
+                          {
+                            "color": "#FAFAF800",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 804,
+                      "height": 25
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "rectangle",
+              "id": "kaH09",
+              "name": "Entry Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "id": "ZHUax",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry — 改进 短",
+              "width": "fill_container",
+              "descendants": {
+                "iRSPY": {
+                  "icon": "sparkles"
+                },
+                "Bw7O0": {
+                  "content": "改进"
+                },
+                "SCbl4": {
+                  "content": "English · 语气与语法 · 14:38"
+                },
+                "EDAjf": {
+                  "content": "No such guarantee."
+                }
+              }
+            },
+            {
+              "type": "rectangle",
+              "id": "x5KK4",
+              "name": "Entry Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "id": "nIrcI",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry — 改进 短",
+              "width": "fill_container",
+              "descendants": {
+                "iRSPY": {
+                  "icon": "sparkles"
+                },
+                "Bw7O0": {
+                  "content": "改进"
+                },
+                "SCbl4": {
+                  "content": "English · 语气与语法 · 14:46"
+                },
+                "EDAjf": {
+                  "content": "Having used GPT-6-Astra for a while now, my current take is that it works more like a person than an engineer."
+                }
+              }
+            },
+            {
+              "type": "rectangle",
+              "id": "b7sxfY",
+              "name": "Entry Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "id": "lgNZL",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry — 翻译 最新",
+              "width": "fill_container",
+              "descendants": {
+                "SCbl4": {
+                  "content": "English → 中文 · 14:48"
+                },
+                "IENJ0": {
+                  "enabled": true
+                },
+                "boMM0": {
+                  "content": "Using GPT-6-Astra for a while now, my current take is that it works more like a human than an engineer. Getting it to work like a good software engineer again takes more effort than before, but it unlocks many new kinds of work."
+                },
+                "EDAjf": {
+                  "content": "使用 GPT-6-Astra 已经有一段时间了，我目前的看法是，它更像一个人，而不是一个工程师。\n\n要让它再次像一个优秀的软件工程师那样工作，需要比以前付出更多努力，但它可以解锁许多新型工作。"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "mdBM0",
+          "type": "ref",
+          "ref": "nvsum",
+          "name": "Composer",
+          "width": "fill_container"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "JoW8q",
+      "x": 2060,
+      "y": 2480,
+      "name": "Main — 宽窗口 1280 · 阅读列宽",
+      "clip": true,
+      "width": 1280,
+      "height": 720,
+      "fill": "$bg",
+      "cornerRadius": "$radius-window",
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "PVyFv",
+          "type": "ref",
+          "ref": "YdbKP",
+          "name": "Titlebar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "u5xSDj",
+          "name": "Stream",
+          "clip": true,
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "padding": [
+            8,
+            "$space-window-x",
+            "$space-entry-y",
+            "$space-window-x"
+          ],
+          "justifyContent": "end",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "QBuAj",
+              "name": "Reading Column",
+              "width": 804,
+              "layout": "vertical",
+              "justifyContent": "end",
+              "children": [
+                {
+                  "id": "BkrtK",
+                  "type": "ref",
+                  "ref": "B2Cx3",
+                  "name": "Entry — 翻译 短",
+                  "width": "fill_container",
+                  "descendants": {
+                    "SCbl4": {
+                      "content": "English → 中文 · 23:21"
+                    },
+                    "EDAjf": {
+                      "content": "2026/09/09更新：我们已经完成了一半！"
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "CSJt8",
+                  "name": "Entry Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "y04wB0",
+                  "type": "ref",
+                  "ref": "B2Cx3",
+                  "name": "Entry — 改进 短",
+                  "width": "fill_container",
+                  "descendants": {
+                    "iRSPY": {
+                      "icon": "sparkles"
+                    },
+                    "Bw7O0": {
+                      "content": "改进"
+                    },
+                    "SCbl4": {
+                      "content": "English · 语气与语法 · 13:06"
+                    },
+                    "EDAjf": {
+                      "content": "Tried something new last night: https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "vyGRr",
+                  "name": "Entry Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "g5AII",
+                  "type": "ref",
+                  "ref": "B2Cx3",
+                  "name": "Entry — 翻译 长 折叠",
+                  "width": "fill_container",
+                  "descendants": {
+                    "SCbl4": {
+                      "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
+                    },
+                    "tzszR": {
+                      "type": "frame",
+                      "id": "FeM36",
+                      "name": "Folded Clip",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": 52,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "JeOBZ",
+                          "name": "Folded Result",
+                          "fill": "$text-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure.",
+                          "lineHeight": "$line-height-body",
+                          "fontFamily": "$font-body",
+                          "fontSize": "$font-size-body",
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "rectangle",
+                          "id": "jyb26",
+                          "layoutPosition": "absolute",
+                          "x": 0,
+                          "y": 27,
+                          "name": "Folded Fade",
+                          "fill": {
+                            "type": "gradient",
+                            "gradientType": "linear",
+                            "enabled": true,
+                            "rotation": 0,
+                            "size": {
+                              "height": 1
+                            },
+                            "colors": [
+                              {
+                                "color": "$bg",
+                                "position": 0
+                              },
+                              {
+                                "color": "#FAFAF800",
+                                "position": 1
+                              }
+                            ]
+                          },
+                          "width": 800,
+                          "height": 25
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "e4Ytkn",
+                  "name": "Entry Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "HXldQ",
+                  "type": "ref",
+                  "ref": "B2Cx3",
+                  "name": "Entry — 改进 短",
+                  "width": "fill_container",
+                  "descendants": {
+                    "iRSPY": {
+                      "icon": "sparkles"
+                    },
+                    "Bw7O0": {
+                      "content": "改进"
+                    },
+                    "SCbl4": {
+                      "content": "English · 语气与语法 · 14:38"
+                    },
+                    "EDAjf": {
+                      "content": "No such guarantee."
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "pyJD1",
+                  "name": "Entry Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "WBbxO",
+                  "type": "ref",
+                  "ref": "B2Cx3",
+                  "name": "Entry — 改进 短",
+                  "width": "fill_container",
+                  "descendants": {
+                    "iRSPY": {
+                      "icon": "sparkles"
+                    },
+                    "Bw7O0": {
+                      "content": "改进"
+                    },
+                    "SCbl4": {
+                      "content": "English · 语气与语法 · 14:46"
+                    },
+                    "EDAjf": {
+                      "content": "Having used GPT-6-Astra for a while now, my current take is that it works more like a person than an engineer."
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "JJwpQ",
+                  "name": "Entry Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "T3G1dw",
+                  "type": "ref",
+                  "ref": "B2Cx3",
+                  "name": "Entry — 翻译 最新",
+                  "width": "fill_container",
+                  "descendants": {
+                    "SCbl4": {
+                      "content": "English → 中文 · 14:48"
+                    },
+                    "IENJ0": {
+                      "enabled": true
+                    },
+                    "boMM0": {
+                      "content": "Using GPT-6-Astra for a while now, my current take is that it works more like a human than an engineer. Getting it to work like a good software engineer again takes more effort than before, but it unlocks many new kinds of work."
+                    },
+                    "EDAjf": {
+                      "content": "使用 GPT-6-Astra 已经有一段时间了，我目前的看法是，它更像一个人，而不是一个工程师。\n\n要让它再次像一个优秀的软件工程师那样工作，需要比以前付出更多努力，但它可以解锁许多新型工作。"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "tTxN6",
+          "name": "Composer",
+          "width": "fill_container",
+          "fill": "$surface",
+          "stroke": "$border",
+          "strokeWidth": {
+            "top": 1
+          },
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            16,
+            28
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "R13zH",
+              "name": "Composer Column",
+              "width": 804,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "vLQsC",
+                  "name": "Composer Input",
+                  "fill": "$text-tertiary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "输入内容,回车翻译…",
+                  "lineHeight": "$line-height-body",
+                  "fontFamily": "$font-body",
+                  "fontSize": "$font-size-body",
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "CdiHi",
+                  "name": "Composer Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "sNIiy",
+                      "name": "Composer Left",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "qTYgL",
+                          "type": "ref",
+                          "ref": "B1Kz01",
+                          "name": "Mode Seg"
+                        },
+                        {
+                          "id": "m2bE6A",
+                          "type": "ref",
+                          "ref": "rpnYw",
+                          "name": "Lang Chip"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "enmQi",
+                      "name": "Composer Right",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "W2yty",
+                          "x": 0,
+                          "y": 0,
+                          "name": "Char Count",
+                          "enabled": false,
+                          "fill": "$text-tertiary",
+                          "content": "2,148 字",
+                          "fontFamily": "$font-ui",
+                          "fontSize": "$font-size-label",
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "id": "SRE9d",
+                          "type": "ref",
+                          "ref": "POaFg",
+                          "name": "Send Button"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "T6tMl",
+      "x": 1120,
+      "y": 3240,
+      "name": "States — 历史折叠 v2",
+      "width": 860,
+      "fill": "$bg",
+      "cornerRadius": "$radius-window",
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "layout": "vertical",
+      "gap": 18,
+      "padding": [
+        24,
+        28
+      ],
+      "children": [
+        {
+          "type": "text",
+          "id": "MdA35",
+          "name": "Board Title",
+          "fill": "$text-tertiary",
+          "content": "历史折叠 v2 · 交互状态",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-caption",
+          "fontWeight": "600"
+        },
+        {
+          "type": "text",
+          "id": "MW3TD",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "① 短记录（结果 ≤ 2 行）— 静止：meta + 完整结果，无底色；记录之间只有 1px 分割线；文字左轨与最新记录对齐",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
+        },
+        {
+          "id": "Ujr6z",
+          "type": "ref",
+          "ref": "B2Cx3",
+          "name": "Demo — 短记录",
+          "width": "fill_container",
+          "descendants": {
+            "iRSPY": {
+              "icon": "sparkles"
+            },
+            "Bw7O0": {
+              "content": "改进"
+            },
+            "SCbl4": {
+              "content": "English · 语气与语法 · 14:38"
+            },
+            "EDAjf": {
+              "content": "No such guarantee."
+            }
+          }
+        },
+        {
+          "type": "rectangle",
+          "id": "I64PMx",
+          "name": "Divider",
+          "fill": "$border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "id": "FLOsT",
+          "type": "ref",
+          "ref": "B2Cx3",
+          "name": "Demo — 短记录",
+          "width": "fill_container",
+          "descendants": {
+            "SCbl4": {
+              "content": "English → 中文 · 13:07"
+            },
+            "EDAjf": {
+              "content": "昨晚尝试了一些新东西：https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
+            }
+          }
+        },
+        {
+          "type": "rectangle",
+          "id": "A7XM8",
+          "name": "Divider",
+          "fill": "$border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "JWAtP",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "② 短记录 hover — 整行 surface-fold 微高亮 120ms 淡入,高亮向左右各外扩 10pt(space-hover-bleed)、圆角 8,文字不动;chevron-down + ↺ / copy 同步淡入;点击任意处展开原文行",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
+        },
+        {
+          "type": "frame",
+          "id": "uf2TY",
+          "name": "Demo — 短记录 hover",
+          "width": "fill_container",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "rectangle",
+              "cornerRadius": "$radius-card",
+              "id": "Q2Xj97",
+              "layoutPosition": "absolute",
+              "x": -10,
+              "y": 0,
+              "name": "Hover Highlight",
+              "fill": "$surface-fold",
+              "width": 824,
+              "height": 82
+            },
+            {
+              "id": "cT5wp",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry",
+              "width": "fill_container",
+              "descendants": {
+                "iRSPY": {
+                  "icon": "sparkles"
+                },
+                "Bw7O0": {
+                  "content": "改进"
+                },
+                "SCbl4": {
+                  "content": "English · 语气与语法 · 14:46"
+                },
+                "wQtyR": {
+                  "type": "frame",
+                  "id": "OCYIv",
+                  "name": "Meta Actions",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "KC8Ga",
+                      "name": "rotate-ccw",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "rotate-ccw",
+                      "library": "lucide",
+                      "fill": "$text-tertiary"
+                    }
+                  ]
+                },
+                "EDAjf": {
+                  "content": "Having used GPT-6-Astra for a while now, my current take is that it works more like a person than an engineer."
+                },
+                "I9LqA": {
+                  "enabled": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "E8xn6D",
+          "name": "Divider",
+          "fill": "$border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "qGGZV",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "③ 长记录（结果 > 2 行，或原文/结果达到长文档阈值）— 静止：meta + 结果前两行 + 25pt 渐隐到窗口底色，无卡片填充；点击任意处原位展开",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
+        },
+        {
+          "id": "pPtFZ",
+          "type": "ref",
+          "ref": "B2Cx3",
+          "name": "Demo — 长记录 折叠",
+          "width": "fill_container",
+          "descendants": {
+            "SCbl4": {
+              "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
+            },
+            "tzszR": {
+              "type": "frame",
+              "id": "Ok1af",
+              "name": "Folded Clip",
+              "clip": true,
+              "width": "fill_container",
+              "height": 52,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "x9ckbX",
+                  "name": "Folded Result",
+                  "fill": "$text-primary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different.",
+                  "lineHeight": "$line-height-body",
+                  "fontFamily": "$font-body",
+                  "fontSize": "$font-size-body",
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "rectangle",
+                  "id": "Wfm6b",
+                  "layoutPosition": "absolute",
+                  "x": 0,
+                  "y": 27,
+                  "name": "Folded Fade",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 0,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "$bg",
+                        "position": 0
+                      },
+                      {
+                        "color": "#FAFAF800",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "width": 804,
+                  "height": 25
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "rectangle",
+          "id": "zZRph",
+          "name": "Divider",
+          "fill": "$border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "mjl8h",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "④ 长记录 hover — 同②的整行微高亮(渐隐随之变为 surface-fold),chevron-down + ↺ / copy 淡入;点击任意处展开",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
+        },
+        {
+          "type": "frame",
+          "id": "e4AMS",
+          "name": "Demo — 长记录 hover",
+          "width": "fill_container",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "rectangle",
+              "cornerRadius": "$radius-card",
+              "id": "FuDsD",
+              "layoutPosition": "absolute",
+              "x": -10,
+              "y": 0,
+              "name": "Hover Highlight",
+              "fill": "$surface-fold",
+              "width": 824,
+              "height": 108
+            },
+            {
+              "id": "Dhd8G",
+              "type": "ref",
+              "ref": "B2Cx3",
+              "name": "Entry",
+              "width": "fill_container",
+              "descendants": {
+                "SCbl4": {
+                  "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
+                },
+                "wQtyR": {
+                  "type": "frame",
+                  "id": "tnU7u",
+                  "name": "Meta Actions",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "evHV9",
+                      "name": "chevron-down",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "chevron-down",
+                      "library": "lucide",
+                      "fill": "$text-tertiary"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "XYhvI",
+                      "name": "rotate-ccw",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "rotate-ccw",
+                      "library": "lucide",
+                      "fill": "$text-tertiary"
+                    }
+                  ]
+                },
+                "tzszR": {
+                  "type": "frame",
+                  "id": "pigB9",
+                  "name": "Folded Clip",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": 52,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "PKc1g",
+                      "name": "Folded Result",
+                      "fill": "$text-primary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different.",
+                      "lineHeight": "$line-height-body",
+                      "fontFamily": "$font-body",
+                      "fontSize": "$font-size-body",
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "MAt1A",
                       "layoutPosition": "absolute",
                       "x": 0,
                       "y": 27,
@@ -3168,12 +4180,12 @@
                             "position": 0
                           },
                           {
-                            "color": "#F1F1EC00",
+                            "color": "#FAFAF800",
                             "position": 1
                           }
                         ]
                       },
-                      "width": 750,
+                      "width": 804,
                       "height": 25
                     }
                   ]
@@ -3183,18 +4195,124 @@
           ]
         },
         {
-          "id": "Lpb1u",
+          "type": "rectangle",
+          "id": "HhxBV",
+          "name": "Divider",
+          "fill": "$border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "R0Wq8S",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "⑤ 长记录展开 — meta + 原文(两行渐隐)+ 完整结果;hover 时只显示 meta 行末 chevron-up 与图标,不做整行高亮;点击 meta 行收起,其余区域点击不收起",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
+        },
+        {
+          "id": "PUuPu",
           "type": "ref",
-          "ref": "pn8Ym",
-          "name": "Motion Note",
+          "ref": "B2Cx3",
+          "name": "Demo — 长记录 展开",
           "width": "fill_container",
           "descendants": {
-            "gRIbr": {
-              "content": "点击历史条任意处原位展开(可多条同开,便于对比);点击其 meta 行收起;copy / ⌘C 始终复制全文,不受折叠影响"
+            "SCbl4": {
+              "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
+            },
+            "wQtyR": {
+              "type": "frame",
+              "id": "OQxTg",
+              "name": "Meta Actions",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "vuHPZ",
+                  "name": "chevron-up",
+                  "width": 12,
+                  "height": 12,
+                  "icon": "chevron-up",
+                  "library": "lucide",
+                  "fill": "$text-tertiary"
+                },
+                {
+                  "type": "icon",
+                  "id": "Ei25d",
+                  "name": "rotate-ccw",
+                  "width": 12,
+                  "height": 12,
+                  "icon": "rotate-ccw",
+                  "library": "lucide",
+                  "fill": "$text-tertiary"
+                }
+              ]
+            },
+            "IENJ0": {
+              "enabled": true
+            },
+            "boMM0": {
+              "content": "分布式系统的设计从来都不是单纯的技术选型问题。当我们讨论一致性、可用性与分区容忍性之间的取舍时,实际上是在讨论业务对错误的容忍程度。"
+            },
+            "YDjBq": {
+              "enabled": true
+            },
+            "EDAjf": {
+              "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different."
+            },
+            "I9LqA": {
+              "enabled": true
             }
           }
+        },
+        {
+          "type": "rectangle",
+          "id": "MOkEb",
+          "name": "Divider",
+          "fill": "$border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "xpLE2",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "⑥ 提交 — 新记录立即入流；前一条是长记录时按 Motion — 历史折叠 T1 以 200ms 折叠（原文收起、结果 clip 到两行）；短记录几何不变，只在下方出现分割线",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
+        },
+        {
+          "type": "text",
+          "id": "dsKQm",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "⑦ 阅读列宽 — Stream 与 composer 的内容列最大 804pt(reading-width);窗口更宽时列居中、两侧留白,标题栏与 composer 底色仍通栏(见 Main — 宽窗口 1280 · 阅读列宽)",
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
         }
       ]
+    },
+    {
+      "type": "note",
+      "id": "mJm8R",
+      "x": 2060,
+      "y": 3240,
+      "name": "Spec — 历史折叠 v2",
+      "width": 860,
+      "height": 0,
+      "content": "历史折叠 v2(已确认 2026-09-10;Sol2d / UVmdQ 已同步,本 note 记录实现细则)\n\n一、分类与行高\n· 短记录:结果在当前列宽下 ≤ 2 行(且未达长文档阈值)。静止态 meta + 完整结果,不显示原文;行高 82(1 行)/ 108(2 行)。\n· 长记录:结果 > 2 行,或原文 ≥ 800 字 / 结果 ≥ 1,200 字。折叠态 meta + 结果前 2 行 + 25pt 渐隐到 bg;行高 108。\n· 两类都没有卡片填充与内缩,记录之间 1px 分割线(border),文字左轨与最新记录对齐。行高判定只依赖每条记录缓存的 420 字预览。\n\n二、展开 / 收起\n· 点击任意历史记录原位展开(200ms,motion-fold-ms):短记录展开 = meta + 原文行 + 结果;长记录展开 = meta + 原文(2 行渐隐)+ 完整结果。可多条同开。\n· 点击已展开记录的 meta 行收起,回到各自的静止态。\n· 新记录提交:前一条为长记录时按 Motion — 历史折叠 T1 折叠;为短记录时几何不变,只补分割线。\n\n三、hover 与图标\n· 短记录与折叠长记录 hover:整行 surface-fold 微高亮 120ms 淡入,向左右各外扩 10pt(space-hover-bleed)、圆角 8;chevron-down 出现在 meta 行末 ↺ 左侧,与 ↺ / copy 同步淡入;离开即隐藏。\n· 已展开记录 hover:只显示 chevron-up 与图标,不做整行高亮。最新一条与生成中的记录不显示 chevron。\n\n四、阅读列宽\n· Stream 与 composer 内容列最大 804pt(reading-width,即 860 窗口里的内容列宽),窗口内容宽 ≤ 860 时与现状完全一致,更宽时列居中;标题栏与 composer 底色通栏,composer 的输入框 / 模式切换 / 发送按钮限制在列内。"
     }
   ],
   "variables": {
@@ -3381,6 +4499,14 @@
     "motion-ease-breathe": {
       "type": "string",
       "value": "ease-in-out"
+    },
+    "reading-width": {
+      "type": "number",
+      "value": 804
+    },
+    "space-hover-bleed": {
+      "type": "number",
+      "value": 10
     }
   },
   "fileToken": "4351a8c3-72b7-472a-91d3-c466c77c32ee"

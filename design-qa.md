@@ -3,7 +3,7 @@
 ## Source of truth
 
 The current source is `Design/cida.pen` (SHA-256
-`b6a85d7cb6db979baed7393407184fc8cedd72534c280077d709a082cc9dba5b`). The aligned
+`a48191b1eae0245acc643129b507e57faaee776a1ed6bafc1675a9dda007ee2e`). The aligned
 Pencil nodes are:
 
 | State or contract | Node |
