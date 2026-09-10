@@ -47,7 +47,7 @@ model, storage, window, history, or renderer paths.
 | --- | --- | --- |
 | Old result survives a new submit | Submission now transfers the latest marker and mounts a new empty result in the same accepted event; pooled result views clear TextKit and compositor state before reuse. | Controlled-first-byte Tart journey checks the new current identity, empty output, forbidden old pixels, and prior-row fold. Pool-capacity journey repeats beyond the prewarmed pool. |
 | Composer sometimes remains populated or becomes uneditable | Native reset synchronization is generation-aware: a stale binding echo is cleared, while a genuine edit made after the reset is preserved. Empty macOS AX values are normalized without confusing `nil` with a failed reset. | Native responder-chain tests, real typing/paste/delete XCUI, atomic-submit unit test, and two consecutive-submit journeys. |
-| A passing test only proved an AX string | Current/expanded state is asserted through visible product structure: current semantic label, source and result presence, absence of the folded card; folded state requires the inverse structure. | Shared driver applies the invariant to every submit. Direct mutation of the latest marker is killed by unit and Tart tests. |
+| A passing test only proved an AX string | Current/expanded state is asserted through visible product structure: current semantic label, source and result presence, absence of the folded row's disclosure element; folded state requires the inverse structure. | Shared driver applies the invariant to every submit. Direct mutation of the latest marker is killed by unit and Tart tests. |
 | Folded and expanded records drifted because two layout engines owned the same component | `HistoryEntryNSView` now owns header, source, result, actions, fades, accessibility, and exact geometry for every presentation state. SwiftUI selects one explicit `folded`, `current`, or `manuallyExpanded` presentation; `HistoryRenderContract` derives content and disclosure behavior without an `isLatest` rendering flag. Native child controls and the entry-local fallback own pointer routing; the window does not scan the view tree. | Pure presentation-matrix tests require both expanded states to show source and result; structural hierarchy tests require all three states to resolve to `HistoryEntryNSView`; native window events exercise standard AppKit hit testing; identity/geometry tests exercise every state transition; Tart asserts that every expanded record restores its source, preserves spacing, and accepts source/result actions. Source and hit-routing mutations must be killed. |
 | SwiftUI and AppKit colors or spacing drifted independently | Both frameworks resolve semantic colors through `CidaDesign.Palette` and history measurements through `HistoryEntryPencilLayout`; renderer files contain no duplicate design RGB constants. | Token tests pin every shared sRGB value, opacity, folded height, row stride, action column, and source fade measurement. |
 | Some UI suites were silently absent from PR | The PR selector names every UI suite, and a source-enumerating unit test fails if a new `*Tests.swift` suite is not selected. | `PairwiseManifestTests/testPRGateIncludesEveryReleaseUITestSuite`. |
@@ -69,11 +69,11 @@ model, storage, window, history, or renderer paths.
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite currently contains 144 tests: 50 model/report tests, 7 SQLite tests, 4 host
-isolation tests, 72 native interaction/layout tests, 3 mutation invariants, 2 suite/matrix manifest
-tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
+The host Swift suite currently contains 154 tests: 51 model/report tests, 7 SQLite tests, 4 host
+isolation tests, 81 native interaction, layout, and design-token tests, 3 mutation invariants,
+2 suite/matrix manifest tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
 
-The Release XCUI target contains 26 tests across ten files: 23 product journeys and three harness
+The Release XCUI target contains 28 tests across ten files: 23 product journeys and five harness
 self-tests. The product journeys cover signed-artifact smoke,
 composer and copy behavior, controlled and uneven streams, cancellation/error recovery, scroll
 direction and follow, history presentation/actions, persistence, shared state-machine relaunch,
@@ -84,13 +84,16 @@ Main/Settings pixel baselines, accessibility audit, and standard window/Settings
 All UI waits use one 20 ms polling primitive that samples immediately, records value transitions,
 and attaches its timeline to the XCResult on timeout. Three deterministic harness tests use an
 injectable clock to prove that 100 ms, 200 ms, and 800 ms transient states are observable and that a
-timeout retains its changed-value history. Tart failures write a machine-readable classification as
+timeout retains its changed-value history; two more prove that the folded-fade pixel oracle rejects an
+unfaded second line and measures a faded one. Tart failures write a machine-readable classification as
 `infrastructure`, `build`, `source-test`, `ui-assertion-or-crash`, or `artifact`; an ambiguous UI
 failure is never automatically labeled as a product regression.
 
 The mutation catalog now contains fourteen source-level faults. Each definition pins an exact source
 anchor and names its unit and/or Release kill tests. Catalog drift fails before an expensive build
-or VM launch. In addition to submit-reset coverage, the
+or VM launch: the anchor must occur exactly once, and every named kill test must be declared in the
+test sources. A targeted `swift test --filter` that matches no test case is reported as
+`infrastructure`, never as a killed or survived mutation. In addition to submit-reset coverage, the
 `history-presentations-bypass-unified-renderer` mutation forces every standalone record into the
 folded presentation; native state/geometry tests and the visible Tart history journey reject it.
 The `expanded-history-source-stays-hidden` mutation restores the reported latest-only source gate;
@@ -120,7 +123,7 @@ are recorded as diagnostics rather than misclassified as test activity.
 
 ## Current verification
 
-- `swift test -Xswiftc -warnings-as-errors`: 144/144 passed.
+- `swift test -Xswiftc -warnings-as-errors`: 154/154 passed.
 - Focused fresh-clone Tart diagnosis reproduced both the source-preview frame overflow and the
   recycled folded-row click failure. After the root repairs, both previously failing journeys passed
   2/2 with a healthy host-session guard and no host artifact activation. The native semantic audit

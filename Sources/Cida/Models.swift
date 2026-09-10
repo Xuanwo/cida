@@ -95,6 +95,27 @@ final class HistoryResultStorage: @unchecked Sendable {
     return foldedPreviewValue
   }
 
+  private var previewSingleLineWidthCache: (previewUTF16Length: Int, width: CGFloat)?
+
+  /// The width of the folded preview laid out on one line, measured by the
+  /// renderer and cached until the preview text changes. History rows use it
+  /// to decide between the one-line and two-line Pencil heights without laying
+  /// the text out.
+  func previewSingleLineWidth(measure: (String) -> CGFloat) -> CGFloat {
+    let preview = foldedPreviewValue
+    let length = (preview as NSString).length
+    if let cache = previewSingleLineWidthCache, cache.previewUTF16Length == length {
+      return cache.width
+    }
+    let width = measure(preview)
+    previewSingleLineWidthCache = (length, width)
+    return width
+  }
+
+  var foldedPreviewContainsLineBreak: Bool {
+    foldedPreviewValue.contains(where: \.isNewline)
+  }
+
   func append(_ suffix: String) {
     value.append(suffix)
     appendToFoldedPresentation(suffix)

@@ -120,7 +120,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     )
     mainWindowController = makeWindowController(
       rootView: AnyView(mainView),
-      size: CGSize(width: 860, height: 640),
+      size: launchOptions.designState.mainWindowSize,
       minimumSize: CGSize(width: 640, height: 480),
       title: "辞达"
     )
@@ -465,13 +465,21 @@ private enum DesignState: String {
   case improve
   case largeInput = "large-input"
   case streaming
-  /// Pencil `Motion — 历史折叠` T0: one folded long card above the focus record.
+  /// Pencil `Main — 翻译 · 长记录折叠`: one long record at rest above the focus record.
   case historyFolded = "history-folded"
+  /// Pencil `Main — 宽窗口 1280 · 阅读列宽`: the reading column centred in a wide window.
+  case wideReadingColumn = "wide-reading-column"
   case settings
   case settingsOpenAI = "settings-openai"
 
   var isSettings: Bool {
     self == .settings || self == .settingsOpenAI
+  }
+
+  var mainWindowSize: CGSize {
+    self == .wideReadingColumn
+      ? CGSize(width: 1_280, height: 720)
+      : CGSize(width: 860, height: 640)
   }
 }
 
@@ -558,6 +566,9 @@ private struct LaunchOptions {
         return HistoryEntry.longDesignSamples
       case .historyFolded:
         return [HistoryEntry.longDesignSamples[0], HistoryEntry.designSamples[2]]
+      case .wideReadingColumn:
+        return [HistoryEntry.designSamples[0], HistoryEntry.longDesignSamples[0]]
+          + Array(HistoryEntry.designSamples[1...])
       case .translate, .improve, .settings, .settingsOpenAI:
         return HistoryEntry.designSamples
       }
@@ -575,7 +586,7 @@ private struct LaunchOptions {
         HistoryEntry.designLongInput
       case .streaming:
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
-      case .translate, .historyFolded, .settings, .settingsOpenAI:
+      case .translate, .historyFolded, .wideReadingColumn, .settings, .settingsOpenAI:
         ""
       }
     #else

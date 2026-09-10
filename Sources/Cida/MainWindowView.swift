@@ -66,6 +66,7 @@ struct MainWindowView: View {
             Composer(
               model: model,
               automaticallyFocusInput: automaticallyFocusInput,
+              availableWidth: geometry.size.width,
               availableHeight: geometry.size.height,
               inputMetrics: $composerMetrics
             )
@@ -161,6 +162,7 @@ private struct ModelStatusChip: View {
 private struct Composer: View {
   @Bindable var model: AppModel
   let automaticallyFocusInput: Bool
+  let availableWidth: CGFloat
   let availableHeight: CGFloat
   @FocusState private var isInputFocused: Bool
   @Binding var inputMetrics: ComposerTextMetrics
@@ -168,13 +170,24 @@ private struct Composer: View {
   init(
     model: AppModel,
     automaticallyFocusInput: Bool,
+    availableWidth: CGFloat,
     availableHeight: CGFloat,
     inputMetrics: Binding<ComposerTextMetrics>
   ) {
     self.model = model
     self.automaticallyFocusInput = automaticallyFocusInput
+    self.availableWidth = availableWidth
     self.availableHeight = availableHeight
     _inputMetrics = inputMetrics
+  }
+
+  /// The composer surface spans the window, but its text and controls stay
+  /// inside the Pencil reading column, centred when the window is wider.
+  private var horizontalInset: CGFloat {
+    max(
+      HistoryEntryPencilLayout.windowHorizontalPadding,
+      floor((availableWidth - HistoryEntryPencilLayout.readingWidth) / 2)
+    )
   }
 
   var body: some View {
@@ -184,7 +197,7 @@ private struct Composer: View {
           Text("输入内容,回车\(model.mode == .translate ? "翻译" : "改进")…")
             .font(CidaDesign.body(16))
             .foregroundStyle(CidaDesign.textTertiary)
-            .padding(.leading, 28)
+            .padding(.leading, horizontalInset)
             .padding(.top, 3)
             .allowsHitTesting(false)
         }
@@ -193,6 +206,7 @@ private struct Composer: View {
           text: $model.inputText,
           metrics: $inputMetrics,
           isFocused: $isInputFocused,
+          horizontalInset: horizontalInset,
           resetRevision: model.inputResetRevision,
           currentResetRevision: { model.inputResetRevision },
           onSubmit: submit,
@@ -269,7 +283,7 @@ private struct Composer: View {
           .accessibilityIdentifier("composer-submit-button")
         }
       }
-      .padding(.horizontal, 28)
+      .padding(.horizontal, horizontalInset)
       .frame(height: 30)
     }
     .padding(.vertical, 16)

@@ -190,9 +190,10 @@ private final class HistoryEntryAccessibilityElement: NSAccessibilityElement,
   }
 }
 
-/// Draws the folded two-line result preview with the same TextKit attributes as
-/// the expanded result, so folding never changes glyph placement or line height.
-/// The Pencil fade sits over the bottom 25 pt of the 52 pt clip.
+/// Draws a historical record's result at rest with the same TextKit attributes
+/// as the expanded result, so folding never changes glyph placement or line
+/// height. Up to two lines show in full; a longer result is clipped under the
+/// Pencil fade at the bottom of the view.
 @MainActor
 final class FoldedPreviewTextView: NSView {
   private static let disabledLayerActions: [String: CAAction] = [
@@ -228,7 +229,7 @@ final class FoldedPreviewTextView: NSView {
     fadeLayer.locations = [0, 1]
     layer?.addSublayer(fadeLayer)
     setAccessibilityElement(false)
-    setFadeColor(CidaDesign.Palette.surfaceFold.appKit, animated: false)
+    setFadeColor(CidaDesign.Palette.background.appKit, animated: false)
   }
 
   @available(*, unavailable)
@@ -271,6 +272,10 @@ final class FoldedPreviewTextView: NSView {
     return ceil(layoutManager.usedRect(for: textContainer).height)
   }
 
+  var naturalLineCount: Int {
+    max(1, Int((naturalTextHeight / HistoryEntryPencilLayout.resultLineHeight).rounded(.up)))
+  }
+
   func setFadeColor(_ color: NSColor, animated: Bool) {
     CATransaction.begin()
     if animated {
@@ -305,8 +310,7 @@ final class FoldedPreviewTextView: NSView {
     CATransaction.setDisableActions(true)
     fadeLayer.frame = NSRect(
       x: 0,
-      y: HistoryEntryPencilLayout.foldedPreviewHeight
-        - HistoryEntryPencilLayout.foldedPreviewFadeHeight,
+      y: max(0, bounds.height - HistoryEntryPencilLayout.foldedPreviewFadeHeight),
       width: bounds.width,
       height: HistoryEntryPencilLayout.foldedPreviewFadeHeight
     )
@@ -325,21 +329,23 @@ final class FoldedPreviewTextView: NSView {
 @MainActor
 final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private enum Layout {
-    static let foldedInset = HistoryEntryPencilLayout.foldedInset
-    static let expandedVerticalPadding = HistoryEntryPencilLayout.expandedVerticalPadding
-    static let headerHeight = HistoryEntryPencilLayout.foldedHeaderHeight
-    static let contentSpacing = HistoryEntryPencilLayout.foldedContentSpacing
+    static let verticalPadding = HistoryEntryPencilLayout.verticalPadding
+    static let headerHeight = HistoryEntryPencilLayout.headerHeight
+    static let contentSpacing = HistoryEntryPencilLayout.contentSpacing
     static let previewHeight = HistoryEntryPencilLayout.foldedPreviewHeight
     static let actionSize = HistoryEntryPencilLayout.actionIconSize
+    static let actionGap = HistoryEntryPencilLayout.actionGap
     static let actionColumnWidth = HistoryEntryPencilLayout.actionColumnWidth
-    static let foldedPreferredHeight = HistoryEntryPencilLayout.foldedHeight
     static let sourceLineHeight = HistoryEntryPencilLayout.latestSourceLineHeight
     static let sourceMaximumHeight = HistoryEntryPencilLayout.latestSourcePreviewHeight
     static let sourceFadeHeight = HistoryEntryPencilLayout.latestSourceFadeHeight
+    static let separatorHeight = HistoryEntryPencilLayout.separatorHeight
+    static let hoverBleed = HistoryEntryPencilLayout.hoverBleed
     static let iconOffset: CGFloat = 2
     static let modeOffset: CGFloat = 18
     static let metadataGap: CGFloat = 6
     static let actionRowOffset: CGFloat = 4
+    static let contentTop = verticalPadding + headerHeight + contentSpacing
   }
 
   private struct SourcePresentationLayout {
@@ -359,12 +365,12 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     var sourceUsesFade: Bool
     var sourceAlpha: CGFloat
     var preview: NSRect
+    var previewUsesFade: Bool
     var result: NSRect
     var redo: NSRect
+    var chevron: NSRect
     var copyResult: NSRect
     var copySource: NSRect
-    var cardOpacity: Float
-    var fadeOpacity: Float
   }
 
   private struct PresentationTransition {
@@ -373,8 +379,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   }
 
   private static let accentColor = CidaDesign.Palette.accent.appKit
-  private static let foldedCardColor = CidaDesign.Palette.surfaceFold.appKit
-  private static let foldedHoverColor = CidaDesign.Palette.surfaceFoldHover.appKit
+  private static let backgroundColor = CidaDesign.Palette.background.appKit
+  private static let hoverHighlightColor = CidaDesign.Palette.surfaceFold.appKit
   private static let tertiaryTextColor = CidaDesign.Palette.textTertiary.appKit
   private static let secondaryTextColor = CidaDesign.Palette.textSecondary.appKit
   private static let borderColor = CidaDesign.Palette.border.appKit
@@ -391,7 +397,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private static let metadataFont =
     NSFont(name: "Inter-Regular", size: 11)
     ?? NSFont.systemFont(ofSize: 11, weight: .regular)
-  private let cardLayer = CALayer()
+  private let hoverHighlightLayer = CALayer()
   private let iconView = NSImageView()
   private let modeTextLayer = CATextLayer()
   private let metadataTextLayer = CATextLayer()
@@ -419,6 +425,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private var redoButton: HistoryEntryActionButton?
   private var copyButton: HistoryEntryActionButton?
   private var copySourceButton: HistoryEntryActionButton?
+  private var chevronButton: HistoryEntryActionButton?
   private var stickyResultActionView: StickyHistoryResultActionNSView?
   private var hoverTrackingView: HistoryEntryHoverTrackingNSView?
   private var resultContainer: HistoryResultTextContainer?
@@ -460,9 +467,12 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     var foldedPreviewFrameForTesting: NSRect { previewView.frame }
     var foldedPreviewViewForTesting: FoldedPreviewTextView { previewView }
     var foldedFadeFrameForTesting: NSRect { previewView.fadeLayer.frame }
-    var foldedCardColorForTesting: CGColor? { cardLayer.backgroundColor }
-    var foldedCardOpacityForTesting: Float { cardLayer.opacity }
-    var foldedCardCornerRadiusForTesting: CGFloat { cardLayer.cornerRadius }
+    var foldedPreviewUsesFadeForTesting: Bool {
+      !previewView.isHidden && previewView.fadeLayer.opacity > 0
+    }
+    var hoverHighlightFrameForTesting: NSRect { hoverHighlightLayer.frame }
+    var hoverHighlightOpacityForTesting: Float { hoverHighlightLayer.opacity }
+    var hoverHighlightColorForTesting: CGColor? { hoverHighlightLayer.backgroundColor }
     var isTransitioningForTesting: Bool { transition != nil }
     var sourceFrameForTesting: NSRect { sourceTextField.frame }
     var sourceFadeFrameForTesting: NSRect { sourceFadeLayer.frame }
@@ -476,8 +486,9 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       ObjectIdentifier(modeTextLayer)
     }
     var actionButtonsForTesting: [HistoryEntryActionButton] {
-      [redoButton, copyButton, copySourceButton].compactMap { $0 }
+      [redoButton, copyButton, copySourceButton, chevronButton].compactMap { $0 }
     }
+    var chevronButtonForTesting: HistoryEntryActionButton? { chevronButton }
   #endif
 
   override var isFlipped: Bool { true }
@@ -493,14 +504,16 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     focusRingType = .none
     wantsLayer = true
     layerContentsRedrawPolicy = .onSetNeedsDisplay
-    layer?.masksToBounds = true
+    // The hover highlight bleeds past the text column, so the entry itself
+    // must not clip; the result container and preview clip their own text.
+    layer?.masksToBounds = false
     layer?.backgroundColor = NSColor.clear.cgColor
 
-    cardLayer.actions = Self.disabledLayerActions
-    cardLayer.cornerRadius = HistoryEntryPencilLayout.foldedCornerRadius
-    cardLayer.backgroundColor = Self.foldedCardColor.cgColor
-    cardLayer.opacity = 0
-    layer?.insertSublayer(cardLayer, at: 0)
+    hoverHighlightLayer.actions = Self.disabledLayerActions
+    hoverHighlightLayer.cornerRadius = HistoryEntryPencilLayout.hoverCornerRadius
+    hoverHighlightLayer.backgroundColor = Self.hoverHighlightColor.cgColor
+    hoverHighlightLayer.opacity = 0
+    layer?.insertSublayer(hoverHighlightLayer, at: 0)
 
     for textLayer in [modeTextLayer, metadataTextLayer] {
       textLayer.alignmentMode = .left
@@ -683,6 +696,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     resultStorage: HistoryResultStorage,
     state: HistoryEntryState,
     isLongEntry: Bool,
+    showsSeparator: Bool,
     animated: Bool,
     onExpand: @escaping @MainActor () -> Void,
     onRedo: @escaping @MainActor () -> Void,
@@ -694,7 +708,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       metadata: metadata,
       preview: preview,
       state: state,
-      showsSeparator: false
+      showsSeparator: showsSeparator
     )
     let nextDisplayedSource = String(source.prefix(420))
     if displayedSource != nextDisplayedSource {
@@ -756,6 +770,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     copySourceButton?.setAccessibilityIdentifier(
       "history-action-copy-source-\(identifierSuffix)"
     )
+    chevronButton?.setAccessibilityIdentifier("history-action-disclose-\(identifierSuffix)")
     updatePresentationAccessibility()
     if completedWhileHovering {
       pendingActionRevealDuration = CidaMotion.iconSwapSeconds
@@ -787,16 +802,14 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     sourceFadeLayer.isHidden = true
     previewView.isHidden = false
     previewView.setText("")
-    previewView.setFadeOpacity(1, duration: 0)
+    previewView.setFadeOpacity(0, duration: 0)
     isHovering = false
     isSourceCopied = false
     isResultCopied = false
-    redoButton?.conceal()
-    redoButton?.resetHoverState()
-    copyButton?.conceal()
-    copyButton?.resetHoverState()
-    copySourceButton?.conceal()
-    copySourceButton?.resetHoverState()
+    for button in [redoButton, copyButton, copySourceButton, chevronButton] {
+      button?.conceal()
+      button?.resetHoverState()
+    }
     presentation = .folded
     displayedSource = ""
     invalidateSourceLayout()
@@ -882,7 +895,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       sourceFadeLayer.isHidden = true
       copySourceButton?.conceal()
       previewView.setText(preview)
-      previewView.setFadeOpacity(1, duration: 0)
       previewView.isHidden = false
     case .current, .manuallyExpanded:
       previewView.isHidden = true
@@ -902,7 +914,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   ) {
     let width = max(1, bounds.width)
     let fromGeometry = geometry(for: previousPresentation, width: width)
-    let toGeometry = geometry(for: nextPresentation, width: width)
+    var toGeometry = geometry(for: nextPresentation, width: width)
 
     // Register the transition first so any layout pass that runs while the
     // animations are in flight leaves the animated frames alone.
@@ -912,36 +924,28 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     }
     transition = PresentationTransition(target: nextPresentation, completion: completion)
 
-    redoButton?.conceal()
-    copyButton?.conceal()
-    copySourceButton?.conceal()
+    for button in [redoButton, copyButton, copySourceButton, chevronButton] {
+      button?.conceal()
+    }
     stickyResultActionView?.isHidden = true
-
-    // Start from the previous presentation's frames even if a layout pass was
-    // still pending.
-    iconView.frame = fromGeometry.icon
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    modeTextLayer.frame = fromGeometry.mode
-    metadataTextLayer.frame = fromGeometry.metadata
-    CATransaction.commit()
 
     switch nextPresentation {
     case .folded:
       // The result text swaps to the preview renderer at the start so the fold
-      // only animates geometry: the source collapses and the result clips to
-      // two lines under the Pencil fade.
+      // only animates geometry: the source collapses and the result rises and,
+      // for a long record, clips to two lines under the Pencil fade.
       hoverTrackingView?.setActive(false)
       let transitionText =
         isLongEntry ? preview : (resultStorage?.string ?? preview)
       previewView.setTextWidth(toGeometry.preview.width)
       previewView.setText(transitionText)
-      let startHeight = max(Layout.previewHeight, previewView.naturalTextHeight)
+      let naturalHeight = previewView.naturalTextHeight
+      toGeometry = geometry(for: .folded, width: width)
       previewView.frame = NSRect(
         x: fromGeometry.result.minX,
         y: fromGeometry.result.minY,
         width: toGeometry.preview.width,
-        height: startHeight
+        height: max(toGeometry.preview.height, naturalHeight)
       )
       previewView.layoutSubtreeIfNeeded()
       previewView.setFadeOpacity(0, duration: 0)
@@ -972,7 +976,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       context.duration = duration
       context.timingFunction = CidaMotion.easeOut
       context.allowsImplicitAnimation = true
-      iconView.animator().frame = toGeometry.icon
       sourceTextField.animator().frame = toGeometry.source
       sourceTextField.animator().alphaValue = toGeometry.sourceAlpha
       if nextPresentation == .folded {
@@ -981,10 +984,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         resultContainer.animator().frame = toGeometry.result
       }
     }
-    animateFrame(of: modeTextLayer, to: toGeometry.mode, duration: duration)
-    animateFrame(of: metadataTextLayer, to: toGeometry.metadata, duration: duration)
-    animateOpacity(of: cardLayer, to: toGeometry.cardOpacity, duration: duration)
-    previewView.setFadeOpacity(toGeometry.fadeOpacity, duration: duration)
+    previewView.setFadeOpacity(toGeometry.previewUsesFade ? 1 : 0, duration: duration)
 
     DispatchQueue.main.asyncAfter(
       deadline: .now() + duration,
@@ -995,9 +995,6 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private func finishTransition(_ transition: PresentationTransition) {
     guard self.transition?.completion === transition.completion else { return }
     self.transition = nil
-    modeTextLayer.removeAnimation(forKey: "presentation-transition")
-    metadataTextLayer.removeAnimation(forKey: "presentation-transition")
-    cardLayer.removeAnimation(forKey: "presentation-opacity")
     switch transition.target {
     case .folded:
       previewView.setText(preview)
@@ -1019,39 +1016,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     }
     needsLayout = true
     layoutSubtreeIfNeeded()
+    updateLayerAppearance(animated: false)
     updateActionVisibility()
-  }
-
-  private func animateFrame(of layer: CALayer, to frame: NSRect, duration: TimeInterval) {
-    let fromPosition = layer.presentation()?.position ?? layer.position
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    layer.removeAnimation(forKey: "presentation-transition")
-    layer.frame = frame
-    CATransaction.commit()
-    guard duration > 0 else { return }
-    let animation = CABasicAnimation(keyPath: "position")
-    animation.fromValue = NSValue(point: fromPosition)
-    animation.toValue = NSValue(point: layer.position)
-    animation.duration = duration
-    animation.timingFunction = CidaMotion.easeOut
-    layer.add(animation, forKey: "presentation-transition")
-  }
-
-  private func animateOpacity(of layer: CALayer, to opacity: Float, duration: TimeInterval) {
-    let fromOpacity = layer.presentation()?.opacity ?? layer.opacity
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    layer.removeAnimation(forKey: "presentation-opacity")
-    layer.opacity = opacity
-    CATransaction.commit()
-    guard duration > 0, fromOpacity != opacity else { return }
-    let animation = CABasicAnimation(keyPath: "opacity")
-    animation.fromValue = fromOpacity
-    animation.toValue = opacity
-    animation.duration = duration
-    animation.timingFunction = CidaMotion.easeOut
-    layer.add(animation, forKey: "presentation-opacity")
   }
 
   private func configureExpandedContent(layoutImmediately: Bool) {
@@ -1177,10 +1143,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     if !active {
       removeScrollObservation()
       isHovering = false
-      redoButton?.conceal()
-      redoButton?.resetHoverState()
-      copyButton?.conceal()
-      copyButton?.resetHoverState()
+      for button in [redoButton, copyButton, chevronButton] {
+        button?.conceal()
+        button?.resetHoverState()
+      }
       updateAccessibilityChildren()
     } else {
       updateTrackingAreas()
@@ -1222,114 +1188,123 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   }
 
   func preferredHeight(for width: CGFloat) -> CGFloat {
+    let separator = showsSeparator ? Layout.separatorHeight : 0
     switch presentation {
     case .folded:
-      return Layout.foldedPreferredHeight
+      previewView.setTextWidth(max(1, width - Layout.actionColumnWidth))
+      return HistoryEntryPencilLayout.historyRowHeight(
+        previewLineCount: previewView.naturalLineCount
+      ) + separator
     case .current, .manuallyExpanded:
       let sourceLayout = sourcePresentationLayout(for: width)
       let sourceHeight =
         sourceLayout.height > 0 ? sourceLayout.height + Layout.contentSpacing : 0
       let resultHeight =
         resultContainer?.naturalTextHeight ?? HistoryResultTextContainer.minimumHeight
-      return Layout.expandedVerticalPadding * 2
+      return Layout.verticalPadding * 2
         + Layout.headerHeight
         + Layout.contentSpacing
         + sourceHeight
         + resultHeight
-        + (showsSeparator ? 1 : 0)
+        + separator
     }
   }
 
   // MARK: - Geometry
+
+  private var contentHeight: CGFloat {
+    max(0, bounds.height - (showsSeparator ? Layout.separatorHeight : 0))
+  }
 
   private func geometry(
     for presentation: HistoryPresentation,
     width: CGFloat
   ) -> PresentationGeometry {
     let modeWidth = ceil(modeAttributedString.size().width)
+    let headerY = Layout.verticalPadding
+    let textWidth = max(0, width - Layout.actionColumnWidth)
+    let modeX = Layout.modeOffset
+    let headerRight = max(modeX, width - Layout.actionColumnWidth)
+    let actionX = max(0, width - Layout.actionSize)
+    let chevronX = max(0, actionX - Layout.actionGap - Layout.actionSize)
+    let icon = NSRect(x: 0, y: headerY + Layout.iconOffset, width: 12, height: 12)
+    let modeRect = NSRect(x: modeX, y: headerY, width: modeWidth, height: Layout.headerHeight)
+    let metadataRect = NSRect(
+      x: modeX + modeWidth + Layout.metadataGap,
+      y: headerY,
+      width: max(0, headerRight - modeX - modeWidth - Layout.metadataGap),
+      height: Layout.headerHeight
+    )
+    let redo = NSRect(
+      x: actionX,
+      y: headerY + Layout.iconOffset,
+      width: Layout.actionSize,
+      height: Layout.actionSize
+    )
+    let chevron = NSRect(
+      x: chevronX,
+      y: headerY + Layout.iconOffset,
+      width: Layout.actionSize,
+      height: Layout.actionSize
+    )
+    let previewNaturalHeight = previewView.naturalTextHeight
     switch presentation {
     case .folded:
-      let inset = Layout.foldedInset
-      let headerY = inset
-      let textWidth = max(0, width - inset * 2 - Layout.actionColumnWidth)
-      let modeX = inset + Layout.modeOffset
-      let headerRight = max(modeX, width - inset - Layout.actionColumnWidth)
-      let previewY = headerY + Layout.headerHeight + Layout.contentSpacing
-      let actionX = max(inset, width - inset - Layout.actionSize)
-      let previewRect = NSRect(x: inset, y: previewY, width: textWidth, height: Layout.previewHeight)
+      let previewHeight = HistoryEntryPencilLayout.previewHeight(forRowHeight: contentHeight)
+      let previewRect = NSRect(
+        x: 0,
+        y: Layout.contentTop,
+        width: textWidth,
+        height: previewHeight
+      )
       return PresentationGeometry(
-        icon: NSRect(x: inset, y: headerY + Layout.iconOffset, width: 12, height: 12),
-        mode: NSRect(x: modeX, y: headerY, width: modeWidth, height: Layout.headerHeight),
-        metadata: NSRect(
-          x: modeX + modeWidth + Layout.metadataGap,
-          y: headerY,
-          width: max(0, headerRight - modeX - modeWidth - Layout.metadataGap),
-          height: Layout.headerHeight
-        ),
-        source: NSRect(x: inset, y: previewY, width: textWidth, height: 0),
+        icon: icon,
+        mode: modeRect,
+        metadata: metadataRect,
+        source: NSRect(x: 0, y: Layout.contentTop, width: textWidth, height: 0),
         sourceUsesFade: false,
         sourceAlpha: 0,
         preview: previewRect,
-        result: NSRect(
-          x: inset,
-          y: previewY,
-          width: max(0, width - Layout.actionColumnWidth),
-          height: Layout.previewHeight
-        ),
-        redo: NSRect(
-          x: actionX,
-          y: headerY + Layout.iconOffset,
-          width: Layout.actionSize,
-          height: Layout.actionSize
-        ),
+        previewUsesFade: previewNaturalHeight > previewHeight + 0.5,
+        result: previewRect,
+        redo: redo,
+        chevron: chevron,
         copyResult: NSRect(
           x: actionX,
-          y: previewY + Layout.actionRowOffset,
+          y: Layout.contentTop + Layout.actionRowOffset,
           width: Layout.actionSize,
           height: Layout.actionSize
         ),
         copySource: NSRect(
           x: actionX,
-          y: previewY + Layout.actionRowOffset,
+          y: Layout.contentTop + Layout.actionRowOffset,
           width: Layout.actionSize,
           height: Layout.actionSize
-        ),
-        cardOpacity: 1,
-        fadeOpacity: 1
+        )
       )
     case .current, .manuallyExpanded:
-      let headerY = Layout.expandedVerticalPadding
-      let textWidth = max(0, width - Layout.actionColumnWidth)
-      let modeX = Layout.modeOffset
-      let headerRight = max(modeX, width - Layout.actionColumnWidth)
-      let sourceY = headerY + Layout.headerHeight + Layout.contentSpacing
       let sourceLayout = sourcePresentationLayout(for: width, presentation: presentation)
       let sourceSpacing = sourceLayout.height > 0 ? Layout.contentSpacing : 0
-      let resultY = sourceY + sourceLayout.height + sourceSpacing
+      let resultY = Layout.contentTop + sourceLayout.height + sourceSpacing
       let resultHeight =
         resultContainer?.naturalTextHeight ?? HistoryResultTextContainer.minimumHeight
-      let actionX = max(0, width - Layout.actionSize)
-      let previewWidth = max(0, width - Layout.foldedInset * 2 - Layout.actionColumnWidth)
       return PresentationGeometry(
-        icon: NSRect(x: 0, y: headerY + Layout.iconOffset, width: 12, height: 12),
-        mode: NSRect(x: modeX, y: headerY, width: modeWidth, height: Layout.headerHeight),
-        metadata: NSRect(
-          x: modeX + modeWidth + Layout.metadataGap,
-          y: headerY,
-          width: max(0, headerRight - modeX - modeWidth - Layout.metadataGap),
-          height: Layout.headerHeight
-        ),
-        source: NSRect(x: 0, y: sourceY, width: textWidth, height: sourceLayout.height),
+        icon: icon,
+        mode: modeRect,
+        metadata: metadataRect,
+        source: NSRect(x: 0, y: Layout.contentTop, width: textWidth, height: sourceLayout.height),
         sourceUsesFade: sourceLayout.usesFade,
         sourceAlpha: 1,
-        preview: NSRect(x: 0, y: resultY, width: previewWidth, height: Layout.previewHeight),
-        result: NSRect(x: 0, y: resultY, width: textWidth, height: resultHeight),
-        redo: NSRect(
-          x: actionX,
-          y: headerY + Layout.iconOffset,
-          width: Layout.actionSize,
-          height: Layout.actionSize
+        preview: NSRect(
+          x: 0,
+          y: resultY,
+          width: textWidth,
+          height: min(Layout.previewHeight, max(HistoryEntryPencilLayout.resultLineHeight, previewNaturalHeight))
         ),
+        previewUsesFade: false,
+        result: NSRect(x: 0, y: resultY, width: textWidth, height: resultHeight),
+        redo: redo,
+        chevron: chevron,
         copyResult: NSRect(
           x: actionX,
           y: resultY + Layout.actionRowOffset,
@@ -1338,36 +1313,37 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         ),
         copySource: NSRect(
           x: actionX,
-          y: sourceY + Layout.actionRowOffset,
+          y: Layout.contentTop + Layout.actionRowOffset,
           width: Layout.actionSize,
           height: Layout.actionSize
-        ),
-        cardOpacity: 0,
-        fadeOpacity: 0
+        )
       )
     }
-  }
-
-  private var showsVisibleActions: Bool {
-    redoButton?.isHidden == false || copyButton?.isHidden == false
   }
 
   override func layout() {
     super.layout()
     let width = max(1, bounds.width)
-    let contentHeight = max(0, bounds.height - (showsSeparator && presentation.isExpanded ? 1 : 0))
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    cardLayer.frame = NSRect(x: 0, y: 0, width: bounds.width, height: contentHeight)
+    hoverHighlightLayer.frame = NSRect(
+      x: -Layout.hoverBleed,
+      y: 0,
+      width: bounds.width + Layout.hoverBleed * 2,
+      height: contentHeight
+    )
     separatorLayer.frame = NSRect(
       x: 0,
-      y: bounds.maxY - 1,
+      y: bounds.maxY - Layout.separatorHeight,
       width: bounds.width,
-      height: showsSeparator && presentation.isExpanded ? 1 : 0
+      height: showsSeparator ? Layout.separatorHeight : 0
     )
     CATransaction.commit()
 
     if transition == nil {
+      if presentation == .folded {
+        previewView.setTextWidth(max(1, width - Layout.actionColumnWidth))
+      }
       let geometry = geometry(for: presentation, width: width)
       iconView.frame = geometry.icon
       CATransaction.begin()
@@ -1377,8 +1353,8 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       CATransaction.commit()
       switch presentation {
       case .folded:
-        previewView.setTextWidth(geometry.preview.width)
         previewView.frame = geometry.preview
+        previewView.setFadeOpacity(geometry.previewUsesFade ? 1 : 0, duration: 0)
         sourceTextField.frame = geometry.source
       case .current, .manuallyExpanded:
         sourceTextField.frame = geometry.source
@@ -1396,6 +1372,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         }
       }
       redoButton?.frame = geometry.redo
+      chevronButton?.frame = geometry.chevron
       copyButton?.frame = geometry.copyResult
       copySourceButton?.frame = geometry.copySource
     }
@@ -1451,7 +1428,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   }
 
   override func hitTest(_ point: NSPoint) -> NSView? {
-    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })
+    for button in [redoButton, copyButton, copySourceButton, chevronButton].compactMap({ $0 })
     where !button.isHidden {
       let buttonPoint = button.convert(point, from: self)
       if let actionHit = button.hitTest(buttonPoint) {
@@ -1467,14 +1444,13 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     for region: HistoryEntryAccessibilityElement.Region
   ) -> NSRect {
     guard let window else { return .zero }
-    let contentHeight = max(0, bounds.height - (showsSeparator && presentation.isExpanded ? 1 : 0))
     let localFrame: NSRect
     switch region {
     case .entry:
       if presentation.isExpanded {
         localFrame = NSRect(
           x: 0,
-          y: Layout.expandedVerticalPadding,
+          y: Layout.verticalPadding,
           width: bounds.width,
           height: Layout.headerHeight
         )
@@ -1493,10 +1469,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     metadataTextLayer.contentsScale = scale
   }
 
-  /// Folded cards rest on `surface-fold` and lift to the hover tint over the
-  /// icon-in duration; expanded records have no card.
+  /// Hovering a record at rest tints the whole row over the icon-in duration;
+  /// the preview fade follows the tint so the clipped line dissolves into it.
   private func updateLayerAppearance(animated: Bool) {
-    let cardColor = isHovering && presentation == .folded ? Self.foldedHoverColor : Self.foldedCardColor
+    let highlighted = isHovering && presentation == .folded && transition == nil
     let duration = animated ? CidaMotion.resolvedDuration(CidaMotion.iconInSeconds, in: window) : 0
     CATransaction.begin()
     if duration > 0 {
@@ -1505,12 +1481,12 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     } else {
       CATransaction.setDisableActions(true)
     }
-    cardLayer.backgroundColor = cardColor.cgColor
+    hoverHighlightLayer.opacity = highlighted ? 1 : 0
     CATransaction.commit()
-    if transition == nil {
-      animateOpacity(of: cardLayer, to: presentation == .folded ? 1 : 0, duration: 0)
-    }
-    previewView.setFadeColor(cardColor, animated: duration > 0)
+    previewView.setFadeColor(
+      highlighted ? Self.hoverHighlightColor : Self.backgroundColor,
+      animated: duration > 0
+    )
   }
 
   override func updateTrackingAreas() {
@@ -1617,7 +1593,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     case .expand:
       onExpand?()
     case .collapse:
-      let headerY = Layout.expandedVerticalPadding
+      let headerY = Layout.verticalPadding
       let headerRect = NSRect(
         x: 0,
         y: headerY,
@@ -1693,6 +1669,25 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     pendingActionRevealDuration = CidaMotion.iconInSeconds
     let buttons = ensureActionButtons()
     setActionVisible(buttons.redo, showsActions, revealDuration: revealDuration)
+
+    let disclosure = HistoryRenderContract(presentation: presentation).disclosureAction
+    if disclosure != .none {
+      let chevron = ensureChevronButton()
+      let description = disclosure == .expand ? "展开这条历史记录" : "收起这条历史记录"
+      if chevron.accessibilityLabel() != description {
+        let icon = Self.describedIcon(
+          disclosure == .expand ? .chevronDown : .chevronUp,
+          description: description
+        )
+        chevron.image = icon
+        chevron.iconImage = icon
+        chevron.setAccessibilityLabel(description)
+        chevron.setAccessibilityHelp(description)
+      }
+      setActionVisible(chevron, showsActions, revealDuration: revealDuration)
+    } else {
+      chevronButton?.conceal()
+    }
 
     switch presentation {
     case .folded:
@@ -1788,6 +1783,19 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     return button
   }
 
+  private func ensureChevronButton() -> HistoryEntryActionButton {
+    if let chevronButton { return chevronButton }
+    let button = makeActionButton(
+      icon: .chevronDown,
+      label: "展开历史记录",
+      identifier: "history-action-disclose-\(identifierSuffix)",
+      action: #selector(toggleDisclosure(_:))
+    )
+    addSubview(button)
+    chevronButton = button
+    return button
+  }
+
   private func updateAccessibilityChildren() {
     guard isPresentationActive else {
       setAccessibilityChildren([])
@@ -1807,14 +1815,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         children.append(resultContainer)
       }
     }
-    if let redoButton, !redoButton.isHidden {
-      children.append(redoButton)
-    }
-    if let copyButton, !copyButton.isHidden {
-      children.append(copyButton)
-    }
-    if let copySourceButton, !copySourceButton.isHidden {
-      children.append(copySourceButton)
+    for button in [redoButton, copyButton, copySourceButton, chevronButton] {
+      if let button, !button.isHidden {
+        children.append(button)
+      }
     }
     if let stickyResultActionView,
       !stickyResultActionView.isHidden,
@@ -1842,7 +1846,7 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
         "history-expand-\(identifierSuffix)"
       )
       expandAccessibilityElement.setAccessibilityLabel("展开历史记录")
-      expandAccessibilityElement.setAccessibilityHelp("显示完整结果")
+      expandAccessibilityElement.setAccessibilityHelp("显示原文和完整结果")
       expandAccessibilityElement.setAccessibilityValue(preview)
     case .collapse, .none:
       expandAccessibilityElement.setAccessibilityIdentifier(
@@ -1873,11 +1877,10 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       switch label {
       case "重新处理": "重新处理这条历史记录"
       case "复制原文": "复制这条历史记录的完整原文"
+      case "展开历史记录": "展开这条历史记录"
       default: "复制这条历史记录的完整结果"
       }
-    let describedIcon = LucideIconAsset.image(for: icon)?.copy() as? NSImage
-    describedIcon?.isTemplate = true
-    describedIcon?.accessibilityDescription = accessibilityDescription
+    let describedIcon = Self.describedIcon(icon, description: accessibilityDescription)
     button.image = describedIcon
     button.iconImage = describedIcon
     button.setAccessibilityLabel(accessibilityDescription)
@@ -1886,9 +1889,28 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     return button
   }
 
+  private static func describedIcon(_ icon: LucideIconName, description: String) -> NSImage? {
+    let image = LucideIconAsset.image(for: icon)?.copy() as? NSImage
+    image?.isTemplate = true
+    image?.accessibilityDescription = description
+    return image
+  }
+
   @objc
   private func redo(_ sender: NSButton) {
     onRedo?()
+  }
+
+  @objc
+  private func toggleDisclosure(_ sender: NSButton) {
+    switch HistoryRenderContract(presentation: presentation).disclosureAction {
+    case .expand:
+      onExpand?()
+    case .collapse:
+      onCollapse?()
+    case .none:
+      break
+    }
   }
 
   @objc

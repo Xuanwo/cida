@@ -21,6 +21,28 @@ enum HistoryResultTextStyle {
       .paragraphStyle: paragraphStyle.copy() as! NSParagraphStyle,
     ]
   }()
+
+  /// Width of `text` typeset on a single unbroken line in the result style.
+  static func singleLineWidth(of text: String) -> CGFloat {
+    guard !text.isEmpty else { return 0 }
+    return ceil(NSAttributedString(string: text, attributes: attributes).size().width)
+  }
+
+  /// Height of a historical record at rest (separator excluded) for a text
+  /// column of `textWidth`. A preview that fits on one unbroken line takes the
+  /// one-line Pencil height; everything else takes the two-line height, whether
+  /// it shows two lines in full or clips a longer result under the fade. The
+  /// single-line width is cached per record, so the virtualized list decides
+  /// every loaded row without laying its text out.
+  static func historyRowHeight(
+    for resultStorage: HistoryResultStorage,
+    textWidth: CGFloat
+  ) -> CGFloat {
+    let fitsOneLine =
+      !resultStorage.foldedPreviewContainsLineBreak
+      && resultStorage.previewSingleLineWidth(measure: singleLineWidth(of:)) <= textWidth + 0.5
+    return HistoryEntryPencilLayout.historyRowHeight(previewLineCount: fitsOneLine ? 1 : 2)
+  }
 }
 
 @MainActor

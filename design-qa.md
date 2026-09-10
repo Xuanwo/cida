@@ -17,12 +17,18 @@ Pencil nodes are:
 | History focus and folding | `Sol2d` |
 | Action behavior | `UVmdQ` |
 | Streaming motion | `NdsRA` |
+| Long record at rest (860) | `rOC5t` |
+| Reading column (1280) | `JoW8q` |
+| History fold v2 states | `T6tMl` |
+| History fold v2 rules | `mJm8R` |
 
 Exports are retained under `Design/LatestReferenceExport`; `l98qna.png` and `cRhyz.png` are the
-`Motion — 历史折叠` T0 and T1 viewports that define the folded card. Current native captures,
+`Motion — 历史折叠` T0 and T1 viewports as they were before the v2 rule (kept for the fold
+transition keyframes). Current native captures,
 normalized references, and side-by-side review images are under `Design/ImplementationCurrent` and
-`Design/QACurrent`. The `history-folded` design state (`scripts/capture-design-states.sh`) renders
-one folded long card above the focus record for direct comparison with `l98qna.png`.
+`Design/QACurrent`. The `history-folded` and `wide-reading-column` design states
+(`scripts/capture-design-states.sh`) render one long record at rest above the focus record and
+the centred reading column in a 1280 × 720 window, for comparison with `rOC5t` and `JoW8q`.
 
 ## Approved visual contracts
 
@@ -55,16 +61,22 @@ inside a disposable headless Tart macOS session. Neither path activates the test
 - An accepted submission is one state transition: capture the source, clear the native document,
   fold the former automatic current record, insert an empty waiting record, and pin the outer
   history to the bottom. The waiting result never reuses the previous record's text or pixels.
-- Only the newest record is automatically expanded. Older records use a two-line cached result
-  preview without mounting their complete TextKit result. Manual comparisons can remain expanded
+- Only the newest record is automatically expanded. Older records use their cached result preview
+  without mounting the complete TextKit result. Manual comparisons can remain expanded
   independently.
-- Folded records are the Pencil card from `BBKsI` ④ and `fgF4n`: a `surface-fold` fill with an
-  8 pt radius, a 10 pt inset on every side, meta plus the first two result lines at the shared
-  26 pt line height, and a 25 pt fade to the card colour. Cards have no divider; consecutive cards
-  keep one 8 pt gap so their fills stay distinct (the Stream frame never stacks two cards, so the
-  gap reuses the `Entry` gap token). Hovering lifts the whole card to `surface-fold-hover`
-  (`#ECECE7`, halfway to `border`, because the design only calls for a slight highlight) over
-  the 120 ms icon-in duration. Dividers only separate two expanded records, as in `mlf3o`.
+- History fold v2 (`Sol2d`, `mJm8R`, `T6tMl`): a historical record at rest is the Pencil `Entry`
+  without its source row, so its text shares the expanded records' left rail, the 24 pt action
+  column, and 1 px dividers; there is no card fill or inset. A result that fits one line takes the
+  82 pt row, two lines take 108 pt in full, and a longer result keeps the 108 pt row with the second
+  line dissolving into the 25 pt fade to the window background. Long documents always fold. The row
+  height comes from a cached single-line width of the 420-grapheme preview, so the virtualized
+  list never lays text out to size a row. Hovering a record at rest tints the whole row with
+  `surface-fold` over the 120 ms icon-in duration, bleeding 10 pt past the column
+  (`space-hover-bleed`), and reveals ↺, copy, and a chevron-down disclosure hint; expanded records
+  show chevron-up without a row tint.
+- The history and composer content sit in a column of at most 804 pt (`reading-width`, the
+  Pencil column at 860). Wider windows centre the column; the title bar, the composer surface, and
+  both scroll indicators keep spanning the window.
 - Folded, latest-expanded, and manually expanded records are presentation states of the same
   `HistoryEntryNSView`. One AppKit coordinate system owns their header, source preview, result,
   actions, fades, clipping, and accessibility frames. SwiftUI chooses the state but does not provide
@@ -72,11 +84,12 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   source-to-result gap; result rows are exactly 26 pt per line with no extra inset, so a
   one-line entry is the Pencil 82 pt.
 - Presentation changes animate over the 200 ms `motion-fold-ms` ease-out. A new submission keeps
-  the former focus record standalone while its source collapses, its result clips to two lines
-  under the fade, and the card fill rises; a clicked card first renders as that card and then
-  opens in place, and collapsing runs the same transition in reverse before the record rejoins the
-  virtualized list. The folded preview and the expanded result share one TextKit style, so the
-  swap at the start of a transition never changes line height.
+  the former focus record standalone while its source collapses and its result rises and, for a
+  long record, clips under the fade; a short record only gains its divider. A clicked row first
+  renders as that row and then opens in place to show its source (and, for a long record, its
+  complete result), and collapsing runs the same transition in reverse before the record rejoins
+  the virtualized list. The resting preview and the expanded result share one TextKit style, so
+  the swap at the start of a transition never changes line height.
 - SwiftUI and AppKit resolve every shared surface, text, border, and accent color from
   `CidaDesign.Palette`, while every history renderer resolves sizing from
   `HistoryEntryPencilLayout`. Token tests pin the approved sRGB values and layout measurements so a
@@ -118,7 +131,7 @@ reintroduced.
 
 ## Executable evidence
 
-- `swift test -Xswiftc -warnings-as-errors`: 153 tests, 0 failures.
+- `swift test -Xswiftc -warnings-as-errors`: 154 tests, 0 failures.
 - Native renderer tests prove all three history presentations use the same concrete view, preserve
   the header renderer identity across transitions, release expanded-only resources when folding,
   expand a recycled row through a real AppKit hit-test and mouse event, run the fold and expand
@@ -131,13 +144,25 @@ reintroduced.
 - `VisualAndAccessibilityJourneyTests` compares the Main Translate and Settings WindowServer
   screenshots against the manifest-bound approved images and runs the native semantic accessibility
   audit. The Main Translate approval was re-recorded from the isolated nonactivating capture after
-  the folded cards moved to the Pencil card styling; the Settings approval is unchanged.
+  the history rows moved to the v2 rule; the Settings approval is unchanged.
 - `scripts/test-ui-in-tart.sh` from this tree: all 28 XCUI journeys passed in a fresh headless
-  Tart clone (`TestResults/vm-ui-pencil-run2`), including the folded-card geometry assertions, the
-  re-approved Main Translate baseline, and the host-session guard.
-- `scripts/e2e/run-mutation-contracts.sh --mode unit` on a scratch clone of this tree: all 14
-  mutations killed (`TestResults/mutations-unit-pencil-20260908`), including the re-anchored
-  `folded-result-fade-hidden` mutation that now empties the Pencil fade frame.
+  Tart clone (`TestResults/vm-ui-pencil-run3`), including the v2 row geometry assertions (108 pt
+  long record, 40 pt preview offset, chevron beside ↺), the re-approved Main Translate baseline,
+  and the host-session guard.
+- `scripts/e2e/run-mutation-contracts.sh --mode unit` on a scratch clone of this tree: 13 of the
+  14 mutations were killed on the first run (`TestResults/mutations-unit-pencil-v2-20260910`). The
+  re-anchored `folded-result-fade-hidden` mutation, which empties the Pencil fade frame, survived
+  that run only because its catalog entry still named the v1 kill test that the v2 rewrite had
+  replaced, so the targeted filter executed no test. The catalog now names
+  `testHistoryRowShowsUpToTwoLinesAndFadesOnlyALongerResult`, which pins the exact fade frame, the
+  runner rejects undeclared kill tests during catalog validation and reports an empty filter as
+  `infrastructure`, and the targeted rerun killed the mutation
+  (`TestResults/mutations-unit-pencil-v2-fade-rerun-20260910`).
+- `scripts/benchmark-smooth-streaming.sh` and `scripts/benchmark-large-history-scroll.sh` against
+  the Tart-verified artifact (`TestResults/performance-pencil-v2-20260910`): both workloads
+  completed with a maximum main-actor latency under 2 ms on the 60 Hz host display; one run
+  recorded two late frames at the very end of the stream that two immediate reruns did not
+  reproduce. The 120 Hz gate itself still needs a 120 Hz display.
 - The full PR gate output for this refactor is written to
   `TestResults/gates/unified-history-renderer-final-20260818/gate-summary.json`. It runs all nine UI
   suites rather than a hand-maintained subset; `PairwiseManifestTests` fails if any suite is omitted.

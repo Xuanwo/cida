@@ -10,6 +10,8 @@ enum LucideIconName: String, CaseIterable {
   case rotateCounterclockwise = "rotate-ccw"
   case copy
   case check
+  case chevronDown = "chevron-down"
+  case chevronUp = "chevron-up"
 }
 
 @MainActor

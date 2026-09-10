@@ -278,12 +278,11 @@ final class ResizingHistoryHostingView: NSHostingView<AnyView>, HistoryResultHei
   }
 }
 
-/// Which records render standalone, which expanded records are followed by a
-/// Pencil `Entry Divider`, and which folded cards need the card gap before them.
+/// Which records render standalone rather than inside the virtualized list of
+/// records at rest: the latest one, manual comparisons, and records that are
+/// still animating their fold.
 private struct HistoryPagePlan: Equatable {
   var standaloneEntryIDs: Set<UUID> = []
-  var separatorEntryIDs: Set<UUID> = []
-  var leadingGapEntryIDs: Set<UUID> = []
 }
 
 private struct HistoryEntriesDocument: View {
@@ -319,8 +318,11 @@ private struct HistoryEntriesDocument: View {
         .equatable()
       }
     }
+    // Pencil `reading-width`: the column never exceeds 804 pt and centres in a
+    // wider window; the 28 pt window inset stays on both sides.
+    .frame(maxWidth: HistoryEntryPencilLayout.readingWidth)
     .frame(maxWidth: .infinity)
-    .padding(.horizontal, 28)
+    .padding(.horizontal, HistoryEntryPencilLayout.windowHorizontalPadding)
     .padding(.top, 8)
     .padding(.bottom, 16)
     .background {
@@ -330,32 +332,18 @@ private struct HistoryEntriesDocument: View {
     }
   }
 
-  /// Dividers only separate two expanded records (Pencil `mlf3o`); folded cards
-  /// separate themselves with their fill and keep one gap between neighbours
-  /// (`Motion — 历史折叠` T0/T2 show no divider next to a card).
   private func makePagePlans(pages: [[HistoryEntry]]) -> [HistoryPagePlan] {
-    var plans = pages.map { _ in HistoryPagePlan() }
-    var previousWasExpanded: Bool?
-    var pendingSeparator: (pageIndex: Int, entryID: UUID)?
-    for (pageIndex, entries) in pages.enumerated() {
-      for entry in entries {
-        let isExpanded =
-          entry.isLatestInHistory || model.isHistoryEntryManuallyExpanded(entry.id)
-        let isStandalone = isExpanded || model.isHistoryEntryFolding(entry.id)
-        if isStandalone {
-          plans[pageIndex].standaloneEntryIDs.insert(entry.id)
-        }
-        if let pendingSeparator, isExpanded {
-          plans[pendingSeparator.pageIndex].separatorEntryIDs.insert(pendingSeparator.entryID)
-        }
-        pendingSeparator = isExpanded ? (pageIndex, entry.id) : nil
-        if !isExpanded, let previousWasExpanded, !previousWasExpanded {
-          plans[pageIndex].leadingGapEntryIDs.insert(entry.id)
-        }
-        previousWasExpanded = isExpanded
-      }
+    pages.map { entries in
+      HistoryPagePlan(
+        standaloneEntryIDs: Set(
+          entries.lazy.filter {
+            $0.isLatestInHistory
+              || model.isHistoryEntryManuallyExpanded($0.id)
+              || model.isHistoryEntryFolding($0.id)
+          }.map(\.id)
+        )
+      )
     }
-    return plans
   }
 
   private var longDocumentScrollRunway: some View {
@@ -385,8 +373,8 @@ private struct HistoryEntriesDocument: View {
 private struct HistoryEntryPageDocument: View, Equatable {
   private struct Segment: Identifiable {
     enum Content {
-      case folded([HistoryEntry], leadingGap: Bool)
-      case standalone(HistoryEntry, showsSeparator: Bool, leadingGapWhenFolded: Bool)
+      case folded([HistoryEntry])
+      case standalone(HistoryEntry)
     }
 
     let id: UUID
@@ -411,31 +399,19 @@ private struct HistoryEntryPageDocument: View, Equatable {
     VStack(spacing: 0) {
       ForEach(segments) { segment in
         switch segment.content {
-        case .folded(let foldedEntries, let leadingGap):
+        case .folded(let foldedEntries):
           VirtualizedFoldedHistoryList(entries: foldedEntries, model: model)
             .frame(maxWidth: .infinity)
-            .frame(
-              height: HistoryEntryPencilLayout.foldedListHeight(rowCount: foldedEntries.count)
-            )
-            .padding(.top, leadingGap ? HistoryEntryPencilLayout.foldedCardGap : 0)
-            .animation(historyTransitionAnimation, value: leadingGap)
-        case .standalone(let entry, let showsSeparator, let leadingGapWhenFolded):
+        case .standalone(let entry):
           HistoryEntryView(
             entry: entry,
             model: model,
-            animatesTransitions: animatesTransitions,
-            showsSeparator: showsSeparator,
-            leadingGapWhenFolded: leadingGapWhenFolded
+            animatesTransitions: animatesTransitions
           )
           .id(entry.id)
         }
       }
     }
-  }
-
-  private var historyTransitionAnimation: Animation? {
-    guard animatesTransitions else { return nil }
-    return .easeOut(duration: CidaMotion.historyFoldSeconds)
   }
 
   private func makeSegments() -> [Segment] {
@@ -444,31 +420,14 @@ private struct HistoryEntryPageDocument: View, Equatable {
 
     func flushFoldedEntries() {
       guard let first = foldedEntries.first else { return }
-      segments.append(
-        Segment(
-          id: first.id,
-          content: .folded(
-            foldedEntries,
-            leadingGap: plan.leadingGapEntryIDs.contains(first.id)
-          )
-        )
-      )
+      segments.append(Segment(id: first.id, content: .folded(foldedEntries)))
       foldedEntries.removeAll(keepingCapacity: true)
     }
 
     for entry in entries {
       if plan.standaloneEntryIDs.contains(entry.id) {
         flushFoldedEntries()
-        segments.append(
-          Segment(
-            id: entry.id,
-            content: .standalone(
-              entry,
-              showsSeparator: plan.separatorEntryIDs.contains(entry.id),
-              leadingGapWhenFolded: plan.leadingGapEntryIDs.contains(entry.id)
-            )
-          )
-        )
+        segments.append(Segment(id: entry.id, content: .standalone(entry)))
       } else {
         foldedEntries.append(entry)
       }
@@ -496,25 +455,15 @@ private struct HistoryEntryView: View {
   private let standaloneEntry: HistoryEntry?
   let model: AppModel
   let animatesTransitions: Bool
-  let showsSeparator: Bool
-  let leadingGapWhenFolded: Bool
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-  /// A record that was just expanded from a virtualized card first renders as
-  /// that card, then animates open in place (Pencil `Motion — 历史折叠` T2).
+  /// A record that was just expanded from a virtualized row first renders as
+  /// that row, then animates open in place (Pencil `Motion — 历史折叠` T2).
   @State private var hasSettledInitialPresentation = false
 
-  init(
-    entry: HistoryEntry,
-    model: AppModel,
-    animatesTransitions: Bool,
-    showsSeparator: Bool,
-    leadingGapWhenFolded: Bool
-  ) {
+  init(entry: HistoryEntry, model: AppModel, animatesTransitions: Bool) {
     standaloneEntry = entry
     self.model = model
     self.animatesTransitions = animatesTransitions
-    self.showsSeparator = showsSeparator
-    self.leadingGapWhenFolded = leadingGapWhenFolded
   }
 
   private var entry: HistoryEntry {
@@ -546,10 +495,6 @@ private struct HistoryEntryView: View {
       presentation == .manuallyExpanded && animatesPresentation && !hasSettledInitialPresentation
       ? .folded
       : presentation
-    let leadingGap: CGFloat =
-      displayedPresentation == .folded && leadingGapWhenFolded
-      ? HistoryEntryPencilLayout.foldedCardGap
-      : 0
     let _ = entry.state
     let _ = entry.presentationRevision
     let _ = entry.metadata
@@ -557,7 +502,7 @@ private struct HistoryEntryView: View {
     NativeHistoryEntryView(
       entry: entry,
       presentation: displayedPresentation,
-      showsSeparator: showsSeparator,
+      showsSeparator: !isLatestEntry,
       animatesTransitions: animatesPresentation,
       onExpand: {
         model.expandHistoryEntry(entry.id)
@@ -577,9 +522,7 @@ private struct HistoryEntryView: View {
       }
     )
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .padding(.top, leadingGap)
     .animation(historyTransitionAnimation, value: displayedPresentation)
-    .animation(historyTransitionAnimation, value: leadingGap)
     .onAppear {
       guard !hasSettledInitialPresentation else { return }
       hasSettledInitialPresentation = true

@@ -145,11 +145,11 @@
       "description": "Collapse the Pencil fade over every folded result preview to an empty frame.",
       "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
       "file": "Sources/Cida/HistoryEntryRenderer.swift",
-      "before": "    fadeLayer.frame = NSRect(\n      x: 0,\n      y: HistoryEntryPencilLayout.foldedPreviewHeight\n        - HistoryEntryPencilLayout.foldedPreviewFadeHeight,\n      width: bounds.width,\n      height: HistoryEntryPencilLayout.foldedPreviewFadeHeight\n    )",
+      "before": "    fadeLayer.frame = NSRect(\n      x: 0,\n      y: max(0, bounds.height - HistoryEntryPencilLayout.foldedPreviewFadeHeight),\n      width: bounds.width,\n      height: HistoryEntryPencilLayout.foldedPreviewFadeHeight\n    )",
       "after": "    fadeLayer.frame = .zero",
       "occurrences": 1,
       "unitTests": [
-        "InteractionReproductionTests/testFoldedHistoryRowAlwaysFadesItsSecondLineAndClipsToTheCard"
+        "InteractionReproductionTests/testHistoryRowShowsUpToTwoLinesAndFadesOnlyALongerResult"
       ],
       "releaseTests": [
         "HistoryPresentationJourneyTests/testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult"

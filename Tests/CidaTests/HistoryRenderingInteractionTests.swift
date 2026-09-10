@@ -854,8 +854,10 @@ extension InteractionReproductionTests {
       preview: "Streaming preview",
       state: .completed
     )
+    // ↺, copy, and the chevron-down disclosure hint reveal together.
     let revealedOnCompletion = row.actionButtonsForTesting.filter { !$0.isHidden }
-    XCTAssertEqual(revealedOnCompletion.count, 2)
+    XCTAssertEqual(revealedOnCompletion.count, 3)
+    XCTAssertFalse(try XCTUnwrap(row.chevronButtonForTesting).isHidden)
     for button in revealedOnCompletion {
       let reveal = try XCTUnwrap(button.revealAnimationForTesting)
       XCTAssertEqual(reveal.duration, 0.15, accuracy: 0.001)
@@ -869,7 +871,12 @@ extension InteractionReproductionTests {
     XCTAssertTrue(row.actionButtonsForTesting.allSatisfy(\.isHidden))
     row.setResolvedHoverState(true)
     let revealedOnHover = row.actionButtonsForTesting.filter { !$0.isHidden }
-    XCTAssertEqual(revealedOnHover.count, 2)
+    XCTAssertEqual(revealedOnHover.count, 3)
+    XCTAssertEqual(
+      row.hoverHighlightOpacityForTesting,
+      1,
+      "Hovering a record at rest tints the whole row"
+    )
     for button in revealedOnHover {
       XCTAssertEqual(
         try XCTUnwrap(button.revealAnimationForTesting).duration,

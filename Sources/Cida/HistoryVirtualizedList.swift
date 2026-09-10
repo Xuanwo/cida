@@ -24,7 +24,7 @@ struct VirtualizedFoldedHistoryList: NSViewRepresentable {
     guard let width = proposal.width, width > 0 else { return nil }
     return CGSize(
       width: width,
-      height: HistoryEntryPencilLayout.foldedListHeight(rowCount: entries.count)
+      height: VirtualizedFoldedHistoryListNSView.listHeight(for: entries, width: width)
     )
   }
 
@@ -68,12 +68,11 @@ struct HistoryPlaceholderRunway: NSViewRepresentable {
     return CGSize(width: width, height: Self.height(for: entryCount))
   }
 
-  /// Placeholder cards keep the folded stride, including the gap before the
-  /// first loaded card.
+  /// Unloaded rows are unknown, so each takes the two-line folded height.
   static func height(for entryCount: Int) -> CGFloat {
     min(
       maximumHeight,
-      CGFloat(max(0, entryCount)) * HistoryEntryPencilLayout.foldedRowStride
+      CGFloat(max(0, entryCount)) * HistoryEntryPencilLayout.placeholderRowStride
     )
   }
 }
@@ -82,8 +81,8 @@ struct HistoryPlaceholderRunway: NSViewRepresentable {
 final class HistoryPlaceholderRunwayNSView: NSView {
   private var entryCount = 0
   private weak var observedClipView: NSClipView?
-  private let cardLayer = CAShapeLayer()
   private let placeholderLayer = CAShapeLayer()
+  private let separatorLayer = CAShapeLayer()
   private var renderedRowRange: Range<Int> = 0..<0
   private var renderedWidth: CGFloat = 0
 
@@ -100,9 +99,9 @@ final class HistoryPlaceholderRunwayNSView: NSView {
     wantsLayer = true
     layerContentsRedrawPolicy = .never
     layer?.backgroundColor = CidaDesign.Palette.background.appKit.cgColor
-    cardLayer.fillColor = CidaDesign.Palette.surfaceFold.appKit.cgColor
     placeholderLayer.fillColor = CidaDesign.Palette.placeholder.appKit.cgColor
-    for shapeLayer in [cardLayer, placeholderLayer] {
+    separatorLayer.fillColor = CidaDesign.Palette.border.appKit.cgColor
+    for shapeLayer in [placeholderLayer, separatorLayer] {
       shapeLayer.actions = [
         "bounds": NSNull(),
         "position": NSNull(),
@@ -170,13 +169,13 @@ final class HistoryPlaceholderRunwayNSView: NSView {
 
   private func updatePlaceholderLayers() {
     guard entryCount > 0, bounds.width > 0, bounds.height > 0 else {
-      cardLayer.path = nil
       placeholderLayer.path = nil
+      separatorLayer.path = nil
       renderedRowRange = 0..<0
       return
     }
 
-    let stride = HistoryEntryPencilLayout.foldedRowStride
+    let stride = HistoryEntryPencilLayout.placeholderRowStride
     let viewportRect =
       observedClipView.map { convert($0.bounds, from: $0) }
       ?? NSRect(
@@ -201,8 +200,8 @@ final class HistoryPlaceholderRunwayNSView: NSView {
       Int(ceil(targetRect.maxY / stride)) + 1
     )
     guard firstRow < lastRow else {
-      cardLayer.path = nil
       placeholderLayer.path = nil
+      separatorLayer.path = nil
       renderedRowRange = 0..<0
       return
     }
@@ -213,30 +212,23 @@ final class HistoryPlaceholderRunwayNSView: NSView {
     renderedRowRange = rowRange
     renderedWidth = bounds.width
 
-    let inset = HistoryEntryPencilLayout.foldedInset
-    let cardPath = CGMutablePath()
     let placeholderPath = CGMutablePath()
+    let separatorPath = CGMutablePath()
+    let headerY = HistoryEntryPencilLayout.verticalPadding + 5
+    let firstLineY = HistoryEntryPencilLayout.verticalPadding + HistoryEntryPencilLayout.headerHeight
+      + HistoryEntryPencilLayout.contentSpacing + 9
+    let secondLineY = firstLineY + HistoryEntryPencilLayout.resultLineHeight
     for row in rowRange {
       let originY = CGFloat(row) * stride
-      cardPath.addRoundedRect(
-        in: CGRect(
-          x: 0,
-          y: originY,
-          width: bounds.width,
-          height: HistoryEntryPencilLayout.foldedHeight
-        ),
-        cornerWidth: HistoryEntryPencilLayout.foldedCornerRadius,
-        cornerHeight: HistoryEntryPencilLayout.foldedCornerRadius
-      )
       placeholderPath.addRoundedRect(
-        in: CGRect(x: inset, y: originY + inset + 5, width: 108, height: 6),
+        in: CGRect(x: 0, y: originY + headerY, width: 108, height: 6),
         cornerWidth: 3,
         cornerHeight: 3
       )
       placeholderPath.addRoundedRect(
         in: CGRect(
-          x: inset,
-          y: originY + 43,
+          x: 0,
+          y: originY + firstLineY,
           width: max(80, min(360, bounds.width * 0.42)),
           height: 7
         ),
@@ -245,17 +237,25 @@ final class HistoryPlaceholderRunwayNSView: NSView {
       )
       placeholderPath.addRoundedRect(
         in: CGRect(
-          x: inset,
-          y: originY + 66,
+          x: 0,
+          y: originY + secondLineY,
           width: max(60, min(260, bounds.width * 0.3)),
           height: 7
         ),
         cornerWidth: 3.5,
         cornerHeight: 3.5
       )
+      separatorPath.addRect(
+        CGRect(
+          x: 0,
+          y: originY + stride - HistoryEntryPencilLayout.separatorHeight,
+          width: bounds.width,
+          height: HistoryEntryPencilLayout.separatorHeight
+        )
+      )
     }
-    cardLayer.path = cardPath
     placeholderLayer.path = placeholderPath
+    separatorLayer.path = separatorPath
   }
 }
 
@@ -302,6 +302,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
   #if DEBUG
     var materializedRowsForTesting: [HistoryEntryNSView] { activeRows }
     var pooledRowCountForTesting: Int { rowsContainer.subviews.count }
+    var rowHeightsForTesting: [CGFloat] { rowHeights }
   #endif
   private(set) var configurationCount = 0
   private(set) var rowMeasurementCount = 0
@@ -318,6 +319,18 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
   @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+
+  /// Row height for one record at rest, including its separator.
+  static func rowHeight(for entry: HistoryEntry, width: CGFloat) -> CGFloat {
+    HistoryResultTextStyle.historyRowHeight(
+      for: entry.resultStorage,
+      textWidth: max(1, width - HistoryEntryPencilLayout.actionColumnWidth)
+    ) + HistoryEntryPencilLayout.separatorHeight
+  }
+
+  static func listHeight(for entries: [HistoryEntry], width: CGFloat) -> CGFloat {
+    entries.reduce(0) { $0 + rowHeight(for: $1, width: width) }
   }
 
   func configure(
@@ -443,10 +456,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
     rowHeights.reserveCapacity(entries.count)
 
     var offset: CGFloat = 0
-    for (index, entry) in entries.enumerated() {
-      if index > 0 {
-        offset += HistoryEntryPencilLayout.foldedCardGap
-      }
+    for entry in entries {
       rowOffsets.append(offset)
       let height = measuredRowHeight(for: entry, width: width)
       rowHeights.append(height)
@@ -457,7 +467,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
 
   private func appendMeasurementsIfPossible(startingAt index: Int) {
     guard
-      measuredWidth != nil,
+      let measuredWidth,
       rowOffsets.count == index,
       rowHeights.count == index
     else {
@@ -468,20 +478,18 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
     var offset = measuredHeight
     rowOffsets.reserveCapacity(entries.count)
     rowHeights.reserveCapacity(entries.count)
-    for _ in entries[index...] {
-      if !rowOffsets.isEmpty {
-        offset += HistoryEntryPencilLayout.foldedCardGap
-      }
+    for entry in entries[index...] {
       rowOffsets.append(offset)
-      rowHeights.append(HistoryEntryPencilLayout.foldedHeight)
-      offset += HistoryEntryPencilLayout.foldedHeight
+      let height = measuredRowHeight(for: entry, width: measuredWidth)
+      rowHeights.append(height)
+      offset += height
     }
     measuredHeight = offset
   }
 
-  private func measuredRowHeight(for _: HistoryEntry, width _: CGFloat) -> CGFloat {
+  private func measuredRowHeight(for entry: HistoryEntry, width: CGFloat) -> CGFloat {
     rowMeasurementCount += 1
-    return HistoryEntryPencilLayout.foldedHeight
+    return Self.rowHeight(for: entry, width: width)
   }
 
   private func updateVisibleRows() {
@@ -584,7 +592,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
       metadata: entry.metadata,
       preview: entry.resultStorage.foldedPreview,
       state: entry.state,
-      showsSeparator: false
+      showsSeparator: true
     )
     return row
   }
@@ -600,7 +608,7 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
         metadata: entry.metadata,
         preview: entry.resultStorage.foldedPreview,
         state: entry.state,
-        showsSeparator: false
+        showsSeparator: true
       )
     }
   }
@@ -633,7 +641,8 @@ final class VirtualizedFoldedHistoryListNSView: NSView {
     {
       let viewport = convert(clipView.bounds, from: clipView)
       let mouseLocation = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-      if viewport.contains(mouseLocation), bounds.contains(mouseLocation) {
+      let hoverBounds = bounds.insetBy(dx: -HistoryEntryPencilLayout.hoverBleed, dy: 0)
+      if viewport.contains(mouseLocation), hoverBounds.contains(mouseLocation) {
         let candidate = firstRowEnding(after: mouseLocation.y)
         if activeRange.contains(candidate),
           rowOffsets[candidate] <= mouseLocation.y,

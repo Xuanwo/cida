@@ -620,13 +620,14 @@ extension InteractionReproductionTests {
     )
     row.mouseEntered(with: entered)
 
+    // ↺, copy result, and the chevron-down disclosure hint.
     XCTAssertEqual(
       row.subviews.compactMap { $0 as? NSButton }.filter { !$0.isHidden }.count,
-      2
+      3
     )
     XCTAssertEqual(
       (row.accessibilityChildren() ?? []).compactMap { $0 as? NSButton }.count,
-      2
+      3
     )
     let accessibilityButtons = (row.accessibilityChildren() ?? [])
       .compactMap { $0 as? NSButton }
@@ -650,43 +651,34 @@ extension InteractionReproductionTests {
     XCTAssertTrue((row.accessibilityChildren() ?? []).allSatisfy { !($0 is NSButton) })
   }
 
-  func testFoldedHistoryRowMatchesThePencilCardAndActionGeometry() throws {
+  func testHistoryRowAtRestMatchesThePencilGeometryAndHoverHighlight() throws {
     let row = HistoryEntryNSView()
     row.configure(
       entryID: UUID(),
       mode: .translate,
       metadata: "中文 → English · 09:14 · 1,846 → 3,214 字",
       preview:
-        "Designing distributed systems has never been a matter of simply picking technologies. When we discuss consistency, availability, and partition tolerance, the second line must remain visible.",
+        "Designing distributed systems has never been a matter of simply picking technologies. When we discuss consistency, availability, and partition tolerance, the second line must remain visible and the third line must be clipped under the fade.",
       state: .completed,
       onExpand: {},
       onRedo: {},
       onCopyResult: {}
     )
 
-    XCTAssertEqual(row.preferredHeight(for: 804), 96, accuracy: 0.001)
-    row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
+    // Pencil v2: a long record at rest is the two-line Entry (108 pt) with no
+    // card fill or inset; its text shares the expanded record's left rail.
+    XCTAssertEqual(row.preferredHeight(for: 804), 108, accuracy: 0.001)
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 108)
     row.layoutSubtreeIfNeeded()
-    // Pencil folded card: surface-fold fill, radius 8, no divider.
-    let restingBackground = try XCTUnwrap(row.foldedCardColorForTesting)
-    XCTAssertTrue(
-      try XCTUnwrap(NSColor(cgColor: restingBackground)).isEqual(
-        NSColor(
-          srgbRed: 241 / 255,
-          green: 241 / 255,
-          blue: 236 / 255,
-          alpha: 1
-        )
-      )
-    )
-    XCTAssertEqual(row.foldedCardOpacityForTesting, 1)
-    XCTAssertEqual(row.foldedCardCornerRadiusForTesting, 8)
-    XCTAssertEqual(row.headerModeFrameForTesting.minX, 28, accuracy: 0.001)
-    XCTAssertEqual(row.headerModeFrameForTesting.minY, 10, accuracy: 0.001)
+    XCTAssertEqual(row.hoverHighlightOpacityForTesting, 0)
+    XCTAssertEqual(row.hoverHighlightFrameForTesting, NSRect(x: -10, y: 0, width: 824, height: 108))
+    XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minY, 16, accuracy: 0.001)
     XCTAssertEqual(
       row.foldedPreviewFrameForTesting,
-      NSRect(x: 10, y: 34, width: 760, height: 52)
+      NSRect(x: 0, y: 40, width: 780, height: 52)
     )
+    XCTAssertTrue(row.foldedPreviewUsesFadeForTesting)
     let entered = try XCTUnwrap(
       NSEvent.mouseEvent(
         with: .mouseMoved,
@@ -703,65 +695,91 @@ extension InteractionReproductionTests {
     row.mouseEntered(with: entered)
     row.layoutSubtreeIfNeeded()
 
-    // Hover lifts the whole card to the hover tint; the fill never disappears.
-    let hoverBackground = try XCTUnwrap(row.foldedCardColorForTesting)
+    // Hover tints the whole row with surface-fold, bleeding 10 pt past the
+    // text column; the text itself never moves.
+    XCTAssertEqual(row.hoverHighlightOpacityForTesting, 1)
+    let hoverBackground = try XCTUnwrap(row.hoverHighlightColorForTesting)
     XCTAssertTrue(
       try XCTUnwrap(NSColor(cgColor: hoverBackground)).isEqual(
         NSColor(
-          srgbRed: 236 / 255,
-          green: 236 / 255,
-          blue: 231 / 255,
+          srgbRed: 241 / 255,
+          green: 241 / 255,
+          blue: 236 / 255,
           alpha: 1
         )
       )
     )
-    XCTAssertEqual(row.foldedCardOpacityForTesting, 1)
 
-    let actions = row.subviews.compactMap { $0 as? NSButton }.filter { !$0.isHidden }
-      .sorted { $0.frame.minY < $1.frame.minY }
-    XCTAssertEqual(actions.count, 2)
-    XCTAssertEqual(actions[0].frame, NSRect(x: 782, y: 12, width: 12, height: 12))
-    XCTAssertEqual(actions[1].frame, NSRect(x: 782, y: 38, width: 12, height: 12))
+    let actionFrames = Set(
+      row.subviews.compactMap { $0 as? NSButton }.filter { !$0.isHidden }.map(\.frame)
+    )
+    XCTAssertEqual(
+      actionFrames,
+      [
+        NSRect(x: 768, y: 18, width: 12, height: 12),  // chevron-down
+        NSRect(x: 792, y: 18, width: 12, height: 12),  // ↺
+        NSRect(x: 792, y: 44, width: 12, height: 12),  // copy result
+      ]
+    )
     XCTAssertEqual(
       row.foldedPreviewFrameForTesting,
-      NSRect(x: 10, y: 34, width: 760, height: 52),
+      NSRect(x: 0, y: 40, width: 780, height: 52),
       "Hover must not reflow the preview; the action column is always reserved."
     )
   }
 
-  func testFoldedHistoryRowAlwaysFadesItsSecondLineAndClipsToTheCard() throws {
+  func testHistoryRowShowsUpToTwoLinesAndFadesOnlyALongerResult() throws {
     let line = String(repeating: "M", count: 32)
     let row = HistoryEntryNSView()
-    row.configure(
-      entryID: UUID(),
-      mode: .translate,
-      metadata: "中文 → English · 09:14",
-      preview: "\(line)\n\(line)",
-      state: .completed,
-      onExpand: {},
-      onRedo: {},
-      onCopyResult: {}
-    )
-    row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
-    row.layoutSubtreeIfNeeded()
-
+    func configure(preview: String) {
+      row.configure(
+        entryID: UUID(),
+        mode: .translate,
+        metadata: "中文 → English · 09:14",
+        preview: preview,
+        state: .completed,
+        showsSeparator: true,
+        onExpand: {},
+        onRedo: {},
+        onCopyResult: {}
+      )
+      row.frame = NSRect(x: 0, y: 0, width: 804, height: row.preferredHeight(for: 804))
+      row.layoutSubtreeIfNeeded()
+      row.foldedPreviewViewForTesting.layoutSubtreeIfNeeded()
+    }
     let previewView = row.foldedPreviewViewForTesting
-    previewView.layoutSubtreeIfNeeded()
     let fadeLayer = previewView.fadeLayer
 
-    XCTAssertTrue(row.layer?.masksToBounds == true)
+    // One line: the Pencil 82 pt row, no fade.
+    configure(preview: line)
+    XCTAssertEqual(row.frame.height, 83, accuracy: 0.001)
+    XCTAssertEqual(previewView.frame, NSRect(x: 0, y: 40, width: 780, height: 26))
+    XCTAssertEqual(fadeLayer.opacity, 0)
+
+    // Two lines fit the 52 pt clip exactly at the shared 26 pt line height and
+    // stay fully legible.
+    configure(preview: "\(line)\n\(line)")
+    XCTAssertEqual(row.frame.height, 109, accuracy: 0.001)
     XCTAssertTrue(previewView.layer?.masksToBounds == true)
     XCTAssertFalse(previewView.isHidden)
     XCTAssertEqual(previewView.text, "\(line)\n\(line)")
-    XCTAssertEqual(previewView.frame.height, 52, accuracy: 0.001)
-    XCTAssertEqual(previewView.frame.maxY, row.bounds.maxY - 10, accuracy: 0.001)
+    XCTAssertEqual(previewView.frame, NSRect(x: 0, y: 40, width: 780, height: 52))
+    XCTAssertEqual(previewView.naturalTextHeight, 52, accuracy: 0.001)
+    XCTAssertEqual(fadeLayer.opacity, 0, "Two visible lines are not a folded record")
+
+    // Three lines: the same 108 pt row, but the second line dissolves into
+    // the 25 pt Pencil fade because more text is clipped below it.
+    configure(preview: "\(line)\n\(line)\n\(line)")
+    XCTAssertEqual(row.frame.height, 109, accuracy: 0.001)
+    XCTAssertEqual(previewView.frame, NSRect(x: 0, y: 40, width: 780, height: 52))
     XCTAssertFalse(fadeLayer.isHidden)
     XCTAssertEqual(fadeLayer.opacity, 1)
-    XCTAssertEqual(fadeLayer.frame.height, 25, accuracy: 0.001)
-    XCTAssertEqual(fadeLayer.frame.maxY, previewView.bounds.maxY, accuracy: 0.001)
-    // Two Pencil result lines fit the 52 pt clip exactly at the shared 26 pt
-    // line height, so the fade covers the second line rather than empty space.
-    XCTAssertEqual(previewView.naturalTextHeight, 52, accuracy: 0.001)
+    XCTAssertEqual(
+      fadeLayer.frame,
+      NSRect(x: 0, y: 27, width: 780, height: 25),
+      "The Pencil fade covers the bottom 25 pt of the 52 pt preview across its full width"
+    )
+    XCTAssertTrue(row.foldedPreviewUsesFadeForTesting)
   }
 
   func testFoldingAndExpandingAnimateThePencilTransitionInsideOneRenderer() async throws {
@@ -808,11 +826,11 @@ extension InteractionReproductionTests {
       (row.resultContainerForTesting?.naturalTextHeight ?? 0) >= 78
     }
     let expandedHeight = row.preferredHeight(for: 804)
-    XCTAssertGreaterThan(expandedHeight, 96)
-    XCTAssertEqual(row.foldedCardOpacityForTesting, 0)
+    XCTAssertGreaterThan(expandedHeight, 108)
+    XCTAssertEqual(row.hoverHighlightOpacityForTesting, 0)
 
     // Fold: the result swaps to the shared TextKit preview at the start and the
-    // geometry animates to the card over motion-fold-ms.
+    // geometry animates to the two-line row over motion-fold-ms.
     row.configureFolding(
       entryID: entryID,
       mode: .translate,
@@ -822,6 +840,7 @@ extension InteractionReproductionTests {
       resultStorage: resultStorage,
       state: .completed,
       isLongEntry: false,
+      showsSeparator: false,
       animated: true,
       onExpand: {},
       onRedo: {},
@@ -829,7 +848,7 @@ extension InteractionReproductionTests {
     )
     XCTAssertEqual(row.presentation, .folded)
     XCTAssertTrue(row.isTransitioningForTesting)
-    XCTAssertEqual(row.preferredHeight(for: 804), 96, accuracy: 0.001)
+    XCTAssertEqual(row.preferredHeight(for: 804), 108, accuracy: 0.001)
     XCTAssertNil(row.resultContainerForTesting)
     XCTAssertFalse(row.foldedPreviewViewForTesting.isHidden)
     XCTAssertEqual(
@@ -839,10 +858,9 @@ extension InteractionReproductionTests {
     )
     XCTAssertEqual(
       row.foldedPreviewFrameForTesting,
-      NSRect(x: 10, y: 34, width: 760, height: 52),
-      "The animator commits the Pencil card frame as the model value"
+      NSRect(x: 0, y: 40, width: 780, height: 52),
+      "The animator commits the Pencil row frame as the model value"
     )
-    XCTAssertEqual(row.foldedCardOpacityForTesting, 1)
     XCTAssertTrue(row.actionButtonsForTesting.allSatisfy(\.isHidden))
     // A re-render toward the same state keeps the transition running.
     row.configure(
@@ -860,10 +878,11 @@ extension InteractionReproductionTests {
     try await waitUntil(timeout: .seconds(2)) { !row.isTransitioningForTesting }
     XCTAssertEqual(row.foldedPreviewViewForTesting.text, resultStorage.foldedPreview)
     XCTAssertEqual(row.sourceFrameForTesting.height, 0, accuracy: 0.001)
-    XCTAssertEqual(row.headerModeFrameForTesting.minX, 28, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
+    XCTAssertTrue(row.foldedPreviewUsesFadeForTesting)
 
     // Expand in place: the natural height is available immediately so SwiftUI
-    // can animate the frame, while the card fades out.
+    // can animate the frame.
     row.configureExpanded(
       entryID: entryID,
       mode: .translate,
@@ -888,7 +907,7 @@ extension InteractionReproductionTests {
     XCTAssertEqual(row.preferredHeight(for: 804), expandedHeight, accuracy: 0.001)
     XCTAssertNotNil(row.resultContainerForTesting)
     XCTAssertTrue(row.foldedPreviewViewForTesting.isHidden)
-    XCTAssertEqual(row.foldedCardOpacityForTesting, 0)
+    XCTAssertEqual(row.hoverHighlightOpacityForTesting, 0)
 
     try await waitUntil(timeout: .seconds(2)) { !row.isTransitioningForTesting }
     row.frame.size.height = row.preferredHeight(for: 804)
@@ -949,7 +968,7 @@ extension InteractionReproductionTests {
     let resultStorage = HistoryResultStorage("A complete result")
     let row = HistoryEntryNSView()
     var didCopyExpandedSource = false
-    row.frame = NSRect(x: 0, y: 0, width: 804, height: 96)
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 82)
     row.configure(
       entryID: entryID,
       mode: .improve,
@@ -964,14 +983,15 @@ extension InteractionReproductionTests {
     let sharedHeaderRenderer = row.headerRendererIdentityForTesting
 
     XCTAssertEqual(row.presentation, .folded)
-    XCTAssertEqual(row.preferredHeight(for: 804), 96, accuracy: 0.001)
-    XCTAssertEqual(row.headerModeFrameForTesting.minX, 28, accuracy: 0.001)
-    XCTAssertEqual(row.headerModeFrameForTesting.minY, 10, accuracy: 0.001)
+    XCTAssertEqual(row.preferredHeight(for: 804), 82, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
+    XCTAssertEqual(row.headerModeFrameForTesting.minY, 16, accuracy: 0.001)
     XCTAssertEqual(
       row.foldedPreviewFrameForTesting,
-      NSRect(x: 10, y: 34, width: 760, height: 52)
+      NSRect(x: 0, y: 40, width: 780, height: 26)
     )
-    XCTAssertEqual(row.foldedCardOpacityForTesting, 1)
+    XCTAssertFalse(row.foldedPreviewUsesFadeForTesting)
+    XCTAssertEqual(row.hoverHighlightOpacityForTesting, 0)
     XCTAssertNil(row.resultContainerForTesting)
     XCTAssertEqual(pool.leasedContainerCountForTesting, initialLeaseCount)
 
@@ -999,11 +1019,11 @@ extension InteractionReproductionTests {
 
     XCTAssertEqual(row.presentation, .manuallyExpanded)
     XCTAssertEqual(row.headerRendererIdentityForTesting, sharedHeaderRenderer)
-    // Expanded records drop the folded card inset: header and result start at
-    // the entry's leading edge (Pencil `Entry` component).
+    // Every presentation shares the Pencil `Entry` left rail: the header and
+    // the result start at the entry's leading edge at rest and when expanded.
     XCTAssertEqual(row.headerModeFrameForTesting.minX, 18, accuracy: 0.001)
     XCTAssertEqual(row.resultFrameForTesting.minX, 0, accuracy: 0.001)
-    XCTAssertEqual(row.foldedCardOpacityForTesting, 0)
+    XCTAssertEqual(row.hoverHighlightOpacityForTesting, 0)
     XCTAssertTrue(row.foldedPreviewViewForTesting.isHidden)
     XCTAssertEqual(expandedResultContainer.accessibilityRole(), .group)
     let expandedSource = try XCTUnwrap(
@@ -1462,14 +1482,14 @@ extension InteractionReproductionTests {
     rows[1].setResolvedHoverState(false)
     XCTAssertEqual(
       rows.flatMap(\.subviews).compactMap { $0 as? NSButton }.filter { !$0.isHidden }.count,
-      2
+      3
     )
 
     rows[0].setResolvedHoverState(false)
     rows[1].setResolvedHoverState(true)
     XCTAssertEqual(
       rows.flatMap(\.subviews).compactMap { $0 as? NSButton }.filter { !$0.isHidden }.count,
-      2
+      3
     )
   }
 

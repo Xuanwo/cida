@@ -157,6 +157,9 @@ struct ComposerTextEditor: NSViewRepresentable {
   @Binding var text: String
   @Binding var metrics: ComposerTextMetrics
   let isFocused: FocusState<Bool>.Binding
+  /// Distance from the editor's edges to the text column; the editor spans the
+  /// window so its scroll indicator stays at the window edge.
+  let horizontalInset: CGFloat
   let resetRevision: Int
   let currentResetRevision: @MainActor () -> Int
   let onSubmit: @MainActor () -> Bool
@@ -191,7 +194,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     textView.isHorizontallyResizable = false
     textView.isVerticallyResizable = true
     textView.autoresizingMask = [.width]
-    textView.textContainerInset = NSSize(width: 28, height: 0)
+    textView.textContainerInset = NSSize(width: horizontalInset, height: 0)
     textView.textContainer?.lineFragmentPadding = 0
     textView.textContainer?.widthTracksTextView = true
     textView.textContainer?.containerSize = NSSize(
@@ -231,6 +234,11 @@ struct ComposerTextEditor: NSViewRepresentable {
     context.coordinator.currentResetRevision = currentResetRevision
     context.coordinator.onSubmit = onSubmit
     context.coordinator.onVirtualDocumentChange = onVirtualDocumentChange
+    if abs(textView.textContainerInset.width - horizontalInset) > 0.5 {
+      textView.textContainerInset = NSSize(width: horizontalInset, height: 0)
+      textView.needsLayout = true
+      textView.needsDisplay = true
+    }
     let scrollIndicator = CidaScrollIndicator.install(
       on: scrollView,
       configuration: .composer

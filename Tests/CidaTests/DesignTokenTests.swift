@@ -10,7 +10,6 @@ final class DesignTokenTests: XCTestCase {
       (CidaDesign.Palette.background, 0xFAFAF8, 1),
       (CidaDesign.Palette.surface, 0xFFFFFF, 1),
       (CidaDesign.Palette.surfaceFold, 0xF1F1EC, 1),
-      (CidaDesign.Palette.surfaceFoldHover, 0xECECE7, 1),
       (CidaDesign.Palette.border, 0xE8E8E3, 1),
       (CidaDesign.Palette.textPrimary, 0x1A1A18, 1),
       (CidaDesign.Palette.textSecondary, 0x8A8A83, 1),
@@ -33,20 +32,56 @@ final class DesignTokenTests: XCTestCase {
 
   func testHistoryMetricsRemainOneSharedContractForEveryRenderer() {
     XCTAssertEqual(HistoryEntryPencilLayout.actionColumnWidth, 24)
+    XCTAssertEqual(HistoryEntryPencilLayout.windowHorizontalPadding, 28)
+    XCTAssertEqual(HistoryEntryPencilLayout.readingWidth, 804)
+    XCTAssertEqual(HistoryEntryPencilLayout.hoverBleed, 10)
+    XCTAssertEqual(HistoryEntryPencilLayout.hoverCornerRadius, 8)
     XCTAssertEqual(HistoryEntryPencilLayout.latestSourceLineLimit, 2)
     XCTAssertEqual(HistoryEntryPencilLayout.latestSourcePreviewHeight, 41)
     XCTAssertEqual(HistoryEntryPencilLayout.latestSourceFadeHeight, 20)
     XCTAssertEqual(HistoryEntryPencilLayout.resultLineHeight, 26)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedInset, 10)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedCornerRadius, 8)
     XCTAssertEqual(HistoryEntryPencilLayout.foldedPreviewHeight, 52)
     XCTAssertEqual(HistoryEntryPencilLayout.foldedPreviewFadeHeight, 25)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedHeight, 96)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedCardGap, 8)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedRowStride, 104)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedListHeight(rowCount: 0), 0)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedListHeight(rowCount: 1), 96)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedListHeight(rowCount: 3), 304)
+    XCTAssertEqual(HistoryEntryPencilLayout.separatorHeight, 1)
+    // Pencil `Entry`: 16 + 16 + 8 + n × 26 + 16 for one or two visible lines.
+    XCTAssertEqual(HistoryEntryPencilLayout.historyRowHeight(previewLineCount: 1), 82)
+    XCTAssertEqual(HistoryEntryPencilLayout.historyRowHeight(previewLineCount: 2), 108)
+    XCTAssertEqual(HistoryEntryPencilLayout.historyRowHeight(previewLineCount: 7), 108)
+    XCTAssertEqual(HistoryEntryPencilLayout.foldedHeight, 108)
+    XCTAssertEqual(HistoryEntryPencilLayout.placeholderRowStride, 109)
+    XCTAssertEqual(HistoryEntryPencilLayout.previewHeight(forRowHeight: 82), 26)
+    XCTAssertEqual(HistoryEntryPencilLayout.previewHeight(forRowHeight: 108), 52)
+    XCTAssertEqual(HistoryEntryPencilLayout.previewHeight(forRowHeight: 300), 52)
+  }
+
+  func testHistoryRowHeightFollowsThePreviewWithoutLayingItOut() {
+    let oneLine = HistoryResultStorage("No such guarantee.")
+    let wrapped = HistoryResultStorage(
+      String(repeating: "Having used GPT-6-Astra for a while now, ", count: 4)
+    )
+    let lineBreak = HistoryResultStorage("First line\nSecond line")
+
+    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: oneLine, textWidth: 780), 82)
+    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: wrapped, textWidth: 780), 108)
+    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: lineBreak, textWidth: 780), 108)
+    // A narrow column wraps the one-liner too.
+    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: oneLine, textWidth: 60), 108)
+
+    let cached = HistoryResultStorage("Cached preview width.")
+    var measurements = 0
+    for _ in 0..<5 {
+      _ = cached.previewSingleLineWidth { text in
+        measurements += 1
+        return HistoryResultTextStyle.singleLineWidth(of: text)
+      }
+    }
+    XCTAssertEqual(measurements, 1, "The single-line width is cached until the preview changes")
+    cached.append(" Really.")
+    _ = cached.previewSingleLineWidth { text in
+      measurements += 1
+      return HistoryResultTextStyle.singleLineWidth(of: text)
+    }
+    XCTAssertEqual(measurements, 2)
   }
 
   func testMotionTokensMatchThePencilVariables() {

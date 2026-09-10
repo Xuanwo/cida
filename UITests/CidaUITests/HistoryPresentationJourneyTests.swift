@@ -53,15 +53,16 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(preview.waitForExistence(timeout: 3))
     XCTAssertFalse(driver.element(identifier: "history-source-\(firstSuffix)").exists)
     XCTAssertFalse(driver.element(identifier: "history-expand-\(latestSuffix)").exists)
-    XCTAssertEqual(card.frame.height, 96, accuracy: 1)
-    // Pencil folded card: 10 pt inset on every side, action column reserved.
-    XCTAssertEqual(preview.frame.minX, card.frame.minX + 10, accuracy: 1)
-    XCTAssertEqual(preview.frame.minY, card.frame.minY + 34, accuracy: 1)
-    XCTAssertEqual(card.frame.maxX - preview.frame.maxX, 34, accuracy: 2)
+    // Pencil v2: a long record at rest is the two-line Entry with no card, so
+    // its preview shares the expanded records' left rail and action column.
+    XCTAssertEqual(card.frame.height, 108, accuracy: 1)
+    XCTAssertEqual(preview.frame.minX, card.frame.minX, accuracy: 1)
+    XCTAssertEqual(preview.frame.minY, card.frame.minY + 40, accuracy: 1)
+    XCTAssertEqual(card.frame.maxX - preview.frame.maxX, 24, accuracy: 2)
     XCTAssertEqual(preview.frame.height, 52, accuracy: 1)
     let latestResult = driver.app.textViews["history-result-\(latestID.uuidString)"]
     XCTAssertTrue(latestResult.waitForExistence(timeout: 3))
-    XCTAssertEqual(preview.frame.minX, latestResult.frame.minX + 10, accuracy: 1)
+    XCTAssertEqual(preview.frame.minX, latestResult.frame.minX, accuracy: 1)
 
     card.click()
     let firstSource = driver.element(identifier: "history-source-\(firstSuffix)")
@@ -110,11 +111,14 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
       XCTAssertLessThanOrEqual(action.frame.width, 14)
       XCTAssertGreaterThanOrEqual(action.frame.height, 12)
       XCTAssertLessThanOrEqual(action.frame.height, 14)
-      XCTAssertEqual(card.frame.maxX - action.frame.maxX, 10, accuracy: 2)
+      XCTAssertEqual(card.frame.maxX, action.frame.maxX, accuracy: 2)
     }
-    XCTAssertEqual(redo.frame.minY - card.frame.minY, 12, accuracy: 2)
-    XCTAssertEqual(copy.frame.minY - card.frame.minY, 38, accuracy: 2)
+    XCTAssertEqual(redo.frame.minY - card.frame.minY, 18, accuracy: 2)
+    XCTAssertEqual(copy.frame.minY - card.frame.minY, 44, accuracy: 2)
     XCTAssertGreaterThanOrEqual(copy.frame.minX - preview.frame.maxX, 11)
+    let disclose = driver.app.buttons["history-action-disclose-\(firstSuffix)"]
+    XCTAssertTrue(disclose.waitForExistence(timeout: 3))
+    XCTAssertEqual(redo.frame.minX - disclose.frame.maxX, 12, accuracy: 2)
 
     let screenshot = driver.window.screenshot()
     VisualOracle.assertActionIconInkFitsPencilBounds(
@@ -210,8 +214,11 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     let sourceLine = String(repeating: "W", count: 28)
     let latestSource = Array(repeating: sourceLine, count: 6).joined(separator: "\n")
     let latestResult = "LATEST_MEDIUM_SOURCE_RESULT_MUST_REMAIN_VISIBLE"
+    // Three result lines: more than the two a record shows at rest, so the
+    // second line must fade; still far below the long-document threshold.
+    let foldedResult = "\(foldedLine)\n\(foldedLine)\n\(foldedLine)"
     XCTAssertLessThan(latestSource.count, 800)
-    XCTAssertLessThan("\(foldedLine)\n\(foldedLine)".count, 120)
+    XCTAssertLessThan(foldedResult.count, 120)
 
     try seed(
       [
@@ -219,7 +226,7 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
           id: foldedID,
           sortOrder: 0,
           source: "The folded source stays hidden.",
-          result: "\(foldedLine)\n\(foldedLine)",
+          result: foldedResult,
           detail: "English",
           timestamp: "09:14"
         ),
@@ -246,9 +253,9 @@ final class HistoryPresentationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(source.waitForExistence(timeout: 3))
     XCTAssertTrue(result.waitForExistence(timeout: 3))
 
-    XCTAssertEqual(foldedCard.frame.height, 96, accuracy: 1)
+    XCTAssertEqual(foldedCard.frame.height, 108, accuracy: 1)
     XCTAssertEqual(foldedPreview.frame.height, 52, accuracy: 1)
-    XCTAssertLessThanOrEqual(foldedPreview.frame.maxY, foldedCard.frame.maxY - 9)
+    XCTAssertLessThanOrEqual(foldedPreview.frame.maxY, foldedCard.frame.maxY - 15)
     XCTAssertGreaterThanOrEqual(source.frame.height, 35)
     XCTAssertLessThanOrEqual(source.frame.height, 41)
     XCTAssertLessThanOrEqual(result.frame.minY - source.frame.maxY, 30)

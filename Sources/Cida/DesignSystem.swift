@@ -32,9 +32,6 @@ enum CidaDesign {
     static let surface = CidaColorToken(0xFFFFFF)
     static let surfaceDim = CidaColorToken(0xF4F4F1)
     static let surfaceFold = CidaColorToken(0xF1F1EC)
-    /// The Pencil folded card only specifies a "slight" hover highlight; this
-    /// sits halfway between `surface-fold` and `border`.
-    static let surfaceFoldHover = CidaColorToken(0xECECE7)
     static let border = CidaColorToken(0xE8E8E3)
     static let textPrimary = CidaColorToken(0x1A1A18)
     static let textSecondary = CidaColorToken(0x8A8A83)
@@ -50,7 +47,6 @@ enum CidaDesign {
   static let surface = Palette.surface.swiftUI
   static let surfaceDim = Palette.surfaceDim.swiftUI
   static let surfaceFold = Palette.surfaceFold.swiftUI
-  static let surfaceFoldHover = Palette.surfaceFoldHover.swiftUI
   static let border = Palette.border.swiftUI
   static let textPrimary = Palette.textPrimary.swiftUI
   static let textSecondary = Palette.textSecondary.swiftUI
