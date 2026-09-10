@@ -538,8 +538,8 @@ private struct HistoryEntryView: View {
 
 @MainActor
 final class StickyHistoryResultActionNSView: NSView {
-  private static let normalTint = CidaDesign.Palette.textSecondary.appKit
-  private static let hoverTint = CidaDesign.Palette.textPrimary.appKit
+  private static let normalTint = CidaDesign.Palette.textTertiary.appKit
+  private static let hoverTint = CidaDesign.Palette.textSecondary.appKit
   private static let copiedTint = CidaDesign.Palette.accent.appKit
 
   private let actionButton = StickyHistoryResultActionButton()
@@ -740,8 +740,11 @@ final class StickyHistoryResultActionNSView: NSView {
     actionButton.reportedAccessibilityValue = isCopied ? "copied" : "idle"
     actionButton.setAccessibilityLabel(isCopied ? "已复制结果" : "复制结果")
     actionButton.setAccessibilityValue(isCopied ? "copied" : "idle")
-    actionButton.iconImage = LucideIconAsset.image(for: isCopied ? .check : .copy)
-    actionButton.setFeedbackTint(isCopied ? Self.copiedTint : nil)
+    actionButton.showIcon(
+      LucideIconAsset.image(for: isCopied ? .check : .copy),
+      feedbackTint: isCopied ? Self.copiedTint : nil,
+      swapDuration: CidaMotion.iconSwapSeconds
+    )
   }
 
   private func resetCopyFeedback() {
@@ -761,7 +764,7 @@ final class StickyHistoryResultActionNSView: NSView {
     if visible {
       actionButton.reveal(duration: revealDuration)
     } else {
-      actionButton.conceal()
+      actionButton.conceal(duration: CidaMotion.iconInSeconds)
     }
     actionButton.setAccessibilityElement(visible)
     if visible {

@@ -2,8 +2,15 @@ import AppKit
 import QuartzCore
 
 @MainActor
+/// One record action icon. The glyph is painted only by `iconView`. The
+/// NSButton cell still holds the described template image because the native
+/// accessibility audit takes a button's description from its image, but the
+/// cell never draws: even with `imagePosition = .noImage` it would paint a
+/// second copy of the image without the icon view's alignment, leaving blocky
+/// strokes and a mark in each corner over the crisp glyph.
 class HistoryEntryActionButton: NSButton {
   private static let revealAnimationKey = "history-action-reveal"
+  private static let concealAnimationKey = "history-action-conceal"
   private let iconView = NSImageView()
 
   var iconImage: NSImage? {
@@ -36,12 +43,22 @@ class HistoryEntryActionButton: NSButton {
     var revealAnimationForTesting: CABasicAnimation? {
       layer?.animation(forKey: Self.revealAnimationKey) as? CABasicAnimation
     }
+    private(set) weak var concealGhostLayerForTesting: CALayer?
+    var concealAnimationForTesting: CABasicAnimation? {
+      concealGhostLayerForTesting?.animation(forKey: Self.concealAnimationKey) as? CABasicAnimation
+    }
+    var iconSwapTransitionForTesting: CATransition? {
+      iconView.layer?.animation(forKey: kCATransition) as? CATransition
+    }
   #endif
 
   override func layout() {
     super.layout()
     iconView.frame = bounds
   }
+
+  /// The cell must not paint; see the class note.
+  override func draw(_ dirtyRect: NSRect) {}
 
   override func hitTest(_ point: NSPoint) -> NSView? {
     guard !isHidden, isEnabled, bounds.contains(point) else { return nil }
@@ -94,11 +111,68 @@ class HistoryEntryActionButton: NSButton {
     layer.add(fade, forKey: Self.revealAnimationKey)
   }
 
+  /// Hides the icon at once. Hit-testing, accessibility, and presentation
+  /// state read `isHidden`, so nothing lingers.
   func conceal() {
     guard !isHidden else { return }
     layer?.removeAnimation(forKey: Self.revealAnimationKey)
     isHidden = true
     alphaValue = 1
+  }
+
+  /// Hides the icon with the Pencil fade reversed. The button hides at once so
+  /// its state stays exact; a detached snapshot layer in the superview carries
+  /// the visual fade-out and removes itself when it ends.
+  func conceal(duration: TimeInterval) {
+    guard !isHidden else { return }
+    let resolved = CidaMotion.resolvedDuration(duration, in: window)
+    if resolved > 0, let ghost = makeGhostLayer(), let hostLayer = superview?.layer {
+      ghost.frame = frame
+      hostLayer.addSublayer(ghost)
+      let fade = CABasicAnimation(keyPath: "opacity")
+      fade.fromValue = layer?.presentation()?.opacity ?? 1
+      fade.toValue = 0
+      fade.duration = resolved
+      fade.timingFunction = CidaMotion.easeOut
+      CATransaction.begin()
+      CATransaction.setCompletionBlock { ghost.removeFromSuperlayer() }
+      ghost.add(fade, forKey: Self.concealAnimationKey)
+      CATransaction.commit()
+      #if DEBUG
+        concealGhostLayerForTesting = ghost
+      #endif
+    }
+    conceal()
+  }
+
+  /// Replaces the glyph, crossfading over the Pencil icon-swap duration when
+  /// the icon is visible and actually changes, e.g. copy → ✓ and back.
+  func showIcon(_ image: NSImage?, feedbackTint: NSColor?, swapDuration: TimeInterval) {
+    let changesGlyph = image !== iconImage
+    let resolved = isHidden || !changesGlyph ? 0 : CidaMotion.resolvedDuration(swapDuration, in: window)
+    if resolved > 0, let iconLayer = iconView.layer {
+      let transition = CATransition()
+      transition.type = .fade
+      transition.duration = resolved
+      transition.timingFunction = CidaMotion.easeOut
+      iconLayer.add(transition, forKey: kCATransition)
+    }
+    iconImage = image
+    setFeedbackTint(feedbackTint)
+  }
+
+  private func makeGhostLayer() -> CALayer? {
+    guard bounds.width > 0, bounds.height > 0,
+      let representation = bitmapImageRepForCachingDisplay(in: bounds)
+    else { return nil }
+    cacheDisplay(in: bounds, to: representation)
+    guard let image = representation.cgImage else { return nil }
+    let ghost = CALayer()
+    ghost.contents = image
+    ghost.contentsScale = layer?.contentsScale ?? 1
+    ghost.opacity = 0
+    ghost.actions = ["opacity": NSNull(), "contents": NSNull()]
+    return ghost
   }
 
   func setFeedbackTint(_ color: NSColor?) {
@@ -111,6 +185,18 @@ class HistoryEntryActionButton: NSButton {
 
   func resetHoverState() {
     setHovering(false)
+  }
+
+  /// Re-reads hover from the pointer. Tracking areas report no exit for a
+  /// button that hides under the pointer and no entry for one that appears
+  /// under it, so visibility changes re-evaluate the real position.
+  func refreshHoverState() {
+    guard !isHidden, let window else {
+      setHovering(false)
+      return
+    }
+    let pointer = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+    setHovering(bounds.contains(pointer))
   }
 
   private func setHovering(_ hovering: Bool) {
@@ -1675,12 +1761,9 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       let chevron = ensureChevronButton()
       let description = disclosure == .expand ? "展开这条历史记录" : "收起这条历史记录"
       if chevron.accessibilityLabel() != description {
-        let icon = Self.describedIcon(
-          disclosure == .expand ? .chevronDown : .chevronUp,
-          description: description
-        )
-        chevron.image = icon
-        chevron.iconImage = icon
+        let icon: LucideIconName = disclosure == .expand ? .chevronDown : .chevronUp
+        chevron.image = Self.describedIcon(icon, description: description)
+        chevron.iconImage = LucideIconAsset.image(for: icon)
         chevron.setAccessibilityLabel(description)
         chevron.setAccessibilityHelp(description)
       }
@@ -1727,9 +1810,9 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     if visible {
       button.reveal(duration: revealDuration)
     } else {
-      button.conceal()
+      button.conceal(duration: CidaMotion.iconInSeconds)
     }
-    button.resetHoverState()
+    button.refreshHoverState()
   }
 
   private var showsExpandedActions: Bool {
@@ -1880,15 +1963,16 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
       case "展开历史记录": "展开这条历史记录"
       default: "复制这条历史记录的完整结果"
       }
-    let describedIcon = Self.describedIcon(icon, description: accessibilityDescription)
-    button.image = describedIcon
-    button.iconImage = describedIcon
+    button.image = Self.describedIcon(icon, description: accessibilityDescription)
+    button.iconImage = LucideIconAsset.image(for: icon)
     button.setAccessibilityLabel(accessibilityDescription)
     button.setAccessibilityHelp(accessibilityDescription)
     button.setAccessibilityIdentifier(identifier)
     return button
   }
 
+  /// A copy of the shared icon carrying the button's description for the
+  /// accessibility audit; the copy is never drawn.
   private static func describedIcon(_ icon: LucideIconName, description: String) -> NSImage? {
     let image = LucideIconAsset.image(for: icon)?.copy() as? NSImage
     image?.isTemplate = true
@@ -1917,8 +2001,11 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   private func copyResult(_ sender: NSButton) {
     onCopyResult?()
     copyResetWorkItem?.cancel()
-    (sender as? HistoryEntryActionButton)?.iconImage = LucideIconAsset.image(for: .check)
-    (sender as? HistoryEntryActionButton)?.setFeedbackTint(Self.accentColor)
+    (sender as? HistoryEntryActionButton)?.showIcon(
+      LucideIconAsset.image(for: .check),
+      feedbackTint: Self.accentColor,
+      swapDuration: CidaMotion.iconSwapSeconds
+    )
     sender.setAccessibilityLabel("已复制这条历史记录的完整结果")
     let entryID = self.entryID
     let workItem = DispatchWorkItem { [weak self] in
@@ -1938,8 +2025,11 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
     onCopySource?()
     sourceCopyResetWorkItem?.cancel()
     isSourceCopied = true
-    (sender as? HistoryEntryActionButton)?.iconImage = LucideIconAsset.image(for: .check)
-    (sender as? HistoryEntryActionButton)?.setFeedbackTint(Self.accentColor)
+    (sender as? HistoryEntryActionButton)?.showIcon(
+      LucideIconAsset.image(for: .check),
+      feedbackTint: Self.accentColor,
+      swapDuration: CidaMotion.iconSwapSeconds
+    )
     sender.setAccessibilityLabel("已复制这条历史记录的完整原文")
     sender.setAccessibilityValue("copied")
     updateActionVisibility()
@@ -1979,14 +2069,20 @@ final class HistoryEntryNSView: NSControl, HistoryResultHeightChangeHosting {
   }
 
   private func resetCopyFeedback() {
-    copyButton?.iconImage = LucideIconAsset.image(for: .copy)
-    copyButton?.setFeedbackTint(nil)
+    copyButton?.showIcon(
+      LucideIconAsset.image(for: .copy),
+      feedbackTint: nil,
+      swapDuration: CidaMotion.iconSwapSeconds
+    )
     copyButton?.setAccessibilityLabel("复制这条历史记录的完整结果")
   }
 
   private func resetSourceCopyFeedback() {
-    copySourceButton?.iconImage = LucideIconAsset.image(for: .copy)
-    copySourceButton?.setFeedbackTint(nil)
+    copySourceButton?.showIcon(
+      LucideIconAsset.image(for: .copy),
+      feedbackTint: nil,
+      swapDuration: CidaMotion.iconSwapSeconds
+    )
     copySourceButton?.setAccessibilityLabel("复制这条历史记录的完整原文")
     copySourceButton?.setAccessibilityValue("idle")
   }

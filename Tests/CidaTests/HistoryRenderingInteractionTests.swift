@@ -886,6 +886,135 @@ extension InteractionReproductionTests {
     }
   }
 
+  func testRecordActionIconsArePaintedOnceAndKeepTheirFrameCornersClear() throws {
+    // The reported defect: the NSButton cell painted its own copy of the
+    // template image over the icon view, with blocky strokes and a mark in each
+    // corner of the 12 pt frame. The cell keeps its described image for the
+    // accessibility audit, so the oracle is the rendering itself: the redo
+    // glyph never touches its corners, and a painted corner pixel is the
+    // defect's signature.
+    let row = HistoryEntryNSView()
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 82)
+    let window = CidaWindow(
+      contentRect: row.frame,
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.isReleasedWhenClosed = false
+    window.contentView = row
+    retainedTestWindows.append(window)
+    row.configure(
+      entryID: UUID(),
+      mode: .translate,
+      metadata: "中文 → English · 09:14",
+      preview: "Done",
+      state: .completed,
+      onExpand: {},
+      onRedo: {},
+      onCopyResult: {}
+    )
+    row.setHoverManagedExternally(true)
+    row.layoutSubtreeIfNeeded()
+    row.setResolvedHoverState(true)
+    let redo = try XCTUnwrap(
+      row.actionButtonsForTesting.first {
+        $0.accessibilityIdentifier().hasPrefix("history-action-redo-")
+      }
+    )
+    XCTAssertFalse(redo.isHidden)
+    XCTAssertEqual(redo.image?.accessibilityDescription, redo.accessibilityLabel())
+
+    let scale: CGFloat = 2
+    let representation = try XCTUnwrap(
+      NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: Int(redo.bounds.width * scale),
+        pixelsHigh: Int(redo.bounds.height * scale),
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+      )
+    )
+    representation.size = redo.bounds.size
+    redo.cacheDisplay(in: redo.bounds, to: representation)
+    let last = Int(redo.bounds.width * scale) - 1
+    for (x, y) in [(0, 0), (last, 0), (0, last), (last, last)] {
+      let alpha = representation.colorAt(x: x, y: y)?.alphaComponent ?? 0
+      XCTAssertEqual(alpha, 0, accuracy: 0.02, "Corner (\(x), \(y)) must stay unpainted")
+    }
+    var paintedPixels = 0
+    for x in 0...last {
+      for y in 0...last where (representation.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 {
+        paintedPixels += 1
+      }
+    }
+    XCTAssertGreaterThan(paintedPixels, 40, "The glyph itself is painted")
+  }
+
+  func testRecordActionsFadeOutOnExitAndCrossfadeTheCopiedCheck() throws {
+    try XCTSkipIf(
+      NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+      "Reduced motion hides and swaps icons immediately"
+    )
+    let row = HistoryEntryNSView()
+    row.frame = NSRect(x: 0, y: 0, width: 804, height: 82)
+    let window = CidaWindow(
+      contentRect: row.frame,
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.isReleasedWhenClosed = false
+    window.contentView = row
+    retainedTestWindows.append(window)
+    row.configure(
+      entryID: UUID(),
+      mode: .translate,
+      metadata: "中文 → English · 09:14",
+      preview: "Done",
+      state: .completed,
+      onExpand: {},
+      onRedo: {},
+      onCopyResult: {}
+    )
+    row.setHoverManagedExternally(true)
+    row.layoutSubtreeIfNeeded()
+    row.setResolvedHoverState(true)
+    let copy = try XCTUnwrap(
+      row.actionButtonsForTesting.first {
+        $0.accessibilityIdentifier().hasPrefix("history-action-copy-")
+      }
+    )
+    XCTAssertFalse(copy.isHidden)
+    XCTAssertNil(copy.iconSwapTransitionForTesting)
+
+    // Copying swaps copy → ✓ over motion-icon-swap-ms instead of snapping.
+    copy.performClick(nil)
+    let swap = try XCTUnwrap(copy.iconSwapTransitionForTesting)
+    XCTAssertEqual(swap.type, .fade)
+    XCTAssertEqual(swap.duration, 0.15, accuracy: 0.001)
+    XCTAssertEqual(copy.iconImage, LucideIconAsset.image(for: .check))
+
+    // Leaving the record hides the buttons at once for hit-testing and
+    // accessibility, while a detached snapshot fades out over
+    // motion-icon-in-ms.
+    row.setResolvedHoverState(false)
+    XCTAssertTrue(row.actionButtonsForTesting.allSatisfy(\.isHidden))
+    XCTAssertTrue((row.accessibilityChildren() ?? []).compactMap { $0 as? NSButton }.isEmpty)
+    let ghost = try XCTUnwrap(copy.concealGhostLayerForTesting)
+    XCTAssertEqual(ghost.frame, copy.frame)
+    XCTAssertTrue(ghost.superlayer === row.layer)
+    let fade = try XCTUnwrap(copy.concealAnimationForTesting)
+    XCTAssertEqual(fade.duration, 0.12, accuracy: 0.001)
+    XCTAssertEqual(try XCTUnwrap(fade.toValue as? NSNumber).doubleValue, 0, accuracy: 0.001)
+    XCTAssertNil(row.hitTest(NSPoint(x: copy.frame.midX, y: copy.frame.midY)) as? HistoryEntryActionButton)
+  }
+
   func testRecordActionsRequireHoverAndACompletedOrTerminalEntry() {
     XCTAssertFalse(
       HistoryEntryActionPolicy.showsActions(isHovering: false, state: .completed)

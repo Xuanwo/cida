@@ -69,8 +69,8 @@ model, storage, window, history, or renderer paths.
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite currently contains 154 tests: 51 model/report tests, 7 SQLite tests, 4 host
-isolation tests, 81 native interaction, layout, and design-token tests, 3 mutation invariants,
+The host Swift suite currently contains 156 tests: 51 model/report tests, 7 SQLite tests, 4 host
+isolation tests, 83 native interaction, layout, and design-token tests, 3 mutation invariants,
 2 suite/matrix manifest tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
 
 The Release XCUI target contains 28 tests across ten files: 23 product journeys and five harness
@@ -123,7 +123,7 @@ are recorded as diagnostics rather than misclassified as test activity.
 
 ## Current verification
 
-- `swift test -Xswiftc -warnings-as-errors`: 154/154 passed.
+- `swift test -Xswiftc -warnings-as-errors`: 156/156 passed.
 - Focused fresh-clone Tart diagnosis reproduced both the source-preview frame overflow and the
   recycled folded-row click failure. After the root repairs, both previously failing journeys passed
   2/2 with a healthy host-session guard and no host artifact activation. The native semantic audit

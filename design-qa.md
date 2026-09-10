@@ -102,8 +102,14 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   is top-origin, so the history thumb is at the bottom for the newest content and moves upward when
   the user reads older content.
 - Record actions are hidden at rest, fade in over 120 ms on hover for terminal records, remain
-  absent during streaming, fade in over 150 ms when a hovered record completes, and show the
-  copied checkmark for 800 ms.
+  absent during streaming, fade in over 150 ms when a hovered record completes, fade out over the
+  same 120 ms when the pointer leaves (the button itself hides at once; a detached snapshot layer
+  carries the fade), crossfade copy → ✓ over the 150 ms `motion-icon-swap-ms`, and hold the ✓ for
+  800 ms. Every icon, including the sticky result copy, rests at `text-tertiary` and darkens to
+  `text-secondary` only while the pointer is over that icon. The icon view is the only painter: the
+  NSButton cell keeps a described copy of the image for the accessibility audit but never draws,
+  because the cell paints a second, blocky copy of a template image even with
+  `imagePosition = .noImage`.
 - Streaming is paced by the app view's native `CADisplayLink`. Uneven backend chunks enter a
   grapheme-safe adaptive buffer and leave in bounded display-aligned batches. Each presented run is
   laid out on the pulse that presents it and painted by its own fragment view that fades from
@@ -131,7 +137,7 @@ reintroduced.
 
 ## Executable evidence
 
-- `swift test -Xswiftc -warnings-as-errors`: 154 tests, 0 failures.
+- `swift test -Xswiftc -warnings-as-errors`: 156 tests, 0 failures.
 - Native renderer tests prove all three history presentations use the same concrete view, preserve
   the header renderer identity across transitions, release expanded-only resources when folding,
   expand a recycled row through a real AppKit hit-test and mouse event, run the fold and expand
@@ -146,9 +152,10 @@ reintroduced.
   audit. The Main Translate approval was re-recorded from the isolated nonactivating capture after
   the history rows moved to the v2 rule; the Settings approval is unchanged.
 - `scripts/test-ui-in-tart.sh` from this tree: all 28 XCUI journeys passed in a fresh headless
-  Tart clone (`TestResults/vm-ui-pencil-run3`), including the v2 row geometry assertions (108 pt
+  Tart clone (`TestResults/vm-ui-icons-run2`), including the row geometry assertions (108 pt
   long record, 40 pt preview offset, chevron beside ↺), the re-approved Main Translate baseline,
-  and the host-session guard.
+  the native accessibility audit with the described but undrawn action-button images, and the
+  host-session guard.
 - `scripts/e2e/run-mutation-contracts.sh --mode unit` on a scratch clone of this tree: 13 of the
   14 mutations were killed on the first run (`TestResults/mutations-unit-pencil-v2-20260910`). The
   re-anchored `folded-result-fade-hidden` mutation, which empties the Pencil fade frame, survived
