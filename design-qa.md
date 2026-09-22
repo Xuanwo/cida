@@ -63,7 +63,8 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   1 px hairline border, and shadow. Its height is exactly the content it shows: the source pane
   (18 pt insets around a 27 pt line that grows with the measured text), the 50 pt control bar, and,
   once a result exists, the result pane (22 pt insets around the result text and an optional note).
-  The top edge stays at 20% of the visible screen; growth animates over `motion-height-ms`.
+  The top edge stays at 20% of the visible screen; growth animates over `motion-height-ms`. The
+  panel itself appears and hides at once, like Spotlight.
 - Height budget: the source editor is capped at 30% of the visible screen height minus its insets,
   the panel at 70%; both panes scroll on their own past their caps with the Pencil 4 pt thumb. A
   completed result opens at its top; a streaming result keeps its tail in view until the user
