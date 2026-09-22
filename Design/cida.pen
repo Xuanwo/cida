@@ -36,7 +36,7 @@
         {
           "type": "frame",
           "id": "lQdpG",
-          "name": "Stream",
+          "name": "Result Area",
           "clip": true,
           "width": "fill_container",
           "height": "fill_container",
@@ -50,69 +50,14 @@
           "justifyContent": "end",
           "children": [
             {
-              "id": "u32cU2",
+              "id": "md4Up",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 改进",
-              "width": "fill_container",
-              "descendants": {
-                "iRSPY": {
-                  "icon": "sparkles"
-                },
-                "Bw7O0": {
-                  "content": "改进"
-                },
-                "SCbl4": {
-                  "content": "English · 语气与语法 · 11:32"
-                },
-                "EDAjf": {
-                  "content": "This feature is very useful — it makes the whole process faster and easier to use."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "u3Qhp",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "bUvB0",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译",
+              "name": "Result — 翻译",
               "width": "fill_container",
               "descendants": {
                 "SCbl4": {
-                  "content": "中文 → English · 14:02"
-                },
-                "EDAjf": {
-                  "content": "Cache invalidation is one of the two hard problems in computer science."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "u8MaIM",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "ZeuhA",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译展开",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 14:05"
-                },
-                "IENJ0": {
-                  "enabled": true
+                  "content": "中文 → English · 14:05 · 38 → 121 字"
                 },
                 "EDAjf": {
                   "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency."
@@ -126,7 +71,13 @@
           "type": "ref",
           "ref": "nvsum",
           "name": "Composer",
-          "width": "fill_container"
+          "width": "fill_container",
+          "descendants": {
+            "fGqEq": {
+              "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。",
+              "fill": "$text-primary"
+            }
+          }
         }
       ]
     },
@@ -165,7 +116,7 @@
         {
           "type": "frame",
           "id": "NURVR",
-          "name": "Stream",
+          "name": "Result Area",
           "clip": true,
           "width": "fill_container",
           "height": "fill_container",
@@ -179,10 +130,10 @@
           "justifyContent": "end",
           "children": [
             {
-              "id": "JnXhn",
+              "id": "CzL9e",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 改进",
+              "name": "Result — 改进",
               "width": "fill_container",
               "descendants": {
                 "iRSPY": {
@@ -192,59 +143,10 @@
                   "content": "改进"
                 },
                 "SCbl4": {
-                  "content": "English · 语气与语法 · 11:32"
+                  "content": "中文 · 语气与语法 · 11:32 · 46 → 40 字"
                 },
                 "EDAjf": {
-                  "content": "This feature is very useful — it makes the whole process faster and easier to use."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "g8M6WU",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "SKSV1",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 14:02"
-                },
-                "EDAjf": {
-                  "content": "Cache invalidation is one of the two hard problems in computer science."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "PBIqh",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "dMmAZ",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译展开",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 14:05"
-                },
-                "IENJ0": {
-                  "enabled": true
-                },
-                "EDAjf": {
-                  "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency."
+                  "content": "这个功能复用已有的缓存结果,使整体处理流程在大多数情况下都明显加速。"
                 }
               }
             }
@@ -819,7 +721,7 @@
         {
           "type": "frame",
           "id": "cD9qs",
-          "name": "Stream",
+          "name": "Result Area",
           "clip": true,
           "width": "fill_container",
           "height": "fill_container",
@@ -833,105 +735,14 @@
           "justifyContent": "end",
           "children": [
             {
-              "id": "g8uTS",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 改进",
-              "width": "fill_container",
-              "descendants": {
-                "iRSPY": {
-                  "icon": "sparkles"
-                },
-                "Bw7O0": {
-                  "content": "改进"
-                },
-                "SCbl4": {
-                  "content": "English · 14:48"
-                },
-                "EDAjf": {
-                  "content": "The deploy pipeline has a few issues that need to be fixed before release."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "TChao",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
               "id": "V7Bbto",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 长文本",
+              "name": "Result — 长文本",
               "width": "fill_container",
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 15:12 · 1,846 → 3,214 字"
-                },
-                "IENJ0": {
-                  "type": "frame",
-                  "id": "hfB3Z",
-                  "name": "Source Folded",
-                  "width": "fill_container",
-                  "gap": 12,
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "S9dEtq",
-                      "name": "Source Clip",
-                      "clip": true,
-                      "width": "fill_container",
-                      "height": 41,
-                      "layout": "vertical",
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "INFuL",
-                          "name": "Entry Source",
-                          "fill": "$text-tertiary",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "分布式系统的设计从来都不是单纯的技术选型问题。当我们讨论一致性、可用性与分区容忍性之间的取舍时,实际上是在讨论业务对错误的容忍程度:一个支付系统和一个信息流推荐服务可能运行在完全相同的基础设施之上,但它们对「出错之后会发生什么」这个问题的回答截然不同。",
-                          "lineHeight": "$line-height-source",
-                          "fontFamily": "$font-body",
-                          "fontSize": "$font-size-secondary",
-                          "fontWeight": "normal"
-                        },
-                        {
-                          "type": "rectangle",
-                          "id": "wVeFK",
-                          "layoutPosition": "absolute",
-                          "x": 0,
-                          "y": 21,
-                          "name": "Source Fade",
-                          "fill": {
-                            "type": "gradient",
-                            "gradientType": "linear",
-                            "enabled": true,
-                            "rotation": 0,
-                            "size": {
-                              "height": 1
-                            },
-                            "colors": [
-                              {
-                                "color": "$bg",
-                                "position": 0
-                              },
-                              {
-                                "color": "#FAFAF800",
-                                "position": 1
-                              }
-                            ]
-                          },
-                          "width": 780,
-                          "height": 20
-                        }
-                      ]
-                    }
-                  ]
                 },
                 "EDAjf": {
                   "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different. For payments, an inconsistent state means real money lost and trust broken, so we accept higher latency and stricter coordination. For recommendations, a stale feed is a minor annoyance at worst, so we choose availability and let the data converge later. Once you frame the discussion this way, most architecture debates become much shorter."
@@ -1028,7 +839,7 @@
         {
           "type": "frame",
           "id": "XQ4ch",
-          "name": "Stream",
+          "name": "Result Area",
           "clip": true,
           "width": "fill_container",
           "height": "fill_container",
@@ -1042,40 +853,14 @@
           "justifyContent": "end",
           "children": [
             {
-              "id": "XBYO7",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 14:02"
-                },
-                "EDAjf": {
-                  "content": "Cache invalidation is one of the two hard problems in computer science."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "qN4EP",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
               "id": "E5Vdx",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 生成中",
+              "name": "Result — 生成中",
               "width": "fill_container",
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 生成中"
-                },
-                "IENJ0": {
-                  "enabled": true
                 },
                 "tzszR": {
                   "type": "frame",
@@ -1179,6 +964,10 @@
           "name": "Composer — 生成中",
           "width": "fill_container",
           "descendants": {
+            "fGqEq": {
+              "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。",
+              "fill": "$text-primary"
+            },
             "Yl8lq/MYqVR": {
               "type": "rectangle",
               "cornerRadius": 2,
@@ -1200,7 +989,7 @@
       "name": "Spec — 流式输出动效",
       "width": 620,
       "height": 0,
-      "content": "流式输出动效规格(对应「生成中」屏与 Motion — 流式输出板)\n所有量值以变量面板 motion-* token 为准;下文数值后括号内为 token 名。\n\n一、平滑缓冲 — 渲染速率与网络解耦\n· 网络 token 只写入缓冲区,永不直接上屏\n· 渲染器每帧消费缓冲:v = clamp(缓冲字符数 / 0.4s(motion-catchup-ms), 30(motion-rate-min-cps), 400(motion-rate-max-cps)) 字符/秒\n  (目标:约 0.4 秒内追平缓冲;下限保证可感知的书写感,上限防止瞬间倾泻)\n· 速率经指数平滑(α ≈ 0.15/帧,motion-rate-alpha):加减速均为渐变,禁止突变\n· 消费循环挂在 CADisplayLink 帧回调,不用 Timer(避免引入自身节拍抖动)\n· 上屏粒度为字素簇:中文逐字,英文可按词,禁止拆开 emoji / 合字\n\n二、阶段动效 — 关键帧见 Motion — 流式输出板 T0–T4\n1. 提交瞬间:记录立即入流(原文 + meta「生成中」);结果区仅一个 accent 色光标(2×20,motion-cursor-w/h),呼吸动画 opacity 0.3(motion-cursor-opacity-min)↔1.0,周期 1.2s(motion-breathe-ms)ease-in-out(motion-ease-breathe)\n2. 流式中:字符在光标后淡入,每字 120ms(motion-char-in-ms)ease-out(motion-ease-char-in),blur 2px(motion-blur-char-px)→0;光标随书写头前进,无呼吸(呼吸仅表示等待)\n3. 高度增长:记录容器高度过渡 150ms(motion-height-ms)ease-out(motion-ease-height),不逐 token 跳变\n4. 滚动锚定:生成期间流平滑贴底;用户上滚立即解除锚定,生成继续;滚回底部自动恢复锚定\n5. 完成:光标 200ms(motion-cursor-out-ms)淡出 → copy/重做图标 150ms(motion-icon-swap-ms;悬停淡入为 120ms 档 motion-icon-in-ms)淡入;meta「生成中」替换为时间与字数;停止按钮 150ms(motion-icon-swap-ms)交叉淡化回发送箭头\n6. 中断/出错:已输出文字保留;meta 显示「已停止」或「出错 · 重试」;光标直接淡出\n\n三、约束\n· 除最后一行外,已上屏文字的位置永不变化(布局只在尾部生长)\n· 所有时长基于 120fps;系统「减弱动态效果」开启时:去掉逐字淡入与呼吸,保留匀速上屏与高度过渡"
+      "content": "流式输出动效规格(对应「生成中」屏与 Motion — 流式输出板)\n所有量值以变量面板 motion-* token 为准;下文数值后括号内为 token 名。\n\n一、平滑缓冲 — 渲染速率与网络解耦\n· 网络 token 只写入缓冲区,永不直接上屏\n· 渲染器每帧消费缓冲:v = clamp(缓冲字符数 / 0.4s(motion-catchup-ms), 30(motion-rate-min-cps), 400(motion-rate-max-cps)) 字符/秒\n  (目标:约 0.4 秒内追平缓冲;下限保证可感知的书写感,上限防止瞬间倾泻)\n· 速率经指数平滑(α ≈ 0.15/帧,motion-rate-alpha):加减速均为渐变,禁止突变\n· 消费循环挂在 CADisplayLink 帧回调,不用 Timer(避免引入自身节拍抖动)\n· 上屏粒度为字素簇:中文逐字,英文可按词,禁止拆开 emoji / 合字\n\n二、阶段动效 — 关键帧见 Motion — 流式输出板 T0–T4\n1. 提交瞬间:原文留在 composer;结果区立即换成 meta「生成中」并移除上一条结果;结果正文只有一个 accent 色光标(2×20,motion-cursor-w/h),呼吸动画 opacity 0.3(motion-cursor-opacity-min)↔1.0,周期 1.2s(motion-breathe-ms)ease-in-out(motion-ease-breathe)\n2. 流式中:字符在光标后淡入,每字 120ms(motion-char-in-ms)ease-out(motion-ease-char-in),blur 2px(motion-blur-char-px)→0;光标随书写头前进,无呼吸(呼吸仅表示等待)\n3. 高度增长:结果容器高度过渡 150ms(motion-height-ms)ease-out(motion-ease-height),不逐 token 跳变\n4. 滚动锚定:生成期间结果区平滑贴底;用户上滚立即解除锚定,生成继续;滚回底部自动恢复锚定\n5. 完成:光标 200ms(motion-cursor-out-ms)淡出;meta「生成中」替换为时间与字数;copy 图标仅在悬停时 120ms(motion-icon-in-ms)淡入;停止按钮 150ms(motion-icon-swap-ms)交叉淡化回发送箭头\n6. 中断/出错:已输出文字保留;meta 显示「已停止」或「出错」;光标直接淡出;再次 ⏎ 重新生成\n\n三、约束\n· 除最后一行外,已上屏文字的位置永不变化(布局只在尾部生长)\n· 所有时长基于 120fps;系统「减弱动态效果」开启时:去掉逐字淡入与呼吸,保留匀速上屏与高度过渡"
     },
     {
       "type": "note",
@@ -1210,14 +999,14 @@
       "name": "Spec — 操作图标",
       "width": 860,
       "height": 0,
-      "content": "操作图标 hover 浮现:默认隐藏,悬停记录时 120ms(motion-icon-in-ms)淡入;悬停图标本身颜色加深;复制成功后图标变 ✓(accent 色)保持 800ms(motion-copied-hold-ms)。⌘C 始终复制最新一条结果。生成中的记录不显示图标。超长文本:copy 图标在所属文本块的可见范围内粘性跟随视口(见 States 板 ③),↺ 固定于 meta 行不跟随。悬停任一历史记录时整行以 surface-fold 微高亮(120ms 淡入),高亮向左右各外扩 10pt(space-hover-bleed)、圆角 8,文字不动;可展开的记录在 meta 行末(↺ 左侧)显示 chevron-down,已展开的记录显示 chevron-up,与图标同步淡入;最新一条与展开中的记录不做整行高亮。图标静止态一律 text-tertiary(含超长文本的粘性 copy),仅指针所在的那个图标加深为 text-secondary;指针离开记录时图标以同一 120ms(motion-icon-in-ms)淡出;copy ↔ ✓ 切换以 150ms(motion-icon-swap-ms)交叉淡入淡出。量值以变量面板 motion-* token 为准。"
+      "content": "操作图标 hover 浮现:默认隐藏,悬停结果时 120ms(motion-icon-in-ms)淡入;悬停图标本身颜色加深;复制成功后图标变 ✓(accent 色)保持 800ms(motion-copied-hold-ms)。⌘C 在输入框没有选区时复制当前结果全文。生成中不显示图标。超长文本:copy 图标在结果的可见范围内粘性跟随视口(见 States — 结果操作 ③)。图标静止态一律 text-tertiary(含超长文本的粘性 copy),指针所在的图标加深为 text-secondary;指针离开结果时图标以同一 120ms(motion-icon-in-ms)淡出;copy ↔ ✓ 切换以 150ms(motion-icon-swap-ms)交叉淡入淡出。结果不做整行高亮。量值以变量面板 motion-* token 为准。"
     },
     {
       "type": "frame",
       "id": "BBKsI",
       "x": 1120,
       "y": 760,
-      "name": "States — 记录操作",
+      "name": "States — 结果操作",
       "width": 860,
       "fill": "$bg",
       "cornerRadius": "$radius-window",
@@ -1235,7 +1024,7 @@
           "id": "z0itrh",
           "name": "Board Title",
           "fill": "$text-tertiary",
-          "content": "记录操作 · 交互状态",
+          "content": "结果操作 · 交互状态",
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-caption",
           "fontWeight": "600",
@@ -1246,7 +1035,7 @@
           "id": "PkYQ3",
           "name": "Caption",
           "fill": "$text-secondary",
-          "content": "① 悬停记录 — 三个图标 120ms(motion-icon-in-ms)淡入(默认完全隐藏)",
+          "content": "① 悬停结果 — copy 图标 120ms(motion-icon-in-ms)淡入(默认完全隐藏)",
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-label",
           "fontWeight": "500"
@@ -1255,24 +1044,12 @@
           "id": "NRRWj",
           "type": "ref",
           "ref": "B2Cx3",
-          "name": "Demo — 悬停记录",
+          "name": "Demo — 悬停结果",
           "width": "fill_container",
           "padding": 0,
           "descendants": {
             "SCbl4": {
               "content": "中文 → English · 14:05"
-            },
-            "wQtyR": {
-              "enabled": true
-            },
-            "IENJ0": {
-              "enabled": true
-            },
-            "boMM0": {
-              "content": "我们的系统采用了全新的存储引擎,显著提升了读写性能。"
-            },
-            "YDjBq": {
-              "enabled": true
             },
             "EDAjf": {
               "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance."
@@ -1311,18 +1088,6 @@
             "SCbl4": {
               "content": "中文 → English · 14:05"
             },
-            "wQtyR": {
-              "enabled": true
-            },
-            "IENJ0": {
-              "enabled": true
-            },
-            "boMM0": {
-              "content": "我们的系统采用了全新的存储引擎,显著提升了读写性能。"
-            },
-            "YDjBq": {
-              "enabled": true
-            },
             "EDAjf": {
               "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance."
             },
@@ -1348,7 +1113,7 @@
           "id": "oyriH",
           "name": "Caption",
           "fill": "$text-secondary",
-          "content": "③ 超长文本 — copy 图标在所属文本块的可见范围内粘性跟随(锚定块与视口交集的顶部)",
+          "content": "③ 超长文本 — copy 图标在结果的可见范围内粘性跟随(结果块与视口交集的顶部)",
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-label",
           "fontWeight": "500"
@@ -1374,7 +1139,7 @@
               "id": "xW1oI",
               "name": "Viewport Label",
               "fill": "$text-tertiary",
-              "content": "视口上边缘 · 记录首行已滚出",
+              "content": "视口上边缘 · 结果首行已滚出",
               "fontFamily": "$font-ui",
               "fontSize": 10.5,
               "fontWeight": "normal"
@@ -1435,16 +1200,6 @@
           ]
         }
       ]
-    },
-    {
-      "type": "note",
-      "id": "Sol2d",
-      "x": 2060,
-      "y": 2200,
-      "name": "Spec — 历史折叠",
-      "width": 860,
-      "height": 0,
-      "content": "历史折叠(已确认 2026-09-10)\n\n一、焦点模型与分类\n· 仅最新一条完全展开:meta + 原文(2 行渐隐)+ 结果全平铺。\n· 短记录:结果在当前列宽下 ≤ 2 行(且未达长文档阈值)。静止态 meta + 完整结果,不显示原文;行高 82(1 行)/ 108(2 行)。\n· 长记录:结果 > 2 行,或原文 ≥ 800 字 / 结果 ≥ 1,200 字。折叠态 meta + 结果前 2 行 + 25pt 渐隐到窗口底色 bg;行高 108。\n· 两类都没有卡片填充与内缩,记录之间 1px 分割线(border),文字左轨与最新记录对齐。行高判定只依赖每条记录缓存的 420 字预览。\n\n二、展开 / 收起\n· 点击任意历史记录原位展开(200ms,motion-fold-ms):短记录展开 = meta + 原文行 + 结果;长记录展开 = meta + 原文(2 行渐隐)+ 完整结果。可多条同开。\n· 点击已展开记录的 meta 行收起,回到各自的静止态;其余区域点击不收起。\n· 新记录提交:前一条为长记录时按 Motion — 历史折叠 T1 折叠(原文收起、结果 clip 到两行);为短记录时几何不变,只补分割线。\n\n三、hover 与图标\n· 短记录与折叠长记录 hover:整行 surface-fold 微高亮 120ms 淡入,向左右各外扩 10pt(space-hover-bleed)、圆角 8,文字不动;chevron-down 出现在 meta 行末 ↺ 左侧,与 ↺ / copy 同步淡入淡出。\n· 已展开记录 hover:只显示 chevron-up 与图标,不做整行高亮。最新一条与生成中的记录不显示 chevron。图标的颜色、淡入淡出与 ✓ 反馈见 Spec — 操作图标。\n\n四、阅读列宽\n· Stream 与 composer 内容列最大 804pt(reading-width,即 860 窗口里的内容列宽);窗口内容宽 ≤ 860 时与现状完全一致,更宽时列居中、两侧留白;标题栏与 composer 底色通栏,composer 的输入框 / 模式切换 / 发送按钮限制在列内(见 Main — 宽窗口 1280 · 阅读列宽)。\n\ncopy / ⌘C 始终复制全文,不受折叠影响。静止 / hover / 展开 / 提交状态见 States — 历史折叠,过渡关键帧见 Motion — 历史折叠;量值以变量面板 token 为准。"
     },
     {
       "type": "frame",
@@ -1805,7 +1560,7 @@
       "id": "B2Cx3",
       "x": 1120,
       "y": -340,
-      "name": "Entry",
+      "name": "Result",
       "reusable": true,
       "width": 804,
       "layout": "vertical",
@@ -1859,70 +1614,6 @@
                   "fontFamily": "$font-ui",
                   "fontSize": "$font-size-caption",
                   "fontWeight": "normal"
-                }
-              ]
-            },
-            {
-              "type": "icon",
-              "id": "wQtyR",
-              "x": 0,
-              "y": 0,
-              "name": "Redo",
-              "enabled": false,
-              "width": 12,
-              "height": 12,
-              "icon": "rotate-ccw",
-              "library": "lucide",
-              "fill": "$text-tertiary"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "IENJ0",
-          "x": 0,
-          "y": 0,
-          "name": "Source Row",
-          "enabled": false,
-          "width": "fill_container(0)",
-          "gap": 12,
-          "children": [
-            {
-              "type": "text",
-              "id": "boMM0",
-              "name": "Entry Source",
-              "fill": "$text-tertiary",
-              "textGrowth": "fixed-width",
-              "width": "fill_container",
-              "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。",
-              "lineHeight": "$line-height-source",
-              "fontFamily": "$font-body",
-              "fontSize": "$font-size-secondary",
-              "fontWeight": "normal"
-            },
-            {
-              "type": "frame",
-              "id": "YDjBq",
-              "x": 0,
-              "y": 0,
-              "name": "Copy Wrap",
-              "enabled": false,
-              "padding": [
-                4,
-                0,
-                0,
-                0
-              ],
-              "children": [
-                {
-                  "type": "icon",
-                  "id": "QzHUR",
-                  "name": "Copy",
-                  "width": 12,
-                  "height": 12,
-                  "icon": "copy",
-                  "library": "lucide",
-                  "fill": "$text-tertiary"
                 }
               ]
             }
@@ -2072,7 +1763,7 @@
       "name": "Guide — 画布导读",
       "width": 860,
       "height": 0,
-      "content": "画布结构(自上而下)\n· Components 行:Titlebar / Composer / Entry / Mode Seg / Lang Chip / Send Button / Settings Row / Motion Label。所有屏幕由这些组件的实例组成;状态差异只通过实例覆盖(descendants overrides)表达,查看某屏与基准的差异,直接看该实例的覆盖列表即可。\n· Screens 行:Main — 翻译(基准态)、改进中文、长文本处理、生成中、Settings、Main — 翻译 · 长记录折叠(860,一条折叠长记录与短记录并存)、Main — 宽窗口 1280 · 阅读列宽。\n· 记录操作与流式输出行:States — 记录操作(悬停 / 复制成功 / 粘性 copy)+ Spec — 操作图标;Motion — 流式输出(T0–T4 过渡关键帧)+ Spec — 流式输出动效。\n· 历史折叠行:States — 历史折叠(短记录 / 长记录的静止、hover、展开、提交与阅读列宽)+ Spec — 历史折叠 + Motion — 历史折叠(T0–T2 过渡关键帧)。\n\n信源约定\n· 本文件是实现的第一信源:每个主题只有一张 Spec note,规则变更直接改这张 note 与对应 States / Motion 板,不另开版本副本;已废弃的方案直接删除。\n· 所有动效量值(时长 / 曲线 / 速率 / 呼吸参数)是变量面板的 motion-* token,与颜色字号同级;spec note 与 Motion 板中的数值后均标注 token 名,数值冲突时以变量面板为准。\n· Motion 板每帧 = 一个稳定状态;帧间标注 = 过渡的触发条件、变化属性与 token。行为逻辑(速率平滑、滚动锚定、字素簇粒度)见 Spec — 流式输出动效。\n· 实现侧将 motion-* token 一比一映射为常量(CidaMotion),reduced-motion 降级行为见流式板 T4。\n\n开发对接\n· 变量面板即 design token,与实现一一映射:颜色 11 个(无 Dark);字号 4 档 caption 11 / label 11.5 / secondary 13 / body 16;行高 body 1.6 / source 1.55;圆角 window 14 / card 8 / seg 7 / chip 6 / seg-item 5;间距 window-x 28 / entry-y 16 / hover-bleed 10;阅读列宽 reading-width 804;动效 motion-* 19 个。设置页少量专用字号(10.5/12/12.5/13.5)保持字面值。\n· QA 截图对比与几何断言所用的顶层节点 id 见 design-qa.md 的清单。"
+      "content": "画布结构(自上而下)\n· Spec — 单结果模型(本 note 右侧):窗口结构、原文与结果成对、替换与空态、操作;所有屏幕都遵守它。\n· Components 行:Titlebar / Composer / Result / Mode Seg / Lang Chip / Send Button / Settings Row / Motion Label。所有屏幕由这些组件的实例组成;状态差异只通过实例覆盖(descendants overrides)表达,查看某屏与基准的差异,直接看该实例的覆盖列表即可。\n· Screens 行:Main — 翻译(基准态)、改进中文、长文本处理、生成中、Settings、Main — 宽窗口 1280 · 阅读列宽。每屏的结果区只有一条结果,composer 保留原文。\n· 结果操作与流式输出行:States — 结果操作(悬停 / 复制成功 / 粘性 copy)+ Spec — 操作图标;Motion — 流式输出(T0–T4 过渡关键帧)+ Spec — 流式输出动效。\n\n信源约定\n· 本文件是实现的第一信源:每个主题只有一张 Spec note,规则变更直接改这张 note 与对应 States / Motion 板,不另开版本副本;已废弃的方案直接删除。\n· 所有动效量值(时长 / 曲线 / 速率 / 呼吸参数)是变量面板的 motion-* token,与颜色字号同级;spec note 与 Motion 板中的数值后均标注 token 名,数值冲突时以变量面板为准。\n· Motion 板每帧 = 一个稳定状态;帧间标注 = 过渡的触发条件、变化属性与 token。行为逻辑(速率平滑、滚动锚定、字素簇粒度)见 Spec — 流式输出动效。\n· 实现侧将 motion-* token 一比一映射为常量(CidaMotion),reduced-motion 降级行为见流式板 T4。\n\n开发对接\n· 变量面板即 design token,与实现一一映射:颜色 10 个(无 Dark);字号 4 档 caption 11 / label 11.5 / secondary 13 / body 16;行高 body 1.6 / source 1.55;圆角 window 14 / card 8 / seg 7 / chip 6 / seg-item 5;间距 window-x 28 / entry-y 16;阅读列宽 reading-width 804;动效 motion-* 18 个。设置页少量专用字号(10.5/12/12.5/13.5)保持字面值。\n· QA 截图对比与几何断言所用的顶层节点 id 见 design-qa.md 的清单。"
     },
     {
       "type": "frame",
@@ -2200,7 +1891,7 @@
           "width": "fill_container",
           "descendants": {
             "gRIbr": {
-              "content": "⏎ 发送:composer 清空;记录(原文 + meta「生成中」)立即入流;send → stop 交叉淡化 150ms(motion-icon-swap-ms)"
+              "content": "⏎ 发送:原文留在 composer 并保持可编辑;结果区立即换成 meta「生成中」,上一条结果直接移除;send → stop 交叉淡化 150ms(motion-icon-swap-ms)"
             }
           }
         },
@@ -2242,17 +1933,11 @@
               "id": "X5zGER",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 等待",
+              "name": "Result — 等待",
               "width": "fill_container",
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 生成中"
-                },
-                "IENJ0": {
-                  "enabled": true
-                },
-                "boMM0": {
-                  "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
                 },
                 "tzszR": {
                   "type": "frame",
@@ -2325,17 +2010,11 @@
               "id": "EjaZF",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 流式中",
+              "name": "Result — 流式中",
               "width": "fill_container",
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 生成中"
-                },
-                "IENJ0": {
-                  "enabled": true
-                },
-                "boMM0": {
-                  "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
                 },
                 "tzszR": {
                   "type": "frame",
@@ -2493,20 +2172,11 @@
               "id": "S3atB1",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 完成",
+              "name": "Result — 完成",
               "width": "fill_container",
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 14:02 · 38 → 121 字"
-                },
-                "wQtyR": {
-                  "enabled": true
-                },
-                "IENJ0": {
-                  "enabled": true
-                },
-                "boMM0": {
-                  "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
                 },
                 "EDAjf": {
                   "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency."
@@ -2526,7 +2196,7 @@
           "width": "fill_container",
           "descendants": {
             "gRIbr": {
-              "content": "光标 200ms(motion-cursor-out-ms)淡出 → copy / ↺ 图标 150ms(motion-icon-swap-ms)淡入;meta「生成中」替换为时间与字数;stop → send 交叉淡化 150ms(motion-icon-swap-ms)"
+              "content": "光标 200ms(motion-cursor-out-ms)淡出;meta「生成中」替换为时间与字数;copy 图标仅在悬停时 120ms(motion-icon-in-ms)淡入;stop → send 交叉淡化 150ms(motion-icon-swap-ms)"
             }
           }
         },
@@ -2568,17 +2238,11 @@
               "id": "OR4o2",
               "type": "ref",
               "ref": "B2Cx3",
-              "name": "Entry — 已停止",
+              "name": "Result — 已停止",
               "width": "fill_container",
               "descendants": {
                 "SCbl4": {
                   "content": "中文 → English · 已停止"
-                },
-                "IENJ0": {
-                  "enabled": true
-                },
-                "boMM0": {
-                  "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
                 },
                 "EDAjf": {
                   "content": "Our system adopts a brand-new storage engine that significantly improves read and write"
@@ -2595,7 +2259,7 @@
           "width": "fill_container",
           "descendants": {
             "gRIbr": {
-              "content": "中断 / 出错:已输出文字保留;meta 显示「已停止」或「出错 · 重试」;光标直接淡出,无图标淡入"
+              "content": "中断 / 出错:已输出文字保留;meta 显示「已停止」或「出错」;光标直接淡出;再次 ⏎ 重新生成"
             }
           }
         },
@@ -2610,757 +2274,6 @@
               "content": "系统「减弱动态效果」开启时:去掉逐字淡入与呼吸,保留匀速上屏与高度过渡;所有时长基于 120fps"
             }
           }
-        }
-      ]
-    },
-    {
-      "type": "frame",
-      "id": "fgF4n",
-      "x": 3000,
-      "y": 2200,
-      "name": "Motion — 历史折叠",
-      "width": 860,
-      "fill": "$bg",
-      "cornerRadius": "$radius-window",
-      "stroke": "$border",
-      "strokeWidth": 1,
-      "layout": "vertical",
-      "gap": 16,
-      "padding": [
-        24,
-        28
-      ],
-      "children": [
-        {
-          "type": "text",
-          "id": "q6OchC",
-          "name": "Board Title",
-          "fill": "$text-tertiary",
-          "content": "历史折叠 · 过渡关键帧(量值 = motion-* token)",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-caption",
-          "fontWeight": "600",
-          "letterSpacing": 0.8
-        },
-        {
-          "type": "text",
-          "id": "NgqDA",
-          "name": "Frame Caption",
-          "fill": "$text-secondary",
-          "content": "T0 — 稳态 · 焦点模型:仅最新一条完全展开(原文 2 行渐隐 + 结果全平铺);短记录完整显示 meta + 结果;长记录折叠为 meta + 结果前 2 行渐隐,无底色",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "600"
-        },
-        {
-          "type": "frame",
-          "id": "l98qna",
-          "name": "Viewport",
-          "clip": true,
-          "width": "fill_container",
-          "fill": "$surface",
-          "cornerRadius": "$radius-card",
-          "stroke": "$border",
-          "strokeWidth": 1,
-          "layout": "vertical",
-          "padding": [
-            8,
-            16
-          ],
-          "children": [
-            {
-              "id": "V2xGh",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "历史条 — 长记录折叠",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 09:14 · 1,846 → 3,214 字"
-                },
-                "tzszR": {
-                  "type": "frame",
-                  "id": "AcLQI",
-                  "name": "Folded Clip",
-                  "clip": true,
-                  "width": "fill_container",
-                  "height": 52,
-                  "layout": "vertical",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "lwJ96",
-                      "name": "Folded Result",
-                      "fill": "$text-primary",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate.",
-                      "lineHeight": "$line-height-body",
-                      "fontFamily": "$font-body",
-                      "fontSize": "$font-size-body",
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "type": "rectangle",
-                      "id": "QRT8B",
-                      "layoutPosition": "absolute",
-                      "x": 0,
-                      "y": 27,
-                      "name": "Folded Fade",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 0,
-                        "size": {
-                          "height": 1
-                        },
-                        "colors": [
-                          {
-                            "color": "$surface",
-                            "position": 0
-                          },
-                          {
-                            "color": "#FFFFFF00",
-                            "position": 1
-                          }
-                        ]
-                      },
-                      "width": 772,
-                      "height": 25
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "id": "ZP3Rw",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "焦点条 — 展开",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 14:05"
-                },
-                "IENJ0": {
-                  "type": "frame",
-                  "id": "w4yfTc",
-                  "name": "Source Folded",
-                  "width": "fill_container",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "i2eyc",
-                      "name": "Source Clip",
-                      "clip": true,
-                      "width": "fill_container",
-                      "height": 41,
-                      "layout": "vertical",
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "EAIBS",
-                          "name": "Entry Source",
-                          "fill": "$text-tertiary",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。",
-                          "lineHeight": "$line-height-source",
-                          "fontFamily": "$font-body",
-                          "fontSize": "$font-size-secondary",
-                          "fontWeight": "normal"
-                        },
-                        {
-                          "type": "rectangle",
-                          "id": "j1ux6m",
-                          "layoutPosition": "absolute",
-                          "x": 0,
-                          "y": 21,
-                          "name": "Source Fade",
-                          "fill": {
-                            "type": "gradient",
-                            "gradientType": "linear",
-                            "enabled": true,
-                            "rotation": 0,
-                            "size": {
-                              "height": 1
-                            },
-                            "colors": [
-                              {
-                                "color": "$surface",
-                                "position": 0
-                              },
-                              {
-                                "color": "#FFFFFF00",
-                                "position": 1
-                              }
-                            ]
-                          },
-                          "width": 750,
-                          "height": 20
-                        }
-                      ]
-                    }
-                  ]
-                },
-                "EDAjf": {
-                  "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency."
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "VqJpg",
-          "type": "ref",
-          "ref": "pn8Ym",
-          "name": "Motion Note",
-          "width": "fill_container",
-          "descendants": {
-            "gRIbr": {
-              "content": "长记录折叠:原文隐藏,结果 clip 至前 2 行 + 渐隐到底色;短记录(≤ 2 行)不折叠,与折叠行同为无底色、分割线分隔;焦点条:原文渐隐 2 行、结果全平铺"
-            }
-          }
-        },
-        {
-          "type": "rectangle",
-          "id": "DKvvF",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "type": "text",
-          "id": "zywRa",
-          "name": "Frame Caption",
-          "fill": "$text-secondary",
-          "content": "T1 — 新记录提交 · 原焦点条为长记录时折叠",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "600"
-        },
-        {
-          "type": "frame",
-          "id": "cRhyz",
-          "name": "Viewport",
-          "clip": true,
-          "width": "fill_container",
-          "fill": "$surface",
-          "cornerRadius": "$radius-card",
-          "stroke": "$border",
-          "strokeWidth": 1,
-          "layout": "vertical",
-          "padding": [
-            8,
-            16
-          ],
-          "children": [
-            {
-              "id": "y4Mgs0",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "原焦点条 — 折叠中(长记录)",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 14:05 · 1,846 → 3,214 字"
-                },
-                "tzszR": {
-                  "type": "frame",
-                  "id": "RuS84",
-                  "name": "Folded Clip",
-                  "clip": true,
-                  "width": "fill_container",
-                  "height": 52,
-                  "layout": "vertical",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "Azr39",
-                      "name": "Folded Result",
-                      "fill": "$text-primary",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency. The new engine batches writes, keeps a compact index in memory, and verifies every page before it is made visible to readers.",
-                      "lineHeight": "$line-height-body",
-                      "fontFamily": "$font-body",
-                      "fontSize": "$font-size-body",
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "type": "rectangle",
-                      "id": "vouMH",
-                      "layoutPosition": "absolute",
-                      "x": 0,
-                      "y": 27,
-                      "name": "Folded Fade",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 0,
-                        "size": {
-                          "height": 1
-                        },
-                        "colors": [
-                          {
-                            "color": "$surface",
-                            "position": 0
-                          },
-                          {
-                            "color": "#FFFFFF00",
-                            "position": 1
-                          }
-                        ]
-                      },
-                      "width": 772,
-                      "height": 25
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "id": "ttFCL",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "新条 — 等待",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → 日本語 · 生成中"
-                },
-                "IENJ0": {
-                  "enabled": true
-                },
-                "boMM0": {
-                  "content": "架构演进的节奏必须与业务发展的节奏匹配。"
-                },
-                "tzszR": {
-                  "type": "frame",
-                  "id": "n6MN0",
-                  "name": "Result Row",
-                  "width": "fill_container",
-                  "children": [
-                    {
-                      "type": "rectangle",
-                      "cornerRadius": 1,
-                      "id": "h9o2B",
-                      "name": "Cursor",
-                      "fill": "$accent",
-                      "width": 0,
-                      "height": 0
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "b8tZwF",
-          "type": "ref",
-          "ref": "pn8Ym",
-          "name": "Motion Note",
-          "width": "fill_container",
-          "descendants": {
-            "gRIbr": {
-              "content": "新记录提交时,原焦点条若为长记录,以 200ms(motion-fold-ms)高度过渡折叠(原文收起、结果 clip 至 2 行、渐隐淡入),流保持贴底;若为短记录则几何不变,只在其下方出现分割线;新条按流式板 T1 起流"
-            }
-          }
-        },
-        {
-          "type": "rectangle",
-          "id": "xhYKM",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "type": "text",
-          "id": "Ulqgk",
-          "name": "Frame Caption",
-          "fill": "$text-secondary",
-          "content": "T2 — 点击记录 · 原位展开",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "600"
-        },
-        {
-          "type": "frame",
-          "id": "I6MAIV",
-          "name": "Viewport",
-          "clip": true,
-          "width": "fill_container",
-          "fill": "$surface",
-          "cornerRadius": "$radius-card",
-          "stroke": "$border",
-          "strokeWidth": 1,
-          "layout": "vertical",
-          "padding": [
-            8,
-            16
-          ],
-          "children": [
-            {
-              "id": "gNPk1",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "历史条 — 已展开",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 09:14 · 1,846 → 3,214 字"
-                },
-                "EDAjf": {
-                  "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate."
-                }
-              }
-            },
-            {
-              "id": "KXaEu",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "历史条 — 长记录折叠",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 09:14 · 1,846 → 3,214 字"
-                },
-                "tzszR": {
-                  "type": "frame",
-                  "id": "T5eEGW",
-                  "name": "Folded Clip",
-                  "clip": true,
-                  "width": "fill_container",
-                  "height": 52,
-                  "layout": "vertical",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "Deos3",
-                      "name": "Folded Result",
-                      "fill": "$text-primary",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate.",
-                      "lineHeight": "$line-height-body",
-                      "fontFamily": "$font-body",
-                      "fontSize": "$font-size-body",
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "type": "rectangle",
-                      "id": "I2JYr",
-                      "layoutPosition": "absolute",
-                      "x": 0,
-                      "y": 27,
-                      "name": "Folded Fade",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 0,
-                        "size": {
-                          "height": 1
-                        },
-                        "colors": [
-                          {
-                            "color": "$surface",
-                            "position": 0
-                          },
-                          {
-                            "color": "#FFFFFF00",
-                            "position": 1
-                          }
-                        ]
-                      },
-                      "width": 772,
-                      "height": 25
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "Lpb1u",
-          "type": "ref",
-          "ref": "pn8Ym",
-          "name": "Motion Note",
-          "width": "fill_container",
-          "descendants": {
-            "gRIbr": {
-              "content": "点击任意历史记录原位展开(200ms):短记录展开后显示原文行,长记录展开后显示原文(2 行渐隐)与完整结果,可多条同开;点击其 meta 行收起;copy / ⌘C 始终复制全文,不受折叠影响"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "type": "frame",
-      "id": "rOC5t",
-      "x": 5600,
-      "y": 0,
-      "name": "Main — 翻译 · 长记录折叠",
-      "clip": true,
-      "width": 860,
-      "height": 640,
-      "fill": "$bg",
-      "cornerRadius": "$radius-window",
-      "stroke": "$border",
-      "strokeWidth": 1,
-      "effect": {
-        "type": "shadow",
-        "shadowType": "outer",
-        "color": "#00000014",
-        "offset": {
-          "x": 0,
-          "y": 24
-        },
-        "blur": 60
-      },
-      "layout": "vertical",
-      "children": [
-        {
-          "id": "fS2jS",
-          "type": "ref",
-          "ref": "YdbKP",
-          "name": "Titlebar",
-          "width": "fill_container"
-        },
-        {
-          "type": "frame",
-          "id": "aLYfy",
-          "name": "Stream",
-          "clip": true,
-          "width": "fill_container",
-          "height": "fill_container",
-          "layout": "vertical",
-          "padding": [
-            8,
-            "$space-window-x",
-            "$space-entry-y",
-            "$space-window-x"
-          ],
-          "justifyContent": "end",
-          "children": [
-            {
-              "id": "z1Yv2",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 改进 短",
-              "width": "fill_container",
-              "descendants": {
-                "iRSPY": {
-                  "icon": "sparkles"
-                },
-                "Bw7O0": {
-                  "content": "改进"
-                },
-                "SCbl4": {
-                  "content": "English · 语气与语法 · 13:06"
-                },
-                "EDAjf": {
-                  "content": "Tried something new last night: https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "uPXqX",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "iO7eU",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译 短",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "English → 中文 · 13:07"
-                },
-                "EDAjf": {
-                  "content": "昨晚尝试了一些新东西：https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "X4S89",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "r1MFbo",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译 长 折叠",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
-                },
-                "tzszR": {
-                  "type": "frame",
-                  "id": "H95eJJ",
-                  "name": "Folded Clip",
-                  "clip": true,
-                  "width": "fill_container",
-                  "height": 52,
-                  "layout": "vertical",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "sNYUk",
-                      "name": "Folded Result",
-                      "fill": "$text-primary",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure.",
-                      "lineHeight": "$line-height-body",
-                      "fontFamily": "$font-body",
-                      "fontSize": "$font-size-body",
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "type": "rectangle",
-                      "id": "z6qTz",
-                      "layoutPosition": "absolute",
-                      "x": 0,
-                      "y": 27,
-                      "name": "Folded Fade",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 0,
-                        "size": {
-                          "height": 1
-                        },
-                        "colors": [
-                          {
-                            "color": "$bg",
-                            "position": 0
-                          },
-                          {
-                            "color": "#FAFAF800",
-                            "position": 1
-                          }
-                        ]
-                      },
-                      "width": 804,
-                      "height": 25
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "kaH09",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "ZHUax",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 改进 短",
-              "width": "fill_container",
-              "descendants": {
-                "iRSPY": {
-                  "icon": "sparkles"
-                },
-                "Bw7O0": {
-                  "content": "改进"
-                },
-                "SCbl4": {
-                  "content": "English · 语气与语法 · 14:38"
-                },
-                "EDAjf": {
-                  "content": "No such guarantee."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "x5KK4",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "nIrcI",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 改进 短",
-              "width": "fill_container",
-              "descendants": {
-                "iRSPY": {
-                  "icon": "sparkles"
-                },
-                "Bw7O0": {
-                  "content": "改进"
-                },
-                "SCbl4": {
-                  "content": "English · 语气与语法 · 14:46"
-                },
-                "EDAjf": {
-                  "content": "Having used GPT-6-Astra for a while now, my current take is that it works more like a person than an engineer."
-                }
-              }
-            },
-            {
-              "type": "rectangle",
-              "id": "b7sxfY",
-              "name": "Entry Divider",
-              "fill": "$border",
-              "width": "fill_container",
-              "height": 1
-            },
-            {
-              "id": "lgNZL",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry — 翻译 最新",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "English → 中文 · 14:48"
-                },
-                "IENJ0": {
-                  "enabled": true
-                },
-                "boMM0": {
-                  "content": "Using GPT-6-Astra for a while now, my current take is that it works more like a human than an engineer. Getting it to work like a good software engineer again takes more effort than before, but it unlocks many new kinds of work."
-                },
-                "EDAjf": {
-                  "content": "使用 GPT-6-Astra 已经有一段时间了，我目前的看法是，它更像一个人，而不是一个工程师。\n\n要让它再次像一个优秀的软件工程师那样工作，需要比以前付出更多努力，但它可以解锁许多新型工作。"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "mdBM0",
-          "type": "ref",
-          "ref": "nvsum",
-          "name": "Composer",
-          "width": "fill_container"
         }
       ]
     },
@@ -3389,7 +2302,7 @@
         {
           "type": "frame",
           "id": "u5xSDj",
-          "name": "Stream",
+          "name": "Result Area",
           "clip": true,
           "width": "fill_container",
           "height": "fill_container",
@@ -3412,203 +2325,14 @@
               "justifyContent": "end",
               "children": [
                 {
-                  "id": "BkrtK",
-                  "type": "ref",
-                  "ref": "B2Cx3",
-                  "name": "Entry — 翻译 短",
-                  "width": "fill_container",
-                  "descendants": {
-                    "SCbl4": {
-                      "content": "English → 中文 · 23:21"
-                    },
-                    "EDAjf": {
-                      "content": "2026/09/09更新：我们已经完成了一半！"
-                    }
-                  }
-                },
-                {
-                  "type": "rectangle",
-                  "id": "CSJt8",
-                  "name": "Entry Divider",
-                  "fill": "$border",
-                  "width": "fill_container",
-                  "height": 1
-                },
-                {
-                  "id": "y04wB0",
-                  "type": "ref",
-                  "ref": "B2Cx3",
-                  "name": "Entry — 改进 短",
-                  "width": "fill_container",
-                  "descendants": {
-                    "iRSPY": {
-                      "icon": "sparkles"
-                    },
-                    "Bw7O0": {
-                      "content": "改进"
-                    },
-                    "SCbl4": {
-                      "content": "English · 语气与语法 · 13:06"
-                    },
-                    "EDAjf": {
-                      "content": "Tried something new last night: https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
-                    }
-                  }
-                },
-                {
-                  "type": "rectangle",
-                  "id": "vyGRr",
-                  "name": "Entry Divider",
-                  "fill": "$border",
-                  "width": "fill_container",
-                  "height": 1
-                },
-                {
-                  "id": "g5AII",
-                  "type": "ref",
-                  "ref": "B2Cx3",
-                  "name": "Entry — 翻译 长 折叠",
-                  "width": "fill_container",
-                  "descendants": {
-                    "SCbl4": {
-                      "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
-                    },
-                    "tzszR": {
-                      "type": "frame",
-                      "id": "FeM36",
-                      "name": "Folded Clip",
-                      "clip": true,
-                      "width": "fill_container",
-                      "height": 52,
-                      "layout": "vertical",
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "JeOBZ",
-                          "name": "Folded Result",
-                          "fill": "$text-primary",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure.",
-                          "lineHeight": "$line-height-body",
-                          "fontFamily": "$font-body",
-                          "fontSize": "$font-size-body",
-                          "fontWeight": "normal"
-                        },
-                        {
-                          "type": "rectangle",
-                          "id": "jyb26",
-                          "layoutPosition": "absolute",
-                          "x": 0,
-                          "y": 27,
-                          "name": "Folded Fade",
-                          "fill": {
-                            "type": "gradient",
-                            "gradientType": "linear",
-                            "enabled": true,
-                            "rotation": 0,
-                            "size": {
-                              "height": 1
-                            },
-                            "colors": [
-                              {
-                                "color": "$bg",
-                                "position": 0
-                              },
-                              {
-                                "color": "#FAFAF800",
-                                "position": 1
-                              }
-                            ]
-                          },
-                          "width": 800,
-                          "height": 25
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  "type": "rectangle",
-                  "id": "e4Ytkn",
-                  "name": "Entry Divider",
-                  "fill": "$border",
-                  "width": "fill_container",
-                  "height": 1
-                },
-                {
-                  "id": "HXldQ",
-                  "type": "ref",
-                  "ref": "B2Cx3",
-                  "name": "Entry — 改进 短",
-                  "width": "fill_container",
-                  "descendants": {
-                    "iRSPY": {
-                      "icon": "sparkles"
-                    },
-                    "Bw7O0": {
-                      "content": "改进"
-                    },
-                    "SCbl4": {
-                      "content": "English · 语气与语法 · 14:38"
-                    },
-                    "EDAjf": {
-                      "content": "No such guarantee."
-                    }
-                  }
-                },
-                {
-                  "type": "rectangle",
-                  "id": "pyJD1",
-                  "name": "Entry Divider",
-                  "fill": "$border",
-                  "width": "fill_container",
-                  "height": 1
-                },
-                {
-                  "id": "WBbxO",
-                  "type": "ref",
-                  "ref": "B2Cx3",
-                  "name": "Entry — 改进 短",
-                  "width": "fill_container",
-                  "descendants": {
-                    "iRSPY": {
-                      "icon": "sparkles"
-                    },
-                    "Bw7O0": {
-                      "content": "改进"
-                    },
-                    "SCbl4": {
-                      "content": "English · 语气与语法 · 14:46"
-                    },
-                    "EDAjf": {
-                      "content": "Having used GPT-6-Astra for a while now, my current take is that it works more like a person than an engineer."
-                    }
-                  }
-                },
-                {
-                  "type": "rectangle",
-                  "id": "JJwpQ",
-                  "name": "Entry Divider",
-                  "fill": "$border",
-                  "width": "fill_container",
-                  "height": 1
-                },
-                {
                   "id": "T3G1dw",
                   "type": "ref",
                   "ref": "B2Cx3",
-                  "name": "Entry — 翻译 最新",
+                  "name": "Result — 翻译",
                   "width": "fill_container",
                   "descendants": {
                     "SCbl4": {
                       "content": "English → 中文 · 14:48"
-                    },
-                    "IENJ0": {
-                      "enabled": true
-                    },
-                    "boMM0": {
-                      "content": "Using GPT-6-Astra for a while now, my current take is that it works more like a human than an engineer. Getting it to work like a good software engineer again takes more effort than before, but it unlocks many new kinds of work."
                     },
                     "EDAjf": {
                       "content": "使用 GPT-6-Astra 已经有一段时间了，我目前的看法是，它更像一个人，而不是一个工程师。\n\n要让它再次像一个优秀的软件工程师那样工作，需要比以前付出更多努力，但它可以解锁许多新型工作。"
@@ -3649,10 +2373,10 @@
                   "type": "text",
                   "id": "vLQsC",
                   "name": "Composer Input",
-                  "fill": "$text-tertiary",
+                  "fill": "$text-primary",
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "content": "输入内容,回车翻译…",
+                  "content": "Using GPT-6-Astra for a while now, my current take is that it works more like a human than an engineer. Getting it to work like a good software engineer again takes more effort than before, but it unlocks many new kinds of work.",
                   "lineHeight": "$line-height-body",
                   "fontFamily": "$font-body",
                   "fontSize": "$font-size-body",
@@ -3724,502 +2448,14 @@
       ]
     },
     {
-      "type": "frame",
-      "id": "T6tMl",
-      "x": 1120,
-      "y": 2200,
-      "name": "States — 历史折叠",
+      "type": "note",
+      "id": "j4dYmH",
+      "x": 2060,
+      "y": -1260,
+      "name": "Spec — 单结果模型",
       "width": 860,
-      "fill": "$bg",
-      "cornerRadius": "$radius-window",
-      "stroke": "$border",
-      "strokeWidth": 1,
-      "layout": "vertical",
-      "gap": 18,
-      "padding": [
-        24,
-        28
-      ],
-      "children": [
-        {
-          "type": "text",
-          "id": "MdA35",
-          "name": "Board Title",
-          "fill": "$text-tertiary",
-          "content": "历史折叠 · 交互状态",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-caption",
-          "fontWeight": "600"
-        },
-        {
-          "type": "text",
-          "id": "MW3TD",
-          "name": "Caption",
-          "fill": "$text-secondary",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
-          "content": "① 短记录（结果 ≤ 2 行）— 静止：meta + 完整结果，无底色；记录之间只有 1px 分割线；文字左轨与最新记录对齐",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "500"
-        },
-        {
-          "id": "Ujr6z",
-          "type": "ref",
-          "ref": "B2Cx3",
-          "name": "Demo — 短记录",
-          "width": "fill_container",
-          "descendants": {
-            "iRSPY": {
-              "icon": "sparkles"
-            },
-            "Bw7O0": {
-              "content": "改进"
-            },
-            "SCbl4": {
-              "content": "English · 语气与语法 · 14:38"
-            },
-            "EDAjf": {
-              "content": "No such guarantee."
-            }
-          }
-        },
-        {
-          "type": "rectangle",
-          "id": "I64PMx",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "id": "FLOsT",
-          "type": "ref",
-          "ref": "B2Cx3",
-          "name": "Demo — 短记录",
-          "width": "fill_container",
-          "descendants": {
-            "SCbl4": {
-              "content": "English → 中文 · 13:07"
-            },
-            "EDAjf": {
-              "content": "昨晚尝试了一些新东西：https://lancedb.slack.com/archives/C07D2CUG36E/p1789009440545289"
-            }
-          }
-        },
-        {
-          "type": "rectangle",
-          "id": "A7XM8",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "type": "text",
-          "id": "JWAtP",
-          "name": "Caption",
-          "fill": "$text-secondary",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
-          "content": "② 短记录 hover — 整行 surface-fold 微高亮 120ms 淡入,高亮向左右各外扩 10pt(space-hover-bleed)、圆角 8,文字不动;chevron-down + ↺ / copy 同步淡入;点击任意处展开原文行",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "500"
-        },
-        {
-          "type": "frame",
-          "id": "uf2TY",
-          "name": "Demo — 短记录 hover",
-          "width": "fill_container",
-          "layout": "vertical",
-          "children": [
-            {
-              "type": "rectangle",
-              "cornerRadius": "$radius-card",
-              "id": "Q2Xj97",
-              "layoutPosition": "absolute",
-              "x": -10,
-              "y": 0,
-              "name": "Hover Highlight",
-              "fill": "$surface-fold",
-              "width": 824,
-              "height": 82
-            },
-            {
-              "id": "cT5wp",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry",
-              "width": "fill_container",
-              "descendants": {
-                "iRSPY": {
-                  "icon": "sparkles"
-                },
-                "Bw7O0": {
-                  "content": "改进"
-                },
-                "SCbl4": {
-                  "content": "English · 语气与语法 · 14:46"
-                },
-                "wQtyR": {
-                  "type": "frame",
-                  "id": "OCYIv",
-                  "name": "Meta Actions",
-                  "gap": 12,
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon",
-                      "id": "KC8Ga",
-                      "name": "rotate-ccw",
-                      "width": 12,
-                      "height": 12,
-                      "icon": "rotate-ccw",
-                      "library": "lucide",
-                      "fill": "$text-tertiary"
-                    }
-                  ]
-                },
-                "EDAjf": {
-                  "content": "Having used GPT-6-Astra for a while now, my current take is that it works more like a person than an engineer."
-                },
-                "I9LqA": {
-                  "enabled": true
-                }
-              }
-            }
-          ]
-        },
-        {
-          "type": "rectangle",
-          "id": "E8xn6D",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "type": "text",
-          "id": "qGGZV",
-          "name": "Caption",
-          "fill": "$text-secondary",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
-          "content": "③ 长记录（结果 > 2 行，或原文/结果达到长文档阈值）— 静止：meta + 结果前两行 + 25pt 渐隐到窗口底色，无卡片填充；点击任意处原位展开",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "500"
-        },
-        {
-          "id": "pPtFZ",
-          "type": "ref",
-          "ref": "B2Cx3",
-          "name": "Demo — 长记录 折叠",
-          "width": "fill_container",
-          "descendants": {
-            "SCbl4": {
-              "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
-            },
-            "tzszR": {
-              "type": "frame",
-              "id": "Ok1af",
-              "name": "Folded Clip",
-              "clip": true,
-              "width": "fill_container",
-              "height": 52,
-              "layout": "vertical",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "x9ckbX",
-                  "name": "Folded Result",
-                  "fill": "$text-primary",
-                  "textGrowth": "fixed-width",
-                  "width": "fill_container",
-                  "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different.",
-                  "lineHeight": "$line-height-body",
-                  "fontFamily": "$font-body",
-                  "fontSize": "$font-size-body",
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "rectangle",
-                  "id": "Wfm6b",
-                  "layoutPosition": "absolute",
-                  "x": 0,
-                  "y": 27,
-                  "name": "Folded Fade",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "linear",
-                    "enabled": true,
-                    "rotation": 0,
-                    "size": {
-                      "height": 1
-                    },
-                    "colors": [
-                      {
-                        "color": "$bg",
-                        "position": 0
-                      },
-                      {
-                        "color": "#FAFAF800",
-                        "position": 1
-                      }
-                    ]
-                  },
-                  "width": 804,
-                  "height": 25
-                }
-              ]
-            }
-          }
-        },
-        {
-          "type": "rectangle",
-          "id": "zZRph",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "type": "text",
-          "id": "mjl8h",
-          "name": "Caption",
-          "fill": "$text-secondary",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
-          "content": "④ 长记录 hover — 同②的整行微高亮(渐隐随之变为 surface-fold),chevron-down + ↺ / copy 淡入;点击任意处展开",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "500"
-        },
-        {
-          "type": "frame",
-          "id": "e4AMS",
-          "name": "Demo — 长记录 hover",
-          "width": "fill_container",
-          "layout": "vertical",
-          "children": [
-            {
-              "type": "rectangle",
-              "cornerRadius": "$radius-card",
-              "id": "FuDsD",
-              "layoutPosition": "absolute",
-              "x": -10,
-              "y": 0,
-              "name": "Hover Highlight",
-              "fill": "$surface-fold",
-              "width": 824,
-              "height": 108
-            },
-            {
-              "id": "Dhd8G",
-              "type": "ref",
-              "ref": "B2Cx3",
-              "name": "Entry",
-              "width": "fill_container",
-              "descendants": {
-                "SCbl4": {
-                  "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
-                },
-                "wQtyR": {
-                  "type": "frame",
-                  "id": "tnU7u",
-                  "name": "Meta Actions",
-                  "gap": 12,
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon",
-                      "id": "evHV9",
-                      "name": "chevron-down",
-                      "width": 12,
-                      "height": 12,
-                      "icon": "chevron-down",
-                      "library": "lucide",
-                      "fill": "$text-tertiary"
-                    },
-                    {
-                      "type": "icon",
-                      "id": "XYhvI",
-                      "name": "rotate-ccw",
-                      "width": 12,
-                      "height": 12,
-                      "icon": "rotate-ccw",
-                      "library": "lucide",
-                      "fill": "$text-tertiary"
-                    }
-                  ]
-                },
-                "tzszR": {
-                  "type": "frame",
-                  "id": "pigB9",
-                  "name": "Folded Clip",
-                  "clip": true,
-                  "width": "fill_container",
-                  "height": 52,
-                  "layout": "vertical",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "PKc1g",
-                      "name": "Folded Result",
-                      "fill": "$text-primary",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different.",
-                      "lineHeight": "$line-height-body",
-                      "fontFamily": "$font-body",
-                      "fontSize": "$font-size-body",
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "type": "rectangle",
-                      "id": "MAt1A",
-                      "layoutPosition": "absolute",
-                      "x": 0,
-                      "y": 27,
-                      "name": "Folded Fade",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 0,
-                        "size": {
-                          "height": 1
-                        },
-                        "colors": [
-                          {
-                            "color": "$surface-fold",
-                            "position": 0
-                          },
-                          {
-                            "color": "#FAFAF800",
-                            "position": 1
-                          }
-                        ]
-                      },
-                      "width": 804,
-                      "height": 25
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "type": "rectangle",
-          "id": "HhxBV",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "type": "text",
-          "id": "R0Wq8S",
-          "name": "Caption",
-          "fill": "$text-secondary",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
-          "content": "⑤ 长记录展开 — meta + 原文(两行渐隐)+ 完整结果;hover 时只显示 meta 行末 chevron-up 与图标,不做整行高亮;点击 meta 行收起,其余区域点击不收起",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "500"
-        },
-        {
-          "id": "PUuPu",
-          "type": "ref",
-          "ref": "B2Cx3",
-          "name": "Demo — 长记录 展开",
-          "width": "fill_container",
-          "descendants": {
-            "SCbl4": {
-              "content": "中文 → English · 13:40 · 1,846 → 3,214 字"
-            },
-            "wQtyR": {
-              "type": "frame",
-              "id": "OQxTg",
-              "name": "Meta Actions",
-              "gap": 12,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "icon",
-                  "id": "vuHPZ",
-                  "name": "chevron-up",
-                  "width": 12,
-                  "height": 12,
-                  "icon": "chevron-up",
-                  "library": "lucide",
-                  "fill": "$text-tertiary"
-                },
-                {
-                  "type": "icon",
-                  "id": "Ei25d",
-                  "name": "rotate-ccw",
-                  "width": 12,
-                  "height": 12,
-                  "icon": "rotate-ccw",
-                  "library": "lucide",
-                  "fill": "$text-tertiary"
-                }
-              ]
-            },
-            "IENJ0": {
-              "enabled": true
-            },
-            "boMM0": {
-              "content": "分布式系统的设计从来都不是单纯的技术选型问题。当我们讨论一致性、可用性与分区容忍性之间的取舍时,实际上是在讨论业务对错误的容忍程度。"
-            },
-            "YDjBq": {
-              "enabled": true
-            },
-            "EDAjf": {
-              "content": "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different."
-            },
-            "I9LqA": {
-              "enabled": true
-            }
-          }
-        },
-        {
-          "type": "rectangle",
-          "id": "MOkEb",
-          "name": "Divider",
-          "fill": "$border",
-          "width": "fill_container",
-          "height": 1
-        },
-        {
-          "type": "text",
-          "id": "xpLE2",
-          "name": "Caption",
-          "fill": "$text-secondary",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
-          "content": "⑥ 提交 — 新记录立即入流；前一条是长记录时按 Motion — 历史折叠 T1 以 200ms 折叠（原文收起、结果 clip 到两行）；短记录几何不变，只在下方出现分割线",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "500"
-        },
-        {
-          "type": "text",
-          "id": "dsKQm",
-          "name": "Caption",
-          "fill": "$text-secondary",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
-          "content": "⑦ 阅读列宽 — Stream 与 composer 的内容列最大 804pt(reading-width);窗口更宽时列居中、两侧留白,标题栏与 composer 底色仍通栏(见 Main — 宽窗口 1280 · 阅读列宽)",
-          "fontFamily": "$font-ui",
-          "fontSize": "$font-size-label",
-          "fontWeight": "500"
-        }
-      ]
+      "height": 0,
+      "content": "单结果模型(已确认 2026-09-22,取代历史时间线)\n\n一、窗口结构\n· 三段:Titlebar / 结果区 / composer。结果区只承载一条结果;没有历史列表、折叠、展开与分页。\n· 结果贴在 composer 上方(底对齐),上方留白;结果高于结果区时结果区可滚动,生成期间贴底锚定(见 Spec — 流式输出动效)。\n· 结果与 composer 的内容列最大 804pt(reading-width);窗口内容宽 ≤ 860 时与现状一致,更宽时列居中、两侧留白,标题栏与 composer 底色通栏(见 Main — 宽窗口 1280 · 阅读列宽)。\n\n二、原文与结果成对\n· ⏎ 提交后原文留在 composer,保持可编辑;composer 高度按现有规则随文本量在 27 / 多行 / 文档态之间变化。\n· 结果只显示 meta 行 + 结果正文,不再重复原文。meta 行 = 模式图标 + 模式 + 「源语言 → 目标语言 · 时间 · 原文字数 → 结果字数」;改进模式不显示语言对,显示「语言 · 改进范围」。\n· 重新生成 = 在 composer 中再次 ⏎;不设 ↺ 图标。修改原文后再次 ⏎ 得到新结果。\n\n三、替换与空态\n· 新提交立即移除上一条结果并显示「生成中」meta 与光标(见 Motion — 流式输出 T0–T1);不做旧结果淡出动画。\n· 未提交过时结果区为空白,只靠 composer 占位文字引导。\n· 应用重启后结果区为空;不持久化任何记录。\n\n四、操作\n· 结果只有 copy 一个操作:悬停结果时淡入,超长文本粘性跟随视口;⌘C 在输入框无选区时复制当前结果全文。细节见 Spec — 操作图标 与 States — 结果操作。\n· 结果不做整行 hover 高亮,没有可展开区域。\n\n量值以变量面板 token 为准。"
     }
   ],
   "variables": {
@@ -4270,10 +2506,6 @@
     "font-brand": {
       "type": "string",
       "value": "Noto Serif SC"
-    },
-    "surface-fold": {
-      "type": "color",
-      "value": "#F1F1EC"
     },
     "accent-foreground": {
       "type": "color",
@@ -4351,10 +2583,6 @@
       "type": "number",
       "value": 200
     },
-    "motion-fold-ms": {
-      "type": "number",
-      "value": 200
-    },
     "motion-copied-hold-ms": {
       "type": "number",
       "value": 800
@@ -4410,10 +2638,6 @@
     "reading-width": {
       "type": "number",
       "value": 804
-    },
-    "space-hover-bleed": {
-      "type": "number",
-      "value": 10
     }
   },
   "fileToken": "4351a8c3-72b7-472a-91d3-c466c77c32ee"
