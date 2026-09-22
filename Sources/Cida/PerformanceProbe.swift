@@ -14,8 +14,6 @@ struct PerformanceProbeConfiguration: Sendable {
 enum FramePacingWorkload: String, Sendable {
   case streaming
   case millionCharacterPaste = "million-character-paste"
-  case largeHistoryScroll = "large-history-scroll"
-  case extremeWorkflow = "extreme-workflow"
 
   var description: String {
     switch self {
@@ -23,10 +21,6 @@ enum FramePacingWorkload: String, Sendable {
       "Adaptive burst-smoothed streaming with Core Animation rendering"
     case .millionCharacterPaste:
       "Pasting a 1,000,000-character document into the native composer"
-    case .largeHistoryScroll:
-      "Continuously scrolling upward through 1,000 persisted history records"
-    case .extremeWorkflow:
-      "Submit, stream, persist, scroll, and hyper-scroll an extreme persisted history"
     }
   }
 }
@@ -37,16 +31,7 @@ struct FramePacingWorkloadMetrics: Equatable, Sendable {
   var operationDurationMilliseconds: Double?
   var streamPresentationUpdateCount: Int?
   var maximumStreamPresentationBatchCharacterCount: Int?
-  var historyEntryCount: Int?
-  var totalHistoryEntryCount: Int?
-  var scrollDistancePoints: Double?
   var outputCharacterCount: Int?
-  var normalScrollDistancePoints: Double?
-  var hyperScrollDistancePoints: Double?
-  var maximumScrollStepPoints: Double?
-  var historyLoadDurationMilliseconds: Double?
-  var initialRenderDurationMilliseconds: Double?
-  var databaseBytes: Int64?
   var workflowPhase: String?
   var workflowEvent: String?
 }
@@ -84,16 +69,7 @@ struct FramePacingReport: Codable, Equatable, Sendable {
   let operationDurationMilliseconds: Double?
   let streamPresentationUpdateCount: Int?
   let maximumStreamPresentationBatchCharacterCount: Int?
-  let historyEntryCount: Int?
-  let totalHistoryEntryCount: Int?
-  let scrollDistancePoints: Double?
   let outputCharacterCount: Int?
-  let normalScrollDistancePoints: Double?
-  let hyperScrollDistancePoints: Double?
-  let maximumScrollStepPoints: Double?
-  let historyLoadDurationMilliseconds: Double?
-  let initialRenderDurationMilliseconds: Double?
-  let databaseBytes: Int64?
   let currentResidentMemoryBytes: Int64
   let peakResidentMemoryBytes: Int64
   let workflowPhase: String?
@@ -355,16 +331,7 @@ final class FramePacingProbeNSView: NSView {
       streamPresentationUpdateCount: metrics.streamPresentationUpdateCount,
       maximumStreamPresentationBatchCharacterCount:
         metrics.maximumStreamPresentationBatchCharacterCount,
-      historyEntryCount: metrics.historyEntryCount,
-      totalHistoryEntryCount: metrics.totalHistoryEntryCount,
-      scrollDistancePoints: metrics.scrollDistancePoints,
       outputCharacterCount: metrics.outputCharacterCount,
-      normalScrollDistancePoints: metrics.normalScrollDistancePoints,
-      hyperScrollDistancePoints: metrics.hyperScrollDistancePoints,
-      maximumScrollStepPoints: metrics.maximumScrollStepPoints,
-      historyLoadDurationMilliseconds: metrics.historyLoadDurationMilliseconds,
-      initialRenderDurationMilliseconds: metrics.initialRenderDurationMilliseconds,
-      databaseBytes: metrics.databaseBytes,
       currentResidentMemoryBytes: ProcessMemory.currentResidentBytes(),
       peakResidentMemoryBytes: max(
         maximumObservedResidentMemoryBytes,
@@ -424,16 +391,7 @@ final class FramePacingProbeNSView: NSView {
     operationDurationMilliseconds: Double? = nil,
     streamPresentationUpdateCount: Int? = nil,
     maximumStreamPresentationBatchCharacterCount: Int? = nil,
-    historyEntryCount: Int? = nil,
-    totalHistoryEntryCount: Int? = nil,
-    scrollDistancePoints: Double? = nil,
     outputCharacterCount: Int? = nil,
-    normalScrollDistancePoints: Double? = nil,
-    hyperScrollDistancePoints: Double? = nil,
-    maximumScrollStepPoints: Double? = nil,
-    historyLoadDurationMilliseconds: Double? = nil,
-    initialRenderDurationMilliseconds: Double? = nil,
-    databaseBytes: Int64? = nil,
     currentResidentMemoryBytes: Int64 = 0,
     peakResidentMemoryBytes: Int64 = 0,
     workflowPhase: String? = nil,
@@ -486,16 +444,7 @@ final class FramePacingProbeNSView: NSView {
         streamPresentationUpdateCount: streamPresentationUpdateCount,
         maximumStreamPresentationBatchCharacterCount:
           maximumStreamPresentationBatchCharacterCount,
-        historyEntryCount: historyEntryCount,
-        totalHistoryEntryCount: totalHistoryEntryCount,
-        scrollDistancePoints: scrollDistancePoints,
         outputCharacterCount: outputCharacterCount,
-        normalScrollDistancePoints: normalScrollDistancePoints,
-        hyperScrollDistancePoints: hyperScrollDistancePoints,
-        maximumScrollStepPoints: maximumScrollStepPoints,
-        historyLoadDurationMilliseconds: historyLoadDurationMilliseconds,
-        initialRenderDurationMilliseconds: initialRenderDurationMilliseconds,
-        databaseBytes: databaseBytes,
         currentResidentMemoryBytes: currentResidentMemoryBytes,
         peakResidentMemoryBytes: peakResidentMemoryBytes,
         workflowPhase: workflowPhase,
@@ -587,16 +536,7 @@ final class FramePacingProbeNSView: NSView {
       streamPresentationUpdateCount: streamPresentationUpdateCount,
       maximumStreamPresentationBatchCharacterCount:
         maximumStreamPresentationBatchCharacterCount,
-      historyEntryCount: historyEntryCount,
-      totalHistoryEntryCount: totalHistoryEntryCount,
-      scrollDistancePoints: scrollDistancePoints,
       outputCharacterCount: outputCharacterCount,
-      normalScrollDistancePoints: normalScrollDistancePoints,
-      hyperScrollDistancePoints: hyperScrollDistancePoints,
-      maximumScrollStepPoints: maximumScrollStepPoints,
-      historyLoadDurationMilliseconds: historyLoadDurationMilliseconds,
-      initialRenderDurationMilliseconds: initialRenderDurationMilliseconds,
-      databaseBytes: databaseBytes,
       currentResidentMemoryBytes: currentResidentMemoryBytes,
       peakResidentMemoryBytes: peakResidentMemoryBytes,
       workflowPhase: workflowPhase,

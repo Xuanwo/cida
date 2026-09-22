@@ -11,16 +11,6 @@ protocol TextProcessingService: Sendable {
   ) -> AsyncThrowingStream<String, Error>
 }
 
-struct HistoryRenderPage: Identifiable, Sendable {
-  let id: UUID
-  let entries: [HistoryEntry]
-
-  init(entries: [HistoryEntry]) {
-    self.entries = entries
-    id = entries.first?.id ?? UUID()
-  }
-}
-
 #if DEBUG
   struct PreviewTextProcessingService: TextProcessingService {
     func stream(
@@ -286,82 +276,54 @@ extension String {
 @MainActor
 @Observable
 final class AppModel {
+  /// The action the next ⏎ runs. It resets to `.translate` every time the
+  /// panel is shown (see `PanelController`).
   var mode: ProcessingMode
-  var sourceLanguage: Language = .chinese
-  var targetLanguage: Language = .english
   var inputText: String
-  var entries: [HistoryEntry] {
-    didSet {
-      synchronizeEntriesAfterMutation(previousEntries: oldValue)
-    }
-  }
-  private(set) var persistedHistoryEntries: [HistoryEntry]
-  private(set) var persistedHistoryPages: [HistoryRenderPage]
-  private(set) var sessionHistoryEntries: [HistoryEntry] = []
-  private(set) var hasLongHistoryDocument: Bool
-  private(set) var totalHistoryEntryCount: Int
-  private(set) var hasOlderHistory: Bool
-  private(set) var isLoadingOlderHistory = false
+  /// The one result the panel shows. A new submission replaces it; hiding the
+  /// panel keeps it.
+  private(set) var result: ResultRecord?
   var settings = CidaSettings()
   private(set) var generationState = GenerationPresentationState.idle
   var isProcessing: Bool {
     generationState.isActive
   }
+  /// Errors from Settings actions (launch at login); request failures live
+  /// on the result record instead.
   var errorMessage: String?
   var editingPrompt: ProcessingMode? = .improve
   var inputFocusRequestID = 0
-  var inputResetRevision = 0
-  var historyScrollRevision = 0
-  private(set) var historyForcePinRevision = 0
-  private var manuallyExpandedHistoryEntryIDs: Set<UUID> = []
-  /// Records that keep their standalone renderer while the Pencil fold
-  /// transition runs; afterwards they join the virtualized folded list.
-  private(set) var foldingHistoryEntryIDs: Set<UUID> = []
+  /// Bumped when the whole source should be selected, e.g. when the panel is
+  /// shown again with the previous text still in it.
+  var inputSelectAllRequestID = 0
+  /// Bumped when the result pane should scroll to the tail of the result.
+  private(set) var resultFollowRevision = 0
+  private(set) var copyFeedbackRevision = 0
 
   private let service: any TextProcessingService
   private let streamPresentationPolicy: StreamPresentationPolicy
-  private let historyPersistence: (any HistoryPersisting)?
-  private let historyPageLoader: (any HistoryPageLoading)?
-  private let historyPageSize: Int
   private let saveSettings: @MainActor (CidaSettings) -> Void
   private let clearPersistedAPIKey: @MainActor () -> Void
   private var processingTask: Task<Void, Never>?
-  @ObservationIgnored private var foldCleanupTasks: [UUID: Task<Void, Never>] = [:]
   private var settingsSaveTask: Task<Void, Never>?
-  private var olderHistoryLoadTask: Task<Void, Never>?
-  @ObservationIgnored private var olderHistoryLoadRequestTask: Task<Void, Never>?
-  @ObservationIgnored private var olderHistoryLoadWasRequested = false
-  @ObservationIgnored private var isHistoryLiveScrolling = false
   private var lastPersistedAPIKey: String
   @ObservationIgnored private var stagedInputDocument: String?
   @ObservationIgnored private var stagedInputDocumentUTF16Count: Int?
   @ObservationIgnored private var stagedInputDocumentHasNonWhitespace: Bool?
   @ObservationIgnored private weak var displayLinkView: NSView?
-  private var oldestLoadedHistorySortOrder: Int64?
-  @ObservationIgnored private var suppressesEntrySynchronization = false
   private var performanceProbeStep = 0
   private var performancePresenter: SmoothStreamPresenter?
-  private var lastHistoryFollowTimestamp = 0.0
+  private var lastResultFollowTimestamp = 0.0
   private(set) var streamPresentationUpdateCount = 0
   private(set) var maximumStreamPresentationCharacterCount = 0
-
-  var unloadedHistoryEntryCount: Int {
-    max(0, totalHistoryEntryCount - entries.count)
-  }
 
   init(
     mode: ProcessingMode = .translate,
     inputText: String = "",
-    entries: [HistoryEntry] = [],
+    result: ResultRecord? = nil,
     settings: CidaSettings = CidaSettings(),
     service: any TextProcessingService = OpenAICompatibleTextProcessingService(),
     streamPresentationPolicy: StreamPresentationPolicy = .production,
-    historyPersistence: (any HistoryPersisting)? = nil,
-    historyPageLoader: (any HistoryPageLoading)? = nil,
-    historyTotalCount: Int? = nil,
-    historyOldestSortOrder: Int64? = nil,
-    historyHasMoreBefore: Bool = false,
-    historyPageSize: Int = 128,
     saveSettings: @escaping @MainActor (CidaSettings) -> Void = { settings in
       SettingsStore.save(settings)
     },
@@ -371,42 +333,27 @@ final class AppModel {
   ) {
     self.mode = mode
     self.inputText = inputText
-    self.entries = entries
-    persistedHistoryEntries = entries
-    persistedHistoryPages = entries.isEmpty ? [] : [HistoryRenderPage(entries: entries)]
-    for entry in entries {
-      entry.isLatestInHistory = false
-    }
-    entries.last?.isLatestInHistory = true
-    hasLongHistoryDocument = entries.contains(where: \.isLongDocument)
-    totalHistoryEntryCount = max(entries.count, historyTotalCount ?? entries.count)
-    hasOlderHistory = historyHasMoreBefore
+    self.result = result
     self.settings = settings
     self.service = service
     self.streamPresentationPolicy = streamPresentationPolicy
-    self.historyPersistence = historyPersistence
-    self.historyPageLoader = historyPageLoader
-    oldestLoadedHistorySortOrder = historyOldestSortOrder
-    self.historyPageSize = max(1, historyPageSize)
     self.saveSettings = saveSettings
     self.clearPersistedAPIKey = clearPersistedAPIKey
     lastPersistedAPIKey = settings.apiKey
-    _ = Self.timeFormatter.string(from: Date())
   }
 
   var modelStatus: String {
     settings.model
   }
 
-  var outputHint: String {
-    switch mode {
-    case .translate:
-      "\(sourceLanguage.title) → \(targetLanguage.title)"
-    case .improve:
-      ImprovementPresentation.composerHint(
-        for: stagedInputDocument ?? inputText
-      )
-    }
+  /// The source language of the current input, detected from the text; the
+  /// target is the other language of the supported pair.
+  var detectedSourceLanguage: Language {
+    TextLanguageDetector.detect(in: stagedInputDocument ?? inputText) ?? .chinese
+  }
+
+  static func targetLanguage(for source: Language) -> Language {
+    source == .chinese ? .english : .chinese
   }
 
   func setMode(_ newMode: ProcessingMode) {
@@ -418,12 +365,17 @@ final class AppModel {
     setMode(mode == .translate ? .improve : .translate)
   }
 
-  func swapLanguages() {
-    (sourceLanguage, targetLanguage) = (targetLanguage, sourceLanguage)
+  /// Every appearance of the panel starts from the default action.
+  func resetModeToDefault() {
+    setMode(.translate)
   }
 
   func requestInputFocus() {
     inputFocusRequestID &+= 1
+  }
+
+  func requestInputSelectAll() {
+    inputSelectAllRequestID &+= 1
   }
 
   func attachDisplayLink(to view: NSView) {
@@ -433,6 +385,10 @@ final class AppModel {
   #if DEBUG
     func setGenerationStateForTesting(_ state: GenerationPresentationState) {
       generationState = state
+    }
+
+    func setResultForTesting(_ result: ResultRecord?) {
+      self.result = result
     }
   #endif
 
@@ -454,37 +410,58 @@ final class AppModel {
     stagedInputDocumentUTF16Count ?? inputText.utf16.count
   }
 
+  var currentInputDocument: String {
+    stagedInputDocument ?? inputText
+  }
+
+  var hasSubmittableInput: Bool {
+    stagedInputDocumentHasNonWhitespace
+      ?? ((inputText as NSString).rangeOfCharacter(from: .whitespacesAndNewlines.inverted)
+        .location != NSNotFound)
+  }
+
+  /// The result no longer matches what the panel would generate now: the
+  /// source or the action changed after the result was produced.
+  var isResultStale: Bool {
+    guard let result, result.phase.isTerminal else { return false }
+    if result.mode != mode { return true }
+    if result.source.utf16.count != inputDocumentUTF16Count { return true }
+    return result.source != currentInputDocument
+  }
+
+  /// The note under the result: a stale marker wins over the terminal notes
+  /// because it describes what ⏎ will do next.
+  var resultNote: ResultNote? {
+    guard let result else { return nil }
+    if isResultStale, result.phase == .completed { return .stale }
+    return result.note
+  }
+
+  var canCopyResult: Bool {
+    result?.isCopyable == true
+  }
+
+  /// ⏎: runs the current action on the current source. The source stays in
+  /// the editor; the previous result is replaced immediately.
   @discardableResult
   func submit() -> Bool {
-    let requestText = stagedInputDocument ?? inputText
-    let requestCharacterCount = stagedInputDocumentUTF16Count ?? requestText.utf16.count
-    let hasNonWhitespace =
-      stagedInputDocumentHasNonWhitespace
-      ?? ((requestText as NSString).rangeOfCharacter(from: .whitespacesAndNewlines.inverted)
-        .location
-        != NSNotFound)
-    guard
-      hasNonWhitespace,
-      !isProcessing
-    else {
-      return false
-    }
-    stageInputDocument(nil)
-    inputResetRevision &+= 1
-    inputText = ""
+    let requestText = currentInputDocument
+    let requestCharacterCount = inputDocumentUTF16Count
+    guard hasSubmittableInput, !isProcessing else { return false }
     processingTask?.cancel()
+    let sourceLanguage = TextLanguageDetector.detect(in: requestText) ?? .chinese
     let request = ProcessingRequest(
       text: requestText,
       mode: mode,
       sourceLanguage: sourceLanguage,
-      targetLanguage: targetLanguage
+      targetLanguage: Self.targetLanguage(for: sourceLanguage)
     )
-    let entryID = beginGeneration(
+    let record = beginGeneration(
       request: request,
       reportedSourceCharacterCount: requestCharacterCount
     )
     processingTask = Task { [weak self] in
-      await self?.runGeneration(request: request, entryID: entryID)
+      await self?.runGeneration(request: request, record: record)
     }
     return true
   }
@@ -493,99 +470,12 @@ final class AppModel {
     processingTask?.cancel()
   }
 
-  func redo(_ entry: HistoryEntry) {
-    guard !isProcessing else { return }
-    setMode(entry.mode)
-    processingTask?.cancel()
-    let request = ProcessingRequest(
-      text: entry.source,
-      mode: entry.mode,
-      sourceLanguage: sourceLanguage,
-      targetLanguage: targetLanguage
-    )
-    let entryID = beginGeneration(
-      request: request,
-      reportedSourceCharacterCount: entry.reportedSourceCharacterCount
-    )
-    processingTask = Task { [weak self] in
-      await self?.runGeneration(request: request, entryID: entryID)
-    }
-  }
-
-  func copyResult(_ entry: HistoryEntry) {
-    copyToPasteboard(entry.result)
-  }
-
-  func copySource(_ entry: HistoryEntry) {
-    copyToPasteboard(entry.source)
-  }
-
   @discardableResult
-  func copyLatestResult() -> Bool {
-    guard let latestCopyableResult else { return false }
-    copyToPasteboard(latestCopyableResult)
+  func copyResult() -> Bool {
+    guard let result, result.isCopyable else { return false }
+    copyToPasteboard(result.result)
+    copyFeedbackRevision &+= 1
     return true
-  }
-
-  var latestCopyableResult: String? {
-    entries.last(where: {
-      $0.state != .streaming && $0.resultUTF16Length > 0
-    })?.result
-  }
-
-  func isHistoryEntryExpanded(_ entryID: UUID) -> Bool {
-    entryID == entries.last?.id || manuallyExpandedHistoryEntryIDs.contains(entryID)
-  }
-
-  func isHistoryEntryExpanded(_ entry: HistoryEntry) -> Bool {
-    entry.isLatestInHistory || manuallyExpandedHistoryEntryIDs.contains(entry.id)
-  }
-
-  func isHistoryEntryManuallyExpanded(_ entryID: UUID) -> Bool {
-    manuallyExpandedHistoryEntryIDs.contains(entryID)
-  }
-
-  func isHistoryEntryFolding(_ entryID: UUID) -> Bool {
-    foldingHistoryEntryIDs.contains(entryID)
-  }
-
-  func expandHistoryEntry(_ entryID: UUID) {
-    guard entryID != entries.last?.id, entries.contains(where: { $0.id == entryID }) else {
-      return
-    }
-    cancelFold(of: entryID)
-    manuallyExpandedHistoryEntryIDs.insert(entryID)
-  }
-
-  func collapseHistoryEntry(_ entryID: UUID) {
-    guard entryID != entries.last?.id else { return }
-    guard manuallyExpandedHistoryEntryIDs.remove(entryID) != nil else { return }
-    beginFold(of: entryID)
-  }
-
-  private func beginFold(of entryID: UUID) {
-    foldingHistoryEntryIDs.insert(entryID)
-    foldCleanupTasks[entryID]?.cancel()
-    foldCleanupTasks[entryID] = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(CidaMotion.historyFoldMilliseconds))
-      guard !Task.isCancelled, let self else { return }
-      self.foldingHistoryEntryIDs.remove(entryID)
-      self.foldCleanupTasks[entryID] = nil
-    }
-  }
-
-  private func cancelFold(of entryID: UUID) {
-    foldCleanupTasks[entryID]?.cancel()
-    foldCleanupTasks[entryID] = nil
-    foldingHistoryEntryIDs.remove(entryID)
-  }
-
-  private func cancelAllFolds() {
-    for task in foldCleanupTasks.values {
-      task.cancel()
-    }
-    foldCleanupTasks.removeAll()
-    foldingHistoryEntryIDs.removeAll()
   }
 
   private func copyToPasteboard(_ value: String) {
@@ -605,10 +495,6 @@ final class AppModel {
   func persistSettings() {
     settingsSaveTask?.cancel()
     persist(settings)
-  }
-
-  func flushHistoryPersistence() {
-    historyPersistence?.flush()
   }
 
   func scheduleSettingsPersistence() {
@@ -676,60 +562,48 @@ final class AppModel {
     }
   }
 
+  /// Runs one request to completion; used by tests and probes that drive the
+  /// model without the editor.
   func process(
     text: String,
-    reportedSourceCharacterCount: Int? = nil,
-    clearInput: Bool = true
+    reportedSourceCharacterCount: Int? = nil
   ) async {
+    inputText = text
+    let sourceLanguage = TextLanguageDetector.detect(in: text) ?? .chinese
     let request = ProcessingRequest(
       text: text,
       mode: mode,
       sourceLanguage: sourceLanguage,
-      targetLanguage: targetLanguage
+      targetLanguage: Self.targetLanguage(for: sourceLanguage)
     )
-    let entryID = beginGeneration(
+    let record = beginGeneration(
       request: request,
       reportedSourceCharacterCount: reportedSourceCharacterCount
     )
-    if clearInput, stagedInputDocument != nil || !inputText.isEmpty {
-      stageInputDocument(nil)
-      inputResetRevision &+= 1
-      inputText = ""
-    }
-    await runGeneration(request: request, entryID: entryID)
+    await runGeneration(request: request, record: record)
   }
 
   private func beginGeneration(
     request: ProcessingRequest,
     reportedSourceCharacterCount: Int?
-  ) -> UUID {
-    errorMessage = nil
-    let entryID = UUID()
-    generationState = .waiting(entryID: entryID)
-    let entry = HistoryEntry(
-      id: entryID,
+  ) -> ResultRecord {
+    let record = ResultRecord(
       mode: request.mode,
       source: request.text,
-      result: "",
-      detail: request.mode == .translate
-        ? "\(request.sourceLanguage.title) → \(request.targetLanguage.title)"
-        : ImprovementPresentation.historyDetail(for: request.text),
-      timestamp: Self.timeFormatter.string(from: Date()),
-      reportedSourceCharacterCount: reportedSourceCharacterCount ?? request.text.utf16.count,
-      state: .streaming
+      sourceCharacterCount: reportedSourceCharacterCount ?? request.text.utf16.count,
+      outputLanguage: request.mode == .translate
+        ? request.targetLanguage : request.sourceLanguage,
+      phase: .streaming
     )
-    entries.append(entry)
-    if entry.isLongDocument {
-      hasLongHistoryDocument = true
-    }
-    historyPersistence?.insert(HistoryPersistenceRecord(entry))
-    requestHistoryFollow()
-    return entryID
+    generationState = .waiting(entryID: record.id)
+    result = record
+    requestResultFollow()
+    return record
   }
 
   private func runGeneration(
     request: ProcessingRequest,
-    entryID: UUID
+    record: ResultRecord
   ) async {
     let latencyActivity = ProcessInfo.processInfo.beginActivity(
       options: [.userInitiated, .latencyCritical],
@@ -738,7 +612,7 @@ final class AppModel {
     defer {
       ProcessInfo.processInfo.endActivity(latencyActivity)
     }
-    let presenter = makeStreamPresenter(for: entryID)
+    let presenter = makeStreamPresenter(for: record)
     let presentationTask = Task { @MainActor in
       try await presenter.run()
     }
@@ -761,281 +635,58 @@ final class AppModel {
       } onCancel: {
         presentationTask.cancel()
       }
-
-      persistState(.completed, for: entryID)
-      requestHistoryFollow(force: false, allowsThrottling: false)
+      finish(record, phase: .completed)
     } catch is CancellationError {
       presentationTask.cancel()
-      persistState(.cancelled, for: entryID)
-      requestHistoryFollow(force: false, allowsThrottling: false)
+      finish(record, phase: .stopped)
     } catch {
       presentationTask.cancel()
-      persistState(.failed, for: entryID)
-      errorMessage = error.localizedDescription
-      requestHistoryFollow(force: false, allowsThrottling: false)
+      finish(record, phase: .failed(message: error.localizedDescription))
     }
 
-    if generationState.entryID == entryID {
+    if generationState.entryID == record.id {
       generationState = .idle
     }
     processingTask = nil
   }
 
-  private func makeStreamPresenter(for entryID: UUID) -> SmoothStreamPresenter {
+  private func finish(_ record: ResultRecord, phase: ResultPhase) {
+    guard result === record else { return }
+    record.phase = phase
+    requestResultFollow(force: false, allowsThrottling: false)
+  }
+
+  private func makeStreamPresenter(for record: ResultRecord) -> SmoothStreamPresenter {
     SmoothStreamPresenter(
       policy: streamPresentationPolicy,
       displayLinkView: displayLinkView
     ) { [weak self] delta in
-      self?.publish(delta, to: entryID)
+      self?.publish(delta, to: record)
     }
   }
 
-  private func publish(_ delta: String, to entryID: UUID) {
-    guard
-      updateEntry(
-        entryID,
-        update: {
-          $0.appendPresentationDelta(delta)
-        })
-    else { return }
-    if generationState == .waiting(entryID: entryID) {
-      generationState = .revealing(entryID: entryID)
+  private func publish(_ delta: String, to record: ResultRecord) {
+    guard result === record else { return }
+    record.appendPresentationDelta(delta)
+    if generationState == .waiting(entryID: record.id) {
+      generationState = .revealing(entryID: record.id)
     }
-    historyPersistence?.appendResult(entryID: entryID, delta: delta)
     streamPresentationUpdateCount &+= 1
     maximumStreamPresentationCharacterCount = max(
       maximumStreamPresentationCharacterCount,
       delta.count
     )
+    requestResultFollow(force: false)
   }
 
-  @discardableResult
-  private func updateEntry(
-    _ entryID: UUID,
-    update: (HistoryEntry) -> Void
-  ) -> Bool {
-    let entry: HistoryEntry
-    if let latest = entries.last, latest.id == entryID {
-      entry = latest
-    } else if let existing = entries.first(where: { $0.id == entryID }) {
-      entry = existing
-    } else {
-      return false
-    }
-    update(entry)
-    if !hasLongHistoryDocument, entry.isLongDocument {
-      hasLongHistoryDocument = true
-    }
-    return true
-  }
-
-  func replaceHistoryEntries(_ entries: [HistoryEntry]) {
-    olderHistoryLoadTask?.cancel()
-    olderHistoryLoadRequestTask?.cancel()
-    olderHistoryLoadWasRequested = false
-    isHistoryLiveScrolling = false
-    cancelAllFolds()
-    suppressesEntrySynchronization = true
-    self.entries = entries
-    suppressesEntrySynchronization = false
-    persistedHistoryEntries = entries
-    persistedHistoryPages = entries.isEmpty ? [] : [HistoryRenderPage(entries: entries)]
-    sessionHistoryEntries = []
-    for entry in entries {
-      entry.isLatestInHistory = false
-    }
-    entries.last?.isLatestInHistory = true
-    hasLongHistoryDocument = entries.contains(where: \.isLongDocument)
-    totalHistoryEntryCount = entries.count
-    hasOlderHistory = false
-    isLoadingOlderHistory = false
-    oldestLoadedHistorySortOrder = nil
-  }
-
-  func loadOlderHistoryIfNeeded() {
-    guard
-      hasOlderHistory,
-      let historyPageLoader,
-      let oldestLoadedHistorySortOrder
-    else {
-      return
-    }
-
-    olderHistoryLoadWasRequested = true
-    scheduleOlderHistoryLoadAfterScrollingSettles(
-      historyPageLoader: historyPageLoader,
-      oldestLoadedHistorySortOrder: oldestLoadedHistorySortOrder
-    )
-  }
-
-  func historyDidLiveScroll() {
-    isHistoryLiveScrolling = true
-    olderHistoryLoadRequestTask?.cancel()
-    olderHistoryLoadRequestTask = nil
-  }
-
-  func historyDidEndLiveScroll() {
-    isHistoryLiveScrolling = false
-    guard
-      let historyPageLoader,
-      let oldestLoadedHistorySortOrder
-    else {
-      return
-    }
-    scheduleOlderHistoryLoadAfterScrollingSettles(
-      historyPageLoader: historyPageLoader,
-      oldestLoadedHistorySortOrder: oldestLoadedHistorySortOrder
-    )
-  }
-
-  private func scheduleOlderHistoryLoadAfterScrollingSettles(
-    historyPageLoader: any HistoryPageLoading,
-    oldestLoadedHistorySortOrder: Int64
-  ) {
-    guard
-      olderHistoryLoadWasRequested,
-      !isHistoryLiveScrolling,
-      !isLoadingOlderHistory
-    else {
-      return
-    }
-
-    olderHistoryLoadRequestTask?.cancel()
-    olderHistoryLoadRequestTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(120))
-      guard
-        !Task.isCancelled,
-        let self,
-        self.olderHistoryLoadWasRequested,
-        !self.isHistoryLiveScrolling,
-        !self.isLoadingOlderHistory
-      else {
-        return
-      }
-      self.olderHistoryLoadRequestTask = nil
-      self.startOlderHistoryLoad(
-        historyPageLoader: historyPageLoader,
-        oldestLoadedHistorySortOrder: oldestLoadedHistorySortOrder
-      )
-    }
-  }
-
-  private func startOlderHistoryLoad(
-    historyPageLoader: any HistoryPageLoading,
-    oldestLoadedHistorySortOrder: Int64
-  ) {
-    guard
-      olderHistoryLoadWasRequested,
-      !isHistoryLiveScrolling,
-      !isLoadingOlderHistory,
-      hasOlderHistory
-    else {
-      return
-    }
-
-    olderHistoryLoadWasRequested = false
-    isLoadingOlderHistory = true
-    let pageSize = historyPageSize
-    olderHistoryLoadTask = Task { [weak self] in
-      defer {
-        self?.isLoadingOlderHistory = false
-        self?.olderHistoryLoadTask = nil
-      }
-      do {
-        let page = try await Task.detached(priority: .utility) {
-          try historyPageLoader.loadBefore(
-            sortOrder: oldestLoadedHistorySortOrder,
-            limit: pageSize
-          )
-        }.value
-        try Task.checkCancellation()
-        guard let self else { return }
-        self.suppressesEntrySynchronization = true
-        self.entries.insert(contentsOf: page.entries, at: 0)
-        self.suppressesEntrySynchronization = false
-        self.persistedHistoryEntries.insert(contentsOf: page.entries, at: 0)
-        if !page.entries.isEmpty {
-          self.persistedHistoryPages.insert(HistoryRenderPage(entries: page.entries), at: 0)
-        }
-        self.oldestLoadedHistorySortOrder = page.oldestSortOrder
-        self.totalHistoryEntryCount = max(self.totalHistoryEntryCount, page.totalCount)
-        self.hasOlderHistory = page.hasMoreBefore
-        if !self.hasLongHistoryDocument, page.entries.contains(where: \.isLongDocument) {
-          self.hasLongHistoryDocument = true
-        }
-      } catch is CancellationError {
-        return
-      } catch {
-        fputs("Failed to load an older history page: \(error)\n", stderr)
-      }
-    }
-  }
-
-  private func synchronizeEntriesAfterMutation(previousEntries: [HistoryEntry]) {
-    guard !suppressesEntrySynchronization else { return }
-
-    let preservesExistingPrefix =
-      previousEntries.count <= entries.count
-      && zip(previousEntries, entries).allSatisfy { previous, current in
-        previous === current
-      }
-    guard preservesExistingPrefix else {
-      cancelAllFolds()
-      persistedHistoryEntries = entries
-      persistedHistoryPages = entries.isEmpty ? [] : [HistoryRenderPage(entries: entries)]
-      sessionHistoryEntries = []
-      totalHistoryEntryCount = entries.count
-      hasOlderHistory = false
-      oldestLoadedHistorySortOrder = nil
-      for entry in entries {
-        entry.isLatestInHistory = false
-      }
-      entries.last?.isLatestInHistory = true
-      hasLongHistoryDocument = entries.contains(where: \.isLongDocument)
-      return
-    }
-
-    let appendedEntries = entries.dropFirst(previousEntries.count)
-    guard !appendedEntries.isEmpty else { return }
-    if previousEntries.last?.isLatestInHistory == true {
-      beginAutomaticFold(of: previousEntries.last)
-    }
-    for entry in appendedEntries {
-      entry.isLatestInHistory = false
-    }
-    if entries.last?.isLatestInHistory == false {
-      entries.last?.isLatestInHistory = true
-    }
-    sessionHistoryEntries.append(contentsOf: appendedEntries)
-    totalHistoryEntryCount += appendedEntries.count
-    if !hasLongHistoryDocument, appendedEntries.contains(where: \.isLongDocument) {
-      hasLongHistoryDocument = true
-    }
-  }
-
-  private func beginAutomaticFold(of entry: HistoryEntry?) {
-    guard let entry, entry.isLatestInHistory else { return }
-    // Preserve the standalone segment before clearing the latest marker. If
-    // these mutations happen in the opposite order SwiftUI briefly replaces
-    // the expanded entry with a virtualized row, only to rebuild it again in
-    // the same submission preflight.
-    beginFold(of: entry.id)
-    entry.isLatestInHistory = false
-  }
-
-  private func persistState(_ state: HistoryEntryState, for entryID: UUID) {
-    guard updateEntry(entryID, update: { $0.state = state }) else { return }
-    historyPersistence?.updateState(entryID: entryID, state: state)
-  }
-
-  func requestHistoryFollow(force: Bool = true, allowsThrottling: Bool = true) {
+  /// Asks the result pane to keep the tail visible. Streaming updates are
+  /// throttled; submissions force the pane back to the tail even after the
+  /// user scrolled away.
+  func requestResultFollow(force: Bool = true, allowsThrottling: Bool = true) {
     let now = ProcessInfo.processInfo.systemUptime
-    guard force || !allowsThrottling || now - lastHistoryFollowTimestamp >= 0.05 else { return }
-    lastHistoryFollowTimestamp = now
-    if force {
-      historyForcePinRevision &+= 1
-    }
-    historyScrollRevision &+= 1
+    guard force || !allowsThrottling || now - lastResultFollowTimestamp >= 0.05 else { return }
+    lastResultFollowTimestamp = now
+    resultFollowRevision &+= 1
   }
 
   @discardableResult
@@ -1044,21 +695,15 @@ final class AppModel {
     elapsedSeconds: Double
   ) -> Bool {
     if performancePresenter == nil {
-      let entryID = UUID()
-      entries.append(
-        HistoryEntry(
-          id: entryID,
-          mode: mode,
-          source: String(repeating: "Large streaming source paragraph. ", count: 120),
-          result: "",
-          detail: "Performance probe",
-          timestamp: "",
-          state: .streaming
-        )
+      let record = ResultRecord(
+        mode: mode,
+        source: String(repeating: "Large streaming source paragraph. ", count: 120),
+        outputLanguage: .english,
+        phase: .streaming
       )
-      generationState = .revealing(entryID: entryID)
-      let presenter = makeStreamPresenter(for: entryID)
-      performancePresenter = presenter
+      result = record
+      generationState = .revealing(entryID: record.id)
+      performancePresenter = makeStreamPresenter(for: record)
     }
 
     guard let performancePresenter else { return false }
@@ -1087,11 +732,4 @@ final class AppModel {
     performancePresenter.presentForExternalDisplayPulse(elapsedSeconds: elapsedSeconds)
     return true
   }
-
-  private static let timeFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "zh_CN")
-    formatter.dateFormat = "HH:mm"
-    return formatter
-  }()
 }

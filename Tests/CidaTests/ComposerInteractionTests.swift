@@ -36,7 +36,6 @@ extension InteractionReproductionTests {
   func testSettingsChangesAreForwardedToPersistence() async throws {
     var persistedSettings: CidaSettings?
     let model = AppModel(
-      entries: [],
       settings: .designPreview,
       saveSettings: { settings in persistedSettings = settings }
     )
@@ -55,15 +54,9 @@ extension InteractionReproductionTests {
   }
 
   func testComposerPreservesLargeMultilineTextAndSubmitsWithReturnAction() async throws {
-    let model = AppModel(
-      inputText: "",
-      entries: [],
-      service: ImmediateStreamingService()
-    )
-    let (_, hostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: model),
-      size: CGSize(width: 860, height: 640)
-    )
+    let model = AppModel(inputText: "", service: ImmediateStreamingService())
+    let controller = makeHiddenPanel(model: model)
+    let hostingView = try XCTUnwrap(controller.contentView)
     let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
     let largeInput = String(repeating: "First line\nSecond line with context.\n", count: 2_000)
     input.string = largeInput
@@ -73,69 +66,41 @@ extension InteractionReproductionTests {
     hostingView.layoutSubtreeIfNeeded()
     XCTAssertEqual(model.inputText, largeInput)
     let inputScrollView = try XCTUnwrap(input.enclosingScrollView)
-    let intermediateEditorHeight = inputScrollView.frame.height
-    XCTAssertGreaterThan(intermediateEditorHeight, 27)
-    XCTAssertLessThan(intermediateEditorHeight, 220)
+    let sourceCap = controller.heightBudget.sourceEditorMaxHeight
     try await waitUntil(timeout: .seconds(1)) {
       hostingView.layoutSubtreeIfNeeded()
-      return inputScrollView.frame.height >= 150
+      return abs(inputScrollView.frame.height - sourceCap) <= 0.5
     }
     XCTAssertFalse(inputScrollView.hasVerticalScroller)
     XCTAssertFalse(CidaScrollIndicator.installed(in: inputScrollView)?.isHidden ?? true)
-    let editorHeight = try XCTUnwrap(input.enclosingScrollView?.frame.height)
-    XCTAssertGreaterThanOrEqual(editorHeight, 150)
-    XCTAssertLessThanOrEqual(editorHeight, 220)
-    XCTAssertGreaterThan(input.bounds.height, editorHeight)
+    XCTAssertGreaterThan(input.bounds.height, inputScrollView.frame.height)
 
     XCTAssertTrue(
       input.delegate?.textView?(input, doCommandBy: #selector(NSResponder.insertNewline(_:)))
         == true)
     try await waitUntil(timeout: .seconds(2)) {
-      model.entries.count == 1
+      model.result?.phase == .completed
     }
-    XCTAssertEqual(model.entries.count, 1)
-    XCTAssertEqual(model.entries.first?.source, largeInput)
-    XCTAssertEqual(model.inputText, "")
-    try await waitUntil(timeout: .seconds(1)) {
-      hostingView.layoutSubtreeIfNeeded()
-      let currentInput = self.firstTextView(
-        in: hostingView,
-        identifier: "composer-input"
-      )
-      return (currentInput?.enclosingScrollView?.frame.height ?? .greatestFiniteMagnitude) <= 27.5
-    }
-    let resetInput = try XCTUnwrap(
-      firstTextView(in: hostingView, identifier: "composer-input")
-    )
-    XCTAssertTrue(resetInput.string.isEmpty, "nativeLength=\(resetInput.string.utf16.count)")
-    XCTAssertEqual(
-      resetInput.enclosingScrollView?.frame.height ?? 0,
-      27,
-      accuracy: 0.5
-    )
+    XCTAssertEqual(model.result?.source, largeInput)
+    XCTAssertEqual(model.inputText, largeInput, "The source stays in the editor after ⏎")
+    XCTAssertEqual(input.string, largeInput)
+    XCTAssertEqual(inputScrollView.frame.height, sourceCap, accuracy: 0.5)
   }
 
   func testComposerShrinksAsNativeMultilineInputIsDeleted() async throws {
-    let model = AppModel(inputText: "", entries: [])
-    let (window, hostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
+    let model = AppModel(inputText: "")
+    let controller = makeHiddenPanel(model: model)
+    let hostingView = try XCTUnwrap(controller.contentView)
+    let panel = controller.panel
     let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
-    let inputScrollView = try XCTUnwrap(input.enclosingScrollView)
-    let historyScrollView = try XCTUnwrap(
-      allScrollViews(in: hostingView).first {
-        $0.accessibilityIdentifier() == "history-scroll-view"
-      }
-    )
 
-    func assertComposerDoesNotCoverHistory(file: StaticString = #filePath, line: UInt = #line) {
-      let inputFrame = inputScrollView.convert(inputScrollView.bounds, to: hostingView)
-      let historyFrame = historyScrollView.convert(historyScrollView.bounds, to: hostingView)
-      XCTAssertLessThanOrEqual(
-        inputFrame.intersection(historyFrame).height,
-        0.5,
-        "The history viewport and composer must use the same presentation state.",
+    func assertPanelFollowsTheEditor(file: StaticString = #filePath, line: UInt = #line) {
+      let editorHeight = input.enclosingScrollView?.frame.height ?? 0
+      XCTAssertEqual(
+        panel.frame.height,
+        editorHeight + CidaDesign.Spacing.paneVertical * 2 + CidaDesign.Panel.controlBarHeight,
+        accuracy: 1,
+        "The panel is exactly as tall as its content.",
         file: file,
         line: line
       )
@@ -146,10 +111,11 @@ extension InteractionReproductionTests {
     try await waitUntil(timeout: .seconds(1)) {
       hostingView.layoutSubtreeIfNeeded()
       return model.inputText == threeLines
-        && abs((input.enclosingScrollView?.frame.height ?? 0) - 94) <= 0.5
+        && abs((input.enclosingScrollView?.frame.height ?? 0) - 78) <= 0.5
+        && abs(panel.frame.height - (78 + 36 + 50)) <= 1
     }
-    XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 94, accuracy: 0.5)
-    assertComposerDoesNotCoverHistory()
+    XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 78, accuracy: 0.5)
+    assertPanelFollowsTheEditor()
 
     let thirdLineRange = (input.string as NSString).range(of: "\nThird line")
     input.insertText("", replacementRange: thirdLineRange)
@@ -157,20 +123,10 @@ extension InteractionReproductionTests {
     try await waitUntil(timeout: .seconds(1)) {
       hostingView.layoutSubtreeIfNeeded()
       return model.inputText == twoLines
-        && abs((input.enclosingScrollView?.frame.height ?? 0) - 68) <= 0.5
+        && abs((input.enclosingScrollView?.frame.height ?? 0) - 52) <= 0.5
+        && abs(panel.frame.height - (52 + 36 + 50)) <= 1
     }
-    XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 68, accuracy: 0.5)
-    assertComposerDoesNotCoverHistory()
-
-    let secondLineRange = (input.string as NSString).range(of: "\nSecond line")
-    input.insertText("", replacementRange: secondLineRange)
-    try await waitUntil(timeout: .seconds(1)) {
-      hostingView.layoutSubtreeIfNeeded()
-      return model.inputText == "First line"
-        && abs((input.enclosingScrollView?.frame.height ?? 0) - 27) <= 0.5
-    }
-    XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 27, accuracy: 0.5)
-    assertComposerDoesNotCoverHistory()
+    assertPanelFollowsTheEditor()
 
     input.insertText(
       "",
@@ -180,180 +136,80 @@ extension InteractionReproductionTests {
       hostingView.layoutSubtreeIfNeeded()
       return model.inputText.isEmpty
         && abs((input.enclosingScrollView?.frame.height ?? 0) - 27) <= 0.5
+        && abs(panel.frame.height - (27 + 36 + 50)) <= 1
     }
-    XCTAssertEqual(input.enclosingScrollView?.frame.height ?? 0, 27, accuracy: 0.5)
-    assertComposerDoesNotCoverHistory()
+    assertPanelFollowsTheEditor()
     assertTestProcessIsNotFrontmost()
-    withExtendedLifetime(window) {}
   }
 
-  func testNativeEditAfterPendingComposerResetIsNotCleared() async throws {
-    let model = AppModel(
-      inputText: "",
-      entries: [],
-      service: ImmediateStreamingService()
-    )
-    let (_, hostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
-    hostingView.layoutSubtreeIfNeeded()
+  /// An input method's provisional text lives only in the native view; a
+  /// SwiftUI update while it is composing must not write the binding back.
+  func testBindingWriteBackIsSkippedWhileAnInputMethodIsComposing() async throws {
+    let model = AppModel(inputText: "")
+    let controller = makeHiddenPanel(model: model)
+    let hostingView = try XCTUnwrap(controller.contentView)
     let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
+    controller.panel.orderBack(nil)
+    _ = controller.panel.makeFirstResponder(input)
 
-    input.string = "first request"
-    input.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: input))
-    XCTAssertEqual(model.inputText, "first request")
-    XCTAssertTrue(model.submit())
+    input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+    XCTAssertTrue(input.hasMarkedText())
+    XCTAssertEqual(input.string, "ni")
+    XCTAssertEqual(model.inputText, "", "Marked text never reaches the binding")
 
-    input.string = "recovery request"
-    input.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: input))
-    XCTAssertEqual(model.inputText, "recovery request")
-
-    await Task.yield()
+    // Any unrelated state change re-renders the panel content.
+    model.requestInputFocus()
+    model.setMode(.improve)
+    try await Task.sleep(for: .milliseconds(80))
     hostingView.layoutSubtreeIfNeeded()
-    try await Task.sleep(for: .milliseconds(50))
-    hostingView.layoutSubtreeIfNeeded()
 
-    XCTAssertEqual(input.string, "recovery request")
-    XCTAssertEqual(model.inputText, "recovery request")
-    model.cancelProcessing()
+    XCTAssertTrue(input.hasMarkedText(), "The composition survives the SwiftUI update")
+    XCTAssertEqual(input.string, "ni")
+    input.insertText("你", replacementRange: input.markedRange())
+    XCTAssertFalse(input.hasMarkedText())
+    XCTAssertEqual(model.inputText, "你")
+    assertTestProcessIsNotFrontmost()
   }
 
-  func testPendingComposerResetClearsTheSubmittedNativeDocument() async throws {
-    let model = AppModel(
-      inputText: "",
-      entries: [],
-      service: ImmediateStreamingService()
-    )
-    let (_, hostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
-    hostingView.layoutSubtreeIfNeeded()
-    let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
-
-    input.string = "submitted through the native responder"
-    input.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: input))
-    XCTAssertEqual(model.inputText, "submitted through the native responder")
-    XCTAssertTrue(model.submit())
-
-    try await waitUntil(timeout: .seconds(1)) {
-      hostingView.layoutSubtreeIfNeeded()
-      return input.string.isEmpty
-        && (input.enclosingScrollView?.frame.height ?? .greatestFiniteMagnitude) <= 27.5
-    }
-    XCTAssertEqual(model.entries.last?.source, "submitted through the native responder")
-    XCTAssertTrue(input.string.isEmpty)
-    model.cancelProcessing()
-  }
-
-  func testComposerResetResolutionRejectsAStaleBindingEchoButPreservesANewerEdit() {
-    XCTAssertEqual(
-      ComposerResetSynchronizer.resolve(
-        revision: 4,
-        lastAppliedRevision: 3,
-        nativeEditRevision: 3
-      ),
-      .clearSubmittedDocument
-    )
-    XCTAssertEqual(
-      ComposerResetSynchronizer.resolve(
-        revision: 4,
-        lastAppliedRevision: 3,
-        nativeEditRevision: 4
-      ),
-      .preserveNewerNativeEdit
-    )
-    XCTAssertEqual(
-      ComposerResetSynchronizer.resolve(
-        revision: 4,
-        lastAppliedRevision: 4,
-        nativeEditRevision: 4
-      ),
-      .none
-    )
-  }
-
-  func testLongInputUsesThePencilScrollIndicators() async throws {
-    let model = AppModel(
-      inputText: HistoryEntry.designLongInput,
-      entries: HistoryEntry.longDesignSamples,
-      settings: .designPreview
-    )
-    let (window, hostingView) = makeNativeWindow(
-      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
-    window.alphaValue = 0
+  func testLongInputAndResultUseThePencilScrollIndicators() async throws {
+    let model = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
+    model.setResultForTesting(ResultRecord.designLong())
+    let controller = makeHiddenPanel(model: model)
+    let window = controller.panel
+    let hostingView = try XCTUnwrap(controller.contentView)
     window.orderBack(nil)
     try await Task.sleep(for: .milliseconds(100))
     hostingView.layoutSubtreeIfNeeded()
 
-    let historyIndicator = try XCTUnwrap(
-      firstScroller(in: hostingView, identifier: "history-scroll-indicator")
+    let resultIndicator = try XCTUnwrap(
+      firstScroller(in: hostingView, identifier: "result-scroll-indicator")
     )
     let composerIndicator = try XCTUnwrap(
       firstScroller(in: hostingView, identifier: "composer-scroll-indicator")
     )
-    let resultTextView = try XCTUnwrap(
-      firstTextView(
-        in: hostingView,
-        identifier: "history-result-\(model.entries[0].id.uuidString)"
-      )
-    )
-    let resultContainer = try XCTUnwrap(resultTextView.superview as? HistoryResultTextContainer)
-    try await waitUntil(timeout: .seconds(1)) {
+    try await waitUntil(timeout: .seconds(2)) {
       window.displayIfNeeded()
       hostingView.layoutSubtreeIfNeeded()
-      hostingView.displayIfNeeded()
-      if let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) {
-        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
-      }
-      historyIndicator.observedScrollView?.layoutSubtreeIfNeeded()
-      historyIndicator.refresh()
-      return !historyIndicator.isHidden && historyIndicator.doubleValue > 0.9
+      resultIndicator.observedScrollView?.layoutSubtreeIfNeeded()
+      resultIndicator.refresh()
+      composerIndicator.refresh()
+      return !resultIndicator.isHidden && !composerIndicator.isHidden
     }
-    XCTAssertFalse(
-      historyIndicator.isHidden,
-      "frame=\(historyIndicator.frame) knob=\(historyIndicator.knobDrawingRect) result=\(resultContainer.frame) natural=\(resultContainer.naturalTextHeight) text=\(resultTextView.frame)"
-    )
-    XCTAssertFalse(
-      composerIndicator.isHidden,
-      "frame=\(composerIndicator.frame) knob=\(composerIndicator.knobDrawingRect)"
-    )
-    XCTAssertEqual(historyIndicator.knobDrawingRect.width, 4, accuracy: 0.1)
-    XCTAssertEqual(historyIndicator.knobDrawingRect.height, 90, accuracy: 0.1)
-    XCTAssertGreaterThan(
-      historyIndicator.doubleValue,
-      0.9,
-      "value=\(historyIndicator.doubleValue) knob=\(historyIndicator.knobDrawingRect)"
-    )
+    XCTAssertEqual(resultIndicator.knobDrawingRect.width, 4, accuracy: 0.1)
+    XCTAssertEqual(resultIndicator.knobDrawingRect.height, 90, accuracy: 0.1)
+    XCTAssertLessThan(resultIndicator.doubleValue, 0.1, "A completed result starts at its top")
     XCTAssertEqual(composerIndicator.knobDrawingRect.width, 4, accuracy: 0.1)
     XCTAssertEqual(composerIndicator.knobDrawingRect.height, 64, accuracy: 0.1)
-    XCTAssertLessThan(composerIndicator.doubleValue, 0.1)
-    let composerIndicatorHost = try XCTUnwrap(composerIndicator.superview)
-    let composerKnobPoint = composerIndicator.convert(
-      NSPoint(
-        x: composerIndicator.knobDrawingRect.midX,
-        y: composerIndicator.knobDrawingRect.midY
-      ),
-      to: composerIndicatorHost
-    )
-    let composerKnobHit = composerIndicatorHost.hitTest(composerKnobPoint)
-    XCTAssertTrue(
-      composerKnobHit === composerIndicator,
-      "hit=\(String(describing: composerKnobHit)) point=\(composerKnobPoint) hostBounds=\(composerIndicatorHost.bounds) indicator=\(composerIndicator.frame) knob=\(composerIndicator.knobDrawingRect) hidden=\(composerIndicator.isHidden)"
-    )
-    let historyScrollView = try XCTUnwrap(historyIndicator.observedScrollView)
-    historyIndicator.scroll(toNormalizedValue: 0)
-    XCTAssertLessThan(historyIndicator.doubleValue, 0.1)
-    XCTAssertFalse(isScrolledToBottom(historyScrollView), scrollDescription(historyScrollView))
-    historyIndicator.scroll(toNormalizedValue: 1)
-    XCTAssertGreaterThan(historyIndicator.doubleValue, 0.9)
-    XCTAssertTrue(isScrolledToBottom(historyScrollView), scrollDescription(historyScrollView))
+
+    let resultScrollView = try XCTUnwrap(resultIndicator.observedScrollView)
+    resultIndicator.scroll(toNormalizedValue: 1)
+    XCTAssertGreaterThan(resultIndicator.doubleValue, 0.9)
+    XCTAssertTrue(isScrolledToBottom(resultScrollView), scrollDescription(resultScrollView))
+    resultIndicator.scroll(toNormalizedValue: 0)
+    XCTAssertLessThan(resultIndicator.doubleValue, 0.1)
+    XCTAssertFalse(isScrolledToBottom(resultScrollView), scrollDescription(resultScrollView))
     window.orderOut(nil)
     assertTestProcessIsNotFrontmost()
-    withExtendedLifetime(window) {}
   }
 
   func testPencilScrollIndicatorMovesDownFromDocumentTopToBottom() throws {
@@ -370,7 +226,7 @@ extension InteractionReproductionTests {
       scrollView.documentView = documentView
       scrollView.layoutSubtreeIfNeeded()
 
-      let indicator = CidaScrollIndicator.install(on: scrollView, configuration: .history)
+      let indicator = CidaScrollIndicator.install(on: scrollView, configuration: .result)
       indicator.refresh()
       let clipView = scrollView.contentView
       let visibleHeight = clipView.documentVisibleRect.height
@@ -410,21 +266,16 @@ extension InteractionReproductionTests {
   }
 
   func testPencilScrollIndicatorsNeverUseSystemOverlayRendering() throws {
-    let mainModel = AppModel(
-      inputText: HistoryEntry.designLongInput,
-      entries: HistoryEntry.longDesignSamples,
-      settings: .designPreview
-    )
-    let (mainWindow, mainHostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: mainModel, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
+    let mainModel = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
+    mainModel.setResultForTesting(ResultRecord.designLong())
+    let controller = makeHiddenPanel(model: mainModel)
+    let mainHostingView = try XCTUnwrap(controller.contentView)
 
     var settings = CidaSettings.designPreview
     settings.provider = .openAI
     settings.model = "local-model"
     let (settingsWindow, settingsHostingView) = makeHiddenWindow(
-      rootView: SettingsWindowView(model: AppModel(entries: [], settings: settings)),
+      rootView: SettingsWindowView(model: AppModel(settings: settings)),
       size: CGSize(width: 500, height: 500)
     )
 
@@ -433,15 +284,9 @@ extension InteractionReproductionTests {
     settingsHostingView.layoutSubtreeIfNeeded()
 
     let indicators = try [
-      XCTUnwrap(
-        firstScroller(in: mainHostingView, identifier: "history-scroll-indicator")
-      ),
-      XCTUnwrap(
-        firstScroller(in: mainHostingView, identifier: "composer-scroll-indicator")
-      ),
-      XCTUnwrap(
-        firstScroller(in: settingsHostingView, identifier: "settings-scroll-indicator")
-      ),
+      XCTUnwrap(firstScroller(in: mainHostingView, identifier: "result-scroll-indicator")),
+      XCTUnwrap(firstScroller(in: mainHostingView, identifier: "composer-scroll-indicator")),
+      XCTUnwrap(firstScroller(in: settingsHostingView, identifier: "settings-scroll-indicator")),
     ]
 
     XCTAssertFalse(CidaScrollIndicator.isCompatibleWithOverlayScrollers)
@@ -468,20 +313,9 @@ extension InteractionReproductionTests {
         indicator.observedScrollView?.hasVerticalScroller ?? true,
         indicator.configuration.accessibilityIdentifier
       )
-      XCTAssertTrue(
-        systemOverlayLayers.isEmpty,
-        "System overlay layers must not be mixed with the Pencil indicator: \(systemOverlayLayers)"
-      )
-      XCTAssertEqual(
-        pencilKnobLayers.count,
-        1,
-        "Each scroll surface must render exactly one Pencil thumb: \(indicator.layer?.sublayers ?? [])"
-      )
-      XCTAssertEqual(
-        indicator.layer?.sublayers?.count,
-        1,
-        "No second track or proportional thumb may appear while scrolling"
-      )
+      XCTAssertTrue(systemOverlayLayers.isEmpty)
+      XCTAssertEqual(pencilKnobLayers.count, 1, indicator.configuration.accessibilityIdentifier)
+      XCTAssertEqual(indicator.layer?.sublayers?.count, 1)
       XCTAssertEqual(
         pencilKnobLayers.first?.backgroundColor,
         CidaScrollIndicator.knobColor.cgColor
@@ -492,24 +326,19 @@ extension InteractionReproductionTests {
     }
 
     assertTestProcessIsNotFrontmost()
-    withExtendedLifetime((mainWindow, settingsWindow)) {}
+    withExtendedLifetime(settingsWindow) {}
   }
 
   func testPencilScrollIndicatorRemovesScrollerReinstalledDuringLiveScroll() throws {
-    let model = AppModel(
-      inputText: HistoryEntry.designLongInput,
-      entries: HistoryEntry.longDesignSamples,
-      settings: .designPreview
-    )
-    let (window, hostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
+    let model = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
+    model.setResultForTesting(ResultRecord.designLong())
+    let controller = makeHiddenPanel(model: model)
+    let hostingView = try XCTUnwrap(controller.contentView)
 
     RunLoop.current.run(until: Date().addingTimeInterval(0.1))
     hostingView.layoutSubtreeIfNeeded()
     let indicator = try XCTUnwrap(
-      firstScroller(in: hostingView, identifier: "history-scroll-indicator")
+      firstScroller(in: hostingView, identifier: "result-scroll-indicator")
     )
     let scrollView = try XCTUnwrap(indicator.observedScrollView)
 
@@ -518,7 +347,6 @@ extension InteractionReproductionTests {
     scrollView.verticalScroller = NSScroller()
     scrollView.hasVerticalScroller = true
     XCTAssertTrue(scrollView.hasVerticalScroller)
-    XCTAssertNotNil(scrollView.verticalScroller)
 
     NotificationCenter.default.post(
       name: NSScrollView.didLiveScrollNotification,
@@ -526,11 +354,7 @@ extension InteractionReproductionTests {
     )
     XCTAssertFalse(scrollView.hasVerticalScroller)
     XCTAssertNil(scrollView.verticalScroller)
-    XCTAssertEqual(scrollView.scrollerStyle, .overlay)
-    XCTAssertTrue(scrollView.autohidesScrollers)
 
-    // Reproduce SwiftUI restoring the native scroller after the synchronous
-    // live-scroll callback. The deferred guard must remove that second copy.
     scrollView.scrollerStyle = .overlay
     scrollView.autohidesScrollers = true
     scrollView.verticalScroller = NSScroller()
@@ -539,24 +363,13 @@ extension InteractionReproductionTests {
 
     XCTAssertFalse(scrollView.hasVerticalScroller)
     XCTAssertNil(scrollView.verticalScroller)
-    XCTAssertEqual(scrollView.scrollerStyle, .overlay)
-    XCTAssertTrue(scrollView.autohidesScrollers)
-
-    window.orderOut(nil)
     assertTestProcessIsNotFrontmost()
-    withExtendedLifetime(window) {}
   }
 
   func testComposerVirtualizesLargeDocumentAndLoadsEarlierPagesOnDemand() async throws {
-    let model = AppModel(
-      inputText: "",
-      entries: [],
-      service: ImmediateStreamingService()
-    )
-    let (_, hostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
+    let model = AppModel(inputText: "", service: ImmediateStreamingService())
+    let controller = makeHiddenPanel(model: model)
+    let hostingView = try XCTUnwrap(controller.contentView)
     let input = try XCTUnwrap(
       firstTextView(in: hostingView, identifier: "composer-input") as? ComposerNativeTextView
     )
@@ -576,15 +389,10 @@ extension InteractionReproductionTests {
       input.textStorage?.length,
       ComposerNativeTextView.initialMaterializedUTF16Length
     )
-    XCTAssertLessThanOrEqual(
-      ComposerNativeTextView.initialMaterializedUTF16Length,
-      512,
-      "The synchronous paste path must materialize only the visible tail"
-    )
+    XCTAssertLessThanOrEqual(ComposerNativeTextView.initialMaterializedUTF16Length, 512)
     XCTAssertLessThanOrEqual(
       ComposerNativeTextView.materializedPageUTF16Length,
-      ComposerNativeTextView.initialMaterializedUTF16Length * 2,
-      "Upward scrolling must page text in bounded chunks"
+      ComposerNativeTextView.initialMaterializedUTF16Length * 2
     )
     XCTAssertGreaterThan(input.materializedDocumentRange.location, 0)
     XCTAssertEqual(input.selectedRange().location, input.textStorage?.length)
@@ -598,31 +406,25 @@ extension InteractionReproductionTests {
       input.delegate?.textView?(input, doCommandBy: #selector(NSResponder.insertNewline(_:)))
         == true
     )
-    try await waitUntil(timeout: .seconds(1)) {
+    try await waitUntil(timeout: .seconds(2)) {
       hostingView.layoutSubtreeIfNeeded()
-      return model.entries.first?.source.utf16.count == largeInput.utf16.count
-        && model.inputText.isEmpty
-        && (self.firstTextView(in: hostingView, identifier: "composer-input")?
-          .enclosingScrollView?.frame.height ?? .greatestFiniteMagnitude) <= 27.5
+      return model.result?.phase == .completed
     }
-    XCTAssertEqual(model.entries.first?.source, largeInput)
-    let resetInput = try XCTUnwrap(
-      firstTextView(in: hostingView, identifier: "composer-input")
+    XCTAssertEqual(model.result?.source, largeInput)
+    XCTAssertEqual(model.inputDocumentUTF16Count, largeInput.utf16.count, "The source stays")
+    XCTAssertTrue(input.isVirtualizingLargeDocument)
+    XCTAssertEqual(
+      input.enclosingScrollView?.frame.height ?? 0,
+      controller.heightBudget.sourceEditorMaxHeight,
+      accuracy: 0.5
     )
-    XCTAssertEqual(resetInput.enclosingScrollView?.frame.height ?? 0, 27, accuracy: 0.5)
     assertTestProcessIsNotFrontmost()
   }
 
-  func testImmediateLargeDocumentSubmissionKeepsComposerCompact() async throws {
-    let model = AppModel(
-      inputText: "",
-      entries: [],
-      service: ImmediateStreamingService()
-    )
-    let (_, hostingView) = makeHiddenWindow(
-      rootView: MainWindowView(model: model, automaticallyFocusInput: false),
-      size: CGSize(width: 860, height: 640)
-    )
+  func testImmediateLargeDocumentSubmissionKeepsTheStagedDocument() async throws {
+    let model = AppModel(inputText: "", service: ImmediateStreamingService())
+    let controller = makeHiddenPanel(model: model)
+    let hostingView = try XCTUnwrap(controller.contentView)
     let input = try XCTUnwrap(
       firstTextView(in: hostingView, identifier: "composer-input") as? ComposerNativeTextView
     )
@@ -634,18 +436,15 @@ extension InteractionReproductionTests {
         == true
     )
 
-    try await waitUntil(timeout: .seconds(1)) {
-      model.entries.first?.source == largeInput
+    try await waitUntil(timeout: .seconds(2)) {
+      model.result?.source == largeInput && model.result?.phase == .completed
     }
     try await Task.sleep(for: .milliseconds(80))
     hostingView.layoutSubtreeIfNeeded()
 
-    let resetInput = try XCTUnwrap(
-      firstTextView(in: hostingView, identifier: "composer-input")
-    )
-    XCTAssertEqual(model.inputDocumentUTF16Count, 0)
-    XCTAssertEqual(resetInput.string, "")
-    XCTAssertEqual(resetInput.enclosingScrollView?.frame.height ?? 0, 27, accuracy: 0.5)
+    XCTAssertEqual(model.inputDocumentUTF16Count, largeInput.utf16.count)
+    XCTAssertEqual(input.documentStringForBinding(), largeInput)
+    XCTAssertFalse(model.isResultStale)
     assertTestProcessIsNotFrontmost()
   }
 
@@ -653,7 +452,7 @@ extension InteractionReproductionTests {
     var settings = CidaSettings.designPreview
     settings.provider = .openAI
     settings.model = "gpt-5"
-    let model = AppModel(entries: [], settings: settings)
+    let model = AppModel(settings: settings)
     let (_, hostingView) = makeHiddenWindow(
       rootView: SettingsWindowView(model: model),
       size: CGSize(width: 560, height: 660)

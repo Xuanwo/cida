@@ -5,44 +5,33 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
   func testImprovementPreservesEnglishAndChineseSourceLanguages() {
     driver.launch()
 
-    let improveMode = driver.app.buttons["改进"]
-    XCTAssertTrue(improveMode.waitForExistence(timeout: 3))
-    improveMode.click()
-    let outputHint = driver.element(identifier: "improvement-output-hint")
-    XCTAssertTrue(outputHint.waitForExistence(timeout: 3))
-    XCTAssertTrue(driver.waitForLabel("输出跟随原文", in: outputHint, timeout: 3))
+    XCTAssertTrue(driver.improveAction.waitForExistence(timeout: 3))
+    driver.composer.click()
+    driver.composer.typeKey(.tab, modifierFlags: [])
+    XCTAssertTrue(driver.improveAction.isSelected, "Tab switches the action to 改进")
 
     let englishSource =
       "This sentence are unclear and too wordy. CIDA_E2E_IMPROVE_ENGLISH"
-    driver.replaceText(in: driver.composer, with: englishSource)
-    XCTAssertTrue(driver.waitForLabel("English · 输出跟随原文", in: outputHint, timeout: 3))
-    let englishID = driver.submitCurrentComposer()
+    driver.replaceSource(with: englishSource)
+    driver.submitCurrentSource()
     let englishResult = driver.result(containing: "CIDA_E2E_IMPROVE_ENGLISH_COMPLETE")
     XCTAssertTrue(englishResult.waitForExistence(timeout: 8))
-    XCTAssertEqual(englishResult.identifier, "history-result-\(englishID.uppercased())")
-    XCTAssertTrue(driver.waitForLabel("改进", in: driver.submitButton, timeout: 3))
-
-    let englishEntry = driver.element(identifier: "history-entry-\(englishID.lowercased())")
-    XCTAssertTrue(englishEntry.waitForExistence(timeout: 3))
-    XCTAssertTrue(englishEntry.label.contains("English · 语气与语法"))
-    XCTAssertFalse(englishEntry.label.contains("中文"))
+    driver.waitForCompletion()
+    XCTAssertTrue(driver.improveAction.isSelected, "The action stays until the panel hides")
 
     let chineseSource = "这句话不太清楚也有一点啰嗦。CIDA_E2E_IMPROVE_CHINESE"
-    driver.paste(chineseSource)
-    XCTAssertEqual(driver.textValue(in: driver.composer), chineseSource)
-    XCTAssertTrue(driver.waitForLabel("中文 · 输出跟随原文", in: outputHint, timeout: 3))
-    let chineseID = driver.submitCurrentComposer()
+    driver.replaceSource(with: chineseSource)
+    XCTAssertTrue(driver.resultNote("stale").waitForExistence(timeout: 3), "An edited source marks the result stale")
+    driver.submitCurrentSource()
     let chineseResult = driver.result(containing: "CIDA_E2E_IMPROVE_CHINESE_COMPLETE")
     XCTAssertTrue(chineseResult.waitForExistence(timeout: 8))
-    XCTAssertEqual(chineseResult.identifier, "history-result-\(chineseID.uppercased())")
-    XCTAssertTrue(driver.waitForLabel("改进", in: driver.submitButton, timeout: 3))
-    let chineseEntry = driver.element(identifier: "history-entry-\(chineseID.lowercased())")
-    XCTAssertTrue(chineseEntry.waitForExistence(timeout: 3))
-    XCTAssertTrue(chineseEntry.label.contains("中文 · 语气与语法"))
+    driver.waitForCompletion()
+    XCTAssertFalse(driver.resultNote("stale").exists)
   }
 
   func testRealTypingPasteGrowthDeletionShrinkAndSubmission() {
     driver.launch()
+    let emptyHeight = driver.panel.frame.height
 
     driver.composer.click()
     driver.composer.typeText("Typed through the real responder chain")
@@ -57,65 +46,52 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     driver.paste(multiline)
     XCTAssertTrue(driver.waitForFrameHeight(atLeast: 150, in: driver.composer, timeout: 5))
     XCTAssertEqual(driver.textValue(in: driver.composer), multiline)
+    XCTAssertGreaterThan(driver.panel.frame.height, emptyHeight + 100, "The panel grows with the source")
 
     driver.composer.typeKey("a", modifierFlags: .command)
     driver.composer.typeKey(.delete, modifierFlags: [])
     XCTAssertTrue(driver.waitForFrameHeight(atMost: 30, in: driver.composer, timeout: 5))
     XCTAssertEqual(driver.textValue(in: driver.composer), "")
+    XCTAssertEqual(driver.panel.frame.height, emptyHeight, accuracy: 2, "The panel shrinks back")
 
-    _ = driver.submit("CIDA_E2E_POOL_COMPOSER")
-    XCTAssertTrue(driver.waitForFrameHeight(atMost: 30, in: driver.composer, timeout: 5))
-    XCTAssertEqual(driver.textValue(in: driver.composer), "")
+    driver.submit("CIDA_E2E_POOL_COMPOSER")
     XCTAssertTrue(
       driver.result(containing: "CIDA_E2E_POOL_COMPOSER_COMPLETE")
         .waitForExistence(timeout: 8)
     )
+    driver.waitForCompletion()
+    XCTAssertEqual(driver.textValue(in: driver.composer), "CIDA_E2E_POOL_COMPOSER")
+    XCTAssertTrue(driver.waitForFrameHeight(atMost: 30, in: driver.composer, timeout: 5))
   }
 
-  func testCommandCCopyPrecedenceCoversComposerSelectionAndLatestResult() throws {
-    let olderID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
-    let latestID = UUID(uuidString: "10000000-0000-0000-0000-000000000002")!
-    try SQLiteHistoryFixture.seed(
-      [
-        HistoryFixtureEntry(
-          id: olderID,
-          sortOrder: 0,
-          source: "OLDER_SOURCE",
-          result: "OLDER_SELECTED_RESULT"
-        ),
-        HistoryFixtureEntry(
-          id: latestID,
-          sortOrder: 1,
-          source: "LATEST_SOURCE",
-          result: "LATEST_COPYABLE_RESULT"
-        ),
-      ],
-      at: driver.databasePath,
-      controlBaseURL: e2eEnvironment.controlBaseURL
-    )
+  func testCommandCCopiesTheSelectionOrTheResult() {
     driver.launch()
 
+    driver.submit("CIDA_E2E_POOL_COPY")
+    let completed = driver.result(containing: "CIDA_E2E_POOL_COPY_COMPLETE")
+    XCTAssertTrue(completed.waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+    let resultValue = completed.value as? String ?? ""
+
     driver.composer.click()
-    driver.composer.typeText("COMPOSER_SELECTED_TEXT")
     driver.composer.typeKey("a", modifierFlags: .command)
     driver.composer.typeKey("c", modifierFlags: .command)
-    XCTAssertTrue(driver.waitForPasteboard("COMPOSER_SELECTED_TEXT", timeout: 2))
+    XCTAssertTrue(
+      driver.waitForPasteboard("CIDA_E2E_POOL_COPY", timeout: 2),
+      "A selection in the source keeps the native copy")
 
-    let latestResult = driver.app.textViews["history-result-\(latestID.uuidString)"]
-    XCTAssertTrue(latestResult.waitForExistence(timeout: 3))
-    latestResult.click()
-    latestResult.typeKey("c", modifierFlags: .command)
-    XCTAssertTrue(driver.waitForPasteboard("LATEST_COPYABLE_RESULT", timeout: 2))
+    driver.composer.typeKey(.rightArrow, modifierFlags: [])
+    driver.composer.typeKey("c", modifierFlags: .command)
+    XCTAssertTrue(
+      driver.waitForPasteboard(resultValue, timeout: 2),
+      "⌘C without a selection copies the result")
+    XCTAssertTrue(
+      driver.waitForExistence(of: driver.copiedButton, timeout: 2),
+      "✓ 已复制 shows for 800 ms")
+    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 3), "✓ 已复制 reverts")
 
-    let olderSuffix = olderID.uuidString.lowercased()
-    let olderExpand = driver.element(identifier: "history-expand-\(olderSuffix)")
-    XCTAssertTrue(olderExpand.waitForExistence(timeout: 3))
-    olderExpand.click()
-    let olderResult = driver.app.textViews["history-result-\(olderID.uuidString)"]
-    XCTAssertTrue(olderResult.waitForExistence(timeout: 3))
-    olderResult.click()
-    olderResult.typeKey("a", modifierFlags: .command)
-    olderResult.typeKey("c", modifierFlags: .command)
-    XCTAssertTrue(driver.waitForPasteboard("OLDER_SELECTED_RESULT", timeout: 2))
+    NSPasteboard.general.clearContents()
+    driver.copyButton.click()
+    XCTAssertTrue(driver.waitForPasteboard(resultValue, timeout: 2))
   }
 }

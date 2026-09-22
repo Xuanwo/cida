@@ -56,11 +56,11 @@ class MutationRunnerContractTests(unittest.TestCase):
             self.assertEqual(declared, {"testRowFades"})
             mutation = {
                 "unitTests": ["InteractionReproductionTests/testRowFades"],
-                "releaseTests": ["HistoryPresentationJourneyTests/testRenamedJourney"],
+                "releaseTests": ["PanelAndSettingsJourneyTests/testRenamedJourney"],
             }
             self.assertEqual(
                 MODULE.missing_kill_tests(mutation, declared, {"testFoldedResultAlwaysFades"}),
-                ["HistoryPresentationJourneyTests/testRenamedJourney"],
+                ["PanelAndSettingsJourneyTests/testRenamedJourney"],
             )
 
     def test_checked_in_catalog_names_only_declared_kill_tests(self):

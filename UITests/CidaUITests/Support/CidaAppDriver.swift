@@ -2,41 +2,42 @@ import AppKit
 import Foundation
 import XCTest
 
+/// Drives the floating panel of a signed Release artifact through XCUI. The
+/// element names match the accessibility identifiers of `PanelView`.
 @MainActor
 final class CidaAppDriver {
   let environment: E2EEnvironment
-  let databasePath: String
   let settingsNamespace: String
   private(set) var app: XCUIApplication
 
   init(
     environment: E2EEnvironment,
-    databasePath: String,
     settingsNamespace: String
   ) {
     self.environment = environment
-    self.databasePath = databasePath
     self.settingsNamespace = settingsNamespace
     app = XCUIApplication(url: URL(fileURLWithPath: environment.appPath))
   }
 
-  var window: XCUIElement { app.windows["辞达"] }
+  /// AppKit exposes an `NSPanel` to XCUI as a dialog, not a window.
+  var panel: XCUIElement { app.dialogs["cida-panel"] }
   var composer: XCUIElement { app.textViews["composer-input"] }
-  var submitButton: XCUIElement { app.buttons["composer-submit-button"] }
-  var history: XCUIElement { app.scrollViews["history-scroll-view"] }
+  var controlBar: XCUIElement { element(identifier: "control-bar") }
+  var translateAction: XCUIElement { app.buttons["action-translate"] }
+  var improveAction: XCUIElement { app.buttons["action-improve"] }
+  var stopButton: XCUIElement { app.buttons["bar-action-stop"] }
+  var copyButton: XCUIElement { app.buttons["bar-action-copy"] }
+  var copiedButton: XCUIElement { app.buttons["bar-action-copied"] }
+  var resultPane: XCUIElement { element(identifier: "result-pane") }
+  var resultText: XCUIElement { app.textViews["result-text"] }
+  var settingsWindow: XCUIElement { app.windows["设置"] }
 
-  var currentHistoryEntry: XCUIElement {
-    app.descendants(matching: .any).matching(
-      NSPredicate(
-        format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@",
-        "history-entry-",
-        "当前历史记录"
-      )
-    ).firstMatch
+  func resultNote(_ kind: String) -> XCUIElement {
+    element(identifier: "result-note-\(kind)")
   }
 
   func settingsProviderMenu(in settingsWindow: XCUIElement? = nil) -> XCUIElement {
-    let root = settingsWindow ?? app.windows["设置"]
+    let root = settingsWindow ?? self.settingsWindow
     return root.menuButtons.matching(
       NSPredicate(
         format: "identifier == %@ AND label IN %@",
@@ -54,23 +55,21 @@ final class CidaAppDriver {
     app.launchEnvironment["CIDA_ISOLATED_AUTOMATION"] = "1"
     app.launchArguments = [
       "--e2e-testing",
-      "--automation-history-database",
-      databasePath,
       "--automation-settings-namespace",
       settingsNamespace,
+      "--automation-lifecycle-log",
+      "\(environment.lifecycleLogDirectory)/\(settingsNamespace).log",
     ]
     if endpointOverride {
       app.launchArguments += ["--automation-openai-endpoint", environment.endpoint]
     }
     app.launchArguments += additionalArguments
     app.launch()
-    app.activate()
 
-    XCTAssertTrue(waitForForeground(timeout: 10))
-    XCTAssertTrue(window.waitForExistence(timeout: 10))
+    XCTAssertTrue(waitForRunning(timeout: 10))
+    XCTAssertTrue(panel.waitForExistence(timeout: 10))
     XCTAssertTrue(composer.waitForExistence(timeout: 5))
-    XCTAssertTrue(submitButton.waitForExistence(timeout: 5))
-    XCTAssertTrue(history.waitForExistence(timeout: 5))
+    XCTAssertTrue(translateAction.waitForExistence(timeout: 5))
   }
 
   func terminate() {
@@ -78,6 +77,26 @@ final class CidaAppDriver {
     app.terminate()
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
   }
+
+  // MARK: - Panel lifecycle
+
+  func hidePanel() {
+    composer.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(panel.waitForNonExistence(timeout: 3), "Escape hides the panel")
+  }
+
+  func showPanel() {
+    app.typeKey(.space, modifierFlags: .option)
+    XCTAssertTrue(panel.waitForExistence(timeout: 5), "Option-Space shows the panel")
+    XCTAssertTrue(composer.waitForExistence(timeout: 3))
+  }
+
+  func openSettings() {
+    composer.typeKey(",", modifierFlags: .command)
+    XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+  }
+
+  // MARK: - Source
 
   func paste(_ value: String, into element: XCUIElement? = nil) {
     let target = element ?? composer
@@ -99,145 +118,45 @@ final class CidaAppDriver {
     }
   }
 
-  @discardableResult
-  func submit(_ text: String, expectsStreamingState: Bool = false) -> String {
-    paste(text)
-    XCTAssertEqual(textValue(in: composer), text)
-    return submitCurrentComposer(expectsStreamingState: expectsStreamingState)
+  func replaceSource(with value: String) {
+    composer.click()
+    composer.typeKey("a", modifierFlags: .command)
+    composer.typeKey(.delete, modifierFlags: [])
+    if !value.isEmpty {
+      paste(value)
+    }
+    XCTAssertTrue(waitForTextValue(value, in: composer, timeout: 2))
   }
 
-  @discardableResult
-  func submitCurrentComposer(expectsStreamingState: Bool = false) -> String {
-    let previousCurrentEntry = currentHistoryEntry
-    let previousCurrentIdentifier =
-      previousCurrentEntry.exists
-      ? previousCurrentEntry.identifier
-      : nil
-    XCTAssertTrue(submitButton.isEnabled)
-    submitButton.click()
-    XCTAssertTrue(
-      waitForTextValue("", in: composer, timeout: 1),
-      "An accepted submission must clear the composer immediately"
-    )
+  // MARK: - Submit
+
+  /// Replaces the source with `text` and presses ⏎. The source stays in the
+  /// editor and the result pane appears with the streaming caret.
+  func submit(_ text: String, expectsStreamingState: Bool = false) {
+    replaceSource(with: text)
+    submitCurrentSource(expectsStreamingState: expectsStreamingState)
+  }
+
+  func submitCurrentSource(expectsStreamingState: Bool = false) {
+    let source = textValue(in: composer)
+    composer.click()
+    composer.typeKey(.return, modifierFlags: [])
+    XCTAssertTrue(resultPane.waitForExistence(timeout: 5), "⏎ opens the result pane")
+    XCTAssertEqual(textValue(in: composer), source, "The source stays after ⏎")
     if expectsStreamingState {
-      XCTAssertTrue(waitForLabel("停止生成", in: submitButton, timeout: 3))
+      XCTAssertTrue(stopButton.waitForExistence(timeout: 3), "The slot shows 停止 while streaming")
     }
-    let identifier = waitForNewCurrentHistoryEntry(
-      excluding: previousCurrentIdentifier,
-      timeout: 5
-    )
-    XCTAssertNotNil(identifier)
-    guard let identifier else { return "" }
-
-    XCTAssertTrue(
-      waitForCurrentExpandedEntry(identifier, timeout: 2),
-      "The submitted entry must become the expanded current record"
-    )
-    if let previousCurrentIdentifier, previousCurrentIdentifier != identifier {
-      XCTAssertTrue(
-        waitForFoldedEntry(previousCurrentIdentifier, timeout: 2),
-        "The former automatic current record must fold when a new submission is accepted"
-      )
-    }
-
-    return String(identifier.dropFirst("history-entry-".count))
   }
 
-  func waitForCurrentExpandedEntry(
-    _ identifier: String,
-    timeout: TimeInterval
-  ) -> Bool {
-    let suffix = String(identifier.dropFirst("history-entry-".count))
-    let entry = element(identifier: identifier)
-    let source = element(identifier: "history-source-\(suffix)")
-    let result = app.textViews["history-result-\(suffix.uppercased())"]
-    let foldedCard = element(identifier: "history-expand-\(suffix)")
-    return wait(
-      description: "current expanded history entry \(identifier)",
-      timeout: timeout,
-      sample: {
-        (
-          entry.exists,
-          entry.label,
-          source.exists,
-          result.exists,
-          foldedCard.exists
-        )
-      },
-      matches: {
-        $0.0 && $0.1.hasPrefix("当前历史记录") && $0.2 && $0.3 && !$0.4
-      },
-      describe: {
-        "entry=\($0.0) label=\($0.1) source=\($0.2) result=\($0.3) folded=\($0.4)"
-      }
-    )
-  }
-
-  func waitForFoldedEntry(
-    _ identifier: String,
-    timeout: TimeInterval
-  ) -> Bool {
-    let suffix = String(identifier.dropFirst("history-entry-".count))
-    let entry = element(identifier: identifier)
-    let foldedCard = element(identifier: "history-expand-\(suffix)")
-    let result = app.textViews["history-result-\(suffix.uppercased())"]
-    return wait(
-      description: "folded history entry \(identifier)",
-      timeout: timeout,
-      sample: {
-        (entry.exists, entry.value as? String, foldedCard.exists, result.exists)
-      },
-      matches: { $0.0 && $0.1 == "collapsed" && $0.2 && !$0.3 },
-      describe: {
-        "entry=\($0.0) value=\($0.1 ?? "nil") folded=\($0.2) result=\($0.3)"
-      }
-    )
+  func waitForCompletion(timeout: TimeInterval = 8) {
+    XCTAssertTrue(copyButton.waitForExistence(timeout: timeout), "复制结果 appears once done")
+    XCTAssertFalse(stopButton.exists)
   }
 
   func result(containing marker: String) -> XCUIElement {
     app.textViews.matching(
-      NSPredicate(format: "value CONTAINS %@", marker)
+      NSPredicate(format: "identifier == %@ AND value CONTAINS %@", "result-text", marker)
     ).firstMatch
-  }
-
-  func historyEntryCount() -> Int {
-    app.descendants(matching: .any).matching(
-      NSPredicate(format: "identifier BEGINSWITH %@", "history-entry-")
-    ).count
-  }
-
-  func waitForNewCurrentHistoryEntry(
-    excluding previousIdentifier: String?,
-    timeout: TimeInterval
-  ) -> String? {
-    var matchedIdentifier: String?
-    let matched = wait(
-      description: "new current history entry",
-      timeout: timeout,
-      sample: {
-        let entry = self.currentHistoryEntry
-        return entry.exists ? entry.identifier : nil
-      },
-      matches: {
-        guard let identifier = $0, identifier != previousIdentifier else { return false }
-        matchedIdentifier = identifier
-        return true
-      },
-      describe: { $0 ?? "missing" }
-    )
-    return matched ? matchedIdentifier : nil
-  }
-
-  func visibleHistoryEntryCount() -> Int {
-    let entries = app.descendants(matching: .any).matching(
-      NSPredicate(format: "identifier BEGINSWITH %@", "history-entry-")
-    )
-    return (0..<entries.count).reduce(into: 0) { count, index in
-      let intersection = entries.element(boundBy: index).frame.intersection(history.frame)
-      if intersection.height > 8, intersection.width > 100 {
-        count += 1
-      }
-    }
   }
 
   func element(identifier: String) -> XCUIElement {
@@ -251,12 +170,7 @@ final class CidaAppDriver {
     model: String = "cida-ui-mock-model",
     apiKey: String = "sk-isolated-ui-test"
   ) {
-    let settingsButton = app.buttons["model-settings-button"]
-    XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
-    settingsButton.click()
-    let settingsWindow = app.windows["设置"]
-    XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
-
+    openSettings()
     let providerMenu = settingsProviderMenu(in: settingsWindow)
     XCTAssertTrue(providerMenu.waitForExistence(timeout: 5))
     if providerMenu.label != "OpenAI" {
@@ -272,6 +186,8 @@ final class CidaAppDriver {
     settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
   }
+
+  // MARK: - Waits
 
   func waitForValue(
     _ expectedValue: String,
@@ -337,6 +253,18 @@ final class CidaAppDriver {
     )
   }
 
+  /// Polls `exists` every 20 ms. `XCUIElement.waitForExistence` samples about
+  /// once per second, which misses the 800 ms `✓ 已复制` state.
+  func waitForExistence(of element: XCUIElement, timeout: TimeInterval) -> Bool {
+    wait(
+      description: "\(element) to exist",
+      timeout: timeout,
+      sample: { element.exists },
+      matches: { $0 },
+      describe: { $0 ? "exists" : "missing" }
+    )
+  }
+
   func waitForPasteboard(_ expected: String, timeout: TimeInterval) -> Bool {
     wait(
       description: "pasteboard value",
@@ -347,24 +275,23 @@ final class CidaAppDriver {
     )
   }
 
-  func attachWindowScreenshot(named name: String, to activity: XCTActivity) {
-    let attachment = XCTAttachment(screenshot: window.screenshot())
+  func attachPanelScreenshot(named name: String, to activity: XCTActivity) {
+    let attachment = XCTAttachment(screenshot: panel.screenshot())
     attachment.name = name
     attachment.lifetime = .keepAlways
     activity.add(attachment)
   }
 
-  private func waitForForeground(timeout: TimeInterval) -> Bool {
+  /// A menu-bar app never runs in the foreground; the process just has to be
+  /// running with its panel on screen.
+  private func waitForRunning(timeout: TimeInterval) -> Bool {
     wait(
-      description: "application foreground state",
+      description: "application running state",
       timeout: timeout,
-      sample: { () -> XCUIApplication.State in
-        if self.app.state != .runningForeground {
-          self.app.activate()
-        }
-        return self.app.state
+      sample: { () -> XCUIApplication.State in self.app.state },
+      matches: { (state: XCUIApplication.State) in
+        state == .runningForeground || state == .runningBackground
       },
-      matches: { (state: XCUIApplication.State) in state == .runningForeground },
       describe: { (state: XCUIApplication.State) in String(describing: state) }
     )
   }
@@ -412,7 +339,6 @@ class CidaReleaseUITestCase: XCTestCase {
     e2eEnvironment.resetSettings(namespace: settingsNamespace)
     driver = CidaAppDriver(
       environment: e2eEnvironment,
-      databasePath: e2eEnvironment.uniqueDatabasePath(for: name),
       settingsNamespace: settingsNamespace
     )
   }

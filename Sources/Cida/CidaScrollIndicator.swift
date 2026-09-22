@@ -8,8 +8,8 @@ struct CidaScrollIndicatorConfiguration: Equatable, Sendable {
   let trackBottomInset: CGFloat
   let minimumScrollableOverflow: CGFloat
 
-  static let history = CidaScrollIndicatorConfiguration(
-    accessibilityIdentifier: "history-scroll-indicator",
+  static let result = CidaScrollIndicatorConfiguration(
+    accessibilityIdentifier: "result-scroll-indicator",
     knobLength: 90,
     trackTopInset: 10,
     trackBottomInset: 12,

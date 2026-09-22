@@ -201,7 +201,7 @@ def run_release_contracts(clone, mutation, result_directory):
                 f"CidaUITests/{name}" for name in mutation["releaseTests"]
             ),
             "CIDA_TART_SWIFT_TEST_FILTER": (
-                "AppModelTests/testNewModelStartsWithoutDesignHistory"
+                "AppModelTests/testNewModelStartsWithoutAResult"
             ),
             "CIDA_TART_BOOT_ATTEMPTS": "1",
         }

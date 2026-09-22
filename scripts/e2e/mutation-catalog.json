@@ -3,9 +3,9 @@
   "mutations": [
     {
       "id": "result-layer-never-redraws",
-      "description": "Restore the stale compositor policy that never redraws recycled streaming result layers.",
-      "contracts": ["CIDA-E2E-010", "CIDA-E2E-013"],
-      "file": "Sources/Cida/HistoryResultTextView.swift",
+      "description": "Restore the stale compositor policy that never redraws the streaming result layer.",
+      "contracts": ["CIDA-E2E-010"],
+      "file": "Sources/Cida/ResultTextView.swift",
       "before": "    wantsLayer = true\n    layerContentsRedrawPolicy = .onSetNeedsDisplay\n    layer?.masksToBounds = true\n    setAccessibilityRole(.textArea)",
       "after": "    wantsLayer = true\n    layerContentsRedrawPolicy = .never\n    layer?.masksToBounds = true\n    setAccessibilityRole(.textArea)",
       "occurrences": 1,
@@ -17,76 +17,76 @@
       ]
     },
     {
-      "id": "reused-result-keeps-old-text",
-      "description": "Ignore empty native renderer replacements so reused result content survives cleanup and rebinding.",
-      "contracts": ["CIDA-E2E-010", "CIDA-E2E-013"],
-      "file": "Sources/Cida/HistoryResultTextView.swift",
+      "id": "replaced-result-keeps-old-text",
+      "description": "Ignore empty renderer replacements so the previous result survives a new submission.",
+      "contracts": ["CIDA-E2E-010", "PANEL-SINGLE-RESULT"],
+      "file": "Sources/Cida/ResultTextView.swift",
       "before": "  func replaceText(with attributedString: NSAttributedString) {\n    textStorage.setAttributedString(attributedString)\n  }",
       "after": "  func replaceText(with attributedString: NSAttributedString) {\n    guard attributedString.length > 0 else { return }\n    textStorage.setAttributedString(attributedString)\n  }",
       "occurrences": 1,
       "unitTests": [
-        "MutationContractTests/testResultContainerPoolClearsRenderedTextBeforeReuse"
+        "MutationContractTests/testReplacingTheResultClearsTheRenderedText"
       ],
       "releaseTests": [
         "CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte",
-        "CoreTranslationJourneyTests/testResultContainerPoolRemainsCorrectBeyondItsPrewarmedCapacity"
+        "CoreTranslationJourneyTests/testConsecutiveSubmissionsReplaceTheResultWithoutLeakingText"
       ]
     },
     {
-      "id": "previous-entry-remains-current",
-      "description": "Transfer the current marker back to the previous entry after appending a submission.",
-      "contracts": ["CIDA-E2E-010", "CIDA-E2E-013", "STATE-MACHINE-CURRENT"],
+      "id": "submit-keeps-previous-result",
+      "description": "Keep the previous result record instead of replacing it with the new submission.",
+      "contracts": ["PANEL-SINGLE-RESULT"],
       "file": "Sources/Cida/AppModel.swift",
-      "before": "    if entries.last?.isLatestInHistory == false {\n      entries.last?.isLatestInHistory = true\n    }",
-      "after": "    previousEntries.last?.isLatestInHistory = true",
+      "before": "    generationState = .waiting(entryID: record.id)\n    result = record\n    requestResultFollow()",
+      "after": "    generationState = .waiting(entryID: record.id)\n    if result == nil {\n      result = record\n    }\n    requestResultFollow()",
       "occurrences": 1,
       "unitTests": [
-        "MutationContractTests/testAppendingNewEntryTransfersTheCurrentMarker",
+        "MutationContractTests/testSubmitReplacesTheResultAndKeepsTheSource",
+        "AppModelTests/testSubmitReplacesThePreviousResultAndKeepsTheSource"
+      ],
+      "releaseTests": [
+        "CoreTranslationJourneyTests/testConsecutiveSubmissionsReplaceTheResultWithoutLeakingText",
+        "TranslationStateMachineJourneyTests/testSharedStateMachineSmokeSurvivesConsecutiveSubmissionsAndHiding"
+      ]
+    },
+    {
+      "id": "stale-result-never-marked",
+      "description": "Report an edited source or a changed action as still matching the result.",
+      "contracts": ["PANEL-STALE"],
+      "file": "Sources/Cida/AppModel.swift",
+      "before": "    if result.mode != mode { return true }\n    if result.source.utf16.count != inputDocumentUTF16Count { return true }\n    return result.source != currentInputDocument",
+      "after": "    _ = result\n    return false",
+      "occurrences": 1,
+      "unitTests": [
+        "MutationContractTests/testEditedSourceMarksTheResultStale"
+      ],
+      "releaseTests": [
+        "ComposerJourneyTests/testImprovementPreservesEnglishAndChineseSourceLanguages"
+      ]
+    },
+    {
+      "id": "panel-show-keeps-action",
+      "description": "Keep the previous action when the panel is shown again instead of returning to 翻译.",
+      "contracts": ["PANEL-DEFAULT-ACTION"],
+      "file": "Sources/Cida/AppModel.swift",
+      "before": "  func resetModeToDefault() {\n    setMode(.translate)\n  }",
+      "after": "  func resetModeToDefault() {\n  }",
+      "occurrences": 1,
+      "unitTests": [
+        "MutationContractTests/testEveryPanelAppearanceResetsTheActionToTranslate",
         "TranslationJourneyPropertyTests/testDeterministicCommandSequencesPreserveProductAndDurabilityInvariants"
       ],
       "releaseTests": [
-        "TranslationStateMachineJourneyTests/testSharedStateMachineSmokeSurvivesConsecutiveSubmissionsAndRelaunch"
-      ]
-    },
-    {
-      "id": "submitted-composer-is-not-cleared",
-      "description": "Accept a submission without clearing the native composer or advancing its reset generation.",
-      "contracts": ["CIDA-E2E-010", "STATE-MACHINE-COMPOSER-RESET"],
-      "file": "Sources/Cida/AppModel.swift",
-      "before": "    stageInputDocument(nil)\n    inputResetRevision &+= 1\n    inputText = \"\"\n    processingTask?.cancel()",
-      "after": "    processingTask?.cancel()",
-      "occurrences": 1,
-      "unitTests": [
-        "AppModelTests/testSubmitAtomicallyClearsTheComposerFoldsThePreviousEntryAndInsertsWaitingOutput"
-      ],
-      "releaseTests": [
-        "CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte",
-        "TranslationStateMachineJourneyTests/testSharedStateMachineSmokeSurvivesConsecutiveSubmissionsAndRelaunch"
-      ]
-    },
-    {
-      "id": "history-follow-disabled",
-      "description": "Disable submit, stream and terminal history follow revisions.",
-      "contracts": ["CIDA-E2E-011", "CIDA-E2E-012"],
-      "file": "Sources/Cida/AppModel.swift",
-      "before": "  func requestHistoryFollow(force: Bool = true, allowsThrottling: Bool = true) {\n    let now = ProcessInfo.processInfo.systemUptime\n    guard force || !allowsThrottling || now - lastHistoryFollowTimestamp >= 0.05 else { return }\n    lastHistoryFollowTimestamp = now\n    if force {\n      historyForcePinRevision &+= 1\n    }\n    historyScrollRevision &+= 1\n  }",
-      "after": "  func requestHistoryFollow(force: Bool = true, allowsThrottling: Bool = true) {\n    _ = force\n    _ = allowsThrottling\n  }",
-      "occurrences": 1,
-      "unitTests": [
-        "AppModelTests/testTerminalHistoryFollowBypassesStreamingThrottleWithoutForcingPin"
-      ],
-      "releaseTests": [
-        "CoreTranslationJourneyTests/testUnevenStreamingFollowsFromDetachedHistoryThroughCompletion",
-        "HistoryAndScrollingJourneyTests/testDetachingDuringAStreamPausesFollowAndTheNextSubmissionReattaches"
+        "PanelAndSettingsJourneyTests/testPanelHidesOnEscapeReturnsOnOptionSpaceAndKeepsItsState"
       ]
     },
     {
       "id": "composer-does-not-shrink",
-      "description": "Stop publishing compact composer metrics after native multiline deletion.",
-      "contracts": ["CIDA-E2E-020"],
+      "description": "Stop publishing composer metrics after native edits so the source pane never resizes.",
+      "contracts": ["CIDA-E2E-004", "CIDA-E2E-005"],
       "file": "Sources/Cida/ComposerTextEditor.swift",
-      "before": "      } else {\n        onVirtualDocumentChange(nil, nil, nil)\n        metrics.wrappedValue = ComposerTextMetrics(text: updatedText)\n      }",
-      "after": "      } else {\n        onVirtualDocumentChange(nil, nil, nil)\n      }",
+      "before": "        onVirtualDocumentChange(nil, nil, nil)\n        var updatedMetrics = ComposerTextMetrics(text: updatedText)\n        updatedMetrics.naturalHeight = Self.naturalHeight(of: textView)\n        metrics.wrappedValue = updatedMetrics",
+      "after": "        onVirtualDocumentChange(nil, nil, nil)",
       "occurrences": 1,
       "unitTests": [
         "InteractionReproductionTests/testComposerShrinksAsNativeMultilineInputIsDeleted"
@@ -96,125 +96,33 @@
       ]
     },
     {
-      "id": "scrollbar-position-inverted",
-      "description": "Invert the Pencil scrollbar's document-position mapping.",
-      "contracts": ["CIDA-E2E-022"],
-      "file": "Sources/Cida/CidaScrollIndicator.swift",
-      "before": "      nextValue = min(1, max(0, offset / scrollableHeight))",
-      "after": "      nextValue = 1 - min(1, max(0, offset / scrollableHeight))",
+      "id": "command-c-ignores-native-selection",
+      "description": "Route every Command-C to the result even while the source has a selection.",
+      "contracts": ["CIDA-E2E-008"],
+      "file": "Sources/Cida/PanelWindow.swift",
+      "before": "    guard let textView = window?.firstResponder as? NSTextView else { return false }\n    return textView.selectedRange().length > 0",
+      "after": "    _ = window\n    return false",
       "occurrences": 1,
       "unitTests": [
-        "InteractionReproductionTests/testPencilScrollIndicatorMovesDownFromDocumentTopToBottom"
+        "InteractionReproductionTests/testResultCopyShortcutDefersOnlyToANativeSelection"
       ],
       "releaseTests": [
-        "HistoryAndScrollingJourneyTests/testHistoryUsesOneOuterScrollSurfaceAndThePencilThumbMovesInTheRightDirection"
-      ]
-    },
-    {
-      "id": "command-c-always-copies-latest",
-      "description": "Ignore editable and selected native text responders for Command-C.",
-      "contracts": ["CIDA-E2E-023"],
-      "file": "Sources/Cida/AppLifecycle.swift",
-      "before": "  static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {\n    guard let textView = window?.firstResponder as? NSTextView else { return false }\n    return textView.isEditable || textView.selectedRange().length > 0\n  }",
-      "after": "  static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {\n    _ = window\n    return false\n  }",
-      "occurrences": 1,
-      "unitTests": [
-        "InteractionReproductionTests/testLatestResultCopyShortcutDefersToEditableTextAndSelectedResultText"
-      ],
-      "releaseTests": [
-        "ComposerJourneyTests/testCommandCCopyPrecedenceCoversComposerSelectionAndLatestResult"
+        "ComposerJourneyTests/testCommandCCopiesTheSelectionOrTheResult"
       ]
     },
     {
       "id": "improvement-reuses-translation-source-language",
-      "description": "Reintroduce the selected translation source language into improvement runtime parameters.",
-      "contracts": ["CIDA-E2E-024", "PROMPT-PRESERVE-SOURCE"],
+      "description": "Send the translation source/target languages during improvement so the model follows the selector instead of the input text.",
+      "contracts": ["CIDA-E2E-009"],
       "file": "Sources/Cida/ModelPrompt.swift",
       "before": "    case .improve:\n      languageBehavior = .preserveSource\n      sourceLanguage = nil\n      targetLanguage = nil",
-      "after": "    case .improve:\n      languageBehavior = .preserveSource\n      sourceLanguage = request.sourceLanguage\n      targetLanguage = nil",
+      "after": "    case .improve:\n      languageBehavior = .preserveSource\n      sourceLanguage = request.sourceLanguage.rawValue\n      targetLanguage = request.targetLanguage.rawValue",
       "occurrences": 1,
       "unitTests": [
         "AppModelTests/testPromptBuilderSeparatesTypedParametersFromTheUserDocument"
       ],
       "releaseTests": [
         "ComposerJourneyTests/testImprovementPreservesEnglishAndChineseSourceLanguages"
-      ]
-    },
-    {
-      "id": "folded-result-fade-hidden",
-      "description": "Collapse the Pencil fade over every folded result preview to an empty frame.",
-      "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
-      "file": "Sources/Cida/HistoryEntryRenderer.swift",
-      "before": "    fadeLayer.frame = NSRect(\n      x: 0,\n      y: max(0, bounds.height - HistoryEntryPencilLayout.foldedPreviewFadeHeight),\n      width: bounds.width,\n      height: HistoryEntryPencilLayout.foldedPreviewFadeHeight\n    )",
-      "after": "    fadeLayer.frame = .zero",
-      "occurrences": 1,
-      "unitTests": [
-        "InteractionReproductionTests/testHistoryRowShowsUpToTwoLinesAndFadesOnlyALongerResult"
-      ],
-      "releaseTests": [
-        "HistoryPresentationJourneyTests/testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult"
-      ]
-    },
-    {
-      "id": "history-presentations-bypass-unified-renderer",
-      "description": "Force every standalone history record through the folded presentation instead of the shared native state renderer.",
-      "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
-      "file": "Sources/Cida/HistoryTimelineView.swift",
-      "before": "    let presentation: HistoryPresentation =\n      if !isExpanded {\n        .folded\n      } else if isLatestEntry {\n        .current\n      } else {\n        .manuallyExpanded\n      }",
-      "after": "    let presentation: HistoryPresentation = .folded",
-      "occurrences": 1,
-      "unitTests": [
-        "InteractionReproductionTests/testEveryHistoryPresentationUsesOneNativeEntryRenderer"
-      ],
-      "releaseTests": [
-        "HistoryPresentationJourneyTests/testFoldedResultAlwaysFadesAndLatestMediumSourceCannotHideItsResult"
-      ]
-    },
-    {
-      "id": "latest-single-line-source-reserves-two-lines",
-      "description": "Force every latest source preview to reserve its full two-line height.",
-      "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-PREVIEW"],
-      "file": "Sources/Cida/HistoryEntryRenderer.swift",
-      "before": "      height: min(Layout.sourceMaximumHeight, naturalHeight),",
-      "after": "      height: Layout.sourceMaximumHeight,",
-      "occurrences": 1,
-      "unitTests": [
-        "InteractionReproductionTests/testLatestSingleLineSourceUsesNaturalHeightWithoutFadeOrDeadSpace"
-      ],
-      "releaseTests": [
-        "HistoryPresentationJourneyTests/testExpandedActionsReserveTheirColumnAndNeverLeakIntoAnActiveStream"
-      ]
-    },
-    {
-      "id": "expanded-history-source-stays-hidden",
-      "description": "Restore the latest-only source layout gate so an expanded historical record still hides its source.",
-      "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-EXPANDED-SOURCE"],
-      "file": "Sources/Cida/HistoryEntryRenderer.swift",
-      "before": "    guard presentation.isExpanded, !displayedSource.isEmpty, textWidth > 0 else {",
-      "after": "    guard presentation == .current, !displayedSource.isEmpty, textWidth > 0 else {",
-      "occurrences": 1,
-      "unitTests": [
-        "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState",
-        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesStandardAppKitHitTesting"
-      ],
-      "releaseTests": [
-        "HistoryPresentationJourneyTests/testFoldedRowsExpandIndependentlyCopyFullResultsAndMatchPencilGeometry"
-      ]
-    },
-    {
-      "id": "history-action-hit-target-swallowed",
-      "description": "Disable the history control's local action fallback so wrapper hit routing can swallow icon clicks.",
-      "contracts": ["CIDA-E2E-025", "PENCIL-HISTORY-ACTIONS"],
-      "file": "Sources/Cida/HistoryEntryRenderer.swift",
-      "before": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    for button in [redoButton, copyButton, copySourceButton].compactMap({ $0 })\n    where !button.isHidden && button.frame.insetBy(dx: -6, dy: -6).contains(location) {\n      button.performClick(nil)\n      return true\n    }\n    return false\n  }",
-      "after": "  @discardableResult\n  func performVisibleAction(at location: NSPoint) -> Bool {\n    _ = location\n    return false\n  }",
-      "occurrences": 1,
-      "unitTests": [
-        "InteractionReproductionTests/testNativeHistoryEntryKeepsOneRendererAndExactGeometryAcrossEveryState",
-        "InteractionReproductionTests/testExpandedHistorySourceCopyUsesStandardAppKitHitTesting"
-      ],
-      "releaseTests": [
-        "HistoryPresentationJourneyTests/testFoldedRowsExpandIndependentlyCopyFullResultsAndMatchPencilGeometry"
       ]
     }
   ]

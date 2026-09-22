@@ -1,32 +1,30 @@
 {
-  "namespace": "macos-26.4-xcode-26.5-retina-light-v1",
+  "namespace": "macos-26.4-xcode-26.5-retina-light-v2",
   "baselines": [
     {
-      "name": "main-translate",
-      "approvedImage": "Design/QACurrent/implementation-translate.png",
-      "approvedImageSHA256": "ec79be453141eb4fddf6f2e5d9cde8e37df2a858fef99fdbc6975aa1581a0a58",
-      "designReference": "Design/QACurrent/reference-translate.png",
-      "designReferenceSHA256": "0b54b18658819a263d3e49396da2dcad5b767bcf80fcd3808e978aea373ff765",
+      "name": "panel-empty",
+      "approvedImage": "Design/QACurrent/implementation-empty.png",
+      "approvedImageSHA256": "e258865d755e689983b702c6ffa5933c8244d3c5f1d78736c6dcaa761dc1a1cf",
+      "designReference": "Design/QACurrent/reference-empty.png",
+      "designReferenceSHA256": "6cce37babda6f47c2adfcf9d237a1d47e3cc907a6fbfcb5c2f6a50e026bfc553",
       "designDocument": "Design/cida.pen",
-      "designDocumentSHA256": "dbe535eb50ee22a22579d5311a56a9f63ba382ef93083ab91cbaa850509566e3",
-      "logicalWidth": 860,
-      "logicalHeight": 640,
+      "designDocumentSHA256": "ce81a76b39677c96f62b5f90a41514a2fe839916ed82e294371534be67230bb7",
+      "logicalWidth": 800,
+      "logicalHeight": 113,
       "blockSize": 8,
       "channelTolerance": 0.08,
       "maximumChangedBlockRatio": 0.12,
       "maximumMeanChannelDelta": 0.025,
-      "masks": [
-        { "x": 0, "y": 0, "width": 860, "height": 46 }
-      ]
+      "masks": []
     },
     {
       "name": "settings",
       "approvedImage": "Design/QACurrent/implementation-settings.png",
-      "approvedImageSHA256": "aa420f24589a8f43e3a0ec10b870b3dbffa6d8f7dc3d9d7fd300167c324d12d5",
+      "approvedImageSHA256": "98a6b7cc3c76845a9858263ec1962492d5084aa933a4f2d911faa35fad226b97",
       "designReference": "Design/QACurrent/reference-settings.png",
-      "designReferenceSHA256": "4608f83c8f6374c411092567825394c3dcce367b9ceef23c702f844d511737ec",
+      "designReferenceSHA256": "10a798932c674264098357f75faf1647d90d778c9126df74681090be918ed726",
       "designDocument": "Design/cida.pen",
-      "designDocumentSHA256": "dbe535eb50ee22a22579d5311a56a9f63ba382ef93083ab91cbaa850509566e3",
+      "designDocumentSHA256": "ce81a76b39677c96f62b5f90a41514a2fe839916ed82e294371534be67230bb7",
       "logicalWidth": 560,
       "logicalHeight": 660,
       "blockSize": 8,
@@ -34,7 +32,12 @@
       "maximumChangedBlockRatio": 0.12,
       "maximumMeanChannelDelta": 0.025,
       "masks": [
-        { "x": 0, "y": 0, "width": 560, "height": 46 }
+        {
+          "x": 0,
+          "y": 0,
+          "width": 560,
+          "height": 46
+        }
       ]
     }
   ]

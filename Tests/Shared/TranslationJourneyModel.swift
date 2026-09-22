@@ -1,22 +1,20 @@
 import Foundation
 
+/// The commands a person can issue to the panel. The unit property test drives
+/// `AppModel` with them and the Release XCUI journey drives the real panel.
 enum TranslationJourneyCommand: Codable, Equatable, Sendable {
   case type(String)
   case paste(String)
   case deleteAll
+  case toggleAction
   case submit
   case releaseChunk(String)
   case pauseStream
   case complete
   case cancel
   case fail
-  case scrollUp
-  case scrollBottom
-  case expand(Int)
-  case collapse(Int)
-  case resize(width: Int, height: Int)
-  case closeSettings
-  case relaunch
+  case hide
+  case show
 }
 
 extension TranslationJourneyCommand: CustomStringConvertible {
@@ -25,28 +23,31 @@ extension TranslationJourneyCommand: CustomStringConvertible {
     case .type(let value): "type(\(value.debugDescription))"
     case .paste(let value): "paste(\(value.debugDescription))"
     case .deleteAll: "deleteAll"
+    case .toggleAction: "toggleAction"
     case .submit: "submit"
     case .releaseChunk(let value): "releaseChunk(\(value.debugDescription))"
     case .pauseStream: "pauseStream"
     case .complete: "complete"
     case .cancel: "cancel"
     case .fail: "fail"
-    case .scrollUp: "scrollUp"
-    case .scrollBottom: "scrollBottom"
-    case .expand(let ordinal): "expand(\(ordinal))"
-    case .collapse(let ordinal): "collapse(\(ordinal))"
-    case .resize(let width, let height): "resize(\(width)x\(height))"
-    case .closeSettings: "closeSettings"
-    case .relaunch: "relaunch"
+    case .hide: "hide"
+    case .show: "show"
     }
   }
 }
 
+/// The oracle for the single-result panel (Pencil `Spec — 面板模型`): one
+/// source, one action, at most one result, and the rules that tie them.
 struct TranslationJourneyModel: Equatable, Sendable {
-  enum EntryState: String, Codable, Equatable, Sendable {
+  enum Action: String, Codable, Equatable, Sendable {
+    case translate
+    case improve
+  }
+
+  enum ResultPhase: String, Codable, Equatable, Sendable {
     case streaming
     case completed
-    case cancelled
+    case stopped
     case failed
   }
 
@@ -56,179 +57,104 @@ struct TranslationJourneyModel: Equatable, Sendable {
     case document
   }
 
-  struct Entry: Codable, Equatable, Sendable {
-    let ordinal: Int
+  struct Result: Codable, Equatable, Sendable {
     let source: String
-    var result: String
-    var state: EntryState
-    var isCurrent: Bool
+    let action: Action
+    var text: String
+    var phase: ResultPhase
   }
 
-  private(set) var composerText = ""
-  private(set) var entries: [Entry] = []
-  private(set) var activeEntryOrdinal: Int?
-  private(set) var isPinnedToBottom = true
-  private(set) var detachedAnchorOrdinal: Int?
-  private(set) var expandedEntryOrdinals: Set<Int> = []
-  private(set) var windowWidth = 860
-  private(set) var windowHeight = 640
-  private(set) var isSettingsOpen = true
-  private(set) var relaunchCount = 0
-  private var durableEntries: [Entry] = []
-  private var sealedEntries: [Int: Entry] = [:]
+  private(set) var sourceText = ""
+  private(set) var action = Action.translate
+  private(set) var result: Result?
+  private(set) var isPanelVisible = true
+  private(set) var showCount = 0
 
-  var currentEntry: Entry? {
-    entries.last
+  var isStreaming: Bool {
+    result?.phase == .streaming
+  }
+
+  /// A terminal result whose source or action no longer matches the panel.
+  var isResultStale: Bool {
+    guard let result, result.phase != .streaming else { return false }
+    return result.source != sourceText || result.action != action
+  }
+
+  var canCopyResult: Bool {
+    guard let result else { return false }
+    return result.phase != .streaming && !result.text.isEmpty
   }
 
   var composerPresentation: ComposerPresentation {
-    let count = composerText.utf16.count
+    let count = sourceText.utf16.count
     if count >= 800 { return .document }
-    if count > 120 || composerText.contains(where: \Character.isNewline) {
+    if count > 120 || sourceText.contains(where: \Character.isNewline) {
       return .multiline
     }
     return .compact
-  }
-
-  var durableProjection: [Entry] {
-    durableEntries.map { entry in
-      var recovered = entry
-      if recovered.state == .streaming {
-        recovered.state = .cancelled
-      }
-      return recovered
-    }
   }
 
   @discardableResult
   mutating func apply(_ command: TranslationJourneyCommand) -> Bool {
     switch command {
     case .type(let value):
-      composerText.append(value)
+      sourceText.append(value)
     case .paste(let value):
-      composerText = value
+      sourceText = value
     case .deleteAll:
-      composerText = ""
+      sourceText = ""
+    case .toggleAction:
+      guard !isStreaming else { return false }
+      action = action == .translate ? .improve : .translate
     case .submit:
-      guard activeEntryOrdinal == nil, containsNonWhitespace(composerText) else {
-        return false
-      }
-      if !entries.isEmpty {
-        entries[entries.count - 1].isCurrent = false
-        sealedEntries[entries[entries.count - 1].ordinal] = entries[entries.count - 1]
-      }
-      let ordinal = (entries.last?.ordinal ?? -1) + 1
-      entries.append(
-        Entry(
-          ordinal: ordinal,
-          source: composerText,
-          result: "",
-          state: .streaming,
-          isCurrent: true
-        )
-      )
-      activeEntryOrdinal = ordinal
-      composerText = ""
-      isPinnedToBottom = true
-      detachedAnchorOrdinal = nil
-      synchronizeDurableProjection()
+      guard !isStreaming, containsNonWhitespace(sourceText) else { return false }
+      result = Result(source: sourceText, action: action, text: "", phase: .streaming)
     case .releaseChunk(let chunk):
-      guard let index = activeEntryIndex, !chunk.isEmpty else { return false }
-      entries[index].result.append(chunk)
-      synchronizeDurableProjection()
+      guard isStreaming, !chunk.isEmpty else { return false }
+      result?.text.append(chunk)
     case .pauseStream:
-      guard activeEntryOrdinal != nil else { return false }
+      guard isStreaming else { return false }
     case .complete:
-      guard let index = activeEntryIndex else { return false }
-      entries[index].state = entries[index].result.isEmpty ? .failed : .completed
-      activeEntryOrdinal = nil
-      synchronizeDurableProjection()
+      guard isStreaming, var completed = result else { return false }
+      completed.phase = completed.text.isEmpty ? .failed : .completed
+      result = completed
     case .cancel:
-      guard let index = activeEntryIndex else { return false }
-      entries[index].state = .cancelled
-      activeEntryOrdinal = nil
-      synchronizeDurableProjection()
+      guard isStreaming else { return false }
+      result?.phase = .stopped
     case .fail:
-      guard let index = activeEntryIndex else { return false }
-      entries[index].state = .failed
-      activeEntryOrdinal = nil
-      synchronizeDurableProjection()
-    case .scrollUp:
-      guard let currentEntry else { return false }
-      isPinnedToBottom = false
-      detachedAnchorOrdinal = currentEntry.ordinal
-    case .scrollBottom:
-      isPinnedToBottom = true
-      detachedAnchorOrdinal = nil
-    case .expand(let ordinal):
-      guard entries.contains(where: { $0.ordinal == ordinal }), ordinal != currentEntry?.ordinal
-      else { return false }
-      expandedEntryOrdinals.insert(ordinal)
-    case .collapse(let ordinal):
-      guard ordinal != currentEntry?.ordinal else { return false }
-      expandedEntryOrdinals.remove(ordinal)
-    case .resize(let width, let height):
-      windowWidth = max(640, width)
-      windowHeight = max(520, height)
-    case .closeSettings:
-      isSettingsOpen = false
-    case .relaunch:
-      entries = durableProjection
-      activeEntryOrdinal = nil
-      composerText = ""
-      isPinnedToBottom = true
-      detachedAnchorOrdinal = nil
-      isSettingsOpen = false
-      relaunchCount += 1
-      for index in entries.indices {
-        entries[index].isCurrent = index == entries.indices.last
-      }
-      expandedEntryOrdinals.formIntersection(entries.dropLast().map(\.ordinal))
-      rebuildSealedEntries()
-      synchronizeDurableProjection()
+      guard isStreaming else { return false }
+      result?.phase = .failed
+    case .hide:
+      guard isPanelVisible else { return false }
+      isPanelVisible = false
+    case .show:
+      guard !isPanelVisible else { return false }
+      isPanelVisible = true
+      showCount += 1
+      action = .translate
     }
     return true
   }
 
   func invariantViolations() -> [String] {
     var violations: [String] = []
-    let currentEntries = entries.filter(\.isCurrent)
-    if entries.isEmpty {
-      if !currentEntries.isEmpty { violations.append("empty history exposes a current entry") }
-    } else if currentEntries.count != 1 || currentEntries.first?.ordinal != entries.last?.ordinal {
-      violations.append("current entry is not the latest accepted submission")
-    }
-    if let activeEntryOrdinal {
-      if currentEntry?.ordinal != activeEntryOrdinal || currentEntry?.state != .streaming {
-        violations.append("active stream is not attached to the current entry")
+    if let result {
+      if result.phase == .streaming, result.source != sourceText, isResultStale {
+        violations.append("a running request reported itself stale")
       }
-    } else if currentEntry?.state == .streaming {
-      violations.append("streaming entry exists without an active request")
-    }
-    for (ordinal, sealed) in sealedEntries {
-      if entries.first(where: { $0.ordinal == ordinal }) != sealed {
-        violations.append("sealed entry \(ordinal) changed after a later submission")
+      if result.phase == .failed, result.text.isEmpty, canCopyResult {
+        violations.append("an empty failed result is copyable")
       }
-    }
-    if isPinnedToBottom {
-      if detachedAnchorOrdinal != nil {
-        violations.append("bottom-pinned history retained a detached anchor")
-      }
-    } else if detachedAnchorOrdinal == nil {
-      violations.append("detached history lost its reading anchor")
-    }
-    if expandedEntryOrdinals.contains(where: { ordinal in
-      !entries.contains(where: { $0.ordinal == ordinal }) || ordinal == currentEntry?.ordinal
-    }) {
-      violations.append("manual expansion contains an invalid or current entry")
+    } else if canCopyResult || isResultStale {
+      violations.append("no result but copy or stale state is set")
     }
     if composerPresentation == .compact,
-      composerText.utf16.count > 120 || composerText.contains(where: \Character.isNewline)
+      sourceText.utf16.count > 120 || sourceText.contains(where: \Character.isNewline)
     {
       violations.append("composer presentation is inconsistent with its document")
     }
-    if durableEntries.count != entries.count {
-      violations.append("durable projection lost an accepted submission")
+    if !isPanelVisible, showCount < 0 {
+      violations.append("hidden panel lost its show count")
     }
     return violations
   }
@@ -244,28 +170,18 @@ struct TranslationJourneyModel: Equatable, Sendable {
         .type("t\(step) "),
         .paste(step.isMultiple(of: 5) ? "line \(step)\nsecond line" : "paste \(step)"),
         .deleteAll,
-        .scrollUp,
-        .scrollBottom,
-        .resize(
-          width: 640 + Int(generator.next() % 600), height: 520 + Int(generator.next() % 360)),
-        .closeSettings,
+        .toggleAction,
+        .submit,
+        model.isPanelVisible ? .hide : .show,
       ]
-      if model.activeEntryOrdinal == nil {
-        candidates.append(.submit)
-        candidates.append(.relaunch)
-      } else {
+      if model.isStreaming {
         candidates += [
-          .submit,
           .releaseChunk("chunk-\(step)-\(generator.next() % 97) "),
           .pauseStream,
           .complete,
           .cancel,
           .fail,
         ]
-      }
-      if let first = model.entries.first, model.entries.count > 1 {
-        candidates.append(.expand(first.ordinal))
-        candidates.append(.collapse(first.ordinal))
       }
 
       let command = candidates[Int(generator.next() % UInt64(candidates.count))]
@@ -281,30 +197,14 @@ struct TranslationJourneyModel: Equatable, Sendable {
     .releaseChunk("Pool response for CIDA_E2E_POOL_STATE_MACHINE_A.\n"),
     .releaseChunk("CIDA_E2E_POOL_STATE_MACHINE_A_COMPLETE"),
     .complete,
-    .scrollUp,
-    .scrollBottom,
+    .hide,
+    .show,
     .paste("CIDA_E2E_POOL_STATE_MACHINE_B"),
     .submit,
     .releaseChunk("Pool response for CIDA_E2E_POOL_STATE_MACHINE_B.\n"),
     .releaseChunk("CIDA_E2E_POOL_STATE_MACHINE_B_COMPLETE"),
     .complete,
-    .relaunch,
   ]
-
-  private var activeEntryIndex: Int? {
-    guard let activeEntryOrdinal else { return nil }
-    return entries.firstIndex(where: { $0.ordinal == activeEntryOrdinal })
-  }
-
-  private mutating func synchronizeDurableProjection() {
-    durableEntries = entries
-  }
-
-  private mutating func rebuildSealedEntries() {
-    sealedEntries = Dictionary(
-      uniqueKeysWithValues: entries.dropLast().map { ($0.ordinal, $0) }
-    )
-  }
 
   private func containsNonWhitespace(_ value: String) -> Bool {
     value.unicodeScalars.contains { !CharacterSet.whitespacesAndNewlines.contains($0) }

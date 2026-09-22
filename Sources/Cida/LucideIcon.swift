@@ -5,13 +5,11 @@ enum LucideIconName: String, CaseIterable {
   case languages
   case sparkles
   case scanText = "scan-text"
-  case arrowLeftRight = "arrow-left-right"
-  case arrowUp = "arrow-up"
-  case rotateCounterclockwise = "rotate-ccw"
   case copy
   case check
-  case chevronDown = "chevron-down"
-  case chevronUp = "chevron-up"
+  case info
+  case circleStop = "circle-stop"
+  case circleAlert = "circle-alert"
 }
 
 @MainActor

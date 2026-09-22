@@ -43,11 +43,13 @@ extension InteractionReproductionTests {
     }
   }
 
+  /// The tests never take the user's focus. A key non-activating panel makes
+  /// `NSApp.isActive` report true without the process becoming frontmost, so
+  /// the frontmost application is the invariant.
   func assertTestProcessIsNotFrontmost(
     file: StaticString = #filePath,
     line: UInt = #line
   ) {
-    XCTAssertFalse(NSApp.isActive, file: file, line: line)
     XCTAssertNotEqual(
       NSWorkspace.shared.frontmostApplication?.processIdentifier,
       ProcessInfo.processInfo.processIdentifier,
@@ -123,7 +125,7 @@ extension InteractionReproductionTests {
     {
       return textView
     }
-    if let container = view as? HistoryResultTextContainer,
+    if let container = view as? ResultTextContainer,
       container.subviews.contains(where: {
         $0.accessibilityIdentifier() == identifier
       })
@@ -138,13 +140,13 @@ extension InteractionReproductionTests {
     return nil
   }
 
-  func allHistoryResultContainers(in view: NSView) -> [HistoryResultTextContainer] {
-    var containers: [HistoryResultTextContainer] = []
-    if let container = view as? HistoryResultTextContainer {
+  func allResultContainers(in view: NSView) -> [ResultTextContainer] {
+    var containers: [ResultTextContainer] = []
+    if let container = view as? ResultTextContainer {
       containers.append(container)
     }
     for child in view.subviews {
-      containers.append(contentsOf: allHistoryResultContainers(in: child))
+      containers.append(contentsOf: allResultContainers(in: child))
     }
     return containers
   }
@@ -159,34 +161,43 @@ extension InteractionReproductionTests {
     return minimumAlpha
   }
 
-  func firstHistoryResultContainer(
-    in view: NSView,
-    identifier: String
-  ) -> HistoryResultTextContainer? {
-    if let container = view as? HistoryResultTextContainer,
-      container.subviews.contains(where: {
-        $0.accessibilityIdentifier() == identifier
-      })
-    {
-      return container
-    }
+  func firstResultContainer(in view: NSView) -> ResultTextContainer? {
+    allResultContainers(in: view).first
+  }
+
+  func firstResultScrollView(in view: NSView) -> ResultScrollView? {
+    if let scrollView = view as? ResultScrollView { return scrollView }
     for child in view.subviews {
-      if let result = firstHistoryResultContainer(in: child, identifier: identifier) {
-        return result
-      }
+      if let result = firstResultScrollView(in: child) { return result }
     }
     return nil
   }
 
-  func nativeHistoryEntryAncestor(of view: NSView) -> HistoryEntryNSView? {
-    var ancestor = view.superview
-    while let current = ancestor {
-      if let historyEntry = current as? HistoryEntryNSView {
-        return historyEntry
+  /// Finds a SwiftUI accessibility element by identifier through the
+  /// accessibility tree, which is how XCUI sees the panel too.
+  func accessibilityElement(in root: NSView, identifier: String) -> NSAccessibilityProtocol? {
+    func visit(_ node: Any) -> NSAccessibilityProtocol? {
+      guard let element = node as? NSAccessibilityProtocol else { return nil }
+      if element.accessibilityIdentifier() == identifier { return element }
+      for child in element.accessibilityChildren() ?? [] {
+        if let match = visit(child) { return match }
       }
-      ancestor = current.superview
+      return nil
     }
-    return nil
+    return visit(root)
+  }
+
+  /// A hidden panel host: the real `PanelController` wiring without ordering
+  /// the panel onto the user's screen.
+  func makeHiddenPanel(model: AppModel) -> PanelController {
+    FontRegistrar.registerBundledFonts()
+    let controller = PanelController(model: model, hidesOnResignKey: false, openSettings: {})
+    controller.panel.alphaValue = 0
+    retainedTestWindows.append(controller.panel)
+    retainedPanelControllers.append(controller)
+    controller.contentView?.layoutSubtreeIfNeeded()
+    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    return controller
   }
 
   func firstScroller(in view: NSView, identifier: String) -> CidaScrollIndicator? {
@@ -197,34 +208,6 @@ extension InteractionReproductionTests {
     }
     for child in view.subviews {
       if let result = firstScroller(in: child, identifier: identifier) {
-        return result
-      }
-    }
-    return nil
-  }
-
-  func firstVirtualizedHistoryList(
-    in view: NSView
-  ) -> VirtualizedFoldedHistoryListNSView? {
-    if let list = view as? VirtualizedFoldedHistoryListNSView {
-      return list
-    }
-    for child in view.subviews {
-      if let result = firstVirtualizedHistoryList(in: child) {
-        return result
-      }
-    }
-    return nil
-  }
-
-  func firstHistoryEntryHoverTracker(
-    in view: NSView
-  ) -> HistoryEntryHoverTrackingNSView? {
-    if let tracker = view as? HistoryEntryHoverTrackingNSView {
-      return tracker
-    }
-    for child in view.subviews {
-      if let result = firstHistoryEntryHoverTracker(in: child) {
         return result
       }
     }
@@ -312,11 +295,11 @@ extension InteractionReproductionTests {
 
 }
 
-final class HistoryResultHeightProbeView: NSView, HistoryResultHeightChangeHosting {
+final class ResultHeightProbeView: NSView, ResultHeightChangeHosting {
   private(set) var publishedHeightDeltas: [CGFloat] = []
   private(set) var publishedAnimatedFlags: [Bool] = []
 
-  func historyResultHeightWillChange(by delta: CGFloat, animated: Bool) {
+  func resultHeightWillChange(by delta: CGFloat, animated: Bool) {
     publishedHeightDeltas.append(delta)
     publishedAnimatedFlags.append(animated)
   }

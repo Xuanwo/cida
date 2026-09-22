@@ -31,11 +31,14 @@ enum CidaDesign {
     static let background = CidaColorToken(0xFAFAF8)
     static let surface = CidaColorToken(0xFFFFFF)
     static let surfaceDim = CidaColorToken(0xF4F4F1)
-    static let surfaceFold = CidaColorToken(0xF1F1EC)
+    static let surfacePaper = CidaColorToken(0xF7F6F1)
     static let border = CidaColorToken(0xE8E8E3)
     static let textPrimary = CidaColorToken(0x1A1A18)
     static let textSecondary = CidaColorToken(0x8A8A83)
     static let textTertiary = CidaColorToken(0xB5B5AE)
+    static let textInk = CidaColorToken(0x161614)
+    static let textControl = CidaColorToken(0x4E4E49)
+    static let hint = CidaColorToken(0xC4C4BD)
     static let accent = CidaColorToken(0x2E6B4F)
     static let accentSoft = CidaColorToken(0xEAF2EE)
     static let accentForeground = CidaColorToken(0xFFFFFF)
@@ -46,11 +49,14 @@ enum CidaDesign {
   static let background = Palette.background.swiftUI
   static let surface = Palette.surface.swiftUI
   static let surfaceDim = Palette.surfaceDim.swiftUI
-  static let surfaceFold = Palette.surfaceFold.swiftUI
+  static let surfacePaper = Palette.surfacePaper.swiftUI
   static let border = Palette.border.swiftUI
   static let textPrimary = Palette.textPrimary.swiftUI
   static let textSecondary = Palette.textSecondary.swiftUI
   static let textTertiary = Palette.textTertiary.swiftUI
+  static let textInk = Palette.textInk.swiftUI
+  static let textControl = Palette.textControl.swiftUI
+  static let hint = Palette.hint.swiftUI
   static let accent = Palette.accent.swiftUI
   static let accentSoft = Palette.accentSoft.swiftUI
   static let accentForeground = Palette.accentForeground.swiftUI
@@ -58,6 +64,7 @@ enum CidaDesign {
 
   enum Radius {
     static let window: CGFloat = 14
+    static let panel: CGFloat = 14
     static let card: CGFloat = 8
     static let segment: CGFloat = 7
     static let chip: CGFloat = 6
@@ -67,7 +74,32 @@ enum CidaDesign {
   enum Spacing {
     static let windowHorizontal: CGFloat = 28
     static let entryVertical: CGFloat = 16
+    static let paneVertical: CGFloat = 18
+    static let resultVertical: CGFloat = 22
     static let component: CGFloat = 12
+  }
+
+  /// Pencil `Spec — 面板模型`: the floating panel's fixed width and the
+  /// screen-relative limits of its height.
+  enum Panel {
+    static let width: CGFloat = 800
+    static let topRatio: CGFloat = 0.2
+    static let sourceMaxRatio: CGFloat = 0.3
+    static let maxRatio: CGFloat = 0.7
+    static let controlBarHeight: CGFloat = 50
+    static let compactEditorHeight: CGFloat = 27
+    static let composerLineHeight: CGFloat = 26
+  }
+
+  /// Pencil result typography (`font-size-result*` × `line-height-result*`,
+  /// rounded to whole points).
+  enum Typography {
+    static let bodySize: CGFloat = 16
+    static let bodyLineHeight: CGFloat = 26
+    static let resultSize: CGFloat = 17.5
+    static let resultSizeCJK: CGFloat = 17
+    static let resultLineHeight: CGFloat = 29
+    static let resultLineHeightCJK: CGFloat = 31
   }
 
   static let windowRadius = Radius.window
@@ -91,6 +123,27 @@ enum CidaDesign {
 
   static func brand(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
     .custom(notoSerifSCName(for: weight), fixedSize: size)
+  }
+
+  /// The result face: Source Serif 4 for Latin results, Noto Serif SC for
+  /// Chinese ones, each cascading to the other for mixed text.
+  static func appKitResult(for language: Language) -> NSFont {
+    let size = language == .chinese ? Typography.resultSizeCJK : Typography.resultSize
+    let primary = language == .chinese ? "Noto Serif SC" : "Source Serif 4"
+    let secondary = language == .chinese ? "Source Serif 4" : "Noto Serif SC"
+    let cascade = [NSFontDescriptor(fontAttributes: [.family: secondary])]
+    let descriptor = NSFontDescriptor(fontAttributes: [
+      .family: primary,
+      .cascadeList: cascade,
+    ])
+    if let font = NSFont(descriptor: descriptor, size: size),
+      font.familyName == primary
+    {
+      return font
+    }
+    let fallback = NSFontDescriptor.preferredFontDescriptor(forTextStyle: .body)
+      .withDesign(.serif) ?? NSFontDescriptor.preferredFontDescriptor(forTextStyle: .body)
+    return NSFont(descriptor: fallback, size: size) ?? NSFont.systemFont(ofSize: size)
   }
 
   static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
@@ -118,7 +171,6 @@ enum CidaMotion {
   static let iconSwapMilliseconds = 150
   static let heightMilliseconds = 150
   static let cursorOutMilliseconds = 200
-  static let historyFoldMilliseconds = 200
   static let copiedHoldMilliseconds = 800
   static let breatheMilliseconds = 1_200
   static let catchUpMilliseconds = 400
@@ -128,7 +180,6 @@ enum CidaMotion {
   static let iconSwapSeconds: Double = 0.150
   static let heightSeconds: Double = 0.150
   static let cursorOutSeconds: CFTimeInterval = 0.200
-  static let historyFoldSeconds: Double = 0.200
   static let breatheHalfCycleSeconds: CFTimeInterval = 0.600
 
   static let minimumCharactersPerSecond = 30.0
@@ -139,8 +190,8 @@ enum CidaMotion {
   static let cursorWidth: CGFloat = 2
   static let cursorHeight: CGFloat = 20
 
-  /// `motion-ease-char-in`, `motion-ease-height`, and `motion-ease-fold` are all
-  /// the Pencil ease-out curve. Core Animation and SwiftUI read the same
+  /// `motion-ease-char-in` and `motion-ease-height` are both the Pencil
+  /// ease-out curve. Core Animation and SwiftUI read the same
   /// control points, so a frame that SwiftUI animates and the content that
   /// AppKit animates inside it stay in step.
   static let easeOutControlPoints: (x1: Float, y1: Float, x2: Float, y2: Float) = (0.33, 1, 0.68, 1)

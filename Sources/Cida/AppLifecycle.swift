@@ -19,8 +19,8 @@ struct CidaApplication: App {
       }
 
       CommandGroup(after: .newItem) {
-        Button("打开输入窗口") {
-          appDelegate.showMainWindow()
+        Button("显示辞达") {
+          appDelegate.togglePanel()
         }
         .keyboardShortcut(.space, modifiers: .option)
       }
@@ -28,62 +28,19 @@ struct CidaApplication: App {
   }
 }
 
+/// Cida is a menu-bar application: no Dock icon, one floating panel shown by
+/// Option-Space, and a standard Settings window (Pencil `Spec — 面板模型`).
 @MainActor
 final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private let launchOptions = LaunchOptions(arguments: ProcessInfo.processInfo.arguments)
-  private let launchDiagnostics = LaunchPerformanceDiagnostics()
-  private lazy var historyStore: HistoryStore? = {
-    if let databaseURL = launchOptions.automationHistoryDatabaseURL {
-      do {
-        return try HistoryStore(databaseURL: databaseURL)
-      } catch {
-        fputs("Failed to open isolated automation history database: \(error)\n", stderr)
-        return nil
-      }
-    }
-    guard !launchOptions.isAutomation else { return nil }
-    do {
-      return try HistoryStore.openProduction()
-    } catch {
-      fputs("Failed to open history database: \(error)\n", stderr)
-      return nil
-    }
-  }()
   private lazy var model: AppModel = {
     let settingsStorageNamespace = launchOptions.settingsStorageNamespace
-    let persistedEntries: [HistoryEntry]
-    var historyPage: HistoryPage?
-    if let historyStore {
-      let startedAt = CACurrentMediaTime()
-      do {
-        let loadedPage = try historyStore.loadRecent(limit: launchOptions.initialHistoryPageSize)
-        historyPage = loadedPage
-        persistedEntries = loadedPage.entries
-      } catch {
-        fputs("Failed to load history database: \(error)\n", stderr)
-        persistedEntries = []
-      }
-      launchDiagnostics.recordHistoryLoad(
-        durationMilliseconds: (CACurrentMediaTime() - startedAt) * 1_000,
-        databaseURL: launchOptions.automationHistoryDatabaseURL
-      )
-    } else if launchOptions.isAutomation {
-      persistedEntries = launchOptions.designEntries
-    } else {
-      persistedEntries = []
-    }
     return AppModel(
       mode: launchOptions.initialMode,
       inputText: launchOptions.initialInput,
-      entries: persistedEntries,
+      result: launchOptions.initialResult,
       settings: launchOptions.initialSettings,
       service: launchOptions.textProcessingService,
-      historyPersistence: historyStore,
-      historyPageLoader: historyStore,
-      historyTotalCount: historyPage?.totalCount,
-      historyOldestSortOrder: historyPage?.oldestSortOrder,
-      historyHasMoreBefore: historyPage?.hasMoreBefore ?? false,
-      historyPageSize: launchOptions.initialHistoryPageSize,
       saveSettings: { settings in
         SettingsStore.save(settings, namespace: settingsStorageNamespace)
       },
@@ -93,59 +50,51 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     )
   }()
 
-  private var mainWindowController: NSWindowController?
+  private var panelController: PanelController?
   private var settingsWindowController: NSWindowController?
-  private var eventMonitor: Any?
+  private var statusItem: NSStatusItem?
   private var globalHotKey: GlobalHotKey?
   private var performanceProbeView: FramePacingProbeNSView?
   private var millionCharacterPasteWorkload: MillionCharacterPasteWorkload?
-  private var largeHistoryScrollWorkload: LargeHistoryScrollWorkload?
-  private var extremeWorkflowWorkload: ExtremeWorkflowWorkload?
   private var inputInteractionProbe: InputInteractionProbe?
+  private var lifecycleLog: AutomationLifecycleLog?
   private var didAttemptInteractiveAPIKeyRecovery = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     FontRegistrar.registerBundledFonts()
-    HistoryResultTextContainerPool.shared.prewarm()
-    NSApp.setActivationPolicy(
-      launchOptions.isAutomation && !launchOptions.displaysInteractiveAutomationUI
-        ? .accessory : .regular
-    )
+    NSApp.setActivationPolicy(.accessory)
 
-    let mainView = MainWindowView(
+    let panelController = PanelController(
       model: model,
-      automaticallyFocusInput:
-        !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI,
+      hidesOnResignKey: !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI,
       openSettings: { [weak self] in self?.showSettings() }
     )
-    mainWindowController = makeWindowController(
-      rootView: AnyView(mainView),
-      size: launchOptions.designState.mainWindowSize,
-      minimumSize: CGSize(width: 640, height: 480),
-      title: "辞达"
-    )
-    if let contentView = mainWindowController?.window?.contentView {
+    self.panelController = panelController
+    if let logURL = launchOptions.lifecycleLogURL {
+      lifecycleLog = AutomationLifecycleLog(url: logURL)
+      lifecycleLog?.observe(panel: panelController.panel)
+      lifecycleLog?.record("did-finish-launching", panel: panelController.panel)
+    }
+    if let contentView = panelController.contentView {
       model.attachDisplayLink(to: contentView)
     }
     installPerformanceProbeIfNeeded()
 
-    installKeyboardMonitor()
-    if !launchOptions.isAutomation {
+    if !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI {
+      installStatusItem()
       globalHotKey = GlobalHotKey { [weak self] in
-        self?.showMainWindow()
+        self?.togglePanel()
       }
     }
 
     if launchOptions.displaysInteractiveAutomationUI {
-      showMainWindow()
+      showPanel()
     } else if launchOptions.isAutomation {
-      prepareAutomationWindow()
-      if let outputURL = launchOptions.inputInteractionOutputURL,
-        let window = mainWindowController?.window
-      {
+      prepareAutomationPanel()
+      if let outputURL = launchOptions.inputInteractionOutputURL {
         inputInteractionProbe = InputInteractionProbe(
           outputURL: outputURL,
-          window: window,
+          window: panelController.panel,
           model: model
         )
         inputInteractionProbe?.run()
@@ -155,29 +104,72 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     } else if launchOptions.designState.isSettings {
       showSettings()
     } else {
-      showMainWindow()
+      showPanel()
     }
 
     if let outputURL = launchOptions.snapshotOutputURL {
-      let targetWindow =
+      let targetWindow: NSWindow? =
         launchOptions.designState.isSettings
         ? settingsWindowController?.window
-        : mainWindowController?.window
+        : panelController.panel
       scheduleSnapshot(of: targetWindow, to: outputURL)
     }
   }
 
   func applicationWillTerminate(_ notification: Notification) {
-    if let eventMonitor {
-      NSEvent.removeMonitor(eventMonitor)
-    }
     if launchOptions.persistsSettings {
       model.persistSettings()
     }
-    model.flushHistoryPersistence()
   }
 
-  func applicationDidBecomeActive(_ notification: Notification) {
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    false
+  }
+
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    showPanel()
+    return true
+  }
+
+  @objc
+  func togglePanel() {
+    guard let panelController else { return }
+    if panelController.isVisible {
+      panelController.hide()
+    } else {
+      showPanel()
+    }
+  }
+
+  @objc
+  func showPanel() {
+    recoverAPIKeyIfNeeded()
+    lifecycleLog?.record("show-panel-requested", panel: panelController?.panel)
+    panelController?.show()
+    lifecycleLog?.record("show-panel-finished", panel: panelController?.panel)
+  }
+
+  @objc
+  func showSettings() {
+    ensureSettingsWindowController()
+
+    guard let window = settingsWindowController?.window else { return }
+    panelController?.hide()
+    NSApp.activate(ignoringOtherApps: true)
+    window.makeKeyAndOrderFront(nil)
+  }
+
+  @objc
+  private func quit() {
+    NSApp.terminate(nil)
+  }
+
+  /// The Keychain may ask the user to allow access; do it the first time the
+  /// panel is shown, when someone is at the keyboard.
+  private func recoverAPIKeyIfNeeded() {
     guard
       !launchOptions.isAutomation,
       !didAttemptInteractiveAPIKeyRecovery,
@@ -193,67 +185,54 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    false
-  }
-
-  func applicationShouldHandleReopen(
-    _ sender: NSApplication,
-    hasVisibleWindows flag: Bool
-  ) -> Bool {
-    if !flag {
-      showMainWindow()
+  private func installStatusItem() {
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    if let button = item.button {
+      if let image = NSImage(systemSymbolName: "translate", accessibilityDescription: "辞达") {
+        button.image = image
+      } else {
+        button.title = "辞"
+      }
+      button.setAccessibilityIdentifier("cida-status-item")
     }
-    return true
+    let menu = NSMenu()
+    let show = NSMenuItem(title: "显示辞达", action: #selector(showPanel), keyEquivalent: " ")
+    show.keyEquivalentModifierMask = [.option]
+    show.target = self
+    menu.addItem(show)
+    let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
+    settings.target = self
+    menu.addItem(settings)
+    menu.addItem(.separator())
+    let quit = NSMenuItem(title: "退出辞达", action: #selector(quit), keyEquivalent: "q")
+    quit.target = self
+    menu.addItem(quit)
+    item.menu = menu
+    statusItem = item
   }
 
-  @objc
-  func showMainWindow() {
-    guard let window = mainWindowController?.window else { return }
-    window.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
-    model.requestInputFocus()
-  }
-
-  @objc
-  func showSettings() {
-    ensureSettingsWindowController()
-
-    guard let window = settingsWindowController?.window else { return }
-    window.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
-  }
-
-  private func prepareAutomationWindow() {
+  /// Non-interactive automation keeps the panel off the user's screen: probes
+  /// order it behind everything at near-zero alpha, snapshots render it
+  /// without ordering it in at all.
+  private func prepareAutomationPanel() {
+    guard let panel = panelController?.panel else { return }
     if launchOptions.designState.isSettings {
       ensureSettingsWindowController()
     }
 
     if launchOptions.inputInteractionOutputURL != nil {
-      guard let window = mainWindowController?.window else { return }
-      window.alphaValue = 0
-      window.hasShadow = false
-      window.orderBack(nil)
-      window.displayIfNeeded()
+      panel.alphaValue = 0
+      panel.hasShadow = false
+      panel.orderBack(nil)
+      panel.displayIfNeeded()
     } else if launchOptions.performanceProbe != nil {
-      guard let window = mainWindowController?.window else { return }
-      window.alphaValue = 1
-      window.isOpaque = false
-      window.backgroundColor = .clear
-      window.hasShadow = false
-      window.contentView?.alphaValue = 0.004
-      window.ignoresMouseEvents = true
-      window.collectionBehavior = [.ignoresCycle, .stationary]
-      for buttonType in [
-        NSWindow.ButtonType.closeButton,
-        .miniaturizeButton,
-        .zoomButton,
-      ] {
-        window.standardWindowButton(buttonType)?.isHidden = true
-      }
-      window.orderBack(nil)
-      window.displayIfNeeded()
-      launchDiagnostics.recordInitialRenderIfNeeded()
+      panel.alphaValue = 1
+      panel.hasShadow = false
+      panel.contentView?.alphaValue = 0.004
+      panel.ignoresMouseEvents = true
+      panel.collectionBehavior = [.ignoresCycle, .stationary]
+      panel.orderBack(nil)
+      panel.displayIfNeeded()
     }
   }
 
@@ -274,7 +253,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private func installPerformanceProbeIfNeeded() {
     guard
       let configuration = launchOptions.performanceProbe,
-      let contentView = mainWindowController?.window?.contentView
+      let contentView = panelController?.contentView
     else {
       return
     }
@@ -300,7 +279,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
           streamPresentationUpdateCount: self.model.streamPresentationUpdateCount,
           maximumStreamPresentationBatchCharacterCount:
             self.model.maximumStreamPresentationCharacterCount,
-          outputCharacterCount: self.model.entries.last?.resultUTF16Length
+          outputCharacterCount: self.model.result?.resultUTF16Length
         )
       }
     case .millionCharacterPaste:
@@ -319,41 +298,6 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         return pasteWorkload.performPaste()
       }
       workloadMetrics = { pasteWorkload.metrics() }
-    case .largeHistoryScroll:
-      let historyWorkload = LargeHistoryScrollWorkload(model: model, rootView: contentView)
-      largeHistoryScrollWorkload = historyWorkload
-      exerciseInteraction = { displayLinkTick in
-        if displayLinkTick < -20 {
-          historyWorkload.warmUpUpwardScroll()
-          return false
-        }
-        if displayLinkTick == -20 {
-          historyWorkload.resetAfterWarmup()
-          return false
-        }
-        guard displayLinkTick > 0 else {
-          return false
-        }
-        return historyWorkload.performUpwardScroll()
-      }
-      workloadMetrics = { historyWorkload.metrics() }
-    case .extremeWorkflow:
-      guard let extremeConfiguration = launchOptions.extremeWorkflowConfiguration else {
-        fputs("Extreme workflow performance configuration is missing\n", stderr)
-        return
-      }
-      let extremeWorkload = ExtremeWorkflowWorkload(
-        model: model,
-        rootView: contentView,
-        configuration: extremeConfiguration,
-        diagnostics: launchDiagnostics
-      )
-      extremeWorkflowWorkload = extremeWorkload
-      exerciseInteraction = { displayLinkTick in
-        guard displayLinkTick > 0 else { return false }
-        return extremeWorkload.exercise()
-      }
-      workloadMetrics = { extremeWorkload.metrics() }
     }
 
     let probeView = FramePacingProbeNSView(
@@ -393,37 +337,6 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     return NSWindowController(window: window)
   }
 
-  private func installKeyboardMonitor() {
-    eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-      guard
-        let self,
-        NSApp.keyWindow === self.mainWindowController?.window
-      else {
-        return event
-      }
-
-      if CopyShortcutRouting.isLatestResultShortcut(event) {
-        if CopyShortcutRouting.nativeTextResponderOwnsCopy(
-          window: self.mainWindowController?.window)
-        {
-          return event
-        }
-        return self.model.copyLatestResult() ? nil : event
-      }
-
-      switch event.keyCode {
-      case 48 where event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty:
-        self.model.toggleMode()
-        return nil
-      case 53:
-        self.mainWindowController?.window?.performClose(nil)
-        return nil
-      default:
-        return event
-      }
-    }
-  }
-
   private func scheduleSnapshot(of window: NSWindow?, to outputURL: URL) {
     guard let window else { return }
 
@@ -444,42 +357,21 @@ final class CidaWindow: NSWindow {
   override var canBecomeMain: Bool { true }
 }
 
-@MainActor
-enum CopyShortcutRouting {
-  static func isLatestResultShortcut(_ event: NSEvent) -> Bool {
-    let modifiers = event.modifierFlags
-      .intersection(.deviceIndependentFlagsMask)
-      .subtracting(.capsLock)
-    guard modifiers == .command else { return false }
-    return event.keyCode == 8 || event.charactersIgnoringModifiers?.lowercased() == "c"
-  }
-
-  static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {
-    guard let textView = window?.firstResponder as? NSTextView else { return false }
-    return textView.isEditable || textView.selectedRange().length > 0
-  }
-}
-
+/// The panel states of `States — 面板交互` that automation can start in.
 private enum DesignState: String {
+  case empty
   case translate
   case improve
-  case largeInput = "large-input"
   case streaming
-  /// Pencil `Main — 翻译 · 长记录折叠`: one long record at rest above the focus record.
-  case historyFolded = "history-folded"
-  /// Pencil `Main — 宽窗口 1280 · 阅读列宽`: the reading column centred in a wide window.
-  case wideReadingColumn = "wide-reading-column"
+  case stale
+  case stopped
+  case failed
+  case long
   case settings
   case settingsOpenAI = "settings-openai"
 
   var isSettings: Bool {
     self == .settings || self == .settingsOpenAI
-  }
-
-  var mainWindowSize: CGSize {
-    self == .wideReadingColumn
-      ? CGSize(width: 1_280, height: 720)
-      : CGSize(width: 860, height: 640)
   }
 }
 
@@ -491,11 +383,9 @@ private struct LaunchOptions {
   let snapshotDelayMilliseconds: Int
   let explicitlyIsolatedAutomation: Bool
   let isE2ETesting: Bool
-  let automationHistoryDatabaseURL: URL?
   let automationOpenAIEndpoint: String?
   let automationSettingsNamespace: String?
-  let extremeWorkflowConfiguration: ExtremeWorkflowConfiguration?
-  let initialHistoryPageSize: Int
+  let lifecycleLogURL: URL?
 
   var isAutomation: Bool {
     explicitlyIsolatedAutomation || snapshotOutputURL != nil
@@ -536,7 +426,7 @@ private struct LaunchOptions {
     #endif
     if let automationOpenAIEndpoint {
       settings.provider = .openAI
-      settings.model = "cida-extreme-local-model"
+      settings.model = "cida-local-model"
       settings.openAIEndpoint = automationOpenAIEndpoint
       settings.apiKey = ""
     }
@@ -556,41 +446,59 @@ private struct LaunchOptions {
     designState == .improve ? .improve : .translate
   }
 
-  var designEntries: [HistoryEntry] {
-    guard isAutomation else { return [] }
+  var initialResult: ResultRecord? {
+    guard usesDesignFixtures else { return nil }
     #if DEBUG
       switch designState {
-      case .streaming:
-        return [HistoryEntry.designSamples[1]]
-      case .largeInput:
-        return HistoryEntry.longDesignSamples
-      case .historyFolded:
-        return [HistoryEntry.longDesignSamples[0], HistoryEntry.designSamples[2]]
-      case .wideReadingColumn:
-        return [HistoryEntry.designSamples[0], HistoryEntry.longDesignSamples[0]]
-          + Array(HistoryEntry.designSamples[1...])
-      case .translate, .improve, .settings, .settingsOpenAI:
-        return HistoryEntry.designSamples
+      case .translate:
+        return ResultRecord.designCompleted(mode: .translate)
+      case .improve:
+        return ResultRecord.designCompleted(mode: .improve)
+      case .stale:
+        return ResultRecord.designCompleted(mode: .translate)
+      case .stopped:
+        let record = ResultRecord(
+          mode: .translate,
+          source: ResultRecord.designTranslateSource,
+          outputLanguage: .english,
+          result: "Our system adopts a brand-new storage engine that significantly improves read and write",
+          phase: .stopped
+        )
+        return record
+      case .failed:
+        return ResultRecord(
+          mode: .translate,
+          source: ResultRecord.designTranslateSource,
+          outputLanguage: .english,
+          phase: .failed(message: "401 Unauthorized（deepseek-chat）。检查 API Key 后")
+        )
+      case .long:
+        return ResultRecord.designLong()
+      case .empty, .streaming, .settings, .settingsOpenAI:
+        return nil
       }
     #else
-      return []
+      return nil
     #endif
   }
 
   var initialInput: String {
+    guard usesDesignFixtures else { return "" }
     #if DEBUG
       return switch designState {
+      case .translate, .streaming, .stopped, .failed:
+        ResultRecord.designTranslateSource
       case .improve:
-        "这个功能通过复用已有的缓存结果,使得整体的处理流程在大多数的情况下都能够得到比较明显的加速。"
-      case .largeInput:
-        HistoryEntry.designLongInput
-      case .streaming:
-        "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
-      case .translate, .historyFolded, .wideReadingColumn, .settings, .settingsOpenAI:
+        ResultRecord.designImproveSource
+      case .stale:
+        "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
+      case .long:
+        ResultRecord.designLongInput
+      case .empty, .settings, .settingsOpenAI:
         ""
       }
     #else
-      ""
+      return ""
     #endif
   }
 
@@ -599,11 +507,6 @@ private struct LaunchOptions {
       ProcessInfo.processInfo.environment["CIDA_ISOLATED_AUTOMATION"] == "1"
     isE2ETesting =
       explicitlyIsolatedAutomation && arguments.contains("--e2e-testing")
-    automationHistoryDatabaseURL =
-      explicitlyIsolatedAutomation
-      ? arguments.value(after: "--automation-history-database")
-        .map { URL(fileURLWithPath: $0) }
-      : nil
     automationOpenAIEndpoint =
       explicitlyIsolatedAutomation
       ? arguments.value(after: "--automation-openai-endpoint")
@@ -611,6 +514,10 @@ private struct LaunchOptions {
     let requestedAutomationSettingsNamespace =
       explicitlyIsolatedAutomation
       ? arguments.value(after: "--automation-settings-namespace")
+      : nil
+    lifecycleLogURL =
+      explicitlyIsolatedAutomation
+      ? arguments.value(after: "--automation-lifecycle-log").map { URL(fileURLWithPath: $0) }
       : nil
     if isE2ETesting {
       guard
@@ -623,17 +530,9 @@ private struct LaunchOptions {
     } else {
       automationSettingsNamespace = nil
     }
-    initialHistoryPageSize = min(
-      5_000,
-      max(
-        64,
-        arguments.value(after: "--history-page-size").flatMap(Int.init)
-          ?? 128
-      )
-    )
     designState =
       arguments.value(after: "--design-state")
-      .flatMap(DesignState.init(rawValue:)) ?? .translate
+      .flatMap(DesignState.init(rawValue:)) ?? .empty
 
     snapshotOutputURL = arguments.value(after: "--snapshot-output")
       .map { URL(fileURLWithPath: $0) }
@@ -655,8 +554,7 @@ private struct LaunchOptions {
       let requiredFramesPerSecond =
         arguments.value(after: "--performance-required-fps")
         .flatMap(Int.init)
-        ?? (workload == .millionCharacterPaste || workload == .largeHistoryScroll
-          || workload == .extremeWorkflow ? 120 : nil)
+        ?? (workload == .millionCharacterPaste ? 120 : nil)
       performanceProbe = PerformanceProbeConfiguration(
         outputURL: URL(fileURLWithPath: output),
         sampleCount: max(120, sampleCount),
@@ -664,34 +562,10 @@ private struct LaunchOptions {
         workload: workload,
         requiredFramesPerSecond: requiredFramesPerSecond,
         requiresZeroMissedFrameBudgets: workload == .millionCharacterPaste
-          || workload == .largeHistoryScroll
-          || workload == .extremeWorkflow
           || arguments.contains("--performance-zero-missed-frame-budgets")
       )
-      if workload == .extremeWorkflow {
-        extremeWorkflowConfiguration = ExtremeWorkflowConfiguration(
-          expectedInitialHistoryEntryCount: arguments.value(
-            after: "--extreme-history-count"
-          ).flatMap(Int.init) ?? 0,
-          inputCharacterCount: arguments.value(after: "--extreme-input-characters")
-            .flatMap(Int.init) ?? 1_000_000,
-          outputCharacterCount: arguments.value(after: "--extreme-output-characters")
-            .flatMap(Int.init) ?? 1_024,
-          minimumNormalScrollDistancePoints: CGFloat(
-            arguments.value(after: "--extreme-normal-scroll-points")
-              .flatMap(Double.init) ?? 6_000
-          ),
-          minimumHyperScrollDistancePoints: CGFloat(
-            arguments.value(after: "--extreme-hyper-scroll-points")
-              .flatMap(Double.init) ?? 120_000
-          )
-        )
-      } else {
-        extremeWorkflowConfiguration = nil
-      }
     } else {
       performanceProbe = nil
-      extremeWorkflowConfiguration = nil
     }
   }
 }

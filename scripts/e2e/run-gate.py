@@ -17,12 +17,9 @@ P0_RELEASE_TESTS = (
     "CidaUITests/CidaReleaseArtifactSmokeTests,"
     "CidaUITests/ComposerJourneyTests,"
     "CidaUITests/CoreTranslationJourneyTests,"
-    "CidaUITests/HistoryAndScrollingJourneyTests,"
-    "CidaUITests/HistoryPresentationJourneyTests,"
-    "CidaUITests/PersistenceJourneyTests,"
+    "CidaUITests/PanelAndSettingsJourneyTests,"
     "CidaUITests/TranslationStateMachineJourneyTests,"
-    "CidaUITests/VisualAndAccessibilityJourneyTests,"
-    "CidaUITests/WindowAndSettingsJourneyTests"
+    "CidaUITests/VisualAndAccessibilityJourneyTests"
 )
 
 
@@ -327,7 +324,7 @@ class GateRun:
                 "CIDA_RELEASE_ARTIFACT_ROOT": str(self.artifact_root),
                 "CIDA_TART_RESULTS_DIR": str(self.results_directory / output_name),
                 "CIDA_TART_SWIFT_TEST_FILTER": (
-                    "AppModelTests/testNewModelStartsWithoutDesignHistory"
+                    "AppModelTests/testNewModelStartsWithoutAResult"
                 ),
                 "CIDA_TART_BOOT_ATTEMPTS": str(boot_attempts),
             }
@@ -396,16 +393,7 @@ class GateRun:
         stages = [
             ("performance-streaming", ["scripts/benchmark-smooth-streaming.sh"]),
             ("performance-million-paste", ["scripts/benchmark-million-character-paste.sh"]),
-            ("performance-history-scroll", ["scripts/benchmark-large-history-scroll.sh"]),
         ]
-        if self.profile == "nightly":
-            stages.append(
-                ("performance-extreme-smoke", ["scripts/benchmark-extreme-workflows.sh", "smoke"])
-            )
-        elif self.profile == "release":
-            stages.append(
-                ("performance-extreme-full", ["scripts/benchmark-extreme-workflows.sh", "full"])
-            )
         passed = True
         for name, command in stages:
             passed = self.run_stage(

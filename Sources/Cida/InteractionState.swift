@@ -35,19 +35,22 @@ enum ComposerPresentationState: Equatable, Sendable {
   }
 }
 
-enum HistoryFollowState: String, Equatable, Sendable {
-  case followingBottom
-  case detached
-}
+/// What the right-hand slot of the control bar shows. One slot, one button,
+/// three phases (Pencil `Spec — 面板模型` §二).
+enum BarActionPresentation: Equatable, Sendable {
+  case none
+  case stop
+  case copy
+  case copied
 
-enum RecordAction: Equatable, Sendable {
-  case redo
-  case copySource
-  case copyResult
-}
-
-enum RecordActionPresentationState: Equatable, Sendable {
-  case hidden
-  case visible
-  case copied(RecordAction)
+  static func resolve(
+    isProcessing: Bool,
+    canCopyResult: Bool,
+    showsCopiedFeedback: Bool
+  ) -> BarActionPresentation {
+    if isProcessing { return .stop }
+    if showsCopiedFeedback { return .copied }
+    if canCopyResult { return .copy }
+    return .none
+  }
 }

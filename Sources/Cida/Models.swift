@@ -2,12 +2,12 @@ import Foundation
 import Observation
 
 extension Notification.Name {
-  static let cidaHistoryResultStorageDidAppend = Notification.Name(
-    "com.xuanwo.Cida.history-result-storage-did-append"
+  static let cidaResultStorageDidAppend = Notification.Name(
+    "com.xuanwo.Cida.result-storage-did-append"
   )
 }
 
-enum HistoryResultStorageNotificationKey {
+enum ResultStorageNotificationKey {
   static let presentationRevision = "presentationRevision"
 }
 
@@ -54,122 +54,63 @@ struct ProcessingRequest: Equatable, Sendable {
   let targetLanguage: Language
 }
 
-final class HistoryResultStorage: @unchecked Sendable {
+/// The text of one result. The stream presenter appends to it on the main
+/// actor and the result renderer observes the append notification, so TextKit
+/// only lays out the missing suffix instead of the whole document.
+final class ResultTextStorage: @unchecked Sendable {
   private let value: NSMutableString
-  private var foldedPreviewValue: String
-  private var foldedPreviewCharacterCount: Int
-  #if DEBUG
-    private(set) var fullStringReadCount = 0
-    private(set) var foldedPreviewReadCount = 0
-  #endif
 
   init(_ value: String) {
     self.value = NSMutableString(string: value)
-    let foldedPresentation = Self.makeFoldedPresentation(value)
-    foldedPreviewValue = foldedPresentation.preview
-    foldedPreviewCharacterCount = foldedPresentation.characterCount
   }
 
   var string: String {
-    #if DEBUG
-      fullStringReadCount += 1
-    #endif
-    return value as String
+    value as String
   }
-
-  #if DEBUG
-    func resetRenderingReadCounts() {
-      fullStringReadCount = 0
-      foldedPreviewReadCount = 0
-    }
-  #endif
 
   var utf16Length: Int {
     value.length
   }
 
-  var foldedPreview: String {
-    #if DEBUG
-      foldedPreviewReadCount += 1
-    #endif
-    return foldedPreviewValue
-  }
-
-  private var previewSingleLineWidthCache: (previewUTF16Length: Int, width: CGFloat)?
-
-  /// The width of the folded preview laid out on one line, measured by the
-  /// renderer and cached until the preview text changes. History rows use it
-  /// to decide between the one-line and two-line Pencil heights without laying
-  /// the text out.
-  func previewSingleLineWidth(measure: (String) -> CGFloat) -> CGFloat {
-    let preview = foldedPreviewValue
-    let length = (preview as NSString).length
-    if let cache = previewSingleLineWidthCache, cache.previewUTF16Length == length {
-      return cache.width
-    }
-    let width = measure(preview)
-    previewSingleLineWidthCache = (length, width)
-    return width
-  }
-
-  var foldedPreviewContainsLineBreak: Bool {
-    foldedPreviewValue.contains(where: \.isNewline)
-  }
-
   func append(_ suffix: String) {
     value.append(suffix)
-    appendToFoldedPresentation(suffix)
   }
 
   func replace(with string: String) {
     value.setString(string)
-    let foldedPresentation = Self.makeFoldedPresentation(string)
-    foldedPreviewValue = foldedPresentation.preview
-    foldedPreviewCharacterCount = foldedPresentation.characterCount
   }
 
   func suffix(fromUTF16Offset offset: Int) -> String? {
     guard (0...value.length).contains(offset) else { return nil }
     return value.substring(from: offset)
   }
+}
 
-  private func appendToFoldedPresentation(_ suffix: String) {
-    guard foldedPreviewCharacterCount < 420 else { return }
+enum ResultPhase: Equatable, Sendable {
+  /// The request is running; the renderer shows the caret and streamed text.
+  case streaming
+  case completed
+  case stopped
+  case failed(message: String)
 
-    for character in suffix {
-      guard foldedPreviewCharacterCount < 420 else { break }
-      foldedPreviewValue.append(character)
-      foldedPreviewCharacterCount += 1
-    }
-  }
-
-  private static func makeFoldedPresentation(
-    _ string: String
-  ) -> (preview: String, characterCount: Int) {
-    var preview = ""
-    var characterCount = 0
-    for character in string {
-      guard characterCount < 420 else { break }
-      preview.append(character)
-      characterCount += 1
-    }
-    return (preview, characterCount)
+  var isTerminal: Bool {
+    self != .streaming
   }
 }
 
+/// The single result the panel shows: the source it was made from, the action
+/// that made it, and its streamed text. A new submission replaces the record.
 @Observable
-final class HistoryEntry: Identifiable, Equatable, @unchecked Sendable {
+final class ResultRecord: Identifiable, @unchecked Sendable {
   let id: UUID
   let mode: ProcessingMode
   let source: String
-  let resultStorage: HistoryResultStorage
-  let detail: String
-  let timestamp: String
-  let reportedSourceCharacterCount: Int?
-  let reportedResultCharacterCount: Int?
-  private let measuredSourceCharacterCount: Int
-  var state: HistoryEntryState
-  var isLatestInHistory = false
+  let sourceCharacterCount: Int
+  /// The language the result is written in; it selects the CJK or Latin
+  /// result typography.
+  let outputLanguage: Language
+  let storage: ResultTextStorage
+  var phase: ResultPhase
   @ObservationIgnored var presentationRevision: Int
   @ObservationIgnored var latestPresentationDelta: String?
 
@@ -177,103 +118,79 @@ final class HistoryEntry: Identifiable, Equatable, @unchecked Sendable {
     id: UUID = UUID(),
     mode: ProcessingMode,
     source: String,
-    result: String,
-    detail: String,
-    timestamp: String,
-    reportedSourceCharacterCount: Int? = nil,
-    reportedResultCharacterCount: Int? = nil,
-    state: HistoryEntryState = .completed,
-    presentationRevision: Int = 0,
-    latestPresentationDelta: String? = nil
+    sourceCharacterCount: Int? = nil,
+    outputLanguage: Language,
+    result: String = "",
+    phase: ResultPhase = .streaming,
+    presentationRevision: Int = 0
   ) {
     self.id = id
     self.mode = mode
     self.source = source
-    resultStorage = HistoryResultStorage(result)
-    self.detail =
-      mode == .improve
-      ? ImprovementPresentation.historyDetail(for: source)
-      : detail
-    self.timestamp = timestamp
-    self.reportedSourceCharacterCount = reportedSourceCharacterCount
-    self.reportedResultCharacterCount = reportedResultCharacterCount
-    measuredSourceCharacterCount = reportedSourceCharacterCount ?? source.count
-    self.state = state
+    self.sourceCharacterCount = sourceCharacterCount ?? source.count
+    self.outputLanguage = outputLanguage
+    storage = ResultTextStorage(result)
+    self.phase = phase
     self.presentationRevision = presentationRevision
-    self.latestPresentationDelta = latestPresentationDelta
   }
 
   var result: String {
-    get { resultStorage.string }
-    set { resultStorage.replace(with: newValue) }
+    storage.string
   }
 
   var resultUTF16Length: Int {
-    resultStorage.utf16Length
+    storage.utf16Length
+  }
+
+  var resultCharacterCount: Int {
+    storage.string.count
+  }
+
+  /// A result that can be copied: text exists and the stream is no longer
+  /// writing into it.
+  var isCopyable: Bool {
+    phase.isTerminal && storage.utf16Length > 0
   }
 
   @MainActor
   func appendPresentationDelta(_ delta: String) {
     guard !delta.isEmpty else { return }
-    resultStorage.append(delta)
+    storage.append(delta)
     presentationRevision &+= 1
     latestPresentationDelta = delta
     NotificationCenter.default.post(
-      name: .cidaHistoryResultStorageDidAppend,
-      object: resultStorage,
+      name: .cidaResultStorageDidAppend,
+      object: storage,
       userInfo: [
-        HistoryResultStorageNotificationKey.presentationRevision: presentationRevision
+        ResultStorageNotificationKey.presentationRevision: presentationRevision
       ]
     )
   }
 
-  var metadata: String {
-    return switch state {
-    case .streaming:
-      "\(detail) · 生成中"
-    case .cancelled:
-      "\(detail) · 已停止"
-    case .failed:
-      "\(detail) · 出错 · 重试"
-    case .completed where isLongDocument:
-      "\(detail) · \(timestamp) · \(sourceCharacterCount.formatted()) → \(resultCharacterCount.formatted()) 字"
-    case .completed:
-      "\(detail) · \(timestamp)"
+  /// The note shown under the result for the terminal states that need one.
+  var note: ResultNote? {
+    switch phase {
+    case .streaming, .completed:
+      nil
+    case .stopped:
+      ResultNote(kind: .stopped, text: "已停止 · ⏎ 重新生成")
+    case .failed(let message):
+      ResultNote(kind: .failed, text: "请求失败：\(message) 按 ⏎ 重试")
     }
-  }
-
-  var isLongDocument: Bool {
-    sourceCharacterCount >= 800 || resultCharacterCount >= 1_200
-  }
-
-  private var sourceCharacterCount: Int {
-    measuredSourceCharacterCount
-  }
-
-  private var resultCharacterCount: Int {
-    reportedResultCharacterCount ?? resultUTF16Length
-  }
-
-  static func == (lhs: HistoryEntry, rhs: HistoryEntry) -> Bool {
-    if lhs === rhs { return true }
-    guard lhs.id == rhs.id else { return false }
-    let resultsMatch = lhs.resultStorage === rhs.resultStorage || lhs.result == rhs.result
-    return lhs.mode == rhs.mode && lhs.source == rhs.source
-      && resultsMatch && lhs.detail == rhs.detail
-      && lhs.timestamp == rhs.timestamp && lhs.state == rhs.state
-      && lhs.isLatestInHistory == rhs.isLatestInHistory
-      && lhs.reportedSourceCharacterCount == rhs.reportedSourceCharacterCount
-      && lhs.reportedResultCharacterCount == rhs.reportedResultCharacterCount
-      && lhs.presentationRevision == rhs.presentationRevision
-      && lhs.latestPresentationDelta == rhs.latestPresentationDelta
   }
 }
 
-enum HistoryEntryState: String, Codable, Equatable, Sendable {
-  case streaming
-  case completed
-  case cancelled
-  case failed
+struct ResultNote: Equatable, Sendable {
+  enum Kind: Equatable, Sendable {
+    case stale
+    case stopped
+    case failed
+  }
+
+  let kind: Kind
+  let text: String
+
+  static let stale = ResultNote(kind: .stale, text: "原文已修改 · ⏎ 重新生成")
 }
 
 struct CidaSettings: Codable, Equatable, Sendable {
@@ -373,138 +290,55 @@ struct CidaSettings: Codable, Equatable, Sendable {
 }
 
 #if DEBUG
-  extension HistoryEntry {
-    static let designSamples: [HistoryEntry] = [
-      HistoryEntry(
-        mode: .improve,
-        source:
-          "This feature are very useful for user, it can makes the process more faster and easy to use.",
-        result:
-          "This feature is very useful — it makes the whole process faster and easier to use.",
-        detail: "English · 语气与语法",
-        timestamp: "11:32"
-      ),
-      HistoryEntry(
-        mode: .translate,
-        source: "缓存失效是计算机科学中的两大难题之一。",
-        result: "Cache invalidation is one of the two hard problems in computer science.",
-        detail: "中文 → English",
-        timestamp: "14:02"
-      ),
-      HistoryEntry(
-        mode: .translate,
-        source: "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。",
-        result:
-          "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.",
-        detail: "中文 → English",
-        timestamp: "14:05"
-      ),
-    ]
+  extension ResultRecord {
+    static let designTranslateSource =
+      "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。"
+    static let designTranslateResult =
+      "Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency."
+    static let designImproveSource =
+      "这个功能通过复用已有的缓存结果,使得整体的处理流程在大多数的情况下都能够得到比较明显的加速。"
+    static let designImproveResult =
+      "通过复用已有缓存结果，该功能可在大多数情况下显著加速整体处理流程。"
 
-    static let longDesignSamples: [HistoryEntry] = [
-      HistoryEntry(
-        mode: .translate,
-        source:
-          "分布式系统的设计从来都不是单纯的技术选型问题。当我们讨论一致性、可用性与分区容忍性之间的取舍时,实际上是在讨论业务对错误的容忍程度:一个支付系统和一个信息流推荐服务可能运行在完全相同的基础设施之上,但它们对「出错之后会发生什么」这个问题的回答截然不同。",
-        result:
-          "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different. For payments, an inconsistent state means real money lost and trust broken, so we accept higher latency and stricter coordination. For recommendations, a stale feed is a minor annoyance at worst, so we choose availability and let the data converge later. Once you frame the discussion this way, most architecture debates become much shorter.",
-        detail: "中文 → English",
-        timestamp: "15:12",
-        reportedSourceCharacterCount: 1_846,
-        reportedResultCharacterCount: 3_214
-      )
-    ]
-
-    static let interactionTestStickyLongResult = HistoryEntry(
-      id: UUID(uuidString: "20000000-0000-0000-0000-000000000001")!,
-      mode: .translate,
-      source:
-        "分布式系统的设计从来都不是单纯的技术选型问题。当我们讨论一致性、可用性与分区容忍性之间的取舍时,实际上是在讨论业务对错误的容忍程度:一个支付系统和一个信息流推荐服务可能运行在完全相同的基础设施之上,但它们对「出错之后会发生什么」这个问题的回答截然不同。",
-      result: String(
-        repeating:
-          "Designing distributed systems has never been a matter of simply picking technologies. When we discuss the trade-offs between consistency, availability, and partition tolerance, we are really discussing how much failure the business can tolerate. A payment system and a feed-recommendation service may run on exactly the same infrastructure, yet their answers to the question of what happens after something goes wrong are entirely different. For payments, an inconsistent state means real money lost and trust broken, so we accept higher latency and stricter coordination. For recommendations, a stale feed is a minor annoyance at worst, so we choose availability and let the data converge later. Once you frame the discussion this way, most architecture debates become much shorter. ",
-        count: 4
-      ),
-      detail: "中文 → English",
-      timestamp: "15:12",
-      reportedSourceCharacterCount: 1_846,
-      reportedResultCharacterCount: 3_214
-    )
-
-    static let interactionTestHistoryContinuitySamples: [HistoryEntry] = {
-      let leadingMultilineResult = (0...10).map { index in
-        "Earlier persisted result line \(index) keeps the production-shaped history geometry realistic."
-      }.joined(separator: "\n")
-      let longPersistedSource = (0...144).map { index in
-        "Persisted source line \(index) contains enough text to reproduce a real multiline document."
-      }.joined(separator: "\n")
-      let longPersistedResult = (0...143).map { index in
-        "Persisted result line \(index) keeps a large natural TextKit height in virtualized history."
-      }.joined(separator: "\n")
-      return [
-        HistoryEntry(
-          id: UUID(uuidString: "30000000-0000-0000-0000-000000000001")!,
+    static func designCompleted(mode: ProcessingMode) -> ResultRecord {
+      switch mode {
+      case .translate:
+        ResultRecord(
           mode: .translate,
-          source: String(repeating: "Earlier source paragraph.\n", count: 10),
-          result: leadingMultilineResult,
-          detail: "中文 → English",
-          timestamp: "15:40"
-        ),
-        HistoryEntry(
-          id: UUID(uuidString: "30000000-0000-0000-0000-000000000002")!,
+          source: designTranslateSource,
+          outputLanguage: .english,
+          result: designTranslateResult,
+          phase: .completed
+        )
+      case .improve:
+        ResultRecord(
           mode: .improve,
-          source: "Persisted source 2",
-          result: "Persisted result 2 remains short.",
-          detail: "English",
-          timestamp: "15:45"
-        ),
-        HistoryEntry(
-          id: UUID(uuidString: "30000000-0000-0000-0000-000000000003")!,
-          mode: .translate,
-          source: "Persisted source 3",
-          result: "Persisted result 3",
-          detail: "中文 → English",
-          timestamp: "15:48"
-        ),
-        HistoryEntry(
-          id: UUID(uuidString: "30000000-0000-0000-0000-000000000004")!,
-          mode: .translate,
-          source: longPersistedSource,
-          result: longPersistedResult,
-          detail: "中文 → English",
-          timestamp: "15:50"
-        ),
-        HistoryEntry(
-          id: UUID(uuidString: "30000000-0000-0000-0000-000000000005")!,
-          mode: .improve,
-          source: "Persisted source 4",
-          result: "Persisted result 4",
-          detail: "English",
-          timestamp: "15:55"
-        ),
-        HistoryEntry(
-          id: UUID(uuidString: "30000000-0000-0000-0000-000000000006")!,
-          mode: .translate,
-          source: "Persisted source 5",
-          result: "Persisted result 5",
-          detail: "中文 → English",
-          timestamp: "16:00"
-        ),
-        HistoryEntry(
-          id: UUID(uuidString: "30000000-0000-0000-0000-000000000007")!,
-          mode: .translate,
-          source: "Persisted source 6",
-          result: "Persisted result 6",
-          detail: "中文 → English",
-          timestamp: "16:05"
-        ),
-      ]
-    }()
+          source: designImproveSource,
+          outputLanguage: .chinese,
+          result: designImproveResult,
+          phase: .completed
+        )
+      }
+    }
 
     static let designLongInput: String = {
       let visible =
         "在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。"
       return visible + String(repeating: " ", count: max(0, 2_148 - visible.count))
     }()
+
+    static let designLongResult =
+      "Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive."
+
+    static func designLong() -> ResultRecord {
+      ResultRecord(
+        mode: .translate,
+        source: designLongInput,
+        sourceCharacterCount: 1_846,
+        outputLanguage: .english,
+        result: String(repeating: designLongResult + "\n\n", count: 3),
+        phase: .completed
+      )
+    }
   }
 #endif

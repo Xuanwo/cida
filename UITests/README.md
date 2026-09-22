@@ -14,9 +14,8 @@ does not launch Cida on the host, share the host pasteboard, or request host foc
   require a clean checkout, a manifest commit equal to `HEAD`, and a Developer ID signature.
 - `UITests/Fixtures/e2e_scenario_server.py` provides a deterministic OpenAI-compatible local
   endpoint. Tests release response headers and chunks through named gates instead of sleeping.
-- `SQLiteHistoryFixture` seeds each journey's isolated production-schema database before launch.
-- Every UI test starts with a unique settings domain, SQLite database, Keychain service, and VM-only
-  pasteboard. Relaunches inside one test deliberately retain that test's namespace.
+- Every UI test starts with a unique settings domain, Keychain service, and VM-only pasteboard.
+  Nothing persists between launches except settings; the panel starts empty.
 - Application assertion failures are never retried. Only a failed Tart boot may use one fresh
   clone retry.
 - Host snapshots record the frontmost app, pasteboard change count, and production Cida processes
@@ -29,38 +28,50 @@ does not launch Cida on the host, share the host pasteboard, or request host foc
 The checked-in UI test host compiles the driver and assertions only. The app under test always
 comes from `CIDA_UI_TEST_APP_PATH`; Debug-only preview fixtures are not an E2E execution path.
 
+## The panel under test
+
+The app is a menu-bar application whose main interface is a borderless floating panel
+(`app.windows["辞达"]`). The driver in `Support/CidaAppDriver.swift` works with these identifiers:
+
+| Element | Identifier |
+| --- | --- |
+| source editor | `composer-input` |
+| action segment / items | `action-segment`, `action-translate`, `action-improve` |
+| control bar slot | `bar-action-stop`, `bar-action-copy`, `bar-action-copied` |
+| result pane / text | `result-pane`, `result-text` |
+| result notes | `result-note-stale`, `result-note-stopped`, `result-note-failed` |
+
+⏎ submits, Tab switches the action, Escape hides, Option-Space shows, ⌘, opens Settings, ⌘C copies
+the result when nothing is selected, ⌘. stops. There is no send button and no title bar.
+
 ## Journey ownership
 
 | File | Contract |
 | --- | --- |
 | `CidaReleaseArtifactSmokeTests.swift` | signed artifact provenance and a production translation |
-| `ComposerJourneyTests.swift` | responder-chain typing, multiline growth/shrink, paste, submit, source-language-preserving improvement, and Command-C precedence |
-| `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, follow, reuse, cancel, failure, and recovery |
-| `HistoryAndScrollingJourneyTests.swift` | one outer scroll surface, Pencil thumb direction, detach, and reattach |
-| `HistoryPresentationJourneyTests.swift` | fold/expand, full copy, Pencil preview fade and clipping, action geometry, streaming action policy, and sticky long-result action |
-| `PersistenceJourneyTests.swift` | SQLite relaunch and OpenAI endpoint/model/API-key persistence and clearing |
-| `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, scroll, and relaunch invariants |
-| `WindowAndSettingsJourneyTests.swift` | native close/minimize/zoom/resize and editable settings |
-| `VisualAndAccessibilityJourneyTests.swift` | approved Main/Settings Pencil pixels and native semantic accessibility audit |
+| `ComposerJourneyTests.swift` | responder-chain typing, panel growth and shrink with the source, submit keeps the source, stale marking, source-language-preserving improvement, and Command-C precedence |
+| `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, panel growth, result replacement, stop, inline failure, and recovery |
+| `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, hide, and show invariants |
+| `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, and editable settings |
+| `VisualAndAccessibilityJourneyTests.swift` | approved empty-panel and Settings Pencil pixels and the native semantic accessibility audit |
 
 `Resources/Scenarios/pairwise-environment-v1.json` is a stable-seed pairwise environment matrix.
 `PairwiseManifestTests` mathematically verifies that every value pair remains covered. The manifest
-is currently an inventory, not an eight-configuration Tart execution matrix.
+is an inventory, not an executed Tart configuration matrix.
 
 ## Visual and accessibility gates
 
 `Resources/VisualBaselines/manifest.json` pins the baseline namespace, approved implementation
 image, Pencil reference, `Design/cida.pen`, their SHA-256 digests, masks, and pixel thresholds.
 A failure retains approved/current/Pencil/diff attachments in the `.xcresult`; changing a
-threshold or baseline is a reviewable source change.
+threshold or baseline is a reviewable source change. The approved images come from
+`scripts/capture-design-states.sh`, which renders the same states offscreen without activating
+anything on the host.
 
 The native accessibility gate covers element detection, hit regions, descriptions, actions, and
 parent/child relationships. Contrast is intentionally owned by the exact Pencil pixel contract so
-the audit cannot silently recolor an approved design. Two macOS 26.4 system-owned proxies have
-narrow recorded exceptions: the private decoration inside a standard window control, and the empty
-XCTest Touch Bar proxy. The handler keeps diagnostics and rejects every application-owned issue.
-Hover actions are made visible explicitly before the audit so coverage does not depend on mouse
-position or test order.
+the audit cannot silently recolor an approved design. The empty XCTest Touch Bar proxy keeps its
+narrow recorded exception.
 
 ## Run
 
@@ -69,8 +80,8 @@ Use the unified profiles for gate decisions:
 | Profile | Required work |
 | --- | --- |
 | PR | full Swift suite, one exact Release artifact, P0 Tart journeys, unit mutation contracts |
-| Nightly | full Tart suite, all unit/Release mutations, focused 120 Hz gates, extreme smoke |
-| Release | nightly correctness plus three fresh P0 burn-ins and the full extreme 120 Hz matrix |
+| Nightly | full Tart suite, all unit/Release mutations, focused 120 Hz gates |
+| Release | nightly correctness plus three fresh P0 burn-ins |
 
 These profiles require a clean, committed checkout:
 
@@ -107,7 +118,11 @@ scripts/test-ui-in-tart.sh
 
 Artifacts include `CidaUITests.xcresult`, `xcresult-summary.json`, signed Release artifact metadata,
 scenario request logs, VM progress, guest logs, screenshots, video, host-session snapshots and guard,
-and retained audit diagnostics.
+retained audit diagnostics, and one panel lifecycle log per app launch under `lifecycle/`. The
+driver launches the app with `--automation-lifecycle-log`, so the log records the activation
+policy, app activation, and the panel's visibility, key status, alpha, and frame at launch, at every
+show, and at every key-window transition: XCUI cannot observe any of that for a non-activating
+panel, and the log is what separates "never shown" from "hid on resign key" or "shown transparent".
 
 Regenerate the project after adding or removing UI source files:
 
@@ -117,6 +132,4 @@ xcodegen generate --spec UITests/project.yml
 
 The VM is a correctness and final-composition target, not proof of 120 Hz presentation. The
 nonactivating hardware performance gates consume the same manifest-bound Release artifact and run
-separately on a detected physical 120 Hz display. Their view-bound `CADisplayLink` report records the physical display
-cadence, main-actor callback latency, activation/key-window observations, hardware and power state,
-and the exact app-tree digest.
+separately on a detected physical 120 Hz display.

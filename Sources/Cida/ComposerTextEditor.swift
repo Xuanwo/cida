@@ -9,6 +9,10 @@ struct ComposerTextMetrics: Equatable, Sendable {
   let hasNonWhitespace: Bool
   let isImportingLargeDocument: Bool
   let presentationState: ComposerPresentationState
+  /// The laid-out height of the text in the editor, measured after each native
+  /// edit while the text is short enough to lay out synchronously. The panel
+  /// sizes the source pane from it; `nil` means "not measured".
+  var naturalHeight: CGFloat?
 
   init(
     text: String,
@@ -134,25 +138,6 @@ struct ComposerTextMetrics: Equatable, Sendable {
   }
 }
 
-enum ComposerResetResolution: Equatable, Sendable {
-  case none
-  case clearSubmittedDocument
-  case preserveNewerNativeEdit
-}
-
-enum ComposerResetSynchronizer {
-  static func resolve(
-    revision: Int,
-    lastAppliedRevision: Int,
-    nativeEditRevision: Int
-  ) -> ComposerResetResolution {
-    guard revision != lastAppliedRevision else { return .none }
-    return nativeEditRevision == revision
-      ? .preserveNewerNativeEdit
-      : .clearSubmittedDocument
-  }
-}
-
 struct ComposerTextEditor: NSViewRepresentable {
   @Binding var text: String
   @Binding var metrics: ComposerTextMetrics
@@ -160,8 +145,9 @@ struct ComposerTextEditor: NSViewRepresentable {
   /// Distance from the editor's edges to the text column; the editor spans the
   /// window so its scroll indicator stays at the window edge.
   let horizontalInset: CGFloat
-  let resetRevision: Int
-  let currentResetRevision: @MainActor () -> Int
+  /// Bumped when the whole text should be selected, e.g. when the panel is
+  /// shown again with the previous source in it.
+  var selectAllRevision = 0
   let onSubmit: @MainActor () -> Bool
   let onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
 
@@ -170,8 +156,6 @@ struct ComposerTextEditor: NSViewRepresentable {
       text: $text,
       metrics: $metrics,
       isFocused: isFocused,
-      resetRevision: resetRevision,
-      currentResetRevision: currentResetRevision,
       onSubmit: onSubmit,
       onVirtualDocumentChange: onVirtualDocumentChange
     )
@@ -231,7 +215,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     context.coordinator.text = $text
     context.coordinator.metrics = $metrics
     context.coordinator.isFocused = isFocused
-    context.coordinator.currentResetRevision = currentResetRevision
     context.coordinator.onSubmit = onSubmit
     context.coordinator.onVirtualDocumentChange = onVirtualDocumentChange
     if abs(textView.textContainerInset.width - horizontalInset) > 0.5 {
@@ -245,25 +228,26 @@ struct ComposerTextEditor: NSViewRepresentable {
     )
     scrollIndicator.setForceVisible(metrics.presentationState.showsDocumentChrome)
 
-    switch context.coordinator.consumeResetRevision(resetRevision) {
-    case .clearSubmittedDocument:
-      textView.replaceDocumentFromBinding("")
-      context.coordinator.onVirtualDocumentChange(nil, nil, nil)
-      context.coordinator.publishMetrics(for: "")
-    case .preserveNewerNativeEdit:
-      break
-    case .none:
-      if textView.isPerformingLargeDocumentPaste {
-        return
-      } else if context.coordinator.consumeNativeBindingEcho() {
-        // The native editor already contains this exact change.
-      } else if !textView.isVirtualizingLargeDocument, textView.string != text {
-        textView.replaceDocumentFromBinding(text)
-        applyTypography(to: textView)
-        context.coordinator.publishMetrics(for: text)
-      }
+    if textView.isPerformingLargeDocumentPaste {
+      return
+    } else if context.coordinator.consumeNativeBindingEcho() {
+      // The native editor already contains this exact change.
+    } else if textView.hasMarkedText() {
+      // An input method is composing (for example pinyin). The native text
+      // contains provisional marked text that the binding never sees, so
+      // writing the binding back would cancel the composition.
+    } else if !textView.isVirtualizingLargeDocument, textView.string != text {
+      textView.replaceDocumentFromBinding(text)
+      applyTypography(to: textView)
+      context.coordinator.publishMetrics(for: text, in: textView)
     }
     scrollIndicator.refresh()
+
+    if context.coordinator.consumeSelectAllRevision(selectAllRevision),
+      !textView.isVirtualizingLargeDocument
+    {
+      textView.setSelectedRange(NSRange(location: 0, length: textView.textStorage?.length ?? 0))
+    }
 
     if isFocused.wrappedValue, textView.window?.firstResponder !== textView {
       Task { @MainActor in
@@ -297,9 +281,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     var text: Binding<String>
     var metrics: Binding<ComposerTextMetrics>
     var isFocused: FocusState<Bool>.Binding
-    private var lastResetRevision: Int
-    private var nativeEditRevision: Int
-    var currentResetRevision: @MainActor () -> Int
     var onSubmit: @MainActor () -> Bool
     var onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
     private var expectsNativeBindingEcho = false
@@ -308,17 +289,12 @@ struct ComposerTextEditor: NSViewRepresentable {
       text: Binding<String>,
       metrics: Binding<ComposerTextMetrics>,
       isFocused: FocusState<Bool>.Binding,
-      resetRevision: Int,
-      currentResetRevision: @escaping @MainActor () -> Int,
       onSubmit: @escaping @MainActor () -> Bool,
       onVirtualDocumentChange: @escaping @MainActor (String?, Int?, Bool?) -> Void
     ) {
       self.text = text
       self.metrics = metrics
       self.isFocused = isFocused
-      lastResetRevision = resetRevision
-      nativeEditRevision = resetRevision
-      self.currentResetRevision = currentResetRevision
       self.onSubmit = onSubmit
       self.onVirtualDocumentChange = onVirtualDocumentChange
     }
@@ -329,7 +305,6 @@ struct ComposerTextEditor: NSViewRepresentable {
       }
       textView.virtualDocumentDidInstall = { [weak self] document, metrics in
         guard let self else { return }
-        self.recordNativeEdit()
         self.onVirtualDocumentChange(
           document,
           metrics.characterCount,
@@ -365,11 +340,7 @@ struct ComposerTextEditor: NSViewRepresentable {
       if modifiers.contains(.shift) || modifiers.contains(.option) {
         return false
       }
-      if onSubmit() {
-        (textView as? ComposerNativeTextView)?.replaceDocumentFromBinding("")
-        onVirtualDocumentChange(nil, nil, nil)
-        text.wrappedValue = ""
-      }
+      _ = onSubmit()
       return true
     }
 
@@ -379,20 +350,43 @@ struct ComposerTextEditor: NSViewRepresentable {
       return true
     }
 
-    func consumeResetRevision(_ revision: Int) -> ComposerResetResolution {
-      let resolution = ComposerResetSynchronizer.resolve(
-        revision: revision,
-        lastAppliedRevision: lastResetRevision,
-        nativeEditRevision: nativeEditRevision
-      )
-      guard resolution != .none else { return .none }
-      lastResetRevision = revision
-      expectsNativeBindingEcho = false
-      return resolution
+    private var lastSelectAllRevision = 0
+
+    func consumeSelectAllRevision(_ revision: Int) -> Bool {
+      guard revision != lastSelectAllRevision else { return false }
+      lastSelectAllRevision = revision
+      return true
     }
 
-    func publishMetrics(for text: String) {
-      let updatedMetrics = ComposerTextMetrics(text: text)
+    /// Measures the text height for the source pane; only short documents are
+    /// laid out synchronously, long ones take the document cap anyway.
+    static func naturalHeight(of textView: NSTextView) -> CGFloat? {
+      guard
+        let textLayoutManager = textView.textLayoutManager,
+        let textContainer = textLayoutManager.textContainer,
+        (textView.textStorage?.length ?? 0) < 20_000
+      else {
+        return nil
+      }
+      _ = textContainer
+      textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+      // `usageBoundsForTextContainer` lags behind deletions; the fragment frames
+      // are exact once layout is ensured.
+      var maxY: CGFloat = 0
+      textLayoutManager.enumerateTextLayoutFragments(
+        from: textLayoutManager.documentRange.location,
+        options: [.ensuresLayout]
+      ) { fragment in
+        maxY = max(maxY, fragment.layoutFragmentFrame.maxY)
+        return true
+      }
+      let height = maxY > 0 ? maxY : textLayoutManager.usageBoundsForTextContainer.height
+      return height > 0 ? ceil(height) : nil
+    }
+
+    func publishMetrics(for text: String, in textView: NSTextView? = nil) {
+      var updatedMetrics = ComposerTextMetrics(text: text)
+      updatedMetrics.naturalHeight = textView.flatMap(Self.naturalHeight(of:))
       guard metrics.wrappedValue != updatedMetrics else { return }
       Task { @MainActor [weak self] in
         self?.metrics.wrappedValue = updatedMetrics
@@ -400,7 +394,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     private func synchronizeText(from textView: NSTextView) {
-      recordNativeEdit()
       let nativeTextView = textView as? ComposerNativeTextView
       let updatedText = textView.string
       expectsNativeBindingEcho = true
@@ -415,12 +408,10 @@ struct ComposerTextEditor: NSViewRepresentable {
           nativeTextView.documentMetrics.boundedForVirtualDocumentPresentation
       } else {
         onVirtualDocumentChange(nil, nil, nil)
-        metrics.wrappedValue = ComposerTextMetrics(text: updatedText)
+        var updatedMetrics = ComposerTextMetrics(text: updatedText)
+        updatedMetrics.naturalHeight = Self.naturalHeight(of: textView)
+        metrics.wrappedValue = updatedMetrics
       }
-    }
-
-    private func recordNativeEdit() {
-      nativeEditRevision = currentResetRevision()
     }
 
     private func publishLargeDocumentMetrics(_ completedMetrics: ComposerTextMetrics) {

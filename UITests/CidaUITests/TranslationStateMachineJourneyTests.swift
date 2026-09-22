@@ -2,55 +2,44 @@ import XCTest
 
 @MainActor
 final class TranslationStateMachineJourneyTests: CidaReleaseUITestCase {
-  func testSharedStateMachineSmokeSurvivesConsecutiveSubmissionsAndRelaunch() {
+  func testSharedStateMachineSmokeSurvivesConsecutiveSubmissionsAndHiding() {
     driver.launch()
     var oracle = TranslationJourneyModel()
-    var submittedEntryIDs: [String] = []
 
     for command in TranslationJourneyModel.releaseUISmokeCommands {
       switch command {
       case .paste(let value):
-        driver.replaceText(in: driver.composer, with: "")
-        driver.paste(value)
-        XCTAssertEqual(driver.textValue(in: driver.composer), value)
+        driver.replaceSource(with: value)
         XCTAssertTrue(oracle.apply(command))
       case .submit:
-        let entryID = driver.submitCurrentComposer()
-        submittedEntryIDs.append(entryID)
+        driver.submitCurrentSource()
         XCTAssertTrue(oracle.apply(command))
       case .releaseChunk:
         XCTAssertTrue(oracle.apply(command))
       case .complete:
         XCTAssertTrue(oracle.apply(command))
-        let expected = try! XCTUnwrap(oracle.currentEntry)
-        let result = driver.app.textViews["history-result-\(submittedEntryIDs.last!.uppercased())"]
-        XCTAssertTrue(driver.waitForValue(expected.result, in: result, timeout: 8))
-        XCTAssertTrue(driver.waitForLabel("翻译", in: driver.submitButton, timeout: 3))
-      case .scrollUp:
-        driver.history.swipeDown()
-        _ = oracle.apply(command)
-      case .scrollBottom:
-        for _ in 0..<8 where driver.history.value as? String != "bottom" {
-          driver.history.swipeUp()
-        }
-        _ = oracle.apply(command)
-      case .relaunch:
-        driver.terminate()
+        let expected = try! XCTUnwrap(oracle.result)
+        XCTAssertTrue(driver.waitForValue(expected.text, in: driver.resultText, timeout: 8))
+        driver.waitForCompletion()
+      case .hide:
+        driver.hidePanel()
         XCTAssertTrue(oracle.apply(command))
-        driver.launch()
-      case .type, .deleteAll, .pauseStream, .cancel, .fail, .expand, .collapse, .resize,
-        .closeSettings:
+      case .show:
+        driver.showPanel()
+        XCTAssertTrue(oracle.apply(command))
+        XCTAssertTrue(driver.translateAction.isSelected, "Showing resets the action to 翻译")
+        let expected = try! XCTUnwrap(oracle.result)
+        XCTAssertEqual(driver.resultText.value as? String, expected.text, "Hiding keeps the result")
+        XCTAssertEqual(driver.textValue(in: driver.composer), expected.source, "Hiding keeps the source")
+      case .type, .deleteAll, .toggleAction, .pauseStream, .cancel, .fail:
         XCTFail("Unsupported Release smoke command: \(command)")
       }
       XCTAssertTrue(oracle.invariantViolations().isEmpty)
     }
 
-    XCTAssertEqual(driver.historyEntryCount(), oracle.entries.count)
-    let expected = try! XCTUnwrap(oracle.currentEntry)
-    let latestID = try! XCTUnwrap(submittedEntryIDs.last)
-    let latestResult = driver.app.textViews["history-result-\(latestID.uppercased())"]
-    XCTAssertTrue(latestResult.waitForExistence(timeout: 5))
-    XCTAssertEqual(latestResult.value as? String, expected.result)
-    XCTAssertFalse((latestResult.value as? String)?.contains("STATE_MACHINE_A_COMPLETE") ?? true)
+    let expected = try! XCTUnwrap(oracle.result)
+    XCTAssertEqual(driver.resultText.value as? String, expected.text)
+    XCTAssertFalse((driver.resultText.value as? String)?.contains("STATE_MACHINE_A_COMPLETE") ?? true)
+    XCTAssertEqual(driver.app.textViews.matching(identifier: "result-text").count, 1)
   }
 }

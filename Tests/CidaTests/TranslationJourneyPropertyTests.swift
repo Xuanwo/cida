@@ -39,12 +39,10 @@ final class TranslationJourneyPropertyTests: XCTestCase {
   func testSharedJourneyModelCoversEveryCommandAndMaintainsItsOwnInvariants() {
     var model = TranslationJourneyModel()
     let commands: [TranslationJourneyCommand] = [
-      .type("draft"), .deleteAll, .paste("first\nrequest"), .submit,
-      .releaseChunk("partial"), .pauseStream, .scrollUp, .releaseChunk(" result"),
-      .scrollBottom, .complete, .expand(0), .collapse(0),
-      .resize(width: 1_120, height: 780), .closeSettings, .relaunch,
-      .paste("cancelled"), .submit, .cancel,
-      .paste("failed"), .submit, .fail,
+      .type("draft"), .deleteAll, .paste("first\nrequest"), .toggleAction, .submit,
+      .releaseChunk("partial"), .pauseStream, .releaseChunk(" result"), .complete,
+      .hide, .show, .paste("cancelled"), .submit, .cancel,
+      .paste("failed"), .submit, .fail, .type(" edited"),
     ]
 
     for command in commands {
@@ -54,33 +52,19 @@ final class TranslationJourneyPropertyTests: XCTestCase {
         "command=\(command) violations=\(model.invariantViolations())"
       )
     }
+    XCTAssertEqual(model.action, .translate, "Showing the panel resets the action")
+    XCTAssertTrue(model.isResultStale)
   }
 
   private func execute(_ commands: [TranslationJourneyCommand], seed: UInt64) async throws {
-    let temporaryRoot = FileManager.default.temporaryDirectory
-      .appending(path: "cida-property-\(seed)-\(UUID().uuidString)", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
-    do {
-      try await execute(commands, seed: seed, temporaryRoot: temporaryRoot)
-      try FileManager.default.removeItem(at: temporaryRoot)
-    } catch {
-      try? FileManager.default.removeItem(at: temporaryRoot)
-      throw error
-    }
-  }
-
-  private func execute(
-    _ commands: [TranslationJourneyCommand],
-    seed: UInt64,
-    temporaryRoot: URL
-  ) async throws {
-    let store = try HistoryStore(
-      databaseURL: temporaryRoot.appending(path: "History.sqlite3"),
-      deltaFlushDelay: .milliseconds(1)
-    )
     let service = CommandStreamingService()
     var oracle = TranslationJourneyModel()
-    var model = makeModel(entries: [], service: service, store: store)
+    let model = AppModel(
+      service: service,
+      streamPresentationPolicy: .fastTests,
+      saveSettings: { _ in },
+      clearPersistedAPIKey: {}
+    )
 
     for (index, command) in commands.enumerated() {
       let oracleAccepted = oracle.apply(command)
@@ -93,93 +77,66 @@ final class TranslationJourneyPropertyTests: XCTestCase {
       case .deleteAll:
         model.stageInputDocument(nil)
         model.inputText = ""
+      case .toggleAction:
+        if !model.isProcessing {
+          model.toggleMode()
+        }
       case .submit:
-        let count = model.entries.count
+        let previous = model.result
         let accepted = model.submit()
         guard accepted == oracleAccepted else {
           throw PropertyFailure(
-            "submit acceptance differs: product=\(accepted) oracle=\(oracleAccepted)")
+            "submit acceptance differs: product=\(accepted) oracle=\(oracleAccepted); index=\(index)")
         }
         if accepted {
-          let submittedModel = model
-          try await waitUntil {
-            submittedModel.entries.count == count + 1 && service.hasActiveStream
+          guard model.result !== previous else {
+            throw PropertyFailure("submit did not replace the result; index=\(index)")
           }
+          try await waitUntil { service.hasActiveStream }
         }
       case .releaseChunk(let chunk):
         if oracleAccepted {
           try service.yield(chunk)
-          let streamingModel = model
-          let expectedResult = oracle.currentEntry?.result
-          try await waitUntil { streamingModel.entries.last?.result == expectedResult }
+          let expectedResult = oracle.result?.text
+          try await waitUntil { model.result?.result == expectedResult }
         }
       case .pauseStream:
         if oracleAccepted {
-          let value = model.entries.last?.result
-          let revision = model.entries.last?.presentationRevision
+          let value = model.result?.result
+          let revision = model.result?.presentationRevision
           try await Task.sleep(for: .milliseconds(12))
-          guard model.entries.last?.result == value,
-            model.entries.last?.presentationRevision == revision
+          guard model.result?.result == value, model.result?.presentationRevision == revision
           else { throw PropertyFailure("backend pause changed the visible result") }
         }
       case .complete:
         if oracleAccepted {
           try service.finish()
-          let completingModel = model
-          try await waitUntil { !completingModel.isProcessing }
+          try await waitUntil { !model.isProcessing }
         }
       case .cancel:
         if oracleAccepted {
           model.cancelProcessing()
-          let cancellingModel = model
-          try await waitUntil { !cancellingModel.isProcessing }
+          try await waitUntil { !model.isProcessing }
         }
       case .fail:
         if oracleAccepted {
           try service.fail()
-          let failingModel = model
-          try await waitUntil { !failingModel.isProcessing }
+          try await waitUntil { !model.isProcessing }
         }
-      case .scrollUp, .scrollBottom, .resize, .closeSettings:
+      case .hide:
         break
-      case .expand(let ordinal):
-        if let entry = model.entries.first(where: { actualOrdinal($0, in: model) == ordinal }) {
-          model.expandHistoryEntry(entry.id)
+      case .show:
+        if oracleAccepted {
+          model.resetModeToDefault()
         }
-      case .collapse(let ordinal):
-        if let entry = model.entries.first(where: { actualOrdinal($0, in: model) == ordinal }) {
-          model.collapseHistoryEntry(entry.id)
-        }
-      case .relaunch:
-        guard oracleAccepted else { break }
-        model.flushHistoryPersistence()
-        let loadedEntries = try store.load()
-        model = makeModel(entries: loadedEntries, service: service, store: store)
       }
 
       try assertProduct(model, matches: oracle, commandIndex: index, command: command)
     }
     if model.isProcessing {
       model.cancelProcessing()
-      let cancellingModel = model
-      try await waitUntil { !cancellingModel.isProcessing }
+      try await waitUntil { !model.isProcessing }
     }
-    model.flushHistoryPersistence()
-  }
-
-  private func makeModel(
-    entries: [HistoryEntry],
-    service: CommandStreamingService,
-    store: HistoryStore
-  ) -> AppModel {
-    AppModel(
-      entries: entries,
-      service: service,
-      streamPresentationPolicy: .fastTests,
-      historyPersistence: store,
-      saveSettings: { _ in },
-      clearPersistedAPIKey: {}
-    )
   }
 
   private func assertProduct(
@@ -193,38 +150,44 @@ final class TranslationJourneyPropertyTests: XCTestCase {
     guard violations.isEmpty else {
       throw PropertyFailure("oracle violations \(violations); \(context)")
     }
-    guard model.inputText == oracle.composerText else {
-      throw PropertyFailure("composer differs; \(context)")
+    guard model.inputText == oracle.sourceText else {
+      throw PropertyFailure("source differs; \(context)")
     }
-    guard model.inputDocumentUTF16Count == oracle.composerText.utf16.count else {
-      throw PropertyFailure("composer document length differs; \(context)")
+    guard model.mode.rawValue == oracle.action.rawValue else {
+      throw PropertyFailure("action differs; \(context)")
     }
-    guard model.entries.count == oracle.entries.count else {
-      throw PropertyFailure(
-        "entry count differs: product=\(model.entries.count) oracle=\(oracle.entries.count); \(context)"
-      )
+    guard (model.result == nil) == (oracle.result == nil) else {
+      throw PropertyFailure("result presence differs; \(context)")
     }
-    for (actual, expected) in zip(model.entries, oracle.entries) {
+    if let actual = model.result, let expected = oracle.result {
       guard actual.source == expected.source else {
-        throw PropertyFailure("source changed for entry \(expected.ordinal); \(context)")
+        throw PropertyFailure("result source differs; \(context)")
       }
-      guard actual.result == expected.result else {
+      guard actual.mode.rawValue == expected.action.rawValue else {
+        throw PropertyFailure("result action differs; \(context)")
+      }
+      guard actual.result == expected.text else {
+        throw PropertyFailure("result is not the released stream prefix; \(context)")
+      }
+      guard phaseName(actual.phase) == expected.phase.rawValue else {
         throw PropertyFailure(
-          "result is not the released stream prefix for entry \(expected.ordinal); \(context)"
-        )
+          "phase differs: product=\(phaseName(actual.phase)) oracle=\(expected.phase); \(context)")
       }
-      guard actual.state.rawValue == expected.state.rawValue else {
-        throw PropertyFailure("state differs for entry \(expected.ordinal); \(context)")
-      }
-      guard actual.isLatestInHistory == expected.isCurrent else {
-        throw PropertyFailure("current entry differs for entry \(expected.ordinal); \(context)")
-      }
-      guard
-        model.isHistoryEntryExpanded(actual) == expected.isCurrent
-          || model.isHistoryEntryManuallyExpanded(actual.id)
-      else {
-        throw PropertyFailure("current entry is not expanded; \(context)")
-      }
+    }
+    guard model.isResultStale == oracle.isResultStale else {
+      throw PropertyFailure("stale flag differs; \(context)")
+    }
+    guard model.canCopyResult == oracle.canCopyResult else {
+      throw PropertyFailure("copyability differs; \(context)")
+    }
+  }
+
+  private func phaseName(_ phase: ResultPhase) -> String {
+    switch phase {
+    case .streaming: "streaming"
+    case .completed: "completed"
+    case .stopped: "stopped"
+    case .failed: "failed"
     }
   }
 
@@ -262,10 +225,6 @@ final class TranslationJourneyPropertyTests: XCTestCase {
       full timeline:
       \(timeline)
       """
-  }
-
-  private func actualOrdinal(_ entry: HistoryEntry, in model: AppModel) -> Int? {
-    model.entries.firstIndex(where: { $0 === entry })
   }
 
   private func waitUntil(

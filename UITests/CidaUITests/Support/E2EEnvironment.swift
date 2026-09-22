@@ -8,6 +8,10 @@ struct E2EEnvironment {
   let endpoint: String
   let controlBaseURL: String
   let recordPath: String
+  /// Directory exported to the host with the run; per-launch lifecycle logs land here.
+  var lifecycleLogDirectory: String {
+    (recordPath as NSString).deletingLastPathComponent + "/lifecycle"
+  }
 
   init() throws {
     let environment = ProcessInfo.processInfo.environment
@@ -35,15 +39,6 @@ struct E2EEnvironment {
       endpoint = "http://127.0.0.1:\(port)/v1/chat/completions"
     }
     controlBaseURL = "http://127.0.0.1:\(port)"
-  }
-
-  func uniqueDatabasePath(for testName: String) -> String {
-    let safeName = testName.replacingOccurrences(
-      of: "[^A-Za-z0-9_-]",
-      with: "-",
-      options: .regularExpression
-    )
-    return "\(workRoot)/history-\(safeName)-\(UUID().uuidString).sqlite3"
   }
 
   func uniqueSettingsNamespace(for testName: String) -> String {

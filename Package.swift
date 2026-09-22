@@ -12,20 +12,15 @@ let package = Package(
     .executable(name: "Cida", targets: ["Cida"])
   ],
   targets: [
-    .systemLibrary(
-      name: "CSQLite",
-      path: "Sources/CSQLite"
-    ),
     .executableTarget(
       name: "Cida",
-      dependencies: ["CSQLite"],
       resources: [
         .process("Resources")
       ]
     ),
     .testTarget(
       name: "CidaTests",
-      dependencies: ["Cida", "CSQLite"],
+      dependencies: ["Cida"],
       path: "Tests",
       exclude: ["CidaTests/Fixtures"],
       sources: ["CidaTests", "Shared"]

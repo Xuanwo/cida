@@ -2,85 +2,94 @@
   "version": 1,
   "seed": 1786953600,
   "dimensions": {
-    "appearance": ["light", "dark"],
-    "reduceMotion": ["normal", "reduced"],
-    "scrollbars": ["automatic", "always"],
-    "window": ["standard", "zoomed"],
-    "lifecycle": ["cold", "relaunch"],
-    "content": ["standard", "long"]
+    "appearance": [
+      "light",
+      "dark"
+    ],
+    "reduceMotion": [
+      "normal",
+      "reduced"
+    ],
+    "scrollbars": [
+      "automatic",
+      "always"
+    ],
+    "action": [
+      "translate",
+      "improve"
+    ],
+    "content": [
+      "standard",
+      "long"
+    ],
+    "display": [
+      "single",
+      "secondary"
+    ]
   },
   "cases": [
     {
       "id": "p00",
       "appearance": "light",
-      "reduceMotion": "normal",
+      "reduceMotion": "reduced",
       "scrollbars": "automatic",
-      "window": "standard",
-      "lifecycle": "cold",
-      "content": "standard"
+      "action": "improve",
+      "content": "standard",
+      "display": "single"
     },
     {
       "id": "p01",
-      "appearance": "light",
+      "appearance": "dark",
       "reduceMotion": "normal",
       "scrollbars": "always",
-      "window": "zoomed",
-      "lifecycle": "relaunch",
-      "content": "long"
+      "action": "improve",
+      "content": "long",
+      "display": "secondary"
     },
     {
       "id": "p02",
-      "appearance": "light",
-      "reduceMotion": "reduced",
-      "scrollbars": "automatic",
-      "window": "standard",
-      "lifecycle": "relaunch",
-      "content": "long"
+      "appearance": "dark",
+      "reduceMotion": "normal",
+      "scrollbars": "always",
+      "action": "translate",
+      "content": "standard",
+      "display": "single"
     },
     {
       "id": "p03",
       "appearance": "light",
       "reduceMotion": "reduced",
-      "scrollbars": "always",
-      "window": "zoomed",
-      "lifecycle": "cold",
-      "content": "standard"
+      "scrollbars": "automatic",
+      "action": "translate",
+      "content": "long",
+      "display": "secondary"
     },
     {
       "id": "p04",
       "appearance": "dark",
-      "reduceMotion": "normal",
-      "scrollbars": "automatic",
-      "window": "zoomed",
-      "lifecycle": "cold",
-      "content": "long"
+      "reduceMotion": "reduced",
+      "scrollbars": "always",
+      "action": "improve",
+      "content": "long",
+      "display": "single"
     },
     {
       "id": "p05",
-      "appearance": "dark",
+      "appearance": "light",
       "reduceMotion": "normal",
       "scrollbars": "always",
-      "window": "standard",
-      "lifecycle": "relaunch",
-      "content": "standard"
+      "action": "improve",
+      "content": "standard",
+      "display": "secondary"
     },
     {
       "id": "p06",
       "appearance": "dark",
-      "reduceMotion": "reduced",
+      "reduceMotion": "normal",
       "scrollbars": "automatic",
-      "window": "zoomed",
-      "lifecycle": "relaunch",
-      "content": "standard"
-    },
-    {
-      "id": "p07",
-      "appearance": "dark",
-      "reduceMotion": "reduced",
-      "scrollbars": "always",
-      "window": "standard",
-      "lifecycle": "cold",
-      "content": "long"
+      "action": "improve",
+      "content": "standard",
+      "display": "single"
     }
   ]
 }

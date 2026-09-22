@@ -1,6 +1,6 @@
 # Cida
 
-Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming DeepSeek and OpenAI-compatible Chat Completions APIs.
+Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming DeepSeek and OpenAI-compatible Chat Completions APIs. It lives in the menu bar and shows one floating panel on `Option-Space`: the source you typed, the action, and the result.
 
 ## Requirements
 
@@ -19,9 +19,7 @@ Create a signed Release app bundle without launching it:
 scripts/build-app.sh release
 ```
 
-The production bundle is written to `build/Cida.app`. It uses a stable Developer ID signature so its Keychain identity survives rebuilds. A fresh production install starts with empty history; design samples and fixed preview responses are compiled only into Debug automation builds. Provider keys are stored only in Keychain; prompts, model IDs, the OpenAI endpoint, and other non-secret preferences are stored in UserDefaults.
-
-Production history is stored in `~/Library/Application Support/com.xuanwo.Cida/History.sqlite3`. The database uses WAL mode, preserves submission order and terminal states, and recovers an interrupted streaming entry as cancelled on the next launch without discarding its partial result. API keys are never written to this database.
+The production bundle is written to `build/Cida.app`. It uses a stable Developer ID signature so its Keychain identity survives rebuilds. Provider keys are stored only in Keychain; prompts, model IDs, the OpenAI endpoint, and other non-secret preferences are stored in UserDefaults. Nothing else is persisted: the panel starts empty on every launch, and no record of past requests is written anywhere.
 
 When OpenAI is selected, Settings exposes an editable Chat Completions endpoint and model ID. Loopback endpoints such as `http://127.0.0.1:8080/v1/chat/completions` and `http://localhost:8080/v1/chat/completions` may omit the API key. Non-local endpoints still require one.
 
@@ -29,15 +27,16 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 ## Interaction
 
-- `Option-Space`: show Cida from any application
-- `Tab`: switch between Translate and Improve
-- `Escape`: close the input window
-- `Command-,`: open Settings
-- `Return`: submit the current text
-- `Shift-Return` or `Option-Return`: insert a newline
-- `Command-C`: keep native copy for editable input or selected text; otherwise copy the latest completed result
-- The submit button becomes a stop button while a response is streaming
-- Main and Settings windows use the standard macOS close, minimize, and zoom controls
+The design source is `Design/cida.pen` (`Spec — 面板模型`, `States — 面板交互`, `Motion — 流式输出`).
+
+- `Option-Space`: show or hide the panel from any application. Showing never activates Cida, so the application you came from keeps its focus and gets it back the moment the panel hides. Every appearance starts on 翻译 with the previous source fully selected, so typing or `Command-V` begins a new task.
+- `Return`: run the selected action on the source. The source stays in the editor; the previous result is replaced immediately. `Shift-Return` or `Option-Return` inserts a newline.
+- `Tab`: switch between 翻译 and 改进. The source language is detected from the text; translation targets the other language of the Chinese/English pair, improvement keeps the source language.
+- `Escape`: hide the panel. Clicking outside hides it too. Hiding keeps the source and the result; a running request keeps streaming and is there when the panel comes back.
+- `Command-C`: copy the selection when there is one, otherwise copy the result. The control bar shows `复制结果` once a result exists and `停止` while a request runs (`Command-.` also stops).
+- `Command-,`: open Settings, a standard window with the usual close, minimize, and zoom controls. The menu-bar item offers the same entries and quit.
+
+The panel is 800 pt wide and exactly as tall as its content: the source pane grows with the text up to 30% of the screen, the panel up to 70%; beyond that each pane scrolls on its own. An edited source or a switched action dims the result and notes `原文已修改 · ⏎ 重新生成`; a stopped or failed request explains itself in the same place instead of an alert.
 
 ## Verification
 
@@ -49,18 +48,16 @@ scripts/e2e/run-nightly-gate.sh
 scripts/e2e/run-release-gate.sh
 ```
 
-Every profile first validates every mutation anchor, runs the complete Swift suite, and reruns five
-named structural performance proxies before it builds and
-signs one Release app, binds its manifest to the current commit, and verifies the app-tree digest
-again after all consumers finish. The PR profile
-runs the P0 Release journeys in Tart and the unit mutation contracts. Nightly runs the full Tart suite,
-all unit and Release mutations, the focused 120 Hz workloads, and the extreme smoke matrix. Release
-adds three fresh-clone P0 burn-in rounds by default and replaces the extreme smoke matrix with the
-full million-row and thousand-by-one-million-character matrix. Each invocation writes a single
-`gate-summary.json`; standalone scripts are diagnostic entry points, not a release verdict.
-After the harness contract check, nightly and release profiles query AppKit and Core Graphics for an
-awake, active display whose native maximum is at least 120 Hz. An unavailable physical frame clock
-is classified as infrastructure and stops the gate before builds, Tart clones, or mutation runs.
+Every profile first validates every mutation anchor, runs the complete Swift suite, and reruns four
+named structural performance proxies before it builds and signs one Release app, binds its manifest
+to the current commit, and verifies the app-tree digest again after all consumers finish. The PR
+profile runs the P0 Release journeys in Tart and the unit mutation contracts. Nightly runs the full
+Tart suite, all unit and Release mutations, and the focused 120 Hz workloads. Release adds three
+fresh-clone P0 burn-in rounds by default. Each invocation writes a single `gate-summary.json`;
+standalone scripts are diagnostic entry points, not a release verdict. After the harness contract
+check, nightly and release profiles query AppKit and Core Graphics for an awake, active display whose
+native maximum is at least 120 Hz. An unavailable physical frame clock is classified as
+infrastructure and stops the gate before builds, Tart clones, or mutation runs.
 
 Useful standalone diagnostics are:
 
@@ -68,70 +65,34 @@ Useful standalone diagnostics are:
 swift test -Xswiftc -warnings-as-errors
 scripts/test-ui-in-tart.sh
 scripts/e2e/run-focused-tart-diagnostic.sh \
-  CidaUITests/CoreTranslationJourneyTests/testTranslationShowsANewEmptyCurrentResultBeforeTheFirstByte
+  CidaUITests/CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte
 scripts/capture-design-states.sh
 scripts/test-release-input-interaction.sh
 scripts/benchmark-frame-pacing.sh
 scripts/benchmark-smooth-streaming.sh
 scripts/benchmark-million-character-paste.sh
-scripts/benchmark-large-history-scroll.sh
-scripts/benchmark-extreme-workflows.sh smoke
-# Opt-in: creates about 1.5 GB of isolated SQLite fixtures in total.
-scripts/benchmark-extreme-workflows.sh full
 ```
 
 The focused Tart diagnostic performs an incremental host compile, runs exactly one selected XCUI
 journey in a fresh no-graphics VM, and skips the duplicate guest Swift preflight. It is intentionally
 not a release verdict; every delivery still requires one of the unified gates above.
 
-The XCUI regression runs inside a fresh clone of the local `cida-ui-golden` macOS VM through [OpenAI Tart](https://github.com/openai/tart). Tart starts without graphics, audio, or host clipboard sharing; the guest network is disabled, the repository is mounted read-only, and only the selected result directory is writable from the VM. The exact signed artifact is copied into that writable share, verified against its source digest, consumed by the guest, and reverified on the host after the run. The ephemeral clone is deleted after every attempt, so the test never launches a host application or reads the production API key, UserDefaults, Keychain, or SQLite history. A 100 ms host monitor fails if either exact artifact copy is launched or takes focus on the host; frontmost-app, pasteboard, and production-Cida changes caused by concurrent user activity remain recorded diagnostics. See `UITests/README.md` for the golden-image contract and artifacts.
+The XCUI regression runs inside a fresh clone of the local `cida-ui-golden` macOS VM through [OpenAI Tart](https://github.com/openai/tart). Tart starts without graphics, audio, or host clipboard sharing; the guest network is disabled, the repository is mounted read-only, and only the selected result directory is writable from the VM. The exact signed artifact is copied into that writable share, verified against its source digest, consumed by the guest, and reverified on the host after the run. The ephemeral clone is deleted after every attempt, so the test never launches a host application or reads the production API key, UserDefaults, or Keychain. A 100 ms host monitor fails if either exact artifact copy is launched or takes focus on the host; frontmost-app, pasteboard, and production-Cida changes caused by concurrent user activity remain recorded diagnostics. See `UITests/README.md` for the golden-image contract and artifacts.
 
-Standalone design snapshots and native input probes use a fresh temporary `辞达测试.app` with a unique `com.xuanwo.Cida.Automation.*` bundle identifier. Release performance gates instead launch the exact manifest-bound `Cida.app` in an isolated automation data directory. The performance instance has activation policy `.accessory`, is ordered behind existing windows, never activates the application or makes its probe window key, and never opens the production history database. Reports fail if activation or a key probe window is observed.
+Standalone design snapshots and native input probes use a fresh temporary `辞达测试.app` with a unique `com.xuanwo.Cida.Automation.*` bundle identifier. Release performance gates instead launch the exact manifest-bound `Cida.app` in an isolated automation data directory. The performance instance orders its panel behind existing windows, never activates the application or makes its panel key, and reports fail if activation or a key panel is observed.
 
-The in-process integration suite and the VM XCUI suite both start a loopback OpenAI-compatible SSE server. XCUI drives the visible guest application through Settings, the OpenAI endpoint, model and API Key editors, the standard close button, multiline growth and deletion shrinkage, latest-only history focus, independent expansion and collapse, full copy from folded previews, consecutive submissions, submission from detached history, uneven streaming, forced follow, completed-result visibility, hover actions and copy feedback, an active-scroll 4 × 90 pt indicator pixel gate, and the exact outbound request body. A separate Release executable gate routes a real mouse click through AppKit hit testing, performs an isolated focus handoff, sends real key-down events, and verifies the native editor and `AppModel` receive identical text. UI waits use an immediately sampled 20 ms polling primitive with timeout timelines, and harness self-tests prove that short-lived feedback cannot be skipped. Tart writes a machine-readable failure category before a failed run is interpreted as a product regression. No external credential or network service is used. `CIDA_UI_TEST_ONLY_TESTING` can select one XCUI identifier for diagnosis; omitting it always runs the complete regression suite.
+The in-process integration suite and the VM XCUI suite both start a loopback OpenAI-compatible SSE server. XCUI drives the visible guest panel through Settings, the OpenAI endpoint, model and API Key editors, multiline growth and shrink of the source pane and the panel, submit with the source retained, stale marking, consecutive submissions, uneven streaming, stop and inline failure, hover-free copy, Escape and Option-Space, the empty-panel and Settings pixel baselines, the native accessibility audit, and the exact outbound request body. A separate Release executable gate routes a real mouse click through AppKit hit testing, performs an isolated focus handoff, sends real key-down events, and verifies the native editor and `AppModel` receive identical text. UI waits use an immediately sampled 20 ms polling primitive with timeout timelines, and harness self-tests prove that short-lived feedback cannot be skipped. Tart writes a machine-readable failure category before a failed run is interpreted as a product regression. No external credential or network service is used. `CIDA_UI_TEST_ONLY_TESTING` can select one XCUI identifier for diagnosis; omitting it always runs the complete regression suite.
 
-The strict performance gates require a detected 120 Hz-capable display, at least 118.8 measured
-native display-link callbacks per second, a P99 physical interval no greater than 12.5 ms, and zero
-main-actor callback latencies above the 12.5 ms budget. The focused gates collect 1,440 samples; the
-extreme matrix collects 2,400. The history gate continuously scrolls upward through 1,000
-persisted-shaped records for at least 12,000 points. Production stream pacing and the probe both use
-the app view's native Core Animation display link; the report labels it
-`view-bound-ca-display-link` and records native callback cadence separately from main-actor handling
-latency. A nonactivating fallback only keeps an unavailable display link from hanging the process; a
-60 Hz or unavailable physical display still fails `displayRequirementSatisfied` and cannot produce
-a passing 120 Hz report. PR gates report structural proxy coverage without claiming an FPS result;
-nightly and release summaries cannot pass unless at least one physical report confirms a 120 Hz
-display and the view-bound clock.
-
-The extreme matrix has a quick smoke profile and two exact, opt-in profiles: one million persisted
-history rows, and one thousand persisted results containing one million characters each. Every
-profile stages an exact one-million-character input, submits it through the production model path,
-receives an uneven local SSE stream, verifies the terminal SQLite row, scrolls normally, and then
-scrolls by one viewport per measured frame. The runner independently checks the request body and
-database, enforces timeout and process-tree RSS limits, and rejects missing phase samples, incomplete
-scroll distances, oversized presentation batches, or an unbounded loaded-history window. It reports
-workflow correctness separately from frame pacing. A red frame gate therefore never hides a
-successfully completed data flow, and a correct data flow never masks a long frame.
+The strict performance gates require a detected 120 Hz-capable display, at least 118.8 measured native display-link callbacks per second, a P99 physical interval no greater than 12.5 ms, and zero main-actor callback latencies above the 12.5 ms budget. The focused gates collect 1,440 samples. Production stream pacing and the probe both use the panel's native Core Animation display link; the report labels it `view-bound-ca-display-link` and records native callback cadence separately from main-actor handling latency. A nonactivating fallback only keeps an unavailable display link from hanging the process; a 60 Hz or unavailable physical display still fails `displayRequirementSatisfied` and cannot produce a passing 120 Hz report. PR gates report structural proxy coverage without claiming an FPS result; nightly and release summaries cannot pass unless at least one physical report confirms a 120 Hz display and the view-bound clock.
 
 ## Architecture
 
-- SwiftUI owns page composition and observable application state. AppKit owns standard titled windows, the global shortcut, native text controls, keyboard routing, history-record rendering, snapshots, and performance instrumentation. A single `HistoryEntryNSView` renders folded, current, and manually expanded records and animates between them over the Pencil 200 ms fold transition; a record that is folding stays standalone for that duration before it joins the virtualized list. `HistoryRenderContract` maps those three mutually exclusive presentations to content, disclosure, and accessibility behavior, so current-record identity cannot accidentally hide historical source content. Both frameworks derive colors from one semantic `CidaDesign.Palette` and history geometry from one `HistoryEntryPencilLayout`; state changes never cross layout engines or duplicate header, source, result, action, fade, or accessibility geometry. A historical record at rest shows its meta row and up to two result lines (82 or 108 pt, sized from a cached single-line width of its preview); only a longer result fades and folds, every record expands in place on click, hover tints the whole row past the column edge, and the content column is capped at the Pencil 804 pt reading width and centred in wider windows.
-- Model requests keep stable prompt policy, typed runtime parameters, and untrusted source content separate. Translation sends explicit source and target languages; improvement sends `preserve_source` without either translation language, so every source passage stays in its original language. The same contract is used for OpenAI, compatible remote providers, and loopback mock endpoints without requiring provider-specific template syntax.
-- Streamed results use a lightweight TextKit 1 rendering view and materialize a native selection editor only when needed. Presentation storage publishes an append notification, so TextKit appends only the missing UTF-16 suffix without invalidating the SwiftUI history tree. A view-bound `CADisplayLink` adaptive presenter follows the window across displays and smooths uneven network delivery at 30–400 grapheme clusters per second with a maximum of eight grapheme clusters per update.
-- Each streamed run is laid out on the display pulse that presents it and painted by a short-lived fragment view that fades in from transparent and unblurs from 2 pt over the Pencil 120 ms ease-out behind the inline caret; the record renderer skips those glyphs until the fade completes and then paints them in place. Results grow naturally inside the history document and never install a second scroll region; the outer history alone follows while the user remains pinned to the bottom, and streaming growth slides in over the 150 ms height transition by offsetting the bottom-anchored hosting view rather than re-laying out SwiftUI per frame. Natural-height TextKit layout is coalesced to at most 10 Hz, except that a wrapped line publishes its height on the same pulse, and notifies the history surface directly instead of round-tripping through the observable model.
-- The actual vertical scroll surfaces—history, composer, and Settings—keep native `NSScrollView` gesture, momentum, and accessibility behavior while drawing exactly one Pencil thumb layer: 4 pt wide, rounded, trackless, fixed to the design-state length, and hidden when content does not overflow. The indicator owns a top-origin coordinate system, so its thumb moves in the same visual direction for both flipped and standard AppKit documents. AppKit's own overlay scroller remains suppressed even when the framework reinstalls it during live scrolling; its overlay layout mode is preserved so content width never oscillates. Geometry notifications are coalesced and repeated installation is idempotent.
-- The composer grows and contracts from the current logical and wrapped line counts, so deleting multiline text immediately restores the compact input height. It uses a full backing document with a virtualized TextKit viewport. Documents of at least 100,000 UTF-16 units materialize only the final 512 units; upward scrolling prepends earlier 1,024-unit pages on demand. One presentation state drives both the editor height and history viewport inset through the 150 ms design transition, while the native backing store and accessibility value retain the exact count. The full document remains available for editing and submission without entering SwiftUI's observed text value. An accepted submit captures the document, clears native TextKit, resets layout, folds the previous record, and inserts the waiting result in the same input event.
-- Submitted long sources are collapsed by default in history. Their character metadata is recorded at submission, so normal history rendering never counts or lays out the whole source.
-- Production startup loads only the newest 512 history rows and preserves the true SQLite count and
-  oldest cursor. Reaching the top loads earlier pages without inserting the complete database into
-  SwiftUI's AttributeGraph. Automation uses a bounded 2,000-row page so the exact million-row
-  scenario exercises a real page transition. Folded history reuses the same native entry renderer
-  through an AppKit viewport recycler: it
-  materializes only visible rows plus overscan, uses binary-search geometry, resets hover and
-  accessibility state before reuse, and reads only each record's cached 420-grapheme preview.
-  Append-only submissions retain the existing row pool and height cache and measure exactly the new
-  folded row instead of re-diffing or remeasuring the page.
-- SQLite writes run on a dedicated utility queue. Streaming result deltas are coalesced for 250 ms and appended in place instead of rewriting the complete growing result; terminal transitions and application shutdown flush pending work before completion.
+- SwiftUI owns the panel composition and observable application state. AppKit owns the non-activating floating panel, the global shortcut, the menu-bar item, native text controls, keyboard routing, result rendering, snapshots, and performance instrumentation. `PanelController` sizes the panel from the height its content reports and keeps the top edge fixed, so the panel only ever grows downward over the Pencil 150 ms height transition. `AppModel` holds one `ResultRecord`: the source and action it was made from, its streamed text, and its phase (streaming, completed, stopped, failed). Both frameworks derive colors and typography from one semantic `CidaDesign` token set: Inter for the source, Source Serif 4 and Noto Serif SC for the result, accent only on the selected action, the caret, and the copied feedback.
+- Model requests keep stable prompt policy, typed runtime parameters, and untrusted source content separate. Translation sends the detected source language and the other language of the supported pair as target; improvement sends `preserve_source` without either translation language, so every source passage stays in its original language. The same contract is used for OpenAI, compatible remote providers, and loopback mock endpoints without requiring provider-specific template syntax.
+- Streamed results use a lightweight TextKit 1 rendering view and materialize a native selection editor only when needed. The result storage publishes an append notification, so TextKit appends only the missing UTF-16 suffix without invalidating the SwiftUI tree. A view-bound `CADisplayLink` adaptive presenter smooths uneven network delivery at 30–400 grapheme clusters per second with a maximum of eight grapheme clusters per update.
+- Each streamed run is laid out on the display pulse that presents it and painted by a short-lived fragment view that fades in from transparent and unblurs from 2 pt over the Pencil 120 ms ease-out behind the inline caret; the renderer skips those glyphs until the fade completes and then paints them in place. The result pane grows with its text until the panel reaches its height budget, then scrolls and keeps the tail in view while streaming unless the user scrolled away; a completed result opens at its top.
+- The three vertical scroll surfaces (source, result, Settings) keep native `NSScrollView` gesture, momentum, and accessibility behavior while drawing exactly one Pencil thumb layer: 4 pt wide, rounded, trackless, fixed to the design-state length, and hidden when content does not overflow. AppKit's own overlay scroller remains suppressed even when the framework reinstalls it during live scrolling.
+- The source editor uses a full backing document with a virtualized TextKit viewport. Documents of at least 100,000 UTF-16 units materialize only the final 512 units; upward scrolling prepends earlier 1,024-unit pages on demand. The pane's height is measured from the laid-out text after every native edit, so deleting lines shrinks the pane and the panel immediately. The SwiftUI binding is never written back into the editor while an input method is composing, so pinyin candidates survive unrelated re-renders.
 - No idle display link or timer runs during normal use.
 
 See `functional-qa.md` for regression evidence and `design-qa.md` for the Pencil comparison matrix.

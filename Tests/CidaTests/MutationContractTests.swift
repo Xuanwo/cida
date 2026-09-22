@@ -3,10 +3,12 @@ import XCTest
 
 @testable import Cida
 
+/// Kill tests named by `scripts/e2e/mutation-catalog.json`. Each one pins the
+/// exact behaviour its mutation breaks.
 @MainActor
 final class MutationContractTests: XCTestCase {
   func testStreamingRendererUsesInvalidatingLayerPolicy() throws {
-    let container = HistoryResultTextContainer(
+    let container = ResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 320, height: 80)
     )
     container.setResultAccessibilityIdentifier("mutation-streaming-renderer")
@@ -22,44 +24,89 @@ final class MutationContractTests: XCTestCase {
     XCTAssertEqual(renderer.layerContentsRedrawPolicy, .onSetNeedsDisplay)
   }
 
-  func testResultContainerPoolClearsRenderedTextBeforeReuse() {
-    let pool = HistoryResultTextContainerPool.shared
-    let firstLease = pool.acquire()
-    firstLease.replaceText("OLD_RESULT_MUST_NOT_SURVIVE_REUSE")
-    XCTAssertEqual(firstLease.renderedString, "OLD_RESULT_MUST_NOT_SURVIVE_REUSE")
+  func testReplacingTheResultClearsTheRenderedText() {
+    let container = ResultTextContainer(
+      frame: NSRect(x: 0, y: 0, width: 320, height: 80)
+    )
+    container.replaceText("OLD_RESULT_MUST_NOT_SURVIVE_REPLACEMENT")
+    XCTAssertEqual(container.renderedString, "OLD_RESULT_MUST_NOT_SURVIVE_REPLACEMENT")
 
-    pool.release(firstLease)
-    let secondLease = pool.acquire()
-    defer { pool.release(secondLease) }
+    container.replaceText("")
 
-    XCTAssertTrue(firstLease === secondLease)
-    XCTAssertEqual(secondLease.renderedString, "")
-    XCTAssertEqual(secondLease.naturalTextHeight, HistoryResultTextContainer.minimumHeight)
+    XCTAssertEqual(container.renderedString, "")
   }
 
-  func testAppendingNewEntryTransfersTheCurrentMarker() {
-    let previous = HistoryEntry(
-      mode: .translate,
-      source: "Previous",
-      result: "Previous result",
-      detail: "中文 → English",
-      timestamp: "18:00"
+  func testSubmitReplacesTheResultAndKeepsTheSource() async throws {
+    let model = AppModel(
+      inputText: "Kept source",
+      service: DelayedStreamingService(chunks: ["Result"], delay: .milliseconds(10))
     )
-    let model = AppModel(entries: [previous])
-    let current = HistoryEntry(
-      mode: .translate,
-      source: "Current",
-      result: "",
-      detail: "中文 → English",
-      timestamp: "18:01",
-      state: .streaming
+    XCTAssertTrue(model.submit())
+    let first = try XCTUnwrap(model.result)
+    XCTAssertEqual(model.inputText, "Kept source")
+    XCTAssertEqual(first.source, "Kept source")
+    XCTAssertEqual(model.generationState, .waiting(entryID: first.id))
+
+    try await waitUntil { model.result?.phase == .completed }
+    XCTAssertTrue(model.submit())
+    XCTAssertFalse(model.result === first)
+    XCTAssertEqual(model.inputText, "Kept source")
+    model.cancelProcessing()
+    try await waitUntil { !model.isProcessing }
+  }
+
+  func testEditedSourceMarksTheResultStale() {
+    let model = AppModel(inputText: "Original")
+    model.setResultForTesting(
+      ResultRecord(
+        mode: .translate,
+        source: "Original",
+        outputLanguage: .english,
+        result: "Result",
+        phase: .completed
+      )
     )
+    XCTAssertFalse(model.isResultStale)
+    XCTAssertNil(model.resultNote)
 
-    model.entries.append(current)
+    model.inputText = "Original edited"
+    XCTAssertTrue(model.isResultStale)
+    XCTAssertEqual(model.resultNote, .stale)
 
-    XCTAssertFalse(previous.isLatestInHistory)
-    XCTAssertTrue(current.isLatestInHistory)
-    XCTAssertFalse(model.isHistoryEntryExpanded(previous))
-    XCTAssertTrue(model.isHistoryEntryExpanded(current))
+    model.inputText = "Original"
+    model.setMode(.improve)
+    XCTAssertTrue(model.isResultStale, "Changing the action also invalidates the result")
+  }
+
+  func testEveryPanelAppearanceResetsTheActionToTranslate() {
+    let model = AppModel(mode: .improve)
+    model.resetModeToDefault()
+    XCTAssertEqual(model.mode, .translate)
+    model.toggleMode()
+    XCTAssertEqual(model.mode, .improve)
+    model.resetModeToDefault()
+    XCTAssertEqual(model.mode, .translate)
+  }
+
+  func testPanelStyleMaskNeverActivatesTheApplication() {
+    let panel = CidaPanel(width: 800)
+    XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
+    XCTAssertTrue(panel.canBecomeKey)
+    XCTAssertFalse(panel.canBecomeMain)
+  }
+
+  private func waitUntil(
+    timeout: Duration = .seconds(3),
+    condition: @escaping @MainActor () -> Bool
+  ) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+    while !condition() {
+      if clock.now >= deadline {
+        XCTFail("Timed out waiting for condition")
+        return
+      }
+      try await Task.sleep(for: .milliseconds(10))
+    }
   }
 }

@@ -10,5 +10,5 @@ if (( $# != 0 )); then
 fi
 
 cd "$project_dir"
-filter='InteractionReproductionTests/test(ScrollingUpThroughLargeFoldedHistoryDoesNotReadCompleteResults|FoldedHistoryMaterializesOnlyTheViewportPoolDuringHyperScroll|LongResultUsesIncrementalNaturalTextLayoutWithoutNestedScrolling|HighFrequencyResultUpdatesCoalesceNaturalHeightLayout|ComposerVirtualizesLargeDocumentAndLoadsEarlierPagesOnDemand)'
+filter='InteractionReproductionTests/test(LongResultUsesIncrementalNaturalTextLayoutWithoutNestedScrolling|HighFrequencyResultUpdatesCoalesceNaturalHeightLayout|ComposerVirtualizesLargeDocumentAndLoadsEarlierPagesOnDemand|PanelNeverExceedsItsHeightBudgetAndScrollsTheResultInstead)'
 exec swift test --skip-build -Xswiftc -warnings-as-errors --filter "$filter"

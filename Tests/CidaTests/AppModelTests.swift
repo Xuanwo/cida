@@ -4,8 +4,12 @@ import XCTest
 
 @MainActor
 final class AppModelTests: XCTestCase {
-  func testNewModelStartsWithoutDesignHistory() {
-    XCTAssertTrue(AppModel().entries.isEmpty)
+  func testNewModelStartsWithoutAResult() {
+    let model = AppModel()
+    XCTAssertNil(model.result)
+    XCTAssertNil(model.resultNote)
+    XCTAssertFalse(model.canCopyResult)
+    XCTAssertEqual(model.mode, .translate)
   }
 
   func testEveryPencilLucideIconIsBundledForOfflineRendering() {
@@ -21,28 +25,14 @@ final class AppModelTests: XCTestCase {
 
     XCTAssertEqual(model.mode, .improve)
     XCTAssertEqual(model.inputText, "Keep this text")
-    XCTAssertEqual(model.outputHint, "English · 输出跟随原文")
   }
 
-  func testImprovementHistoryShowsTheDetectedSourceLanguageAndProfile() {
-    let legacyEntry = HistoryEntry(
-      mode: .improve,
-      source: "This sentence needs improvement.",
-      result: "This sentence is clearer.",
-      detail: "中文",
-      timestamp: "18:00"
-    )
-
-    XCTAssertTrue(legacyEntry.metadata.hasPrefix("English · 语气与语法 · "))
-    XCTAssertFalse(legacyEntry.metadata.contains("中文"))
-  }
-
-  func testImprovementComposerHintTracksChineseAndEnglishWithoutChangingTheModelPolicy() {
+  func testImprovementDetectsTheSourceLanguageWithoutChangingTheModelPolicy() {
     let model = AppModel(mode: .improve, inputText: "这句话需要改进。")
 
-    XCTAssertEqual(model.outputHint, "中文 · 输出跟随原文")
+    XCTAssertEqual(model.detectedSourceLanguage, .chinese)
     model.inputText = "This sentence needs improvement."
-    XCTAssertEqual(model.outputHint, "English · 输出跟随原文")
+    XCTAssertEqual(model.detectedSourceLanguage, .english)
 
     let request = ProcessingRequest(
       text: model.inputText,
@@ -55,115 +45,33 @@ final class AppModelTests: XCTestCase {
     XCTAssertNil(ModelTaskParameters(request: request).targetLanguage)
   }
 
-  func testLatestCopyableResultSkipsTheActiveStreamingEntry() {
-    let model = AppModel(
-      entries: [
-        HistoryEntry(
-          mode: .translate,
-          source: "Older",
-          result: "Older result",
-          detail: "中文 → English",
-          timestamp: "16:01"
-        ),
-        HistoryEntry(
-          mode: .translate,
-          source: "Latest completed",
-          result: "Latest completed result",
-          detail: "中文 → English",
-          timestamp: "16:02"
-        ),
-        HistoryEntry(
-          mode: .translate,
-          source: "Streaming",
-          result: "Partial stream",
-          detail: "中文 → English",
-          timestamp: "16:03",
-          state: .streaming
-        ),
-      ]
-    )
+  func testCopyResultRequiresATerminalResultWithText() {
+    let model = AppModel(inputText: "Source")
+    XCTAssertFalse(model.copyResult())
 
-    XCTAssertEqual(model.latestCopyableResult, "Latest completed result")
+    let streaming = ResultRecord(
+      mode: .translate, source: "Source", outputLanguage: .english,
+      result: "Partial", phase: .streaming)
+    model.setResultForTesting(streaming)
+    XCTAssertFalse(model.canCopyResult)
+    XCTAssertFalse(model.copyResult())
+
+    streaming.phase = .stopped
+    XCTAssertTrue(model.canCopyResult, "A stopped result keeps its partial text copyable")
+
+    let failed = ResultRecord(
+      mode: .translate, source: "Source", outputLanguage: .english,
+      phase: .failed(message: "boom"))
+    model.setResultForTesting(failed)
+    XCTAssertFalse(model.canCopyResult)
+    XCTAssertEqual(model.resultNote?.kind, .failed)
   }
 
-  func testHistoryFocusKeepsOnlyTheLatestEntryAutomaticallyExpanded() {
-    let firstID = UUID()
-    let secondID = UUID()
-    let thirdID = UUID()
-    let fourthID = UUID()
-    let model = AppModel(
-      entries: [
-        historyEntry(id: firstID, source: "First"),
-        historyEntry(id: secondID, source: "Second"),
-        historyEntry(id: thirdID, source: "Third"),
-      ]
-    )
-
-    XCTAssertFalse(model.isHistoryEntryExpanded(firstID))
-    XCTAssertFalse(model.isHistoryEntryExpanded(secondID))
-    XCTAssertTrue(model.isHistoryEntryExpanded(thirdID))
-
-    model.expandHistoryEntry(firstID)
-    XCTAssertTrue(model.isHistoryEntryExpanded(firstID))
-
-    model.entries.append(historyEntry(id: fourthID, source: "Fourth"))
-
-    XCTAssertTrue(
-      model.isHistoryEntryExpanded(firstID),
-      "A manually expanded comparison must survive a new submission"
-    )
-    XCTAssertFalse(
-      model.isHistoryEntryExpanded(thirdID),
-      "The former automatic focus must fold when a newer entry arrives"
-    )
-    XCTAssertTrue(model.isHistoryEntryExpanded(fourthID))
-
-    model.collapseHistoryEntry(firstID)
-    XCTAssertFalse(model.isHistoryEntryExpanded(firstID))
-
-    model.collapseHistoryEntry(fourthID)
-    XCTAssertTrue(
-      model.isHistoryEntryExpanded(fourthID),
-      "The newest automatic focus cannot be collapsed"
-    )
-  }
-
-  func testCollapsingKeepsTheRecordStandaloneForThePencilFoldTransition() async throws {
-    let firstID = UUID()
-    let secondID = UUID()
-    let model = AppModel(
-      entries: [
-        historyEntry(id: firstID, source: "First"),
-        historyEntry(id: secondID, source: "Second"),
-      ]
-    )
-
-    model.expandHistoryEntry(firstID)
-    XCTAssertFalse(model.isHistoryEntryFolding(firstID))
-
-    model.collapseHistoryEntry(firstID)
-    XCTAssertFalse(model.isHistoryEntryExpanded(firstID))
-    XCTAssertTrue(
-      model.isHistoryEntryFolding(firstID),
-      "A collapsing record keeps its standalone renderer while the 200 ms fold runs"
-    )
-
-    model.expandHistoryEntry(firstID)
-    XCTAssertTrue(model.isHistoryEntryExpanded(firstID))
-    XCTAssertFalse(model.isHistoryEntryFolding(firstID), "Re-expanding cancels the pending fold")
-
-    model.collapseHistoryEntry(firstID)
-    try await waitUntil { !model.isHistoryEntryFolding(firstID) }
-    XCTAssertFalse(model.isHistoryEntryExpanded(firstID))
-
-    let thirdID = UUID()
-    model.entries.append(historyEntry(id: thirdID, source: "Third"))
-    XCTAssertTrue(
-      model.isHistoryEntryFolding(secondID),
-      "A new submission folds the former focus through the same transition"
-    )
-    XCTAssertFalse(model.isHistoryEntryExpanded(secondID))
-    try await waitUntil { !model.isHistoryEntryFolding(secondID) }
+  func testTargetLanguageIsTheOtherHalfOfTheSupportedPair() {
+    XCTAssertEqual(AppModel.targetLanguage(for: .chinese), .english)
+    XCTAssertEqual(AppModel.targetLanguage(for: .english), .chinese)
+    let model = AppModel(inputText: "Cache invalidation is hard.")
+    XCTAssertEqual(model.detectedSourceLanguage, .english)
   }
 
   func testStagedVirtualDocumentKeepsItsPreparedUTF16Count() {
@@ -176,74 +84,51 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.inputDocumentUTF16Count, "Visible tail".utf16.count)
   }
 
-  private func historyEntry(id: UUID, source: String) -> HistoryEntry {
-    HistoryEntry(
-      id: id,
-      mode: .translate,
-      source: source,
-      result: "\(source) result",
-      detail: "中文 → English",
-      timestamp: "18:00"
-    )
-  }
-
-  func testSwappingLanguagesUpdatesBothSides() {
-    let model = AppModel()
-
-    model.swapLanguages()
-
-    XCTAssertEqual(model.sourceLanguage, .english)
-    XCTAssertEqual(model.targetLanguage, .chinese)
-  }
-
-  func testStreamingPublishesPartialResultsAndCompletionScrollRequests() async throws {
+  func testStreamingPublishesPartialResultsAndCompletionFollowRequests() async throws {
     let model = AppModel(
       mode: .improve,
       inputText: "Draft",
-      entries: [],
       service: DelayedStreamingService(chunks: ["Clear", " and", " concise."])
     )
 
     let processing = Task { await model.process(text: "Draft") }
 
     try await waitUntil { model.generationState.phase == .waiting }
-    try await waitUntil { model.entries.last?.result.hasPrefix("Clear") == true }
-    let partialScrollRevision = model.historyScrollRevision
+    try await waitUntil { model.result?.result.hasPrefix("Clear") == true }
+    let partialFollowRevision = model.resultFollowRevision
     XCTAssertTrue(model.isProcessing)
     XCTAssertEqual(model.generationState.phase, .revealing)
-    XCTAssertEqual(model.entries.last?.state, .streaming)
-    XCTAssertEqual(model.inputText, "")
+    XCTAssertEqual(model.result?.phase, .streaming)
+    XCTAssertEqual(model.inputText, "Draft", "The source stays in the editor")
 
     await processing.value
 
-    XCTAssertEqual(model.entries.count, 1)
-    XCTAssertEqual(model.entries[0].result, "Clear and concise.")
-    XCTAssertEqual(model.entries[0].state, .completed)
+    let result = try XCTUnwrap(model.result)
+    XCTAssertEqual(result.result, "Clear and concise.")
+    XCTAssertEqual(result.phase, .completed)
+    XCTAssertEqual(result.outputLanguage, .english, "Improvement keeps the source language")
     XCTAssertFalse(model.isProcessing)
     XCTAssertEqual(model.generationState, .idle)
-    XCTAssertGreaterThan(model.historyScrollRevision, partialScrollRevision)
+    XCTAssertGreaterThan(model.resultFollowRevision, partialFollowRevision)
   }
 
-  func testTerminalHistoryFollowBypassesStreamingThrottleWithoutForcingPin() {
+  func testTerminalResultFollowBypassesTheStreamingThrottle() {
     let model = AppModel()
 
-    model.requestHistoryFollow(force: false)
-    let throttledRevision = model.historyScrollRevision
-    let forcePinRevision = model.historyForcePinRevision
-    model.requestHistoryFollow(force: false)
+    model.requestResultFollow(force: false)
+    let throttledRevision = model.resultFollowRevision
+    model.requestResultFollow(force: false)
 
-    XCTAssertEqual(model.historyScrollRevision, throttledRevision)
+    XCTAssertEqual(model.resultFollowRevision, throttledRevision)
 
-    model.requestHistoryFollow(force: false, allowsThrottling: false)
+    model.requestResultFollow(force: false, allowsThrottling: false)
 
-    XCTAssertEqual(model.historyScrollRevision, throttledRevision + 1)
-    XCTAssertEqual(model.historyForcePinRevision, forcePinRevision)
+    XCTAssertEqual(model.resultFollowRevision, throttledRevision + 1)
   }
 
   func testCancellingStreamingKeepsTheVisiblePartialResult() async throws {
     let model = AppModel(
       inputText: "Draft",
-      entries: [],
       service: DelayedStreamingService(
         chunks: ["First", " second", " third"],
         delay: .milliseconds(100)
@@ -251,66 +136,71 @@ final class AppModelTests: XCTestCase {
     )
 
     model.submit()
-    try await waitUntil { model.entries.last?.result.isEmpty == false }
-    let visibleResult = model.entries.last?.result
+    try await waitUntil { model.result?.result.isEmpty == false }
+    let visibleResult = model.result?.result
     model.cancelProcessing()
     try await waitUntil { !model.isProcessing }
 
-    XCTAssertEqual(model.entries.last?.result, visibleResult)
-    XCTAssertEqual(model.entries.last?.state, .cancelled)
+    XCTAssertEqual(model.result?.result, visibleResult)
+    XCTAssertEqual(model.result?.phase, .stopped)
+    XCTAssertEqual(model.resultNote?.kind, .stopped)
+    XCTAssertTrue(model.canCopyResult)
   }
 
-  func testSubmitAtomicallyClearsTheComposerFoldsThePreviousEntryAndInsertsWaitingOutput()
-    async throws
-  {
-    let previous = HistoryEntry(
-      mode: .translate,
-      source: "Previous source",
-      result: "Previous result",
-      detail: "中文 → English",
-      timestamp: "18:00"
-    )
+  func testSubmitReplacesThePreviousResultAndKeepsTheSource() async throws {
     let model = AppModel(
       inputText: "Next source",
-      entries: [previous],
-      service: DelayedStreamingService(
-        chunks: ["Next result"],
-        delay: .milliseconds(250)
-      )
+      service: DelayedStreamingService(chunks: ["Next result"], delay: .milliseconds(250))
     )
+    model.setResultForTesting(
+      ResultRecord(
+        mode: .translate, source: "Previous source", outputLanguage: .english,
+        result: "Previous result", phase: .completed))
+    XCTAssertTrue(model.isResultStale)
+
     XCTAssertTrue(model.submit())
 
-    let submitted = try XCTUnwrap(model.entries.last)
-    XCTAssertEqual(model.inputText, "")
-    XCTAssertEqual(model.entries.count, 2)
-    XCTAssertFalse(previous.isLatestInHistory)
-    XCTAssertTrue(submitted.isLatestInHistory)
+    let submitted = try XCTUnwrap(model.result)
+    XCTAssertEqual(model.inputText, "Next source")
     XCTAssertEqual(submitted.source, "Next source")
     XCTAssertEqual(submitted.result, "")
-    XCTAssertEqual(submitted.state, .streaming)
+    XCTAssertEqual(submitted.phase, .streaming)
     XCTAssertEqual(model.generationState, .waiting(entryID: submitted.id))
+    XCTAssertFalse(model.isResultStale, "A running request is never stale")
 
     model.cancelProcessing()
     try await waitUntil { !model.isProcessing }
+    XCTAssertEqual(submitted.phase, .stopped)
+  }
 
-    XCTAssertEqual(model.entries.count, 2)
-    XCTAssertEqual(submitted.state, .cancelled)
-    XCTAssertFalse(model.isHistoryEntryExpanded(previous))
-    XCTAssertTrue(model.isHistoryEntryExpanded(submitted))
+  func testFailedRequestKeepsThePartialTextAndExplainsInline() async throws {
+    let model = AppModel(
+      inputText: "Draft",
+      service: FailingStreamingService(chunks: ["Partial"], message: "boom"),
+      streamPresentationPolicy: .fastTests
+    )
+
+    await model.process(text: "Draft")
+
+    let result = try XCTUnwrap(model.result)
+    XCTAssertEqual(result.result, "Partial")
+    XCTAssertEqual(result.phase, .failed(message: "boom"))
+    XCTAssertEqual(model.resultNote?.kind, .failed)
+    XCTAssertTrue(model.resultNote?.text.contains("boom") == true)
+    XCTAssertNil(model.errorMessage, "Request failures never raise a Settings alert")
   }
 
   func testBurstyResponseIsReleasedInBoundedPresentationUpdates() async {
     let response = String(repeating: "Smooth burst rendering. ", count: 24)
     let model = AppModel(
-      entries: [],
       service: DelayedStreamingService(chunks: [response], delay: .zero),
       streamPresentationPolicy: .fastTests
     )
 
     await model.process(text: "Draft")
 
-    XCTAssertEqual(model.entries.last?.result, response)
-    XCTAssertEqual(model.entries.last?.state, .completed)
+    XCTAssertEqual(model.result?.result, response)
+    XCTAssertEqual(model.result?.phase, .completed)
     XCTAssertGreaterThan(model.streamPresentationUpdateCount, 1)
     XCTAssertLessThan(model.maximumStreamPresentationCharacterCount, response.count)
     XCTAssertLessThanOrEqual(model.maximumStreamPresentationCharacterCount, 16)
@@ -319,7 +209,6 @@ final class AppModelTests: XCTestCase {
   func testCharacterAtATimeResponseIsCoalescedBeforeRendering() async {
     let response = "A backend can arrive one character at a time."
     let model = AppModel(
-      entries: [],
       service: DelayedStreamingService(
         chunks: response.map(String.init),
         delay: .zero
@@ -329,7 +218,7 @@ final class AppModelTests: XCTestCase {
 
     await model.process(text: "Draft")
 
-    XCTAssertEqual(model.entries.last?.result, response)
+    XCTAssertEqual(model.result?.result, response)
     XCTAssertGreaterThan(model.streamPresentationUpdateCount, 1)
     XCTAssertLessThan(model.streamPresentationUpdateCount, response.count)
   }
@@ -337,24 +226,23 @@ final class AppModelTests: XCTestCase {
   func testVisibleResultRemainsStableDuringABackendPause() async throws {
     let service = GatedStreamingService(firstChunk: "Steady", secondChunk: " finish")
     let model = AppModel(
-      entries: [],
       service: service,
       streamPresentationPolicy: .fastTests
     )
 
     let processing = Task { await model.process(text: "Draft") }
-    try await waitUntil { model.entries.last?.result == "Steady" }
+    try await waitUntil { model.result?.result == "Steady" }
     let revisionDuringPause = model.streamPresentationUpdateCount
     try await Task.sleep(for: .milliseconds(70))
 
-    XCTAssertEqual(model.entries.last?.result, "Steady")
+    XCTAssertEqual(model.result?.result, "Steady")
     XCTAssertEqual(model.streamPresentationUpdateCount, revisionDuringPause)
-    XCTAssertEqual(model.entries.last?.state, .streaming)
+    XCTAssertEqual(model.result?.phase, .streaming)
 
     service.releaseSecondChunk()
     await processing.value
-    XCTAssertEqual(model.entries.last?.result, "Steady finish")
-    XCTAssertEqual(model.entries.last?.state, .completed)
+    XCTAssertEqual(model.result?.result, "Steady finish")
+    XCTAssertEqual(model.result?.phase, .completed)
   }
 
   func testPresentationBufferPreservesASplitUnicodeGraphemeCluster() {
@@ -469,59 +357,17 @@ final class AppModelTests: XCTestCase {
     )
   }
 
-  func testHistoryMetadataTransitionsFromGeneratingToCompletedCounts() {
-    let entry = HistoryEntry(
-      mode: .translate,
-      source: "Source",
-      result: "Result",
-      detail: "中文 → English",
-      timestamp: "18:00",
-      reportedSourceCharacterCount: 1_846,
-      reportedResultCharacterCount: 3_214,
-      state: .streaming
-    )
-
-    XCTAssertEqual(entry.metadata, "中文 → English · 生成中")
-    entry.state = .completed
-    XCTAssertEqual(entry.metadata, "中文 → English · 18:00 · 1,846 → 3,214 字")
-  }
-
-  func testHistoryResultStorageKeepsIdentityAcrossIncrementalUpdates() {
-    let entry = HistoryEntry(
-      mode: .translate,
-      source: "Source",
-      result: "",
-      detail: "中文 → English",
-      timestamp: "18:00",
-      state: .streaming
-    )
-    let storage = entry.resultStorage
+  func testResultStorageKeepsIdentityAcrossIncrementalUpdates() {
+    let record = ResultRecord(mode: .translate, source: "Source", outputLanguage: .english)
+    let storage = record.storage
 
     for _ in 0..<1_000 {
-      entry.appendPresentationDelta("bounded delta ")
+      record.appendPresentationDelta("bounded delta ")
     }
 
-    XCTAssertTrue(storage === entry.resultStorage)
-    XCTAssertEqual(entry.presentationRevision, 1_000)
-    XCTAssertEqual(entry.result, String(repeating: "bounded delta ", count: 1_000))
-  }
-
-  func testFoldedHistoryPreviewCacheStaysBoundedAndGraphemeSafe() {
-    let family = "👨‍👩‍👧‍👦"
-    let initial = String(repeating: "A", count: 419) + family + "trailing text"
-    let storage = HistoryResultStorage(initial)
-
-    XCTAssertEqual(storage.foldedPreview, String(initial.prefix(420)))
-    XCTAssertTrue(storage.foldedPreview.hasSuffix(family))
-
-    storage.replace(with: String(repeating: "B", count: 120))
-    XCTAssertEqual(storage.foldedPreview, String(repeating: "B", count: 120))
-
-    storage.append(family)
-    XCTAssertEqual(storage.foldedPreview, String(repeating: "B", count: 120) + family)
-
-    storage.replace(with: "first\nsecond\nthird")
-    XCTAssertEqual(storage.foldedPreview, "first\nsecond\nthird")
+    XCTAssertTrue(storage === record.storage)
+    XCTAssertEqual(record.presentationRevision, 1_000)
+    XCTAssertEqual(record.result, String(repeating: "bounded delta ", count: 1_000))
   }
 
   func testStrictSmoothStreamingReportCarriesPresentationMetrics() {
@@ -548,16 +394,15 @@ final class AppModelTests: XCTestCase {
   func testHighFrequencyStreamUpdatesAreBatchedForRendering() async {
     let chunks = Array(repeating: "token ", count: 1_000)
     let model = AppModel(
-      entries: [],
       service: DelayedStreamingService(chunks: chunks, delay: .zero),
       streamPresentationPolicy: .fastTests
     )
 
     await model.process(text: "Draft")
 
-    XCTAssertEqual(model.entries.last?.result, chunks.joined())
+    XCTAssertEqual(model.result?.result, chunks.joined())
     XCTAssertLessThan(model.streamPresentationUpdateCount, chunks.count)
-    XCTAssertLessThan(model.historyScrollRevision, model.streamPresentationUpdateCount)
+    XCTAssertLessThan(model.resultFollowRevision, model.streamPresentationUpdateCount)
   }
 
   func testLegacySettingsDecodeWithTheOfficialOpenAIEndpoint() throws {
@@ -688,7 +533,6 @@ final class AppModelTests: XCTestCase {
     var clearCount = 0
     var persistedSettings: CidaSettings?
     let model = AppModel(
-      entries: [],
       settings: CidaSettings(),
       saveSettings: { persistedSettings = $0 },
       clearPersistedAPIKey: { clearCount += 1 }
@@ -706,7 +550,6 @@ final class AppModelTests: XCTestCase {
     settings.apiKey = "sk-existing-test-key"
     var clearCount = 0
     let model = AppModel(
-      entries: [],
       settings: settings,
       saveSettings: { _ in },
       clearPersistedAPIKey: { clearCount += 1 }
@@ -721,7 +564,6 @@ final class AppModelTests: XCTestCase {
   func testRecoveredAPIKeyIsRestoredWithoutReenteringIt() {
     var clearCount = 0
     let model = AppModel(
-      entries: [],
       settings: CidaSettings(),
       saveSettings: { _ in },
       clearPersistedAPIKey: { clearCount += 1 }
@@ -923,74 +765,6 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(report.inputCharacterCount, 850_000)
   }
 
-  func testLargeHistoryScrollReportCarriesTheSustainedUpwardWorkload() {
-    let timestamps = (0..<1_440).map { Double($0) / 120 }
-
-    let report = FramePacingProbeNSView.makeReport(
-      timestamps: timestamps,
-      maximumFramesPerSecond: 120,
-      interactionCount: 1_200,
-      requiredSampleCount: 1_440,
-      workload: FramePacingWorkload.largeHistoryScroll.description,
-      requiredFramesPerSecond: 120,
-      requiresZeroMissedFrameBudgets: true,
-      workloadCompleted: true,
-      historyEntryCount: 1_000,
-      scrollDistancePoints: 38_400
-    )
-
-    XCTAssertTrue(report.passed)
-    XCTAssertEqual(report.historyEntryCount, 1_000)
-    XCTAssertEqual(report.scrollDistancePoints, 38_400)
-    XCTAssertEqual(report.interactionCount, 1_200)
-    XCTAssertEqual(report.missedFrameBudgetCount, 0)
-  }
-
-  func testOlderHistoryPageApplicationWaitsUntilLiveScrollEnds() async throws {
-    let initialEntry = HistoryEntry(
-      mode: .translate,
-      source: "Newest source",
-      result: "Newest result",
-      detail: "中文 → English",
-      timestamp: "18:00"
-    )
-    let olderEntry = HistoryEntry(
-      mode: .translate,
-      source: "Older source",
-      result: "Older result",
-      detail: "中文 → English",
-      timestamp: "17:59"
-    )
-    let loader = CountingHistoryPageLoader(
-      page: HistoryPage(
-        entries: [olderEntry],
-        oldestSortOrder: 0,
-        totalCount: 2,
-        hasMoreBefore: false
-      )
-    )
-    let model = AppModel(
-      entries: [initialEntry],
-      historyPageLoader: loader,
-      historyTotalCount: 2,
-      historyOldestSortOrder: 1,
-      historyHasMoreBefore: true,
-      historyPageSize: 128
-    )
-
-    model.historyDidLiveScroll()
-    model.loadOlderHistoryIfNeeded()
-    try await Task.sleep(for: .milliseconds(200))
-
-    XCTAssertEqual(loader.loadCount, 0)
-    XCTAssertEqual(model.entries.map(\.id), [initialEntry.id])
-
-    model.historyDidEndLiveScroll()
-    try await waitUntil {
-      loader.loadCount == 1 && model.entries.map(\.id) == [olderEntry.id, initialEntry.id]
-    }
-  }
-
   func testFramePacingReportWithoutSamplesCanBeEncodedAsAFailure() throws {
     let report = FramePacingProbeNSView.makeReport(
       timestamps: [],
@@ -1016,29 +790,6 @@ final class AppModelTests: XCTestCase {
       }
       try await Task.sleep(for: .milliseconds(10))
     }
-  }
-}
-
-private final class CountingHistoryPageLoader: HistoryPageLoading, @unchecked Sendable {
-  private let lock = NSLock()
-  private let page: HistoryPage
-  private var count = 0
-
-  init(page: HistoryPage) {
-    self.page = page
-  }
-
-  var loadCount: Int {
-    lock.lock()
-    defer { lock.unlock() }
-    return count
-  }
-
-  func loadBefore(sortOrder: Int64, limit: Int) throws -> HistoryPage {
-    lock.lock()
-    count += 1
-    lock.unlock()
-    return page
   }
 }
 
@@ -1080,7 +831,7 @@ private final class GatedStreamingService: TextProcessingService, @unchecked Sen
   }
 }
 
-private struct DelayedStreamingService: TextProcessingService {
+struct DelayedStreamingService: TextProcessingService {
   let chunks: [String]
   var delay: Duration = .milliseconds(45)
 
@@ -1099,6 +850,29 @@ private struct DelayedStreamingService: TextProcessingService {
         } catch {
           continuation.finish(throwing: error)
         }
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
+  }
+}
+
+private struct FailingStreamingService: TextProcessingService {
+  let chunks: [String]
+  let message: String
+
+  func stream(
+    _ request: ProcessingRequest,
+    settings: CidaSettings
+  ) -> AsyncThrowingStream<String, Error> {
+    AsyncThrowingStream { continuation in
+      let task = Task {
+        for chunk in chunks {
+          continuation.yield(chunk)
+        }
+        // Let the presenter show what arrived before the backend fails.
+        try? await Task.sleep(for: .milliseconds(150))
+        continuation.finish(
+          throwing: TextProcessingError.apiError(statusCode: 500, message: message))
       }
       continuation.onTermination = { _ in task.cancel() }
     }

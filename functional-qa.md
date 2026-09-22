@@ -8,107 +8,99 @@ and complete app-tree digest. Swift tests, Tart XCUI, mutation contracts, and pe
 consume that artifact or the same source commit, and the final gate verifies the app-tree digest
 again.
 
-The current core experience contract includes:
+The current core experience contract (Pencil `Spec — 面板模型`) includes:
 
-1. Real native typing, selection, paste, multiline growth, deletion-driven shrink, Return submit,
-   and immediate native composer reset.
-2. An atomic submit transition that clears the composer, folds the previous automatic current
-   record, creates an empty current waiting result, and force-pins history.
-3. Delayed-first-byte, bursty, character-at-a-time, paused, cancelled, failed, and recovered
-   OpenAI-compatible streaming.
-4. Display-linked smoothing, bounded grapheme batches, per-run 120 ms glyph reveal (fade plus
-   2 pt unblur) behind the caret, waiting caret, coalesced TextKit natural-height publication, and
-   the 150 ms height slide for streaming growth.
-5. Automatic follow through terminal completion, deliberate user detachment, and reattachment on a
-   new accepted submission.
-6. One outer result/history scroll surface, correct 4 pt custom thumb direction, and sticky result
-   actions for long records.
-7. Latest-only automatic expansion, independent manual comparisons, bounded folded previews, full
-   source/result restoration after manual expansion, full copy from folded records, and no hidden
-   full-result layout. Folded, current, and manually expanded records are states of one native
-   history-entry renderer.
-8. Native Command-C precedence, hover-only terminal actions, streaming action suppression, and
-   copied-state reset.
-9. DeepSeek/OpenAI selection, editable local endpoint and model, Keychain API-key persistence and
-   clearing, prompt edit/reset, and source-language-preserving improvement.
-10. SQLite order/content/state persistence, interrupted-stream recovery, cursor pagination, and
-    malformed-row isolation.
-11. Standard macOS close, minimize, zoom, resize, focus, and Settings lifecycle behavior.
-12. Exact one-million-character input, one-million persisted rows, and one thousand
-    one-million-character records in isolated correctness/performance workloads.
+1. A menu-bar application whose main interface is one borderless, non-activating floating panel:
+   `Option-Space` shows or hides it without taking focus from the application the user came from,
+   Escape and clicking outside hide it, and hiding never loses the source, the result, or a running
+   request.
+2. Real native typing, selection, paste, multiline growth, deletion-driven shrink, and Return
+   submit in the source pane, with the panel exactly as tall as its content: the source pane is
+   capped at 30% of the screen, the panel at 70%, and both panes scroll past their caps.
+3. One result at a time. Return runs the selected action on the current source, keeps the source
+   in the editor, and replaces the previous result immediately. Every appearance of the panel
+   resets the action to 翻译 and selects the whole source.
+4. Delayed-first-byte, bursty, character-at-a-time, paused, stopped, failed, and recovered
+   OpenAI-compatible streaming, rendered with display-linked smoothing, bounded grapheme batches,
+   the per-run 120 ms glyph reveal behind the caret, the waiting caret, coalesced TextKit
+   natural-height publication, and the 150 ms height slide for pane and panel growth.
+5. A control bar with the `翻译 | 改进` action (Tab switches it) and one context slot: `停止`
+   while a request runs, `复制结果` once a result exists, `✓ 已复制` for 800 ms after copying.
+6. Result notes instead of alerts: an edited source or a changed action dims the result and notes
+   `原文已修改 · ⏎ 重新生成`; a stopped request keeps its partial text with `已停止`; a failed
+   request explains itself inline and Return retries.
+7. Native Command-C precedence: a selection keeps the system copy; without one, Command-C copies
+   the result.
+8. DeepSeek/OpenAI selection, editable local endpoint and model, Keychain API-key persistence and
+   clearing, prompt edit/reset, source-language detection, and source-language-preserving
+   improvement, all from a standard Settings window.
+9. Input-method safety: the SwiftUI binding is never written back into the editor while a
+   composition (for example pinyin) is in progress.
+10. Exact one-million-character input in the isolated performance workload.
 
-Production starts without design records or mock output. Automation redirects only its database,
-preferences, Keychain namespace, local endpoint, and diagnostics; it does not replace the production
-model, storage, window, history, or renderer paths.
+Production starts empty and without mock output. Automation redirects only its preferences,
+Keychain namespace, local endpoint, and diagnostics; it does not replace the production model,
+panel, or renderer paths.
 
-## Root repairs in the current refactor
+## Root repairs in the panel rewrite
 
 | Risk | Root repair | Regression oracle |
 | --- | --- | --- |
-| Old result survives a new submit | Submission now transfers the latest marker and mounts a new empty result in the same accepted event; pooled result views clear TextKit and compositor state before reuse. | Controlled-first-byte Tart journey checks the new current identity, empty output, forbidden old pixels, and prior-row fold. Pool-capacity journey repeats beyond the prewarmed pool. |
-| Composer sometimes remains populated or becomes uneditable | Native reset synchronization is generation-aware: a stale binding echo is cleared, while a genuine edit made after the reset is preserved. Empty macOS AX values are normalized without confusing `nil` with a failed reset. | Native responder-chain tests, real typing/paste/delete XCUI, atomic-submit unit test, and two consecutive-submit journeys. |
-| A passing test only proved an AX string | Current/expanded state is asserted through visible product structure: current semantic label, source and result presence, absence of the folded row's disclosure element; folded state requires the inverse structure. | Shared driver applies the invariant to every submit. Direct mutation of the latest marker is killed by unit and Tart tests. |
-| Folded and expanded records drifted because two layout engines owned the same component | `HistoryEntryNSView` now owns header, source, result, actions, fades, accessibility, and exact geometry for every presentation state. SwiftUI selects one explicit `folded`, `current`, or `manuallyExpanded` presentation; `HistoryRenderContract` derives content and disclosure behavior without an `isLatest` rendering flag. Native child controls and the entry-local fallback own pointer routing; the window does not scan the view tree. | Pure presentation-matrix tests require both expanded states to show source and result; structural hierarchy tests require all three states to resolve to `HistoryEntryNSView`; native window events exercise standard AppKit hit testing; identity/geometry tests exercise every state transition; Tart asserts that every expanded record restores its source, preserves spacing, and accepts source/result actions. Source and hit-routing mutations must be killed. |
-| SwiftUI and AppKit colors or spacing drifted independently | Both frameworks resolve semantic colors through `CidaDesign.Palette` and history measurements through `HistoryEntryPencilLayout`; renderer files contain no duplicate design RGB constants. | Token tests pin every shared sRGB value, opacity, folded height, row stride, action column, and source fade measurement. |
-| Some UI suites were silently absent from PR | The PR selector names every UI suite, and a source-enumerating unit test fails if a new `*Tests.swift` suite is not selected. | `PairwiseManifestTests/testPRGateIncludesEveryReleaseUITestSuite`. |
-| Settings could open but not work | Stable identifiers now cover provider, endpoint/model, API key, prompt editor/reset, and launch-at-login. Prompt editing, close/reopen, reset, provider switch, local endpoint, and official endpoint reset form one E2E state machine. | `WindowAndSettingsJourneyTests`, persistence relaunch, and Settings pixel baseline. |
-| Improvement followed translation language selectors | Improvement uses `preserve_source` with no source/target translation parameters; UI history and hints derive from detected input language. | English and Chinese improvement journey plus request-body contract tests. |
-| Backend timing was visually abrupt | Network arrival is decoupled from presentation by a view-bound display link and adaptive buffer. Each presented run is laid out on its pulse and painted by a short-lived fragment view that fades in and unblurs over the Pencil 120 ms ease-out; the record renderer skips those glyphs until the fade completes, so there is no whole-document filtering and nothing shifts on commit. | Bursty/character stream tests, real uneven SSE journey, fragment/animation token tests, and performance probe. |
-| Streaming growth lost follow or caused layout churn | Native result storage notifies the existing TextKit view directly; suffix append and natural-height updates avoid rebuilding folded history. Force-pin and terminal revisions bypass stream throttling when required. | Detached/follow integration, uneven stream journey, layout-coalescing tests, and no-reconfiguration tests. |
-| Large history scroll rebuilt full results | SQLite loads bounded pages; AppKit recycles only viewport folded rows and reads cached grapheme-safe previews. | 5,000-row recycler tests, 1,000-row sustained scroll, and exact extreme workflows. |
-| A PR could pass without naming the hot-path invariants it relied on | Every gate reruns a dedicated proxy stage for bounded history reads, viewport-only materialization, incremental result layout, layout coalescing, and large-document virtualization. PR summaries explicitly stop at proxy coverage; nightly/release summaries additionally require physical view-bound reports from a 120 Hz display. | `performance-proxies` gate stage plus physical streaming, million-paste, history-scroll, and extreme reports. |
-| Scrollbar direction or duplicate system thumb regressed | Custom indicators use top-origin normalized geometry and suppress reinstalled AppKit overlay scrollers while retaining native scroll behavior. | Native direction/reinstallation tests and two-position WindowServer pixel assertions. |
-| Expanding a record ballooned and snapped back | SwiftUI switched a freshly created standalone record to its expanded presentation before the native view had a frame or a window, so the result was measured at a 1 pt width and the in-place transition was skipped. The switch now waits for the layout turn, an animated expand lays the result out at the row's real width before SwiftUI measures it, measuring never lays text out (SwiftUI probes 1 pt and 10 pt widths), and an unsized view never starts a transition. | Probe-width measurement test (`preferredHeight` at 1, 10, 400, and 1,280 pt leaves the live layout untouched) and a hosted expand journey sampled every frame: the record never exceeds its final height, the rows above stay in the viewport, and the transition runs. |
+| The history timeline consumed most of the code and its interaction never converged | The timeline, folding, SQLite persistence, virtualized list, and their gates are removed. `AppModel` holds one `ResultRecord`; the panel shows source, control bar, and result. | The whole suite runs against the panel; `PairwiseManifestTests` keeps every UI suite in the PR gate. |
+| A fixed window left dead space and a chat-style bottom composer | `PanelController` sizes a non-activating `NSPanel` from the height its SwiftUI content reports, anchored at the top edge, within a screen-relative budget. | Panel style-mask, content-height, fixed-top-edge, and height-budget tests; XCUI growth/shrink and hide/show journeys. |
+| Pinyin composition was cancelled by SwiftUI write-backs | `ComposerTextEditor.updateNSView` skips the binding write-back while the text view has marked text (found by the panel IME spike). | `testBindingWriteBackIsSkippedWhileAnInputMethodIsComposing`. |
+| The source pane did not shrink after deletions | The source height is measured from TextKit 2 layout fragments after every native edit instead of the lazily updated usage bounds. | Composer shrink test with exact 78/52/27 pt heights and the matching panel heights; XCUI growth/shrink journey. |
+| A completed result opened scrolled to its end | The result scroll view follows the tail only while streaming; the first follow revision of a completed result stays at the top. | Height-budget test and the long-input indicator test assert `contentView.bounds.minY == 0`. |
+| A stale result could be copied as if current | `isResultStale` compares source length and text and the action against the record; the note row states what ⏎ will do. | `testEditedSourceMarksTheResultStale`, property test stale parity, XCUI stale note. |
+| The panel showed transparent in the signed Release build | `PanelController.show()` faded the panel in through `NSWindow.animator().alphaValue`, which never progressed in the Release guest; the panel is ordered front at full opacity instead. Only production and the Tart launch reach `show()` (design snapshots use `prepareAutomationPanel`). | Every XCUI journey (the panel must exist), plus the per-launch lifecycle log that records the panel's alpha on show. |
 
 ## Test layers
 
 | Layer | Environment | Current role |
 | --- | --- | --- |
-| State/storage | Swift XCTest | model transitions, typed request envelope, SQLite, deterministic property sequences, report validation |
-| Native components | AppKit XCTest | responder chain, TextKit append/layout, pooling, hover, geometry, indicators, background windows |
-| Release E2E | fresh headless Tart clone | real signed app, WindowServer, XCUI input, local SSE, persistence, screenshots, accessibility |
+| State | Swift XCTest | model transitions, typed request envelope, deterministic property sequences, report validation |
+| Native components | AppKit XCTest | responder chain, TextKit append/layout, panel sizing, indicators, background windows |
+| Release E2E | fresh headless Tart clone | real signed app, WindowServer, XCUI input, local SSE, screenshots, accessibility |
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite currently contains 158 tests: 51 model/report tests, 7 SQLite tests, 4 host
-isolation tests, 85 native interaction, layout, and design-token tests, 3 mutation invariants,
-2 suite/matrix manifest tests, 4 loopback integration tests, and 2 deterministic journey-model tests.
+The host Swift suite contains 102 tests: 45 model/report tests, 36 native interaction and layout
+tests, 6 mutation invariants, 4 host isolation tests, 4 design-token tests, 3 loopback integration
+tests, 2 suite/matrix manifest tests, and 2 deterministic journey-model tests.
 
-The Release XCUI target contains 28 tests across ten files: 23 product journeys and five harness
-self-tests. The product journeys cover signed-artifact smoke,
-composer and copy behavior, controlled and uneven streams, cancellation/error recovery, scroll
-direction and follow, history presentation/actions, persistence, shared state-machine relaunch,
-Main/Settings pixel baselines, accessibility audit, and standard window/Settings behavior.
+The Release XCUI target contains 18 tests across seven files: 15 product journeys and three harness
+self-tests. The product journeys cover signed-artifact smoke, composer growth and shrink, submit
+with the source retained, stale marking, improvement in both languages, Command-C precedence,
+controlled and uneven streams, result replacement, stop/failure/recovery, the shared state-machine
+smoke with hide and show, the panel lifecycle and Settings, and the empty-panel and Settings pixel
+baselines with the accessibility audit.
 
 ## Test-system self-verification
 
 All UI waits use one 20 ms polling primitive that samples immediately, records value transitions,
 and attaches its timeline to the XCResult on timeout. Three deterministic harness tests use an
 injectable clock to prove that 100 ms, 200 ms, and 800 ms transient states are observable and that a
-timeout retains its changed-value history; two more prove that the folded-fade pixel oracle rejects an
-unfaded second line and measures a faded one. Tart failures write a machine-readable classification as
+timeout retains its changed-value history. Tart failures write a machine-readable classification as
 `infrastructure`, `build`, `source-test`, `ui-assertion-or-crash`, or `artifact`; an ambiguous UI
-failure is never automatically labeled as a product regression.
+failure is never automatically labeled as a product regression. Every XCUI launch also writes a
+panel lifecycle log (`lifecycle/<namespace>.log`, via `--automation-lifecycle-log`) with the
+activation policy, app activation, and the panel's visibility, key status, alpha, and frame at
+launch, on every show, and on every key-window transition, because none of that is observable
+through accessibility for a non-activating panel.
 
-The mutation catalog now contains fourteen source-level faults. Each definition pins an exact source
-anchor and names its unit and/or Release kill tests. Catalog drift fails before an expensive build
+The mutation catalog contains eight source-level faults. Each definition pins an exact source
+anchor and names its unit and Release kill tests. Catalog drift fails before an expensive build
 or VM launch: the anchor must occur exactly once, and every named kill test must be declared in the
 test sources. A targeted `swift test --filter` that matches no test case is reported as
-`infrastructure`, never as a killed or survived mutation. In addition to submit-reset coverage, the
-`history-presentations-bypass-unified-renderer` mutation forces every standalone record into the
-folded presentation; native state/geometry tests and the visible Tart history journey reject it.
-The `expanded-history-source-stays-hidden` mutation restores the reported latest-only source gate;
-the same native geometry test and real expanded-history journey must reject it.
-The `history-action-hit-target-swallowed` mutation disables the history control's entry-local action
-fallback; the regression must fail before an icon can appear interactive while a wrapper consumes
-the click. Standard AppKit child-control hit testing and this local fallback own pointer routing; the
-window never scans the view tree for history actions.
+`infrastructure`, never as a killed or survived mutation. The faults cover the redraw policy of the
+result layer, a replaced result keeping its old text, a submission keeping the previous record, a
+stale result never being marked, the action not resetting on show, the source pane never resizing,
+Command-C ignoring a native selection, and improvement reusing translation languages.
 
 The checked-in pairwise manifest provides a stable inventory of light/dark, reduced motion,
-scrollbar preference, window size, lifecycle, and content combinations, and its pair coverage is
-mathematically verified. It is not currently executed as eight separate Tart configurations, so it
-must not be presented as a completed environment matrix. The release gate's executable coverage is
-the 23 deterministic journeys above.
+scrollbar preference, action, content, and display combinations, and its pair coverage is
+mathematically verified. It is not executed as separate Tart configurations, so it must not be
+presented as a completed environment matrix.
 
 ## Isolation contract
 
@@ -124,19 +116,41 @@ are recorded as diagnostics rather than misclassified as test activity.
 
 ## Current verification
 
-- `swift test -Xswiftc -warnings-as-errors`: 158/158 passed.
-- Focused fresh-clone Tart diagnosis reproduced both the source-preview frame overflow and the
-  recycled folded-row click failure. After the root repairs, both previously failing journeys passed
-  2/2 with a healthy host-session guard and no host artifact activation. The native semantic audit
-  also passes after the result action exposes only its real button rather than a roleless overlay.
-- The complete source mutation catalog validates all 14 exact anchors.
-- The complete clean-checkout PR gate for this repair writes its machine-readable result to
-  `TestResults/gates/expanded-history-source-final-rerun-20260818/gate-summary.json`.
+- `swift test -Xswiftc -warnings-as-errors`: 102/102 passed on the host.
+- Tart XCUI suite: see the run recorded below.
+- Mutation catalog: all 8 anchors validate (`run-mutation-contracts.sh --mode catalog`).
+
+### Tart XCUI run `panel-tart-20260923j`
+
+18 of 18 tests passed in a fresh headless Tart clone (macOS 26.4 guest, Xcode 26.5) against
+the signed Release artifact built from this tree (app-tree digest
+`d7fd4dab11fcb98bfe951bad16e08d032ae61725581571e694775d8e19bc059b`), after the guest's own
+`swift test` (102/102). The host session guard passed: neither artifact executable was launched or
+frontmost on the host. Results directory: `TestResults/panel-tart-20260923j`.
+
+The first runs of the rewritten suite failed as a whole before any journey ran, and the failures
+were harness and product findings rather than flakes:
+
+- `show()` faded the panel in with a window animator that never progressed in the Release guest,
+  so the panel was key and ordered front at alpha 0 for the whole run (found with the lifecycle
+  log, fixed in the product).
+- XCUI reports the borderless `NSPanel` as a dialog, never under `windows`; the driver queries
+  `dialogs["cida-panel"]`.
+- An identifier on the panel's root stack was pushed by SwiftUI onto the pane containers and hid
+  their own `source-pane`, `control-bar`, and `result-pane` identifiers.
+- The 800 ms `✓ 已复制` state is missed by `waitForExistence`, which samples about once per
+  second; the driver's 20 ms polling waiter observes it.
+- The pre-first-byte pixel oracle screenshots the result pane rather than the text view (whose
+  accessibility frame is the full document height), skips the rounded bottom corners where the
+  desktop shows, and skips the caret column, whose faded breathing edges read as neutral ink.
+- The combined note row exposes its text as the element's value, not its label.
+- The accessibility audit ignores elements outside the panel's frame (the guest's Touch Bar proxy
+  and menu bar).
 
 ## Performance acceptance boundary
 
 The performance runner uses the exact manifest-bound app with activation policy `.accessory`, orders
-its transparent probe behind existing windows, and fails if the app activates or the probe becomes
+its transparent panel behind existing windows, and fails if the app activates or the panel becomes
 key. Focused gates require a detected 120 Hz display, at least 118.8 native display-link callbacks
 per second, P99 and main-actor latency within the configured budget, zero missed budgets for strict
 workloads, and complete workload-specific invariants.

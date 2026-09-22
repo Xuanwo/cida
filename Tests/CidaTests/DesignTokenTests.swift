@@ -9,11 +9,13 @@ final class DesignTokenTests: XCTestCase {
     let expectations: [(CidaColorToken, UInt32, CGFloat)] = [
       (CidaDesign.Palette.background, 0xFAFAF8, 1),
       (CidaDesign.Palette.surface, 0xFFFFFF, 1),
-      (CidaDesign.Palette.surfaceFold, 0xF1F1EC, 1),
+      (CidaDesign.Palette.surfacePaper, 0xF7F6F1, 1),
       (CidaDesign.Palette.border, 0xE8E8E3, 1),
       (CidaDesign.Palette.textPrimary, 0x1A1A18, 1),
       (CidaDesign.Palette.textSecondary, 0x8A8A83, 1),
       (CidaDesign.Palette.textTertiary, 0xB5B5AE, 1),
+      (CidaDesign.Palette.textInk, 0x161614, 1),
+      (CidaDesign.Palette.textControl, 0x4E4E49, 1),
       (CidaDesign.Palette.accent, 0x2E6B4F, 1),
       (CidaDesign.Palette.placeholder, 0xB5B7B0, 0.22),
     ]
@@ -30,58 +32,39 @@ final class DesignTokenTests: XCTestCase {
     }
   }
 
-  func testHistoryMetricsRemainOneSharedContractForEveryRenderer() {
-    XCTAssertEqual(HistoryEntryPencilLayout.actionColumnWidth, 24)
-    XCTAssertEqual(HistoryEntryPencilLayout.windowHorizontalPadding, 28)
-    XCTAssertEqual(HistoryEntryPencilLayout.readingWidth, 804)
-    XCTAssertEqual(HistoryEntryPencilLayout.hoverBleed, 10)
-    XCTAssertEqual(HistoryEntryPencilLayout.hoverCornerRadius, 8)
-    XCTAssertEqual(HistoryEntryPencilLayout.latestSourceLineLimit, 2)
-    XCTAssertEqual(HistoryEntryPencilLayout.latestSourcePreviewHeight, 41)
-    XCTAssertEqual(HistoryEntryPencilLayout.latestSourceFadeHeight, 20)
-    XCTAssertEqual(HistoryEntryPencilLayout.resultLineHeight, 26)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedPreviewHeight, 52)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedPreviewFadeHeight, 25)
-    XCTAssertEqual(HistoryEntryPencilLayout.separatorHeight, 1)
-    // Pencil `Entry`: 16 + 16 + 8 + n × 26 + 16 for one or two visible lines.
-    XCTAssertEqual(HistoryEntryPencilLayout.historyRowHeight(previewLineCount: 1), 82)
-    XCTAssertEqual(HistoryEntryPencilLayout.historyRowHeight(previewLineCount: 2), 108)
-    XCTAssertEqual(HistoryEntryPencilLayout.historyRowHeight(previewLineCount: 7), 108)
-    XCTAssertEqual(HistoryEntryPencilLayout.foldedHeight, 108)
-    XCTAssertEqual(HistoryEntryPencilLayout.placeholderRowStride, 109)
-    XCTAssertEqual(HistoryEntryPencilLayout.previewHeight(forRowHeight: 82), 26)
-    XCTAssertEqual(HistoryEntryPencilLayout.previewHeight(forRowHeight: 108), 52)
-    XCTAssertEqual(HistoryEntryPencilLayout.previewHeight(forRowHeight: 300), 52)
+  /// Pencil `Spec — 面板模型`: the panel's fixed width and screen ratios, the
+  /// pane insets, and the result typography.
+  func testPanelAndResultTokensMatchThePencilVariables() {
+    XCTAssertEqual(CidaDesign.Panel.width, 800)
+    XCTAssertEqual(CidaDesign.Panel.topRatio, 0.2)
+    XCTAssertEqual(CidaDesign.Panel.sourceMaxRatio, 0.3)
+    XCTAssertEqual(CidaDesign.Panel.maxRatio, 0.7)
+    XCTAssertEqual(CidaDesign.Panel.controlBarHeight, 50)
+    XCTAssertEqual(CidaDesign.Radius.panel, 14)
+    XCTAssertEqual(CidaDesign.Spacing.windowHorizontal, 28)
+    XCTAssertEqual(CidaDesign.Spacing.paneVertical, 18)
+    XCTAssertEqual(CidaDesign.Spacing.resultVertical, 22)
+    XCTAssertEqual(CidaDesign.Typography.resultSize, 17.5)
+    XCTAssertEqual(CidaDesign.Typography.resultSizeCJK, 17)
+    XCTAssertEqual(CidaDesign.Typography.resultLineHeight, 29)
+    XCTAssertEqual(CidaDesign.Typography.resultLineHeightCJK, 31)
+
+    let budget = PanelHeightBudget(visibleScreenHeight: 1_000)
+    XCTAssertEqual(budget.panelMaxHeight, 700)
+    XCTAssertEqual(budget.sourceEditorMaxHeight, 300 - 36)
   }
 
-  func testHistoryRowHeightFollowsThePreviewWithoutLayingItOut() {
-    let oneLine = HistoryResultStorage("No such guarantee.")
-    let wrapped = HistoryResultStorage(
-      String(repeating: "Having used GPT-6-Astra for a while now, ", count: 4)
-    )
-    let lineBreak = HistoryResultStorage("First line\nSecond line")
+  func testResultTypographyUsesTheBundledSerifFacesPerLanguage() {
+    FontRegistrar.registerBundledFonts()
+    let latin = CidaDesign.appKitResult(for: .english)
+    let cjk = CidaDesign.appKitResult(for: .chinese)
 
-    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: oneLine, textWidth: 780), 82)
-    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: wrapped, textWidth: 780), 108)
-    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: lineBreak, textWidth: 780), 108)
-    // A narrow column wraps the one-liner too.
-    XCTAssertEqual(HistoryResultTextStyle.historyRowHeight(for: oneLine, textWidth: 60), 108)
-
-    let cached = HistoryResultStorage("Cached preview width.")
-    var measurements = 0
-    for _ in 0..<5 {
-      _ = cached.previewSingleLineWidth { text in
-        measurements += 1
-        return HistoryResultTextStyle.singleLineWidth(of: text)
-      }
-    }
-    XCTAssertEqual(measurements, 1, "The single-line width is cached until the preview changes")
-    cached.append(" Really.")
-    _ = cached.previewSingleLineWidth { text in
-      measurements += 1
-      return HistoryResultTextStyle.singleLineWidth(of: text)
-    }
-    XCTAssertEqual(measurements, 2)
+    XCTAssertEqual(latin.familyName, "Source Serif 4")
+    XCTAssertEqual(latin.pointSize, 17.5)
+    XCTAssertEqual(cjk.familyName, "Noto Serif SC")
+    XCTAssertEqual(cjk.pointSize, 17)
+    XCTAssertEqual(ResultTextStyle.lineHeight(for: .english), 29)
+    XCTAssertEqual(ResultTextStyle.lineHeight(for: .chinese), 31)
   }
 
   func testMotionTokensMatchThePencilVariables() {
@@ -90,7 +73,6 @@ final class DesignTokenTests: XCTestCase {
     XCTAssertEqual(CidaMotion.iconSwapMilliseconds, 150)
     XCTAssertEqual(CidaMotion.heightMilliseconds, 150)
     XCTAssertEqual(CidaMotion.cursorOutMilliseconds, 200)
-    XCTAssertEqual(CidaMotion.historyFoldMilliseconds, 200)
     XCTAssertEqual(CidaMotion.copiedHoldMilliseconds, 800)
     XCTAssertEqual(CidaMotion.breatheMilliseconds, 1_200)
     XCTAssertEqual(CidaMotion.characterBlurRadius, 2)

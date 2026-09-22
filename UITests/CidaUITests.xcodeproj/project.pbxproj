@@ -8,24 +8,20 @@
 
 /* Begin PBXBuildFile section */
 		116C00C0EAF212AA6CD07692 /* ScenarioServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16BEBDD324433E5FA03D1F7A /* ScenarioServerClient.swift */; };
-		1BCE688F1EAC7BA8BF6E6B23 /* WindowAndSettingsJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDBF42A18B54A7D3A5EB0417 /* WindowAndSettingsJourneyTests.swift */; };
 		3DBC579F27425649AFD7236A /* E2EEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64C4835C130AB6150934275E /* E2EEnvironment.swift */; };
 		604598F0EB0BA2B688EAA635 /* VisualOracle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B9D7CCB1EEA892D70EB4F6 /* VisualOracle.swift */; };
 		6C987EAAC924C824412E2B48 /* VisualAndAccessibilityJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB642A29177A2EB430F1E13 /* VisualAndAccessibilityJourneyTests.swift */; };
-		71CFC0D0FC2D42564927BA5A /* HistoryPresentationJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F81980DDA2F64949AA34C62 /* HistoryPresentationJourneyTests.swift */; };
 		78AE92CEBBB14456DB1C0844 /* TranslationJourneyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90784A20041E837591076724 /* TranslationJourneyModel.swift */; };
 		8915B79168311F4613F4ED4A /* PixelDiff.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6859BC5F1656E4E22A4B579 /* PixelDiff.swift */; };
-		90ECC54E5A0A0435AF20D9E8 /* HistoryAndScrollingJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38300FEF22958B4D47572A3A /* HistoryAndScrollingJourneyTests.swift */; };
 		9658E1A159A4B1D0F018B492 /* TranslationStateMachineJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBE58D585EC1502EA7EDC7F8 /* TranslationStateMachineJourneyTests.swift */; };
 		98079F84986DF79A8A8C3EC4 /* ComposerJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62805E99CDE4B3142280C05A /* ComposerJourneyTests.swift */; };
 		9D2A0BD4DEF53C4A70D28B3C /* CidaReleaseArtifactSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5990720A4619BC224AB6FC2E /* CidaReleaseArtifactSmokeTests.swift */; };
-		9E9C757B69BB8A03894C5415 /* PersistenceJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89088A5808F28FE33CA29576 /* PersistenceJourneyTests.swift */; };
-		B0EC7B35DB563CA87359A640 /* SQLiteHistoryFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9990058EF13AEDBBCAECC857 /* SQLiteHistoryFixture.swift */; };
+		9F6D7313C1FA05450992710D /* PanelAndSettingsJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 659D1E8907687990A05B53EF /* PanelAndSettingsJourneyTests.swift */; };
 		C4239F72E7A01BD68C31ECCF /* CidaAppDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 917C4319C2BD891ACB456A57 /* CidaAppDriver.swift */; };
-		E10000000000000000000001 /* PollingWaiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* PollingWaiter.swift */; };
-		E10000000000000000000003 /* HarnessSelfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000004 /* HarnessSelfTests.swift */; };
 		C843C064A2652EBD409E7228 /* CidaUITestHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5FB85BE252B3B8DCCF1BC2 /* CidaUITestHost.swift */; };
 		CAE7F6F0D5DE38B76DE23064 /* CoreTranslationJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF95B8EB25315CE7DDB1B2A /* CoreTranslationJourneyTests.swift */; };
+		E065CCA7520CAAD10A5B2B45 /* HarnessSelfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140648BDD52528DA5C1EDD1E /* HarnessSelfTests.swift */; };
+		F1E19E0C057248EF9E51DB53 /* PollingWaiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C275F2F4892A3F6ABB4D746 /* PollingWaiter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,25 +36,21 @@
 
 /* Begin PBXFileReference section */
 		0D6117909E998A6029A69AE1 /* CidaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CidaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		140648BDD52528DA5C1EDD1E /* HarnessSelfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessSelfTests.swift; sourceTree = "<group>"; };
 		16BEBDD324433E5FA03D1F7A /* ScenarioServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioServerClient.swift; sourceTree = "<group>"; };
-		1F81980DDA2F64949AA34C62 /* HistoryPresentationJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPresentationJourneyTests.swift; sourceTree = "<group>"; };
-		38300FEF22958B4D47572A3A /* HistoryAndScrollingJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryAndScrollingJourneyTests.swift; sourceTree = "<group>"; };
 		4B1EC20C2F36348DA180EB42 /* CidaUITestHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CidaUITestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5990720A4619BC224AB6FC2E /* CidaReleaseArtifactSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaReleaseArtifactSmokeTests.swift; sourceTree = "<group>"; };
 		5B5FB85BE252B3B8DCCF1BC2 /* CidaUITestHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaUITestHost.swift; sourceTree = "<group>"; };
 		62805E99CDE4B3142280C05A /* ComposerJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerJourneyTests.swift; sourceTree = "<group>"; };
 		64C4835C130AB6150934275E /* E2EEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEnvironment.swift; sourceTree = "<group>"; };
+		659D1E8907687990A05B53EF /* PanelAndSettingsJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelAndSettingsJourneyTests.swift; sourceTree = "<group>"; };
 		79B9D7CCB1EEA892D70EB4F6 /* VisualOracle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualOracle.swift; sourceTree = "<group>"; };
+		7C275F2F4892A3F6ABB4D746 /* PollingWaiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollingWaiter.swift; sourceTree = "<group>"; };
 		7FF95B8EB25315CE7DDB1B2A /* CoreTranslationJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreTranslationJourneyTests.swift; sourceTree = "<group>"; };
-		89088A5808F28FE33CA29576 /* PersistenceJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceJourneyTests.swift; sourceTree = "<group>"; };
 		90784A20041E837591076724 /* TranslationJourneyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationJourneyModel.swift; sourceTree = "<group>"; };
 		917C4319C2BD891ACB456A57 /* CidaAppDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CidaAppDriver.swift; sourceTree = "<group>"; };
-		E10000000000000000000002 /* PollingWaiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollingWaiter.swift; sourceTree = "<group>"; };
-		E10000000000000000000004 /* HarnessSelfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessSelfTests.swift; sourceTree = "<group>"; };
-		9990058EF13AEDBBCAECC857 /* SQLiteHistoryFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteHistoryFixture.swift; sourceTree = "<group>"; };
 		A6859BC5F1656E4E22A4B579 /* PixelDiff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelDiff.swift; sourceTree = "<group>"; };
 		BBE58D585EC1502EA7EDC7F8 /* TranslationStateMachineJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationStateMachineJourneyTests.swift; sourceTree = "<group>"; };
-		BDBF42A18B54A7D3A5EB0417 /* WindowAndSettingsJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAndSettingsJourneyTests.swift; sourceTree = "<group>"; };
 		DCB642A29177A2EB430F1E13 /* VisualAndAccessibilityJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualAndAccessibilityJourneyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -75,11 +67,10 @@
 			isa = PBXGroup;
 			children = (
 				917C4319C2BD891ACB456A57 /* CidaAppDriver.swift */,
-				E10000000000000000000002 /* PollingWaiter.swift */,
 				64C4835C130AB6150934275E /* E2EEnvironment.swift */,
 				A6859BC5F1656E4E22A4B579 /* PixelDiff.swift */,
+				7C275F2F4892A3F6ABB4D746 /* PollingWaiter.swift */,
 				16BEBDD324433E5FA03D1F7A /* ScenarioServerClient.swift */,
-				9990058EF13AEDBBCAECC857 /* SQLiteHistoryFixture.swift */,
 				79B9D7CCB1EEA892D70EB4F6 /* VisualOracle.swift */,
 			);
 			path = Support;
@@ -115,16 +106,13 @@
 		7E021BACEF3CA8171142B526 /* CidaUITests */ = {
 			isa = PBXGroup;
 			children = (
-				E10000000000000000000004 /* HarnessSelfTests.swift */,
 				5990720A4619BC224AB6FC2E /* CidaReleaseArtifactSmokeTests.swift */,
 				62805E99CDE4B3142280C05A /* ComposerJourneyTests.swift */,
 				7FF95B8EB25315CE7DDB1B2A /* CoreTranslationJourneyTests.swift */,
-				38300FEF22958B4D47572A3A /* HistoryAndScrollingJourneyTests.swift */,
-				1F81980DDA2F64949AA34C62 /* HistoryPresentationJourneyTests.swift */,
-				89088A5808F28FE33CA29576 /* PersistenceJourneyTests.swift */,
+				140648BDD52528DA5C1EDD1E /* HarnessSelfTests.swift */,
+				659D1E8907687990A05B53EF /* PanelAndSettingsJourneyTests.swift */,
 				BBE58D585EC1502EA7EDC7F8 /* TranslationStateMachineJourneyTests.swift */,
 				DCB642A29177A2EB430F1E13 /* VisualAndAccessibilityJourneyTests.swift */,
-				BDBF42A18B54A7D3A5EB0417 /* WindowAndSettingsJourneyTests.swift */,
 				322EB8C72B1F210BAD237A40 /* Support */,
 			);
 			path = CidaUITests;
@@ -229,23 +217,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				C4239F72E7A01BD68C31ECCF /* CidaAppDriver.swift in Sources */,
-				E10000000000000000000001 /* PollingWaiter.swift in Sources */,
-				E10000000000000000000003 /* HarnessSelfTests.swift in Sources */,
 				9D2A0BD4DEF53C4A70D28B3C /* CidaReleaseArtifactSmokeTests.swift in Sources */,
 				98079F84986DF79A8A8C3EC4 /* ComposerJourneyTests.swift in Sources */,
 				CAE7F6F0D5DE38B76DE23064 /* CoreTranslationJourneyTests.swift in Sources */,
 				3DBC579F27425649AFD7236A /* E2EEnvironment.swift in Sources */,
-				90ECC54E5A0A0435AF20D9E8 /* HistoryAndScrollingJourneyTests.swift in Sources */,
-				71CFC0D0FC2D42564927BA5A /* HistoryPresentationJourneyTests.swift in Sources */,
-				9E9C757B69BB8A03894C5415 /* PersistenceJourneyTests.swift in Sources */,
+				E065CCA7520CAAD10A5B2B45 /* HarnessSelfTests.swift in Sources */,
+				9F6D7313C1FA05450992710D /* PanelAndSettingsJourneyTests.swift in Sources */,
 				8915B79168311F4613F4ED4A /* PixelDiff.swift in Sources */,
-				B0EC7B35DB563CA87359A640 /* SQLiteHistoryFixture.swift in Sources */,
+				F1E19E0C057248EF9E51DB53 /* PollingWaiter.swift in Sources */,
 				116C00C0EAF212AA6CD07692 /* ScenarioServerClient.swift in Sources */,
 				78AE92CEBBB14456DB1C0844 /* TranslationJourneyModel.swift in Sources */,
 				9658E1A159A4B1D0F018B492 /* TranslationStateMachineJourneyTests.swift in Sources */,
 				6C987EAAC924C824412E2B48 /* VisualAndAccessibilityJourneyTests.swift in Sources */,
 				604598F0EB0BA2B688EAA635 /* VisualOracle.swift in Sources */,
-				1BCE688F1EAC7BA8BF6E6B23 /* WindowAndSettingsJourneyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

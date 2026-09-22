@@ -3,7 +3,6 @@
 import http.server
 import json
 import pathlib
-import sqlite3
 import sys
 import threading
 import time
@@ -44,8 +43,13 @@ class ScenarioState:
     def event(self, request_id, name, **values):
         with self.lock:
             request = next(
-                item for item in self.requests if item["requestID"] == request_id
+                (item for item in self.requests if item["requestID"] == request_id),
+                None,
             )
+            if request is None:
+                # A reset from the next test dropped this request while its
+                # stream was still being written; nothing left to record.
+                return
             request["status"] = name
             request.update(values)
             event = {
@@ -98,84 +102,6 @@ class ScenarioState:
 
 
 state = ScenarioState()
-
-
-def controlled_database_path(raw_path):
-    candidate = pathlib.Path(raw_path).resolve()
-    allowed_root = port_path.parent.resolve()
-    if candidate.suffix != ".sqlite3" or allowed_root not in candidate.parents:
-        raise ValueError("database path is outside the isolated E2E work root")
-    return candidate
-
-
-def seed_history(body):
-    database_path = controlled_database_path(body.get("databasePath", ""))
-    database_path.unlink(missing_ok=True)
-    connection = sqlite3.connect(database_path)
-    try:
-        connection.executescript(
-            """
-            PRAGMA journal_mode = WAL;
-            CREATE TABLE history_entries (
-              id TEXT PRIMARY KEY NOT NULL,
-              sort_order INTEGER NOT NULL UNIQUE,
-              mode TEXT NOT NULL,
-              source TEXT NOT NULL,
-              result TEXT NOT NULL,
-              detail TEXT NOT NULL,
-              timestamp TEXT NOT NULL,
-              source_character_count INTEGER,
-              result_character_count INTEGER,
-              state TEXT NOT NULL,
-              created_at REAL NOT NULL,
-              updated_at REAL NOT NULL
-            );
-            CREATE TABLE history_result_overrides (
-              entry_id TEXT PRIMARY KEY NOT NULL,
-              result TEXT NOT NULL
-            );
-            PRAGMA user_version = 2;
-            """
-        )
-        connection.executemany(
-            """
-            INSERT INTO history_entries (
-              id, sort_order, mode, source, result, detail, timestamp,
-              source_character_count, result_character_count, state, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
-            """,
-            [
-                (
-                    entry["id"],
-                    entry["sortOrder"],
-                    entry.get("mode", "translate"),
-                    entry["source"],
-                    entry["result"],
-                    entry.get("detail", "English → 中文"),
-                    entry.get("timestamp", "12:00"),
-                    entry.get("sourceCharacterCount", len(entry["source"])),
-                    entry.get("resultCharacterCount", len(entry["result"])),
-                    entry.get("state", "completed"),
-                )
-                for entry in body.get("entries", [])
-            ],
-        )
-        connection.commit()
-    finally:
-        connection.close()
-
-
-def query_history(body):
-    database_path = controlled_database_path(body.get("databasePath", ""))
-    sql = str(body.get("sql", "")).strip()
-    if not sql.upper().startswith(("SELECT ", "PRAGMA ")):
-        raise ValueError("only read-only SQLite queries are accepted")
-    connection = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
-    try:
-        row = connection.execute(sql).fetchone()
-        return "" if row is None or row[0] is None else str(row[0])
-    finally:
-        connection.close()
 
 
 def plan_for(submitted_text):
@@ -296,21 +222,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = self.read_json_body()
             released = state.release(str(body.get("scenario", "")))
             self.send_json(200 if released else 409, {"released": released})
-            return
-        if parsed_path.path == "/control/seed-history":
-            try:
-                entries = self.read_json_body()
-                seed_history(entries)
-                self.send_json(200, {"seeded": len(entries.get("entries", []))})
-            except (KeyError, TypeError, ValueError, sqlite3.Error) as error:
-                self.send_json(400, {"error": str(error)})
-            return
-        if parsed_path.path == "/control/query-history":
-            try:
-                value = query_history(self.read_json_body())
-                self.send_json(200, {"value": value})
-            except (TypeError, ValueError, sqlite3.Error) as error:
-                self.send_json(400, {"error": str(error)})
             return
         if parsed_path.path != "/v1/chat/completions":
             self.send_error(404)

@@ -85,11 +85,10 @@ class PerformanceGateContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         expected_tests = (
-            "ScrollingUpThroughLargeFoldedHistoryDoesNotReadCompleteResults",
-            "FoldedHistoryMaterializesOnlyTheViewportPoolDuringHyperScroll",
             "LongResultUsesIncrementalNaturalTextLayoutWithoutNestedScrolling",
             "HighFrequencyResultUpdatesCoalesceNaturalHeightLayout",
             "ComposerVirtualizesLargeDocumentAndLoadsEarlierPagesOnDemand",
+            "PanelNeverExceedsItsHeightBudgetAndScrollsTheResultInstead",
         )
         for test_name in expected_tests:
             self.assertIn(test_name, source)
