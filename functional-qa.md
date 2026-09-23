@@ -126,7 +126,8 @@ are recorded as diagnostics rather than misclassified as test activity.
   `--mode unit` kills all 8 in temporary clean clones (7 of 8 on commit 0f83f03; the eighth,
   `improvement-reuses-translation-source-language`, did not compile until its replacement text
   followed the typed `Language` fields and was killed on commit 7b418ff). Results directories:
-  `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`.
+  `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`; all 8
+  killed again on the Settings redesign commit 805366e (`TestResults/settings-mutations-20260923`).
 
 ### Tart XCUI run `settings-tart-20260923a`
 
