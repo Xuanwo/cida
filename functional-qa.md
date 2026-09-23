@@ -131,6 +131,13 @@ are recorded as diagnostics rather than misclassified as test activity.
   `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`; all 8
   killed again on the Settings redesign commit 805366e (`TestResults/settings-mutations-20260923`).
 
+### Tart XCUI run `overlay-tart-20260923`
+
+18 of 18 tests passed with the scroll bars pinned to the overlay style (`OverlayScrollView`; artifact
+digest `a9532fc1f5c102c192a40a1497174f354a26c61845656e5f676bb26262593ed2`, host suite 101/101).
+Letting the bars follow the system preference gave the user's Mac, which has a mouse attached, the
+legacy track in every pane; the guest no longer narrows the result column either.
+
 ### Tart XCUI run `scrollbars-tart-20260923c`
 
 18 of 18 tests passed with the system scroll bars (app-tree digest

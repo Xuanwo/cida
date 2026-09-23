@@ -208,14 +208,18 @@ extension InteractionReproductionTests {
       return resultScrollView.container.frame.height > resultScrollView.contentView.bounds.height
     }
 
-    // Both panes scroll with the system scroll bar; both scroll views reach
-    // the panel's right edge so the bars share it, and both texts start at
-    // the same 28 pt inset. A legacy (always visible) scroll bar narrows the
-    // text column by its own width, as it does in every native view.
+    // Both panes scroll with the system overlay scroll bar whatever the
+    // user's scroll-bar preference or pointing device: both scroll views
+    // reach the panel's right edge so the bars share it, the bar takes no
+    // width from the text, and both texts start at the same 28 pt inset.
     for scrollView in [resultScrollView, composerScrollView] {
       XCTAssertTrue(scrollView.hasVerticalScroller)
       XCTAssertTrue(scrollView.autohidesScrollers)
+      scrollView.scrollerStyle = .legacy
+      XCTAssertEqual(scrollView.scrollerStyle, .overlay, "The overlay style survives AppKit re-applying the preferred style")
+      XCTAssertEqual(scrollView.verticalScroller?.scrollerStyle, .overlay)
       XCTAssertEqual(scrollView.convert(scrollView.bounds, to: nil).maxX, CidaDesign.Panel.width, accuracy: 0.5)
+      XCTAssertEqual(scrollView.contentView.bounds.width, scrollView.bounds.width, accuracy: 0.5, "The overlay bar takes no width")
     }
     let textColumn = resultScrollView.container.textColumnFrameForTesting
     XCTAssertEqual(textColumn.minX, CidaDesign.Spacing.windowHorizontal, accuracy: 0.5)
@@ -226,7 +230,7 @@ extension InteractionReproductionTests {
 
     XCTAssertEqual(resultScrollView.contentView.bounds.minY, 0, accuracy: 0.5, "A completed result starts at its top")
 
-    // A legacy scroll bar (or any narrower clip) re-wraps the column at once.
+    // A narrower clip re-wraps the column at once.
     let layoutsBefore = resultScrollView.container.documentLayoutCount
     let narrowerWidth = resultScrollView.contentView.bounds.width - 17
     resultScrollView.container.setFrameSize(

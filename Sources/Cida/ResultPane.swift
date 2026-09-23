@@ -59,7 +59,7 @@ struct ResultTextView: NSViewRepresentable {
 }
 
 @MainActor
-final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
+final class ResultScrollView: OverlayScrollView, ResultHeightChangeHosting {
   let container = ResultTextContainer()
   var onContentHeightChange: @MainActor (CGFloat, Bool) -> Void = { _, _ in }
   /// While the text is shorter than this the pane still grows, so following
@@ -73,8 +73,9 @@ final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
     super.init(frame: .zero)
     drawsBackground = false
     borderType = .noBorder
-    // System overlay scroll bar, on the same edge as the source pane's: the
-    // scroll view spans the pane and the container insets its text.
+    // System overlay scroll bar (`OverlayScrollView`), on the same edge as the
+    // source pane's: the scroll view spans the pane and the container insets
+    // its text.
     hasVerticalScroller = true
     hasHorizontalScroller = false
     autohidesScrollers = true
