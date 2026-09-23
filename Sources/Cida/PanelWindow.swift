@@ -78,19 +78,23 @@ final class PanelController {
     self.openSettings = openSettings
     panel = CidaPanel(width: CidaDesign.Panel.width)
 
-    let container = PanelContentView()
+    // Sized before the hosting view joins it: the hosting view's flexible
+    // width would otherwise absorb the container's first resize twice.
+    let container = PanelContentView(frame: panel.contentRect(forFrameRect: panel.frame))
     let heightBudget = PanelHeightBudget.automation
     let rootView = PanelView(model: model, heightBudget: heightBudget)
     hostingView = NSHostingView(rootView: rootView)
-    hostingView.translatesAutoresizingMaskIntoConstraints = false
     hostingView.setAccessibilityLabel("辞达面板内容")
+    // The content keeps its own (final) height at the top of the flipped
+    // container while the window animates its frame; the container clips the
+    // part the window has not revealed yet. Filling the container would
+    // re-centre the panes on every animation step, and Auto Layout
+    // constraints would let AppKit resize the window to the hosting view's
+    // intrinsic size, so the frame is managed by hand.
+    hostingView.autoresizingMask = [.width]
+    hostingView.frame = NSRect(x: 0, y: 0, width: CidaDesign.Panel.width, height: contentHeight)
     container.addSubview(hostingView)
-    NSLayoutConstraint.activate([
-      hostingView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-      hostingView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-      hostingView.topAnchor.constraint(equalTo: container.topAnchor),
-      hostingView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-    ])
+    hostingView.needsLayout = true
     panel.contentView = container
     applyRootView()
     installKeyMonitor()
@@ -165,6 +169,8 @@ final class PanelController {
     let clamped = min(heightBudget.panelMaxHeight, max(1, ceil(height)))
     guard abs(clamped - contentHeight) > 0.5 else { return }
     contentHeight = clamped
+    hostingView.setFrameSize(NSSize(width: hostingView.frame.width, height: clamped))
+    hostingView.needsLayout = true
     let top = topEdge ?? panel.frame.maxY
     let frame = NSRect(
       x: panel.frame.minX,

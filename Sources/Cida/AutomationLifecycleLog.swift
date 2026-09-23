@@ -40,6 +40,12 @@ final class AutomationLifecycleLog {
       fields.append("panelKey=\(panel.isKeyWindow)")
       fields.append("panelAlpha=\(panel.alphaValue)")
       fields.append("panelFrame=\(NSStringFromRect(panel.frame))")
+      if let content = panel.contentView {
+        fields.append("contentFrame=\(NSStringFromRect(content.frame))")
+        if let hosting = content.subviews.first {
+          fields.append("hostingFrame=\(NSStringFromRect(hosting.frame))")
+        }
+      }
     }
     if let frontmost = NSWorkspace.shared.frontmostApplication {
       fields.append("frontmost=\(frontmost.bundleIdentifier ?? frontmost.localizedName ?? "?")")
@@ -53,6 +59,7 @@ final class AutomationLifecycleLog {
     let panelEvents: [(Notification.Name, String)] = [
       (NSWindow.didBecomeKeyNotification, "panel-did-become-key"),
       (NSWindow.didResignKeyNotification, "panel-did-resign-key"),
+      (NSWindow.didResizeNotification, "panel-did-resize"),
     ]
     for (name, event) in panelEvents {
       observers.append(

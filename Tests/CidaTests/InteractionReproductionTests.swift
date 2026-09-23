@@ -247,7 +247,15 @@ final class InteractionReproductionTests: XCTestCase {
     var lastPanelHeight = controller.panel.frame.height
     var scrollReversals: [String] = []
     var panelShrinks: [String] = []
+    var sourceTopDrift: [String] = []
     var scrolledPastTheCap = false
+    let composer = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
+    let composerScrollView = try XCTUnwrap(composer.enclosingScrollView)
+    func sourceTopInset() -> CGFloat {
+      let inWindow = composerScrollView.convert(composerScrollView.bounds, to: nil)
+      return controller.panel.frame.height - inWindow.maxY
+    }
+    let initialSourceTop = sourceTopInset()
     let started = Date()
     while Date().timeIntervalSince(started) < 4, model.result?.phase != .completed {
       try await Task.sleep(for: .milliseconds(8))
@@ -261,6 +269,10 @@ final class InteractionReproductionTests: XCTestCase {
         panelShrinks.append("\(lastPanelHeight) -> \(panelHeight)")
       }
       if scrollY > 0 { scrolledPastTheCap = true }
+      let sourceTop = sourceTopInset()
+      if abs(sourceTop - initialSourceTop) > 0.5 {
+        sourceTopDrift.append(String(format: "%.1f", sourceTop))
+      }
       lastScrollY = scrollY
       lastPanelHeight = panelHeight
     }
@@ -269,6 +281,9 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertTrue(scrolledPastTheCap, "The result outgrew the pane and followed its tail")
     XCTAssertEqual(scrollReversals, [], "The text never jumped back down")
     XCTAssertEqual(panelShrinks, [], "The panel only grew")
+    XCTAssertEqual(
+      sourceTopDrift, [],
+      "The source pane stays pinned to the panel's top edge while the height animates (initial \(initialSourceTop))")
     XCTAssertEqual(controller.panel.frame.height, PanelHeightBudget.automation.panelMaxHeight, accuracy: 0.5)
     assertTestProcessIsNotFrontmost()
   }
