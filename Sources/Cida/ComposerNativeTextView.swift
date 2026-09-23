@@ -39,7 +39,6 @@ final class ComposerNativeTextView: NSTextView {
     if let virtualDocumentMetrics {
       return ComposerTextMetrics(
         characterCount: documentUTF16Length,
-        formattedCharacterCount: virtualDocumentMetrics.formattedCharacterCount,
         hasLineBreak: virtualDocumentMetrics.hasLineBreak,
         hasNonWhitespace: virtualDocumentMetrics.hasNonWhitespace,
         isImportingLargeDocument: false
@@ -282,7 +281,6 @@ final class ComposerNativeTextView: NSTextView {
 
     let completedMetrics = ComposerTextMetrics(
       characterCount: document.source.length,
-      formattedCharacterCount: document.metrics.formattedCharacterCount,
       hasLineBreak: document.metrics.hasLineBreak,
       hasNonWhitespace: document.metrics.hasNonWhitespace,
       isImportingLargeDocument: false

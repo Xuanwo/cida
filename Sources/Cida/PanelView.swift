@@ -181,18 +181,6 @@ private struct SourcePane: View {
         CidaMotion.easeOutAnimation(duration: CidaMotion.heightSeconds),
         value: editorHeight
       )
-
-      if metrics.presentationState.showsDocumentChrome {
-        Text("\(metrics.formattedCharacterCount) 字")
-          .font(CidaDesign.mainUI(11.5))
-          .foregroundStyle(CidaDesign.textTertiary)
-          .accessibilityLabel("输入了 \(metrics.formattedCharacterCount) 个字符")
-          .accessibilityIdentifier("source-character-count")
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-          .padding(.trailing, CidaDesign.Spacing.windowHorizontal)
-          .padding(.bottom, 2)
-          .allowsHitTesting(false)
-      }
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, CidaDesign.Spacing.paneVertical)

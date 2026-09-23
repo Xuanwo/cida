@@ -337,7 +337,6 @@ final class AppModelTests: XCTestCase {
   func testComposerPresentationStateDoesNotReplaceTheTrueDocumentMetrics() {
     let metrics = ComposerTextMetrics(
       characterCount: 1_000_000,
-      formattedCharacterCount: "1,000,000",
       hasLineBreak: true,
       lineCount: 8_000,
       hasNonWhitespace: true,
@@ -348,7 +347,6 @@ final class AppModelTests: XCTestCase {
     let multilinePresentation = metrics.presented(as: .multiline(visibleLineCount: 5))
 
     XCTAssertEqual(compactPresentation.characterCount, 1_000_000)
-    XCTAssertEqual(compactPresentation.formattedCharacterCount, "1,000,000")
     XCTAssertEqual(compactPresentation.presentationState, .compact)
     XCTAssertEqual(multilinePresentation.characterCount, 1_000_000)
     XCTAssertEqual(

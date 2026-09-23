@@ -131,6 +131,12 @@ are recorded as diagnostics rather than misclassified as test activity.
   `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`; all 8
   killed again on the Settings redesign commit 805366e (`TestResults/settings-mutations-20260923`).
 
+### Tart XCUI run `count-tart-20260923`
+
+18 of 18 tests passed after the source pane's character count was removed (artifact digest
+`4690f1001365ee8fc588eddfce5b385573145102b586701d17106388bae3539a`, host suite 101/101). The
+`long` design state was re-captured; every other state capture is byte-identical.
+
 ### Tart XCUI run `overlay-tart-20260923`
 
 18 of 18 tests passed with the scroll bars pinned to the overlay style (`OverlayScrollView`; artifact

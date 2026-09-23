@@ -29,10 +29,6 @@ enum ComposerPresentationState: Equatable, Sendable {
   case compact
   case multiline(visibleLineCount: Int)
   case document
-
-  var showsDocumentChrome: Bool {
-    self == .document
-  }
 }
 
 /// What the right-hand slot of the control bar shows. One slot, one button,

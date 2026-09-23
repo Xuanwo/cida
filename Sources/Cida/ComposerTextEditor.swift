@@ -3,7 +3,6 @@ import SwiftUI
 
 struct ComposerTextMetrics: Equatable, Sendable {
   let characterCount: Int
-  let formattedCharacterCount: String
   let hasLineBreak: Bool
   let lineCount: Int
   let hasNonWhitespace: Bool
@@ -28,7 +27,6 @@ struct ComposerTextMetrics: Equatable, Sendable {
       utf16Count >= ComposerNativeTextView.virtualDocumentThreshold
       ? utf16Count
       : text.count
-    formattedCharacterCount = Self.formatCharacterCount(characterCount)
     lineCount =
       utf16Count < 800
       ? text.reduce(into: 1) { count, character in
@@ -50,7 +48,6 @@ struct ComposerTextMetrics: Equatable, Sendable {
 
   init(
     characterCount: Int,
-    formattedCharacterCount: String? = nil,
     hasLineBreak: Bool,
     lineCount: Int = 1,
     hasNonWhitespace: Bool,
@@ -58,8 +55,6 @@ struct ComposerTextMetrics: Equatable, Sendable {
     presentationState: ComposerPresentationState? = nil
   ) {
     self.characterCount = characterCount
-    self.formattedCharacterCount =
-      formattedCharacterCount ?? Self.formatCharacterCount(characterCount)
     self.hasLineBreak = hasLineBreak
     self.lineCount = max(lineCount, hasLineBreak ? 2 : 1)
     self.hasNonWhitespace = hasNonWhitespace
@@ -92,7 +87,6 @@ struct ComposerTextMetrics: Equatable, Sendable {
     guard characterCount >= ComposerNativeTextView.virtualDocumentThreshold else { return self }
     return Self(
       characterCount: characterCount,
-      formattedCharacterCount: formattedCharacterCount,
       hasLineBreak: hasLineBreak,
       lineCount: lineCount,
       hasNonWhitespace: hasNonWhitespace,
@@ -104,7 +98,6 @@ struct ComposerTextMetrics: Equatable, Sendable {
   func presented(as presentationState: ComposerPresentationState) -> Self {
     Self(
       characterCount: characterCount,
-      formattedCharacterCount: formattedCharacterCount,
       hasLineBreak: hasLineBreak,
       lineCount: lineCount,
       hasNonWhitespace: hasNonWhitespace,
@@ -127,20 +120,6 @@ struct ComposerTextMetrics: Equatable, Sendable {
     let wrappedLineCount = max(1, Int(ceil(Double(characterCount) / 90)))
     return .multiline(visibleLineCount: min(5, max(lineCount, wrappedLineCount)))
   }
-
-  private static func formatCharacterCount(_ value: Int) -> String {
-    let digits = String(value)
-    guard digits.count > 3 else { return digits }
-    var result = ""
-    result.reserveCapacity(digits.count + digits.count / 3)
-    for (index, character) in digits.enumerated() {
-      if index > 0, (digits.count - index).isMultiple(of: 3) {
-        result.append(",")
-      }
-      result.append(character)
-    }
-    return result
-  }
 }
 
 struct ComposerTextEditor: NSViewRepresentable {
@@ -148,7 +127,7 @@ struct ComposerTextEditor: NSViewRepresentable {
   @Binding var metrics: ComposerTextMetrics
   let isFocused: FocusState<Bool>.Binding
   /// Distance from the editor's edges to the text column; the editor spans the
-  /// window so its scroll indicator stays at the window edge.
+  /// window so its scroll bar stays at the window edge.
   let horizontalInset: CGFloat
   /// Bumped when the whole text should be selected, e.g. when the panel is
   /// shown again with the previous source in it.
