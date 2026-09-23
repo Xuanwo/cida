@@ -413,7 +413,51 @@ final class AppModelTests: XCTestCase {
 
     let settings = try JSONDecoder().decode(CidaSettings.self, from: data)
 
-    XCTAssertEqual(settings.openAIEndpoint, CidaSettings.officialOpenAIEndpoint)
+    XCTAssertEqual(settings.provider, .openAI)
+    XCTAssertEqual(settings.customEndpoint, "")
+    XCTAssertEqual(settings.resolvedEndpoint?.absoluteString, CidaSettings.officialOpenAIEndpoint)
+  }
+
+  func testLegacyOpenAIWithAnotherEndpointBecomesACustomProvider() throws {
+    let data = Data(
+      #"{"provider":"OpenAI","apiKey":"","model":"local-model","openAIEndpoint":"http://127.0.0.1:8080/v1/chat/completions","translationPrompt":"translate","improvementPrompt":"improve","launchAtLogin":false}"#
+        .utf8
+    )
+
+    let settings = try JSONDecoder().decode(CidaSettings.self, from: data)
+
+    XCTAssertEqual(settings.provider, .custom)
+    XCTAssertEqual(settings.customEndpoint, "http://127.0.0.1:8080/v1/chat/completions")
+    XCTAssertTrue(settings.usesLocalEndpoint)
+    let encoded = try JSONEncoder().encode(settings)
+    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: encoded), settings)
+  }
+
+  func testReadinessIsDerivedWithoutANetworkRequest() {
+    var settings = CidaSettings()
+    XCTAssertEqual(settings.readiness, .missingAPIKey)
+    settings.apiKey = "sk-test"
+    XCTAssertEqual(settings.readiness, .ready)
+
+    settings.provider = .custom
+    settings.model = "local-model"
+    settings.customEndpoint = ""
+    XCTAssertEqual(settings.readiness, .invalidEndpoint)
+    settings.customEndpoint = "http://localhost:8080/v1/chat/completions"
+    settings.apiKey = ""
+    XCTAssertEqual(settings.readiness, .localEndpoint)
+    XCTAssertTrue(settings.readiness.isReady)
+    settings.customEndpoint = "https://example.com/v1/chat/completions"
+    XCTAssertEqual(settings.readiness, .missingAPIKey)
+    settings.model = " "
+    settings.apiKey = "sk-test"
+    XCTAssertEqual(settings.readiness, .missingModel)
+
+    for provider in ModelProvider.allCases where !provider.isCustom {
+      XCTAssertNotNil(provider.presetEndpoint, provider.rawValue)
+      XCTAssertFalse(provider.suggestedModels.isEmpty, provider.rawValue)
+      XCTAssertNotNil(provider.endpointCaption, provider.rawValue)
+    }
   }
 
   func testLegacyPromptPlaceholdersMigrateToPlainPoliciesOnlyOnce() throws {
@@ -493,6 +537,10 @@ final class AppModelTests: XCTestCase {
 
     XCTAssertEqual(model.settings.provider, .openAI)
     XCTAssertEqual(model.settings.model, "gpt-5")
+
+    model.selectProvider(.custom)
+    XCTAssertEqual(model.settings.provider, .custom)
+    XCTAssertEqual(model.settings.model, "", "A custom endpoint takes a typed model")
   }
 
   func testAutomationBundleUsesAnIndependentSettingsNamespace() {

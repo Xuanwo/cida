@@ -169,18 +169,17 @@ final class InteractionReproductionTests: XCTestCase {
 
   // MARK: - Settings window
 
-  func testSettingsWindowRemainsAStandardTitledWindow() {
-    let window = CidaWindowFactory.makeWindow(
-      size: CGSize(width: 560, height: 660),
-      title: "设置"
-    )
+  func testSettingsWindowIsAFixedWidthTitledWindowSizedByItsContent() throws {
+    let controller = SettingsWindowFactory.makeWindowController(model: AppModel(settings: .designPreview))
+    let window = try XCTUnwrap(controller.window)
     retainedTestWindows.append(window)
 
     XCTAssertTrue(window.styleMask.contains(.titled))
     XCTAssertTrue(window.styleMask.contains(.closable))
     XCTAssertTrue(window.styleMask.contains(.miniaturizable))
-    XCTAssertTrue(window.styleMask.contains(.resizable))
+    XCTAssertFalse(window.styleMask.contains(.resizable), "Width is fixed; height follows content")
     XCTAssertNotNil(window.standardWindowButton(.closeButton))
+    XCTAssertEqual(window.frame.width, SettingsWindowFactory.width, accuracy: 0.5)
   }
 
   func testNativeCloseButtonClosesARealBackgroundSettingsWindow() throws {
@@ -200,59 +199,30 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
-  func testSettingsContentRemainsScrollableAtItsMinimumWindowSize() throws {
-    var settings = CidaSettings.designPreview
-    settings.provider = .openAI
-    settings.model = "local-model"
-    let (_, hostingView) = makeNativeWindow(
-      rootView: SettingsWindowView(model: AppModel(settings: settings)),
-      size: CGSize(width: 500, height: 500)
-    )
-    let scrollView = try XCTUnwrap(
-      allScrollViews(in: hostingView).max { lhs, rhs in
-        (lhs.documentView?.bounds.height ?? 0) < (rhs.documentView?.bounds.height ?? 0)
-      }
-    )
-    let documentView = try XCTUnwrap(scrollView.documentView)
+  func testSettingsWindowHeightFollowsItsContentFromAFixedTopEdge() throws {
+    let model = AppModel(settings: .designPreview)
+    let controller = SettingsWindowFactory.makeWindowController(model: model)
+    let window = try XCTUnwrap(controller.window)
+    retainedTestWindows.append(window)
+    window.alphaValue = 0
+    window.orderBack(nil)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
-    XCTAssertGreaterThan(documentView.bounds.height, scrollView.contentView.bounds.height)
-    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    let settingsIndicator = try XCTUnwrap(
-      firstScroller(in: hostingView, identifier: "settings-scroll-indicator")
-    )
-    XCTAssertFalse(settingsIndicator.isHidden)
-    XCTAssertEqual(settingsIndicator.knobDrawingRect.width, 4, accuracy: 0.1)
-    XCTAssertEqual(settingsIndicator.knobDrawingRect.height, 64, accuracy: 0.1)
-    let bottomOrigin = NSPoint(
-      x: 0,
-      y: max(0, documentView.bounds.maxY - scrollView.contentView.bounds.height)
-    )
-    scrollView.contentView.scroll(to: bottomOrigin)
-    scrollView.reflectScrolledClipView(scrollView.contentView)
-    XCTAssertTrue(isScrolledToBottom(scrollView))
-  }
+    let collapsedFrame = window.frame
+    XCTAssertEqual(collapsedFrame.height, 616, accuracy: 4, "Pencil 默认 · DeepSeek is 617 pt tall")
+    XCTAssertNil(firstScroller(in: window.contentView!, identifier: "settings-scroll-indicator"))
 
-  func testSettingsHidesItsScrollIndicatorAtThePencilWindowSize() throws {
-    let (window, hostingView) = makeHiddenWindow(
-      rootView: SettingsWindowView(
-        model: AppModel(settings: .designPreview)
-      ),
-      size: CGSize(width: 560, height: 660)
-    )
-    RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    hostingView.layoutSubtreeIfNeeded()
+    model.editingPrompt = .improve
+    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
-    let indicator = try XCTUnwrap(
-      firstScroller(in: hostingView, identifier: "settings-scroll-indicator")
-    )
-    let scrollView = try XCTUnwrap(indicator.observedScrollView)
-    let documentView = try XCTUnwrap(scrollView.documentView)
-    XCTAssertTrue(
-      indicator.isHidden,
-      "document=\(documentView.bounds) visible=\(scrollView.contentView.documentVisibleRect)"
-    )
+    let expandedFrame = window.frame
+    XCTAssertGreaterThan(expandedFrame.height, collapsedFrame.height + 80, "The prompt sheet grows the window")
+    XCTAssertEqual(expandedFrame.maxY, collapsedFrame.maxY, accuracy: 0.5, "The top edge stays put")
+
+    model.editingPrompt = nil
+    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+    XCTAssertEqual(window.frame.height, collapsedFrame.height, accuracy: 0.5)
     assertTestProcessIsNotFrontmost()
-    withExtendedLifetime(window) {}
   }
 
   // MARK: - Responder chain

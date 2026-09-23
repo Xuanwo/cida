@@ -1,6 +1,6 @@
 # Cida
 
-Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming DeepSeek and OpenAI-compatible Chat Completions APIs. It lives in the menu bar and shows one floating panel on `Option-Space`: the source you typed, the action, and the result.
+Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming OpenAI-compatible Chat Completions APIs (DeepSeek, OpenAI, Moonshot, 智谱 GLM presets, or any custom endpoint). It lives in the menu bar and shows one floating panel on `Option-Space`: the source you typed, the action, and the result.
 
 ## Requirements
 
@@ -19,9 +19,9 @@ Create a signed Release app bundle without launching it:
 scripts/build-app.sh release
 ```
 
-The production bundle is written to `build/Cida.app`. It uses a stable Developer ID signature so its Keychain identity survives rebuilds. Provider keys are stored only in Keychain; prompts, model IDs, the OpenAI endpoint, and other non-secret preferences are stored in UserDefaults. Nothing else is persisted: the panel starts empty on every launch, and no record of past requests is written anywhere.
+The production bundle is written to `build/Cida.app`. It uses a stable Developer ID signature so its Keychain identity survives rebuilds. Provider keys are stored only in Keychain; prompts, model IDs, the custom endpoint, and other non-secret preferences are stored in UserDefaults. Nothing else is persisted: the panel starts empty on every launch, and no record of past requests is written anywhere.
 
-When OpenAI is selected, Settings exposes an editable Chat Completions endpoint and model ID. Loopback endpoints such as `http://127.0.0.1:8080/v1/chat/completions` and `http://localhost:8080/v1/chat/completions` may omit the API key. Non-local endpoints still require one.
+The provider menu lists presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM), each a fixed Chat Completions endpoint with suggested models, plus 自定义（OpenAI 兼容）, which exposes an editable endpoint and model ID. Loopback endpoints such as `http://127.0.0.1:8080/v1/chat/completions` and `http://localhost:8080/v1/chat/completions` may omit the API key. Non-local endpoints still require one. The model group ends in a readiness line derived locally from the provider, endpoint, model, and key.
 
 Prompts are stored as stable task policies rather than string templates. Each request sends the operation and language choices as a typed, trusted parameter envelope in the system message, while the complete source document appears exactly once in the user message. Legacy `{text}` and `{target_lang}` prompts migrate once; braces in current prompts remain literal text.
 

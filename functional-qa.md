@@ -31,9 +31,11 @@ The current core experience contract (Pencil `Spec — 面板模型`) includes:
    request explains itself inline and Return retries.
 7. Native Command-C precedence: a selection keeps the system copy; without one, Command-C copies
    the result.
-8. DeepSeek/OpenAI selection, editable local endpoint and model, Keychain API-key persistence and
+8. Provider presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM) plus a custom OpenAI-compatible
+   endpoint with a typed model, a locally derived readiness line, Keychain API-key persistence and
    clearing, prompt edit/reset, source-language detection, and source-language-preserving
-   improvement, all from a standard Settings window.
+   improvement, all from a fixed-width Settings window whose height follows its content. Settings
+   saved before presets (`OpenAI` with a non-official endpoint) load as the custom provider.
 9. Input-method safety: the SwiftUI binding is never written back into the editor while a
    composition (for example pinyin) is in progress, the placeholder hides as soon as marked text
    appears, and Escape, Tab, and the other panel shortcuts reach the input method first while it
@@ -66,7 +68,7 @@ panel, or renderer paths.
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite contains 102 tests: 45 model/report tests, 36 native interaction and layout
+The host Swift suite contains 103 tests: 47 model/report tests, 35 native interaction and layout
 tests, 6 mutation invariants, 4 host isolation tests, 4 design-token tests, 3 loopback integration
 tests, 2 suite/matrix manifest tests, and 2 deterministic journey-model tests.
 
@@ -118,13 +120,24 @@ are recorded as diagnostics rather than misclassified as test activity.
 
 ## Current verification
 
-- `swift test -Xswiftc -warnings-as-errors`: 102/102 passed on the host.
-- Tart XCUI suite: see the run recorded below.
+- `swift test -Xswiftc -warnings-as-errors`: 103/103 passed on the host.
+- Tart XCUI suite: see the runs recorded below.
 - Mutation catalog: all 8 anchors validate (`run-mutation-contracts.sh --mode catalog`), and
   `--mode unit` kills all 8 in temporary clean clones (7 of 8 on commit 0f83f03; the eighth,
   `improvement-reuses-translation-source-language`, did not compile until its replacement text
   followed the typed `Language` fields and was killed on commit 7b418ff). Results directories:
   `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`.
+
+### Tart XCUI run `settings-tart-20260923a`
+
+18 of 18 tests passed in a fresh headless Tart clone (macOS 26.4 guest, Xcode 26.5) against
+the signed Release artifact built from the Settings redesign tree (app-tree digest
+`d9f2d15962a6a58b3dd8a255f23058b1474b7e226cd63906ee0d0aa2e6234b84`), after the guest's own
+`swift test` (103/103); the host session guard passed. The settings journey now covers the preset
+menu, the endpoint caption, the readiness line in all four states, the collapsed prompts, the
+custom endpoint with a typed model, and the local-endpoint key placeholder; the Settings pixel
+baseline is the 560 × 616 default state of `States — 设置`. Results directory:
+`TestResults/settings-tart-20260923a`.
 
 ### Tart XCUI run `panel-tart-20260923j`
 

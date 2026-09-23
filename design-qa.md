@@ -12,8 +12,9 @@ nodes are:
 | Streaming motion rules | `NdsRA` (`Spec — 流式输出动效`) |
 | All panel states | `oeKVI` (`States — 面板交互`) |
 | Streaming keyframes T0–T4 | `hwlXF` (`Motion — 流式输出`) |
-| Settings | `l1gIe` |
-| Components | `mXBP1` Control Bar, `qZy7Z` Bar Action, `KCEUn` Result Note, `B1Kz01` Mode Seg, `POaFg` Send Button (unused by the panel), `YdbKP` Titlebar (Settings only), `KYbZ2` Settings Row, `pn8Ym` Motion Label |
+| Settings rules | `mJ1h8` (`Spec — 设置`) |
+| All Settings states | `E86Rv` (`States — 设置`) |
+| Components | `mXBP1` Control Bar, `qZy7Z` Bar Action, `KCEUn` Result Note, `B1Kz01` Mode Seg, `POaFg` Send Button (unused by the panel), `YdbKP` Titlebar (Settings only), `pn8Ym` Motion Label |
 
 The panel states inside `oeKVI`, and the `--design-state` that renders each one natively:
 
@@ -30,6 +31,15 @@ The panel states inside `oeKVI`, and the `--design-state` that renders each one 
 | 改进 · 完成 | `kYllY` | `improve` |
 | 再次唤起 · 全选 | `N6v3qq` | (selection, no fixture) |
 | 最大高度 | `U2mUc` | `long` |
+
+The Settings states inside `E86Rv`, and the `--design-state` that renders each one natively:
+
+| Pencil state | Node | `--design-state` |
+| --- | --- | --- |
+| 默认 · DeepSeek 已配置 | `yhtH2` | `settings` |
+| 服务商菜单展开 | `p5EOr` | (open menu, no fixture) |
+| 还差 API Key | `PA25F` | `settings-missing-key` |
+| 自定义端点 · 编辑改进提示词 | `VKwj7` | `settings-custom` |
 
 The Pencil document is the first source: each topic has one Spec note, and a rule change edits that
 note and its States or Motion board instead of adding a versioned copy. Exports of the boards and
@@ -48,7 +58,7 @@ image or design file cannot silently reuse an old approval.
 | Baseline | Logical size | Mask |
 | --- | ---: | --- |
 | Panel, empty | 800 × 113 | none |
-| Settings | 560 × 660 | native title bar, 46 pt |
+| Settings, default | 560 × 616 | native title bar, 46 pt |
 
 The remaining states are retained as reviewable reference/current comparisons and are protected by
 deterministic geometry and interaction assertions (panel height budget, source cap, result
@@ -82,7 +92,14 @@ inside a disposable headless Tart macOS session. Neither path activates the test
 - Streaming matches `Spec — 流式输出动效`: waiting caret breathing at 1.2 s, per-run 120 ms glyph
   reveal behind the caret, 150 ms height growth of the pane and the panel, 200 ms caret fade on
   completion, and the slot crossfading between 停止 and 复制结果 over 150 ms.
-- Settings is unchanged: a standard titled window matching the Pencil `l1gIe` board.
+- Settings follows `Spec — 设置`: a fixed-width (560 pt) titled window whose height follows its
+  content (no scrolling), with three groups in the order of the user's questions. The provider is
+  a menu of presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM) plus 自定义（OpenAI 兼容）; presets show
+  the host they call under the menu, and only 自定义 shows the endpoint field. Fields fill the
+  control column; the model group ends in a locally derived readiness line (已就绪 / 还差 API Key /
+  本地端点 · 无需 API Key / 端点无效); prompts collapse to a one-line preview with `编辑` and expand
+  into a `surface-paper` sheet (Inter 13 / 21 pt lines in `text-ink`, accent focus ring). Accent
+  appears only on the menu's current item, the readiness dot, focus rings, and the switch.
 
 ## Executable evidence
 

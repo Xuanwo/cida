@@ -47,11 +47,20 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     let providerMenu = driver.settingsProviderMenu(in: settingsWindow)
     XCTAssertEqual(providerMenu.label, "DeepSeek")
-    XCTAssertFalse(driver.app.textFields["settings-openai-endpoint"].exists)
+    XCTAssertFalse(driver.app.textFields["settings-endpoint"].exists, "Presets hide the endpoint")
+    XCTAssertTrue(
+      driver.element(identifier: "settings-provider-endpoint-caption").exists,
+      "Presets name the host requests go to")
+    XCTAssertTrue(driver.readinessRow.waitForExistence(timeout: 3))
+    XCTAssertTrue(
+      driver.waitForValue("还差 API Key", in: driver.readinessRow, timeout: 3),
+      "Readiness is derived from the empty key")
     let launchAtLogin = driver.element(identifier: "settings-launch-at-login-toggle")
     XCTAssertTrue(launchAtLogin.exists)
     XCTAssertEqual(launchAtLogin.elementType, .checkBox)
 
+    XCTAssertFalse(driver.app.textViews["settings-prompt-editor-improve"].exists, "Prompts start collapsed")
+    driver.app.buttons["settings-prompt-edit-improve"].click()
     let improveEditor = driver.app.textViews["settings-prompt-editor-improve"]
     XCTAssertTrue(improveEditor.waitForExistence(timeout: 3))
     let customPrompt = "Improve this text while preserving its source language."
@@ -81,34 +90,29 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     )
 
     providerMenu.click()
-    let openAIItem = driver.app.menuItems["OpenAI"]
-    XCTAssertTrue(openAIItem.waitForExistence(timeout: 3))
-    openAIItem.click()
-    XCTAssertEqual(driver.settingsProviderMenu(in: settingsWindow).label, "OpenAI")
-    let endpoint = driver.app.textFields["settings-openai-endpoint"]
-    XCTAssertTrue(endpoint.waitForExistence(timeout: 3))
-    XCTAssertTrue(driver.app.textFields["settings-model"].exists)
+    let customItem = driver.app.menuItems[CidaAppDriver.customProviderLabel]
+    XCTAssertTrue(customItem.waitForExistence(timeout: 3))
+    customItem.click()
+    XCTAssertEqual(
+      driver.settingsProviderMenu(in: settingsWindow).label, CidaAppDriver.customProviderLabel)
+    let endpoint = driver.app.textFields["settings-endpoint"]
+    XCTAssertTrue(endpoint.waitForExistence(timeout: 3), "Custom shows the endpoint field")
+    XCTAssertTrue(driver.app.textFields["settings-model"].exists, "Custom takes a typed model")
+    XCTAssertTrue(driver.waitForValue("端点无效", in: driver.readinessRow, timeout: 3))
 
-    driver.replaceText(
-      in: endpoint,
-      with: "http://127.0.0.1:8080/v1/chat/completions"
-    )
-    XCTAssertTrue(settingsWindow.staticTexts["本地端点可留空"].waitForExistence(timeout: 3))
-    let resetEndpoint = driver.app.buttons["settings-openai-endpoint-reset"]
-    XCTAssertTrue(resetEndpoint.waitForExistence(timeout: 3))
-    resetEndpoint.click()
+    driver.replaceText(in: driver.app.textFields["settings-model"], with: "local-model")
+    driver.replaceText(in: endpoint, with: "http://127.0.0.1:8080/v1/chat/completions")
     XCTAssertTrue(
-      driver.waitForValue(
-        "https://api.openai.com/v1/chat/completions",
-        in: endpoint,
-        timeout: 3
-      )
+      driver.waitForValue("本地端点 · 无需 API Key", in: driver.readinessRow, timeout: 3))
+    XCTAssertEqual(
+      driver.app.secureTextFields["settings-api-key-editor"].placeholderValue,
+      "本地端点可留空"
     )
   }
 
   func testFreshAppInstancesDoNotShareSettingsOrCredentials() {
     driver.launch(endpointOverride: false)
-    driver.configureOpenAI(
+    driver.configureCustomEndpoint(
       endpoint: e2eEnvironment.endpoint,
       model: "first-instance-model",
       apiKey: "sk-first-instance"

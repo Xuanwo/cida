@@ -24,13 +24,6 @@ struct CidaScrollIndicatorConfiguration: Equatable, Sendable {
     minimumScrollableOverflow: 1
   )
 
-  static let settings = CidaScrollIndicatorConfiguration(
-    accessibilityIdentifier: "settings-scroll-indicator",
-    knobLength: 64,
-    trackTopInset: 8,
-    trackBottomInset: 8,
-    minimumScrollableOverflow: 4
-  )
 }
 
 @MainActor
@@ -495,37 +488,5 @@ private final class CidaScrollIndicatorHostView: NSView {
   override func hitTest(_ point: NSPoint) -> NSView? {
     guard bounds.contains(point), !indicator.isHidden else { return nil }
     return indicator
-  }
-}
-
-struct CidaScrollIndicatorInstaller: NSViewRepresentable {
-  let configuration: CidaScrollIndicatorConfiguration
-
-  func makeNSView(context: Context) -> CidaScrollIndicatorInstallerView {
-    let view = CidaScrollIndicatorInstallerView()
-    view.configuration = configuration
-    return view
-  }
-
-  func updateNSView(_ view: CidaScrollIndicatorInstallerView, context: Context) {
-    view.configuration = configuration
-    view.installIfNeeded()
-  }
-}
-
-@MainActor
-final class CidaScrollIndicatorInstallerView: NSView {
-  var configuration = CidaScrollIndicatorConfiguration.settings
-
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    DispatchQueue.main.async { [weak self] in
-      self?.installIfNeeded()
-    }
-  }
-
-  func installIfNeeded() {
-    guard let scrollView = enclosingScrollView else { return }
-    CidaScrollIndicator.install(on: scrollView, configuration: configuration)
   }
 }

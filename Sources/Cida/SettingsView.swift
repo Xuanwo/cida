@@ -1,6 +1,10 @@
 import AppKit
 import SwiftUI
 
+/// The Settings window (Pencil `Spec — 设置`, `States — 设置`): three groups
+/// that answer, in order, which model, how to translate or improve, and how
+/// to summon the panel. Everything saves itself; the window is as tall as
+/// its content.
 struct SettingsWindowView: View {
   @Bindable var model: AppModel
 
@@ -12,36 +16,53 @@ struct SettingsWindowView: View {
     WindowSurface {
       VStack(spacing: 0) {
         SettingsTitlebar()
-        ScrollView(.vertical) {
-          SettingsBody(model: model)
-            .background {
-              CidaScrollIndicatorInstaller(configuration: .settings)
-                .frame(width: 0, height: 0)
-            }
-        }
-        .scrollIndicators(.hidden)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        SettingsBody(model: model)
       }
     }
+    .frame(width: SettingsWindowFactory.width)
+    .fixedSize(horizontal: false, vertical: true)
+  }
+}
+
+/// Builds the Settings window around a hosting controller whose preferred
+/// content size drives the window height, so expanding a prompt grows the
+/// window instead of scrolling it.
+@MainActor
+enum SettingsWindowFactory {
+  static let width: CGFloat = 560
+  static let titlebarHeight: CGFloat = 46
+
+  static func makeWindowController(model: AppModel) -> NSWindowController {
+    let hostingController = NSHostingController(rootView: SettingsWindowView(model: model))
+    hostingController.sizingOptions = [.preferredContentSize]
+    // The titlebar is drawn by `SettingsTitlebar` inside the content; without
+    // this SwiftUI would add the system titlebar's safe area to the height.
+    hostingController.safeAreaRegions = []
+    let initialSize = hostingController.view.fittingSize
+    let window = CidaWindowFactory.makeWindow(
+      size: CGSize(width: width, height: initialSize.height),
+      minimumSize: CGSize(width: width, height: 200),
+      title: "设置"
+    )
+    window.styleMask.remove(.resizable)
+    window.contentViewController = hostingController
+    hostingController.view.setAccessibilityLabel("设置窗口内容")
+    window.setContentSize(CGSize(width: width, height: initialSize.height))
+    window.center()
+    return NSWindowController(window: window)
   }
 }
 
 private struct SettingsTitlebar: View {
   var body: some View {
     ZStack {
-      HStack {
-        Color.clear.frame(width: 66, height: 16)
-        Spacer()
-        Color.clear.frame(width: 66, height: 16)
-      }
-      .padding(.horizontal, 16)
-
       Text("设置")
         .font(CidaDesign.ui(13, weight: .semibold))
         .foregroundStyle(CidaDesign.textPrimary)
         .accessibilityAddTraits(.isHeader)
     }
-    .frame(height: 46)
+    .frame(maxWidth: .infinity)
+    .frame(height: SettingsWindowFactory.titlebarHeight)
   }
 }
 
@@ -50,40 +71,35 @@ private struct SettingsBody: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SettingsSectionTitle("模型服务")
-      ProviderRow(model: model)
-      if model.settings.provider == .openAI {
-        OpenAIEndpointRow(model: model)
+      SettingsGroup(title: "模型", isFirst: true) {
+        ProviderRow(model: model)
+        if model.settings.provider.isCustom {
+          EndpointRow(model: model)
+        }
+        if model.settings.provider.isCustom {
+          ModelRow(model: model)
+          APIKeyRow(model: model)
+        } else {
+          APIKeyRow(model: model)
+          ModelRow(model: model)
+        }
+        ReadinessRow(readiness: model.settings.readiness)
       }
-      APIKeyRow(model: model)
-      ModelRow(model: model)
-
       Hairline()
-
-      SettingsSectionTitle("提示词")
-      TranslationPromptRow(model: model)
-      ImprovementPromptRow(model: model)
-
-      Hairline()
-
-      SettingsSectionTitle("通用")
-      GlobalShortcutRow()
-      LaunchAtLoginRow(model: model)
-
-      HStack(spacing: 8) {
-        Text("辞达")
-          .font(CidaDesign.brand(12, weight: .semibold))
-          .tracking(2)
-          .foregroundStyle(CidaDesign.textSecondary)
-        Text("1.0 · 辞达而已矣")
-          .font(CidaDesign.ui(11))
-          .foregroundStyle(CidaDesign.textTertiary)
+      SettingsGroup(title: "提示词") {
+        PromptRow(model: model, mode: .translate)
+        PromptRow(model: model, mode: .improve)
       }
-      .frame(height: 39, alignment: .bottom)
+      Hairline()
+      SettingsGroup(title: "唤起") {
+        GlobalShortcutRow()
+        LaunchAtLoginRow(model: model)
+      }
+      AboutFooter()
     }
-    .padding(.leading, 24)
-    .padding(.trailing, 24)
-    .padding(.bottom, 20)
+    .padding(.top, 6)
+    .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+    .padding(.bottom, 24)
     .onChange(of: model.settings) {
       model.scheduleSettingsPersistence()
     }
@@ -103,32 +119,52 @@ private struct SettingsBody: View {
   }
 }
 
-private struct SettingsSectionTitle: View {
-  let title: String
+// MARK: - Layout pieces
 
-  init(_ title: String) {
-    self.title = title
-  }
+private struct SettingsGroup<Content: View>: View {
+  let title: String
+  var isFirst = false
+  @ViewBuilder let content: Content
 
   var body: some View {
-    Text(title)
-      .font(CidaDesign.ui(11, weight: .semibold))
-      .tracking(0.8)
-      .foregroundStyle(CidaDesign.textTertiary)
-      .frame(height: 16)
-      .padding(.bottom, 4)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .frame(height: 34, alignment: .bottom)
+    VStack(alignment: .leading, spacing: 0) {
+      Text(title)
+        .font(CidaDesign.ui(12, weight: .semibold))
+        .foregroundStyle(CidaDesign.textControl)
+        .frame(height: 17)
+      content
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.top, isFirst ? 12 : 20)
+  }
+}
+
+/// Label column (120 pt) beside a control column that fills the row.
+private struct SettingsRow<Control: View>: View {
+  let title: String
+  var caption: String? = nil
+  var verticalPadding: CGFloat = 9
+  var alignment: Alignment = .leading
+  @ViewBuilder let control: Control
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 24) {
+      SettingsLabel(title, caption: caption)
+        .frame(width: 120, alignment: .leading)
+      control
+        .frame(maxWidth: .infinity, alignment: alignment)
+    }
+    .padding(.vertical, verticalPadding)
   }
 }
 
 private struct SettingsLabel: View {
   let title: String
-  let subtitle: String?
+  let caption: String?
 
-  init(_ title: String, subtitle: String? = nil) {
+  init(_ title: String, caption: String? = nil) {
     self.title = title
-    self.subtitle = subtitle
+    self.caption = caption
   }
 
   var body: some View {
@@ -137,8 +173,8 @@ private struct SettingsLabel: View {
         .font(CidaDesign.ui(13.5))
         .foregroundStyle(CidaDesign.textPrimary)
         .frame(height: 20)
-      if let subtitle {
-        Text(subtitle)
+      if let caption {
+        Text(caption)
           .font(CidaDesign.ui(11.5))
           .foregroundStyle(CidaDesign.textTertiary)
           .lineLimit(1)
@@ -150,7 +186,6 @@ private struct SettingsLabel: View {
 private struct SettingsMenu<Value: Hashable>: View {
   let valueLabel: String
   let values: [Value]
-  let width: CGFloat
   let title: (Value) -> String
   let onSelect: (Value) -> Void
 
@@ -160,26 +195,21 @@ private struct SettingsMenu<Value: Hashable>: View {
         Button(title(value)) { onSelect(value) }
       }
     } label: {
-      ZStack {
+      HStack(spacing: 6) {
         Text(valueLabel)
           .font(CidaDesign.ui(12.5, weight: .medium))
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.trailing, 12)
-        HStack {
-          Spacer()
-          Image(systemName: "chevron.down")
-            .font(.system(size: 7.5, weight: .semibold))
-            .frame(width: 12, height: 12)
-            .foregroundStyle(CidaDesign.textTertiary)
-        }
+          .foregroundStyle(CidaDesign.textPrimary)
+        Image(systemName: "chevron.down")
+          .font(.system(size: 7.5, weight: .semibold))
+          .frame(width: 12, height: 12)
+          .foregroundStyle(CidaDesign.textTertiary)
       }
-      .foregroundStyle(CidaDesign.textPrimary)
       .padding(.horizontal, 10)
-      .frame(width: width, height: 25, alignment: .leading)
+      .frame(height: 25)
       .background(CidaDesign.surface)
-      .clipShape(.rect(cornerRadius: 7, style: .continuous))
+      .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
       .overlay {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
+        RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
           .strokeBorder(CidaDesign.border, lineWidth: 1)
       }
     }
@@ -189,23 +219,121 @@ private struct SettingsMenu<Value: Hashable>: View {
   }
 }
 
+/// A bordered text field that fills its column; the border turns accent while
+/// it has focus.
+private struct SettingsTextField: View {
+  @Binding var text: String
+  let placeholder: String
+  let accessibilityIdentifier: String
+  var usesMonospacedFont = true
+  @FocusState private var isFocused: Bool
+
+  var body: some View {
+    TextField(placeholder, text: $text)
+      .textFieldStyle(.plain)
+      .font(usesMonospacedFont ? CidaDesign.mono(11.5) : CidaDesign.ui(12.5))
+      .foregroundStyle(CidaDesign.textPrimary)
+      .focused($isFocused)
+      .padding(.horizontal, 10)
+      .frame(maxWidth: .infinity)
+      .frame(height: 30)
+      .background(CidaDesign.surface)
+      .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
+          .strokeBorder(isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: isFocused ? 1.5 : 1)
+      }
+      .accessibilityIdentifier(accessibilityIdentifier)
+  }
+}
+
+private struct SettingsBorderedButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(CidaDesign.ui(12.5, weight: .medium))
+      .foregroundStyle(CidaDesign.textControl)
+      .padding(.horizontal, 12)
+      .frame(height: 30)
+      .background(CidaDesign.surface.opacity(configuration.isPressed ? 0.7 : 1))
+      .clipShape(.rect(cornerRadius: CidaDesign.Radius.card, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+          .strokeBorder(CidaDesign.border, lineWidth: 1)
+      }
+  }
+}
+
+// MARK: - 模型
+
 private struct ProviderRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    HStack {
-      SettingsLabel("服务商")
-      Spacer()
-      SettingsMenu(
-        valueLabel: model.settings.provider.rawValue,
-        values: ModelProvider.allCases,
-        width: 100,
-        title: \.rawValue,
-        onSelect: model.selectProvider
-      )
-      .accessibilityIdentifier("settings-provider-menu")
+    SettingsRow(title: "服务商") {
+      VStack(alignment: .leading, spacing: 5) {
+        SettingsMenu(
+          valueLabel: model.settings.provider.displayName,
+          values: ModelProvider.allCases,
+          title: \.displayName,
+          onSelect: model.selectProvider
+        )
+        .accessibilityIdentifier("settings-provider-menu")
+        if let caption = model.settings.provider.endpointCaption {
+          Text(caption)
+            .font(CidaDesign.ui(11.5))
+            .foregroundStyle(CidaDesign.textTertiary)
+            .accessibilityIdentifier("settings-provider-endpoint-caption")
+        }
+      }
     }
-    .frame(height: 43)
+  }
+}
+
+private struct EndpointRow: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    SettingsRow(title: "端点", caption: "OpenAI 格式的接口") {
+      SettingsTextField(
+        text: $model.settings.customEndpoint,
+        placeholder: "http://127.0.0.1:8080/v1/chat/completions",
+        accessibilityIdentifier: "settings-endpoint"
+      )
+    }
+  }
+}
+
+/// Presets offer their models in a menu whose last item switches to a typed
+/// model; a custom endpoint always takes a typed model.
+private struct ModelRow: View {
+  @Bindable var model: AppModel
+
+  private var suggestions: [String] {
+    model.settings.provider.suggestedModels
+  }
+
+  private var showsField: Bool {
+    model.settings.provider.isCustom || !suggestions.contains(model.settings.model)
+  }
+
+  var body: some View {
+    SettingsRow(title: "模型") {
+      if showsField {
+        SettingsTextField(
+          text: $model.settings.model,
+          placeholder: "模型 ID",
+          accessibilityIdentifier: "settings-model"
+        )
+      } else {
+        SettingsMenu(
+          valueLabel: model.settings.model,
+          values: suggestions + [""],
+          title: { $0.isEmpty ? "其他…" : $0 },
+          onSelect: { model.settings.model = $0 }
+        )
+        .accessibilityIdentifier("settings-model-menu")
+      }
+    }
   }
 }
 
@@ -213,130 +341,56 @@ private struct APIKeyRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    HStack {
-      SettingsLabel(
-        "API Key",
-        subtitle: model.settings.usesLocalOpenAIEndpoint
-          ? "本地端点可留空"
-          : "仅保存在本机"
+    SettingsRow(title: "API Key", caption: "只存本机钥匙串") {
+      MaskedAPIKeyField(
+        apiKey: $model.settings.apiKey,
+        placeholder: model.settings.usesLocalEndpoint ? "本地端点可留空" : "粘贴 API Key"
       )
-      Spacer(minLength: 24)
-      MaskedAPIKeyField(apiKey: $model.settings.apiKey)
-        .frame(width: 159, height: 27)
     }
-    .frame(minHeight: 58)
   }
 }
 
-private struct OpenAIEndpointRow: View {
-  @Bindable var model: AppModel
+/// What the model group can tell without a request: a 6 pt dot and one line.
+private struct ReadinessRow: View {
+  let readiness: SettingsReadiness
 
   var body: some View {
-    HStack(alignment: .center, spacing: 24) {
-      SettingsLabel(
-        "Endpoint",
-        subtitle: model.settings.usesLocalOpenAIEndpoint
-          ? "本地 OpenAI-compatible 服务"
-          : "Chat Completions API 地址"
+    HStack(spacing: 8) {
+      Circle()
+        .fill(readiness.isReady ? CidaDesign.accent : CidaDesign.textTertiary)
+        .frame(width: 6, height: 6)
+      Text(readiness.text)
+        .font(CidaDesign.ui(12))
+        .foregroundStyle(CidaDesign.textSecondary)
+    }
+    .padding(.top, 6)
+    .padding(.bottom, 4)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("settings-readiness")
+  }
+}
+
+// MARK: - 提示词
+
+private struct PromptRow: View {
+  @Bindable var model: AppModel
+  let mode: ProcessingMode
+
+  private var prompt: Binding<String> {
+    mode == .translate ? $model.settings.translationPrompt : $model.settings.improvementPrompt
+  }
+
+  var body: some View {
+    if model.editingPrompt == mode {
+      ExpandedPromptRow(
+        mode: mode,
+        prompt: prompt,
+        reset: mode == .translate ? model.resetTranslationPrompt : model.resetImprovementPrompt
       )
-      .frame(minWidth: 130, alignment: .leading)
-
-      Spacer(minLength: 0)
-
-      VStack(alignment: .trailing, spacing: 5) {
-        SettingsTextField(
-          text: $model.settings.openAIEndpoint,
-          placeholder: CidaSettings.officialOpenAIEndpoint,
-          accessibilityIdentifier: "settings-openai-endpoint",
-          usesMonospacedFont: true
-        )
-        .frame(minWidth: 250, idealWidth: 300, maxWidth: 340, minHeight: 30, maxHeight: 30)
-
-        if model.settings.openAIEndpoint != CidaSettings.officialOpenAIEndpoint {
-          Button("恢复 OpenAI 官方地址") {
-            model.settings.openAIEndpoint = CidaSettings.officialOpenAIEndpoint
-          }
-          .buttonStyle(.plain)
-          .font(CidaDesign.ui(10.5, weight: .medium))
-          .foregroundStyle(CidaDesign.accent)
-          .accessibilityIdentifier("settings-openai-endpoint-reset")
-        }
-      }
-    }
-    .frame(minHeight: 66)
-  }
-}
-
-private struct ModelRow: View {
-  @Bindable var model: AppModel
-
-  var body: some View {
-    HStack {
-      SettingsLabel("模型")
-      Spacer()
-      if model.settings.provider == .openAI {
-        SettingsTextField(
-          text: $model.settings.model,
-          placeholder: "Model ID",
-          accessibilityIdentifier: "settings-model",
-          usesMonospacedFont: true
-        )
-        .frame(width: 220, height: 30)
-      } else {
-        SettingsMenu(
-          valueLabel: model.settings.model,
-          values: model.settings.provider.models,
-          width: 128,
-          title: { $0 },
-          onSelect: { model.settings.model = $0 }
-        )
-      }
-    }
-    .frame(minHeight: 46)
-  }
-}
-
-private struct TranslationPromptRow: View {
-  @Bindable var model: AppModel
-
-  var body: some View {
-    Group {
-      if model.editingPrompt == .translate {
-        ExpandedPromptRow(
-          mode: .translate,
-          prompt: $model.settings.translationPrompt,
-          reset: model.resetTranslationPrompt
-        )
-      } else {
-        CollapsedPromptRow(
-          mode: .translate,
-          summary: "Translate using application-provided language parameters…"
-        ) {
-          model.editingPrompt = .translate
-        }
-      }
-    }
-  }
-}
-
-private struct ImprovementPromptRow: View {
-  @Bindable var model: AppModel
-
-  var body: some View {
-    Group {
-      if model.editingPrompt == .improve {
-        ExpandedPromptRow(
-          mode: .improve,
-          prompt: $model.settings.improvementPrompt,
-          reset: model.resetImprovementPrompt
-        )
-      } else {
-        CollapsedPromptRow(
-          mode: .improve,
-          summary: "Improve clarity, grammar, and natural tone while preserving meaning…"
-        ) {
-          model.editingPrompt = .improve
-        }
+    } else {
+      CollapsedPromptRow(mode: mode, preview: prompt.wrappedValue) {
+        model.editingPrompt = mode
       }
     }
   }
@@ -344,25 +398,22 @@ private struct ImprovementPromptRow: View {
 
 private struct CollapsedPromptRow: View {
   let mode: ProcessingMode
-  let summary: String
+  let preview: String
   let edit: () -> Void
 
   var body: some View {
-    HStack(spacing: 24) {
-      SettingsLabel(mode.title, subtitle: summary)
+    HStack(alignment: .center, spacing: 24) {
+      SettingsLabel(mode.title, caption: preview)
         .frame(maxWidth: .infinity, alignment: .leading)
-
       Button("编辑", action: edit)
-        .font(CidaDesign.ui(12.5, weight: .medium))
-        .foregroundStyle(CidaDesign.textPrimary)
         .buttonStyle(SettingsBorderedButtonStyle())
-        .frame(width: 50, height: 28)
         .accessibilityIdentifier("settings-prompt-edit-\(mode.rawValue)")
     }
-    .frame(height: 55)
+    .padding(.vertical, 10)
   }
 }
 
+/// The prompt sheet: paper under the text the model will read.
 private struct ExpandedPromptRow: View {
   let mode: ProcessingMode
   @Binding var prompt: String
@@ -388,38 +439,36 @@ private struct ExpandedPromptRow: View {
         accessibilityLabel: "\(mode.title)提示词",
         accessibilityIdentifier: "settings-prompt-editor-\(mode.rawValue)"
       )
-        .frame(height: 84)
-        .background(CidaDesign.surface)
-        .clipShape(.rect(cornerRadius: 8, style: .continuous))
-        .overlay {
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .strokeBorder(CidaDesign.accent, lineWidth: 1.5)
-        }
+      .frame(height: 92)
+      .background(CidaDesign.surfacePaper)
+      .clipShape(.rect(cornerRadius: CidaDesign.Radius.card, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+          .strokeBorder(CidaDesign.accent, lineWidth: 1.5)
+      }
 
-      Text("自动保存 · 任务参数由应用安全传入,无需占位符")
+      Text("自动保存 · 目标语言与任务由应用传入，不必写占位符")
         .font(CidaDesign.ui(11.5))
         .foregroundStyle(CidaDesign.textTertiary)
         .frame(height: 17)
     }
-    .padding(.vertical, 9)
-    .frame(height: 155, alignment: .top)
+    .padding(.vertical, 10)
   }
 }
 
+// MARK: - 唤起
+
 private struct GlobalShortcutRow: View {
   var body: some View {
-    HStack {
-      SettingsLabel("全局唤起", subtitle: "在任意应用中打开输入窗口")
-      Spacer()
+    SettingsRow(title: "全局快捷键", caption: "在任何应用里显示辞达", alignment: .trailing) {
       Text("⌥ Space")
         .font(CidaDesign.ui(12, weight: .medium))
         .foregroundStyle(CidaDesign.textSecondary)
         .padding(.horizontal, 9)
         .padding(.vertical, 4)
         .background(CidaDesign.surfaceDim)
-        .clipShape(.rect(cornerRadius: 6, style: .continuous))
+        .clipShape(.rect(cornerRadius: CidaDesign.Radius.chip, style: .continuous))
     }
-    .frame(height: 58)
   }
 }
 
@@ -427,11 +476,7 @@ private struct LaunchAtLoginRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    HStack {
-      Text("开机启动")
-        .font(CidaDesign.ui(13.5))
-        .foregroundStyle(CidaDesign.textPrimary)
-      Spacer()
+    SettingsRow(title: "开机启动", alignment: .trailing) {
       Toggle(
         "",
         isOn: Binding(
@@ -447,103 +492,67 @@ private struct LaunchAtLoginRow: View {
       .controlSize(.mini)
       .accessibilityIdentifier("settings-launch-at-login-toggle")
     }
-    .frame(height: 38)
     .onAppear(perform: model.refreshLaunchAtLoginStatus)
   }
 }
 
-private struct SettingsTextField: View {
-  @Binding var text: String
-  let placeholder: String
-  let accessibilityIdentifier: String
-  let usesMonospacedFont: Bool
-  @FocusState private var isFocused: Bool
-
+private struct AboutFooter: View {
   var body: some View {
-    TextField(placeholder, text: $text)
-      .textFieldStyle(.plain)
-      .font(usesMonospacedFont ? CidaDesign.mono(11.5) : CidaDesign.ui(12.5))
-      .foregroundStyle(CidaDesign.textPrimary)
-      .focused($isFocused)
-      .padding(.horizontal, 10)
-      .background(CidaDesign.surface)
-      .clipShape(.rect(cornerRadius: 7, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .strokeBorder(isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: 1)
-      }
-      .accessibilityIdentifier(accessibilityIdentifier)
+    HStack(spacing: 8) {
+      Text("辞达")
+        .font(CidaDesign.brand(12, weight: .semibold))
+        .tracking(2)
+        .foregroundStyle(CidaDesign.textSecondary)
+      Text("1.0 · 辞达而已矣")
+        .font(CidaDesign.ui(11))
+        .foregroundStyle(CidaDesign.textTertiary)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.top, 26)
   }
 }
 
+// MARK: - API key field
+
 struct MaskedAPIKeyField: View {
   @Binding var apiKey: String
+  var placeholder = "粘贴 API Key"
   @FocusState private var isFocused: Bool
 
   var body: some View {
     ZStack(alignment: .leading) {
-      SecureField("API Key", text: $apiKey)
+      SecureField(placeholder, text: $apiKey)
         .textFieldStyle(.plain)
         .font(CidaDesign.mono(11.5))
-        .foregroundStyle(isFocused ? CidaDesign.textSecondary : Color.clear)
+        .foregroundStyle(isFocused || apiKey.isEmpty ? CidaDesign.textPrimary : Color.clear)
         .focused($isFocused)
         .accessibilityIdentifier("settings-api-key-editor")
 
-      if !isFocused {
+      if !isFocused, !apiKey.isEmpty {
         Text(maskedValue)
           .font(CidaDesign.mono(11.5))
-          .foregroundStyle(CidaDesign.textSecondary)
+          .foregroundStyle(CidaDesign.textPrimary)
           .lineLimit(1)
           .allowsHitTesting(false)
       }
     }
-    .padding(.leading, 10)
-    .padding(.trailing, 27)
+    .padding(.horizontal, 10)
+    .frame(maxWidth: .infinity)
+    .frame(height: 30)
     .background(CidaDesign.surface)
-    .clipShape(.rect(cornerRadius: 7, style: .continuous))
+    .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
     .overlay {
-      RoundedRectangle(cornerRadius: 7, style: .continuous)
-        .strokeBorder(isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: 1)
+      RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
+        .strokeBorder(isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: isFocused ? 1.5 : 1)
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("API Key")
-    .overlay(alignment: .trailing) {
-      ConfiguredAPIKeyIcon(isVisible: !apiKey.isEmpty)
-        .padding(.trailing, 10)
-    }
   }
 
   private var maskedValue: String {
     guard !apiKey.isEmpty else { return "" }
     let prefix = apiKey.hasPrefix("sk-") ? "sk-" : ""
     let suffix = String(apiKey.suffix(min(4, apiKey.count)))
-    return "\(prefix)••••••••••\(suffix)"
-  }
-}
-
-private struct ConfiguredAPIKeyIcon: View {
-  let isVisible: Bool
-
-  var body: some View {
-    Image(systemName: "checkmark.circle")
-      .font(.system(size: 11, weight: .medium))
-      .foregroundStyle(CidaDesign.accent)
-      .opacity(isVisible ? 1 : 0)
-      .fixedSize()
-      .accessibilityLabel("API Key 已配置")
-      .accessibilityHidden(!isVisible)
-  }
-}
-
-private struct SettingsBorderedButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(CidaDesign.surface.opacity(configuration.isPressed ? 0.7 : 1))
-      .clipShape(.rect(cornerRadius: 7, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .strokeBorder(CidaDesign.border, lineWidth: 1)
-      }
+    return "\(prefix)••••••••••••••••\(suffix)"
   }
 }

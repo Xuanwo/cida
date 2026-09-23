@@ -238,16 +238,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   private func ensureSettingsWindowController() {
     guard settingsWindowController == nil else { return }
-    settingsWindowController = makeWindowController(
-      rootView: AnyView(
-        SettingsWindowView(
-          model: model
-        )
-      ),
-      size: CGSize(width: 560, height: 660),
-      minimumSize: CGSize(width: 500, height: 500),
-      title: "设置"
-    )
+    #if DEBUG
+      if launchOptions.designState == .settingsCustom {
+        model.editingPrompt = .improve
+      }
+    #endif
+    settingsWindowController = SettingsWindowFactory.makeWindowController(model: model)
   }
 
   private func installPerformanceProbeIfNeeded() {
@@ -312,31 +308,6 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     performanceProbeView = probeView
   }
 
-  private func makeWindowController(
-    rootView: AnyView,
-    size: CGSize,
-    minimumSize: CGSize,
-    title: String
-  ) -> NSWindowController {
-    let window = CidaWindowFactory.makeWindow(
-      size: size,
-      minimumSize: minimumSize,
-      title: title
-    )
-
-    let hostingView = NSHostingView(rootView: rootView)
-    hostingView.frame = NSRect(origin: .zero, size: size)
-    hostingView.autoresizingMask = [.width, .height]
-    hostingView.setAccessibilityLabel("\(title)窗口内容")
-    hostingView.wantsLayer = true
-    hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-    window.contentView = hostingView
-    window.setContentSize(size)
-    window.center()
-
-    return NSWindowController(window: window)
-  }
-
   private func scheduleSnapshot(of window: NSWindow?, to outputURL: URL) {
     guard let window else { return }
 
@@ -368,10 +339,11 @@ private enum DesignState: String {
   case failed
   case long
   case settings
-  case settingsOpenAI = "settings-openai"
+  case settingsMissingKey = "settings-missing-key"
+  case settingsCustom = "settings-custom"
 
   var isSettings: Bool {
-    self == .settings || self == .settingsOpenAI
+    self == .settings || self == .settingsMissingKey || self == .settingsCustom
   }
 }
 
@@ -417,17 +389,21 @@ private struct LaunchOptions {
       if usesDesignFixtures {
         settings = CidaSettings.designPreview
       }
-      if usesDesignFixtures, designState == .settingsOpenAI {
-        settings.provider = .openAI
-        settings.model = "local-model"
-        settings.openAIEndpoint = "http://127.0.0.1:8080/v1/chat/completions"
+      if usesDesignFixtures, designState == .settingsMissingKey {
         settings.apiKey = ""
+      }
+      if usesDesignFixtures, designState == .settingsCustom {
+        settings.provider = .custom
+        settings.model = "qwen3-32b"
+        settings.customEndpoint = "http://127.0.0.1:8080/v1/chat/completions"
+        settings.apiKey = ""
+        settings.launchAtLogin = true
       }
     #endif
     if let automationOpenAIEndpoint {
-      settings.provider = .openAI
+      settings.provider = .custom
       settings.model = "cida-local-model"
-      settings.openAIEndpoint = automationOpenAIEndpoint
+      settings.customEndpoint = automationOpenAIEndpoint
       settings.apiKey = ""
     }
     return settings
@@ -474,7 +450,7 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
-      case .empty, .streaming, .settings, .settingsOpenAI:
+      case .empty, .streaming, .settings, .settingsMissingKey, .settingsCustom:
         return nil
       }
     #else
@@ -494,7 +470,7 @@ private struct LaunchOptions {
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:
         ResultRecord.designLongInput
-      case .empty, .settings, .settingsOpenAI:
+      case .empty, .settings, .settingsMissingKey, .settingsCustom:
         ""
       }
     #else

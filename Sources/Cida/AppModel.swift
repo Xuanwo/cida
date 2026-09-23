@@ -123,24 +123,10 @@ struct OpenAICompatibleTextProcessingService: TextProcessingService {
     for request: ProcessingRequest,
     settings: CidaSettings
   ) throws -> URLRequest {
-    let endpoint: URL
-    switch settings.provider {
-    case .deepSeek:
-      endpoint = URL(string: "https://api.deepseek.com/chat/completions")!
-    case .openAI:
-      let value = settings.openAIEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard
-        let candidate = URL(string: value),
-        let scheme = candidate.scheme?.lowercased(),
-        ["http", "https"].contains(scheme),
-        candidate.host != nil
-      else {
-        throw TextProcessingError.invalidEndpoint
-      }
-      endpoint = candidate
+    guard let endpoint = settings.resolvedEndpoint else {
+      throw TextProcessingError.invalidEndpoint
     }
-
-    guard !settings.apiKey.isEmpty || settings.usesLocalOpenAIEndpoint else {
+    guard !settings.apiKey.isEmpty || settings.usesLocalEndpoint else {
       throw TextProcessingError.missingAPIKey
     }
 
@@ -291,7 +277,8 @@ final class AppModel {
   /// Errors from Settings actions (launch at login); request failures live
   /// on the result record instead.
   var errorMessage: String?
-  var editingPrompt: ProcessingMode? = .improve
+  /// The prompt whose sheet is open in Settings; at most one at a time.
+  var editingPrompt: ProcessingMode?
   var inputFocusRequestID = 0
   /// Bumped when the whole source should be selected, e.g. when the panel is
   /// shown again with the previous text still in it.
@@ -526,9 +513,11 @@ final class AppModel {
     lastPersistedAPIKey = settings.apiKey
   }
 
+  /// Switching the provider starts from its first suggested model; a custom
+  /// endpoint has no suggestions, so its model is typed in.
   func selectProvider(_ provider: ModelProvider) {
     settings.provider = provider
-    settings.model = provider.models[0]
+    settings.model = provider.suggestedModels.first ?? ""
   }
 
   func restorePersistedAPIKey(_ apiKey: String) {

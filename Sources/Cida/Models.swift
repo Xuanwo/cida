@@ -35,15 +35,81 @@ enum Language: String, CaseIterable, Codable, Sendable {
   }
 }
 
+/// A model service. Every preset is one OpenAI-compatible Chat Completions
+/// endpoint with its suggested models; `custom` points Cida at any compatible
+/// server, including a local one. Adding a provider is one more preset here
+/// (Pencil `Spec — 设置`).
 enum ModelProvider: String, CaseIterable, Codable, Sendable {
   case deepSeek = "DeepSeek"
   case openAI = "OpenAI"
+  case moonshot = "Moonshot"
+  case zhipu = "Zhipu"
+  case custom = "Custom"
 
-  var models: [String] {
+  var displayName: String {
+    switch self {
+    case .deepSeek: "DeepSeek"
+    case .openAI: "OpenAI"
+    case .moonshot: "Moonshot"
+    case .zhipu: "智谱 GLM"
+    case .custom: "自定义（OpenAI 兼容）"
+    }
+  }
+
+  /// The preset's Chat Completions endpoint; `nil` for `custom`, whose
+  /// endpoint lives in `CidaSettings.customEndpoint`.
+  var presetEndpoint: URL? {
+    switch self {
+    case .deepSeek: URL(string: "https://api.deepseek.com/chat/completions")
+    case .openAI: URL(string: "https://api.openai.com/v1/chat/completions")
+    case .moonshot: URL(string: "https://api.moonshot.cn/v1/chat/completions")
+    case .zhipu: URL(string: "https://open.bigmodel.cn/api/paas/v4/chat/completions")
+    case .custom: nil
+    }
+  }
+
+  /// Shown under the provider menu so the user knows where requests go.
+  var endpointCaption: String? {
+    presetEndpoint?.host().map { "\($0) · Chat Completions" }
+  }
+
+  var suggestedModels: [String] {
     switch self {
     case .deepSeek: ["deepseek-chat", "deepseek-reasoner"]
     case .openAI: ["gpt-5", "gpt-5-mini"]
+    case .moonshot: ["kimi-k3", "kimi-k2.6"]
+    case .zhipu: ["glm-5.3", "glm-5.3-flash"]
+    case .custom: []
     }
+  }
+
+  var isCustom: Bool {
+    self == .custom
+  }
+}
+
+/// What the model group can tell without a network request (the readiness
+/// row of `Spec — 设置`).
+enum SettingsReadiness: Equatable, Sendable {
+  case ready
+  case missingAPIKey
+  case localEndpoint
+  case invalidEndpoint
+  case missingModel
+
+  var text: String {
+    switch self {
+    case .ready: "已就绪"
+    case .missingAPIKey: "还差 API Key"
+    case .localEndpoint: "本地端点 · 无需 API Key"
+    case .invalidEndpoint: "端点无效"
+    case .missingModel: "还差模型"
+    }
+  }
+
+  /// Whether requests can be sent as configured.
+  var isReady: Bool {
+    self == .ready || self == .localEndpoint
   }
 }
 
@@ -194,7 +260,7 @@ struct ResultNote: Equatable, Sendable {
 }
 
 struct CidaSettings: Codable, Equatable, Sendable {
-  static let officialOpenAIEndpoint = "https://api.openai.com/v1/chat/completions"
+  static let officialOpenAIEndpoint = ModelProvider.openAI.presetEndpoint!.absoluteString
   static let defaultTranslationPrompt =
     "Translate the user-provided text into the target language specified by the application. Preserve meaning, tone, and terminology. Return only the translated text."
   static let defaultImprovementPrompt =
@@ -205,16 +271,33 @@ struct CidaSettings: Codable, Equatable, Sendable {
   var provider: ModelProvider = .deepSeek
   var apiKey = ""
   var model = "deepseek-chat"
-  var openAIEndpoint = officialOpenAIEndpoint
+  /// The Chat Completions URL used when `provider` is `.custom`.
+  var customEndpoint = ""
   var translationPrompt = defaultTranslationPrompt
   var improvementPrompt = defaultImprovementPrompt
   var launchAtLogin = false
   private var promptContractVersion = currentPromptContractVersion
 
-  var usesLocalOpenAIEndpoint: Bool {
+  /// The endpoint requests go to: the preset's, or a valid http(s) custom URL.
+  var resolvedEndpoint: URL? {
+    if let preset = provider.presetEndpoint { return preset }
+    let value = customEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
-      provider == .openAI,
-      let url = URL(string: openAIEndpoint),
+      let candidate = URL(string: value),
+      let scheme = candidate.scheme?.lowercased(),
+      ["http", "https"].contains(scheme),
+      candidate.host != nil
+    else {
+      return nil
+    }
+    return candidate
+  }
+
+  /// A custom endpoint on this machine, which may omit the API key.
+  var usesLocalEndpoint: Bool {
+    guard
+      provider.isCustom,
+      let url = resolvedEndpoint,
       let rawHost = url.host(percentEncoded: false)?.lowercased()
     else {
       return false
@@ -223,11 +306,20 @@ struct CidaSettings: Codable, Equatable, Sendable {
     return host == "localhost" || host == "127.0.0.1" || host == "::1"
   }
 
+  var readiness: SettingsReadiness {
+    if resolvedEndpoint == nil { return .invalidEndpoint }
+    if model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .missingModel }
+    if usesLocalEndpoint { return .localEndpoint }
+    if apiKey.isEmpty { return .missingAPIKey }
+    return .ready
+  }
+
   private enum CodingKeys: String, CodingKey {
     case provider
     case apiKey
     case model
-    case openAIEndpoint
+    /// Historic key: it held the OpenAI endpoint before providers became presets.
+    case customEndpoint = "openAIEndpoint"
     case translationPrompt
     case improvementPrompt
     case launchAtLogin
@@ -238,12 +330,23 @@ struct CidaSettings: Codable, Equatable, Sendable {
 
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    provider = try container.decodeIfPresent(ModelProvider.self, forKey: .provider) ?? .deepSeek
+    let decodedProvider =
+      try container.decodeIfPresent(ModelProvider.self, forKey: .provider) ?? .deepSeek
     apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
     model = try container.decodeIfPresent(String.self, forKey: .model) ?? "deepseek-chat"
-    openAIEndpoint =
-      try container.decodeIfPresent(String.self, forKey: .openAIEndpoint)
-      ?? Self.officialOpenAIEndpoint
+    let decodedEndpoint =
+      try container.decodeIfPresent(String.self, forKey: .customEndpoint) ?? ""
+    // Before presets, "OpenAI" with a non-official endpoint was the way to
+    // reach any compatible server; that configuration is now `custom`.
+    if decodedProvider == .openAI, !decodedEndpoint.isEmpty,
+      decodedEndpoint != Self.officialOpenAIEndpoint
+    {
+      provider = .custom
+      customEndpoint = decodedEndpoint
+    } else {
+      provider = decodedProvider
+      customEndpoint = decodedProvider.isCustom ? decodedEndpoint : ""
+    }
     let decodedPromptContractVersion =
       try container.decodeIfPresent(Int.self, forKey: .promptContractVersion) ?? 1
     let decodedTranslationPrompt =

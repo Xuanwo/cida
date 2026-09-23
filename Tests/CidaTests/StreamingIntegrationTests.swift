@@ -14,10 +14,10 @@ final class StreamingIntegrationTests: XCTestCase {
 
     let largeInput = String(repeating: "Large input paragraph. ", count: 6_000)
     var settings = CidaSettings()
-    settings.provider = .openAI
+    settings.provider = .custom
     settings.model = "local-model"
     settings.apiKey = ""
-    settings.openAIEndpoint = server.endpoint.absoluteString
+    settings.customEndpoint = server.endpoint.absoluteString
     let model = AppModel(
       inputText: largeInput,
       settings: settings,
@@ -55,7 +55,6 @@ final class StreamingIntegrationTests: XCTestCase {
     var settings = CidaSettings()
     settings.provider = .openAI
     settings.apiKey = ""
-    settings.openAIEndpoint = "https://api.openai.com/v1/chat/completions"
     let model = AppModel(
       inputText: "Draft",
       settings: settings,
@@ -77,8 +76,9 @@ final class StreamingIntegrationTests: XCTestCase {
     defer { server.stop() }
 
     var settings = CidaSettings()
-    settings.provider = .openAI
-    settings.model = "gpt-5"
+    settings.provider = .custom
+    settings.model = "typed-model"
+    settings.customEndpoint = "http://127.0.0.1:1/v1/chat/completions"
     let model = AppModel(
       settings: settings,
       service: OpenAICompatibleTextProcessingService(),
@@ -87,11 +87,11 @@ final class StreamingIntegrationTests: XCTestCase {
 
     let (settingsWindow, settingsHost) = makeHiddenHost(
       SettingsWindowView(model: model),
-      size: CGSize(width: 560, height: 660)
+      size: CGSize(width: 560, height: 800)
     )
     let endpointField = try XCTUnwrap(
       allTextFields(in: settingsHost).first {
-        $0.stringValue == CidaSettings.officialOpenAIEndpoint
+        $0.stringValue == settings.customEndpoint
       }
     )
     endpointField.stringValue = server.endpoint.absoluteString
@@ -99,7 +99,7 @@ final class StreamingIntegrationTests: XCTestCase {
       Notification(name: NSControl.textDidChangeNotification, object: endpointField)
     )
     let modelField = try XCTUnwrap(
-      allTextFields(in: settingsHost).first { $0.stringValue == "gpt-5" }
+      allTextFields(in: settingsHost).first { $0.stringValue == "typed-model" }
     )
     modelField.stringValue = "mock-local-model"
     modelField.delegate?.controlTextDidChange?(

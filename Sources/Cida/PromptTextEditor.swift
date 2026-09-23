@@ -27,7 +27,7 @@ struct PromptTextEditor: NSViewRepresentable {
     textView.isHorizontallyResizable = false
     textView.isVerticallyResizable = true
     textView.autoresizingMask = [.width]
-    textView.textContainerInset = NSSize(width: 12, height: 8)
+    textView.textContainerInset = NSSize(width: 14, height: 14)
     textView.textContainer?.lineFragmentPadding = 0
     textView.textContainer?.widthTracksTextView = true
     textView.textContainer?.containerSize = NSSize(
@@ -57,13 +57,15 @@ struct PromptTextEditor: NSViewRepresentable {
   }
 
   private func applyTypography(to textView: NSTextView) {
+    // The prompt sheet: Inter 13 on 1.6 lines in ink, like text on paper
+    // (Pencil `Spec — 设置`).
     let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.minimumLineHeight = 20
-    paragraphStyle.maximumLineHeight = 20
+    paragraphStyle.minimumLineHeight = 21
+    paragraphStyle.maximumLineHeight = 21
 
     let attributes: [NSAttributedString.Key: Any] = [
-      .font: CidaDesign.appKitBody(12.5),
-      .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
+      .font: CidaDesign.appKitBody(13),
+      .foregroundColor: CidaDesign.Palette.textInk.appKit,
       .paragraphStyle: paragraphStyle,
     ]
 

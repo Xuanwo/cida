@@ -19,7 +19,7 @@ mkdir -p "$implementation_dir" "$qa_dir"
 swift build --package-path "$project_dir"
 
 # Panel states: the capture is the panel at its content height, 800 pt wide.
-for state in empty translate improve stale stopped failed long settings settings-openai; do
+for state in empty translate improve stale stopped failed long settings settings-missing-key settings-custom; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
     --snapshot-output "$implementation_dir/$state.png"
@@ -56,11 +56,14 @@ if [[ -d "$reference_dir" ]]; then
     node_height=$(/usr/bin/sips --getProperty pixelHeight "$implementation" | awk '/pixelHeight/ {print $2}')
     export_width=$(/usr/bin/sips --getProperty pixelWidth "$reference" | awk '/pixelWidth/ {print $2}')
     export_height=$(/usr/bin/sips --getProperty pixelHeight "$reference" | awk '/pixelHeight/ {print $2}')
-    # The panel nodes carry a shadow offset 12 pt downwards, so the export's
-    # top margin is 24 px (2x) shorter than its bottom margin.
+    # The nodes carry a downward shadow offset (12 pt on panel states, 24 pt on
+    # Settings), so the export's top margin is shorter than its bottom margin
+    # by twice that offset in pixels.
     offset_x=$(( (export_width - node_width) / 2 ))
     offset_y=$(( (export_height - node_height) / 2 ))
-    if [[ "$name" != settings* ]]; then
+    if [[ "$name" == settings* ]]; then
+      offset_y=$(( offset_y - 48 ))
+    else
       offset_y=$(( offset_y - 24 ))
     fi
     if (( offset_x < 0 || offset_y < 0 )); then

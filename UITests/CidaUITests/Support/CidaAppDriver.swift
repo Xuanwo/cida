@@ -42,10 +42,16 @@ final class CidaAppDriver {
       NSPredicate(
         format: "identifier == %@ AND label IN %@",
         "settings-provider-menu",
-        ["DeepSeek", "OpenAI"]
+        Self.providerLabels
       )
     ).firstMatch
   }
+
+  /// `ModelProvider.displayName` of every preset plus the custom entry.
+  static let providerLabels = ["DeepSeek", "OpenAI", "Moonshot", "智谱 GLM", "自定义（OpenAI 兼容）"]
+  static let customProviderLabel = "自定义（OpenAI 兼容）"
+
+  var readinessRow: XCUIElement { element(identifier: "settings-readiness") }
 
   func launch(
     endpointOverride: Bool = true,
@@ -165,7 +171,8 @@ final class CidaAppDriver {
     ).firstMatch
   }
 
-  func configureOpenAI(
+  /// Points Settings at a custom (OpenAI-compatible) endpoint.
+  func configureCustomEndpoint(
     endpoint: String,
     model: String = "cida-ui-mock-model",
     apiKey: String = "sk-isolated-ui-test"
@@ -173,14 +180,14 @@ final class CidaAppDriver {
     openSettings()
     let providerMenu = settingsProviderMenu(in: settingsWindow)
     XCTAssertTrue(providerMenu.waitForExistence(timeout: 5))
-    if providerMenu.label != "OpenAI" {
+    if providerMenu.label != Self.customProviderLabel {
       providerMenu.click()
-      let openAIItem = app.menuItems["OpenAI"]
-      XCTAssertTrue(openAIItem.waitForExistence(timeout: 5))
-      openAIItem.click()
+      let customItem = app.menuItems[Self.customProviderLabel]
+      XCTAssertTrue(customItem.waitForExistence(timeout: 5))
+      customItem.click()
     }
 
-    replaceText(in: app.textFields["settings-openai-endpoint"], with: endpoint)
+    replaceText(in: app.textFields["settings-endpoint"], with: endpoint)
     replaceText(in: app.textFields["settings-model"], with: model)
     replaceText(in: app.secureTextFields["settings-api-key-editor"], with: apiKey)
     settingsWindow.buttons[XCUIIdentifierCloseWindow].click()

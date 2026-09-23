@@ -291,22 +291,12 @@ extension InteractionReproductionTests {
     let controller = makeHiddenPanel(model: mainModel)
     let mainHostingView = try XCTUnwrap(controller.contentView)
 
-    var settings = CidaSettings.designPreview
-    settings.provider = .openAI
-    settings.model = "local-model"
-    let (settingsWindow, settingsHostingView) = makeHiddenWindow(
-      rootView: SettingsWindowView(model: AppModel(settings: settings)),
-      size: CGSize(width: 500, height: 500)
-    )
-
     RunLoop.current.run(until: Date().addingTimeInterval(0.1))
     mainHostingView.layoutSubtreeIfNeeded()
-    settingsHostingView.layoutSubtreeIfNeeded()
 
     let indicators = try [
       XCTUnwrap(firstScroller(in: mainHostingView, identifier: "result-scroll-indicator")),
       XCTUnwrap(firstScroller(in: mainHostingView, identifier: "composer-scroll-indicator")),
-      XCTUnwrap(firstScroller(in: settingsHostingView, identifier: "settings-scroll-indicator")),
     ]
 
     XCTAssertFalse(CidaScrollIndicator.isCompatibleWithOverlayScrollers)
@@ -346,7 +336,6 @@ extension InteractionReproductionTests {
     }
 
     assertTestProcessIsNotFrontmost()
-    withExtendedLifetime(settingsWindow) {}
   }
 
   func testPencilScrollIndicatorRemovesScrollerReinstalledDuringLiveScroll() throws {
@@ -468,18 +457,18 @@ extension InteractionReproductionTests {
     assertTestProcessIsNotFrontmost()
   }
 
-  func testOpenAIEndpointFieldIsEditableWhenOpenAIIsSelected() throws {
+  func testCustomEndpointFieldIsEditableWhenCustomIsSelected() throws {
     var settings = CidaSettings.designPreview
-    settings.provider = .openAI
-    settings.model = "gpt-5"
+    settings.provider = .custom
+    settings.model = "local-model"
     let model = AppModel(settings: settings)
     let (_, hostingView) = makeHiddenWindow(
       rootView: SettingsWindowView(model: model),
-      size: CGSize(width: 560, height: 660)
+      size: CGSize(width: 560, height: 800)
     )
 
     let endpoint = try XCTUnwrap(
-      firstTextField(in: hostingView, identifier: "settings-openai-endpoint")
+      firstTextField(in: hostingView, identifier: "settings-endpoint")
     )
     endpoint.stringValue = "http://127.0.0.1:8080/v1/chat/completions"
     endpoint.delegate?.controlTextDidChange?(
@@ -487,6 +476,7 @@ extension InteractionReproductionTests {
     )
     RunLoop.current.run(until: Date().addingTimeInterval(0.02))
 
-    XCTAssertEqual(model.settings.openAIEndpoint, endpoint.stringValue)
+    XCTAssertEqual(model.settings.customEndpoint, endpoint.stringValue)
+    XCTAssertEqual(model.settings.readiness, .localEndpoint)
   }
 }
