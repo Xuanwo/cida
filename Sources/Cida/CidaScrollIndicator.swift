@@ -7,13 +7,17 @@ struct CidaScrollIndicatorConfiguration: Equatable, Sendable {
   let trackTopInset: CGFloat
   let trackBottomInset: CGFloat
   let minimumScrollableOverflow: CGFloat
+  /// How far past the scroll view's right edge the indicator sits, so a
+  /// scroll view inset inside its pane can still hug the pane's edge.
+  var trailingOutset: CGFloat = 0
 
   static let result = CidaScrollIndicatorConfiguration(
     accessibilityIdentifier: "result-scroll-indicator",
     knobLength: 90,
     trackTopInset: 10,
     trackBottomInset: 12,
-    minimumScrollableOverflow: 1.5
+    minimumScrollableOverflow: 1.5,
+    trailingOutset: CidaDesign.Spacing.windowHorizontal
   )
 
   static let composer = CidaScrollIndicatorConfiguration(
@@ -478,7 +482,8 @@ private final class CidaScrollIndicatorHostView: NSView {
 
   func updateFrame(in scrollView: NSScrollView) {
     frame = NSRect(
-      x: scrollView.bounds.maxX - CidaScrollIndicator.interactionWidth,
+      x: scrollView.bounds.maxX + indicator.configuration.trailingOutset
+        - CidaScrollIndicator.interactionWidth,
       y: scrollView.bounds.minY,
       width: CidaScrollIndicator.interactionWidth,
       height: scrollView.bounds.height

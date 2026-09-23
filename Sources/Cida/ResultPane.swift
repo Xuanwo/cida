@@ -9,6 +9,8 @@ struct ResultTextView: NSViewRepresentable {
   let generationState: GenerationPresentationState
   let isStale: Bool
   let followRevision: Int
+  /// The tallest the text area can get before the pane scrolls instead.
+  let maxVisibleHeight: CGFloat
   let onContentHeightChange: @MainActor (CGFloat, Bool) -> Void
 
   func makeCoordinator() -> ResultTextCoordinator {
@@ -23,6 +25,7 @@ struct ResultTextView: NSViewRepresentable {
 
   func updateNSView(_ scrollView: ResultScrollView, context: Context) {
     scrollView.onContentHeightChange = onContentHeightChange
+    scrollView.maxVisibleHeight = maxVisibleHeight
     let container = scrollView.container
     guard let record else {
       context.coordinator.detach(from: container)
@@ -59,6 +62,9 @@ struct ResultTextView: NSViewRepresentable {
 final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
   let container = ResultTextContainer()
   var onContentHeightChange: @MainActor (CGFloat, Bool) -> Void = { _, _ in }
+  /// While the text is shorter than this the pane still grows, so following
+  /// the tail would scroll up and then snap back once the pane catches up.
+  var maxVisibleHeight: CGFloat = .greatestFiniteMagnitude
   private var followsTail = true
   private var appliedFollowRevision = -1
   private var isStreaming = false
@@ -71,6 +77,9 @@ final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
     hasHorizontalScroller = false
     autohidesScrollers = true
     verticalScrollElasticity = .allowed
+    // The indicator hangs past the right edge to line up with the source
+    // pane's (`trailingOutset`); the clip view still clips the text.
+    clipsToBounds = false
     container.autoresizingMask = [.width]
     documentView = container
     contentView.postsBoundsChangedNotifications = true
@@ -99,18 +108,28 @@ final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
     let width = contentView.bounds.width
     if abs(container.frame.width - width) > 0.5 {
       container.frame = NSRect(
-        x: 0, y: 0, width: width, height: max(container.naturalTextHeight, bounds.height))
+        x: 0, y: 0, width: width,
+        height: max(container.naturalTextHeight, bounds.height))
     }
     resizeDocument()
+    if isStreaming, followsTail, paneIsAtItsCap {
+      scrollToTail()
+    }
     CidaScrollIndicator.installed(in: self)?.refresh()
   }
 
   func resultHeightWillChange(by delta: CGFloat, animated: Bool) {
     resizeDocument()
     onContentHeightChange(container.naturalTextHeight, animated)
-    if isStreaming, followsTail {
+    if isStreaming, followsTail, paneIsAtItsCap {
       scrollToTail()
     }
+  }
+
+  /// The visible area has stopped growing, so scrolling is the only way to
+  /// show more; before that, `layout()` follows the tail once the frame lands.
+  private var paneIsAtItsCap: Bool {
+    contentView.bounds.height >= maxVisibleHeight - 0.5
   }
 
   /// Streaming keeps the tail visible; a forced follow (a new submission)
@@ -144,6 +163,11 @@ final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
     if abs(container.frame.height - height) > 0.5 {
       container.setFrameSize(NSSize(width: container.frame.width, height: height))
     }
+  }
+
+  /// The document's own height: the text plus nothing else.
+  var documentHeight: CGFloat {
+    container.frame.height
   }
 
   private func scrollToTail() {

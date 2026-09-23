@@ -221,7 +221,18 @@ extension InteractionReproductionTests {
     XCTAssertEqual(composerIndicator.knobDrawingRect.width, 4, accuracy: 0.1)
     XCTAssertEqual(composerIndicator.knobDrawingRect.height, 64, accuracy: 0.1)
 
-    let resultScrollView = try XCTUnwrap(resultIndicator.observedScrollView)
+    // Both indicators hug the panel's right edge; both texts start at the
+    // 28 pt inset, so the panes read as one column.
+    let resultKnob = resultIndicator.convert(resultIndicator.knobDrawingRect, to: nil)
+    let composerKnob = composerIndicator.convert(composerIndicator.knobDrawingRect, to: nil)
+    XCTAssertEqual(resultKnob.maxX, composerKnob.maxX, accuracy: 0.5, "Indicators line up")
+    let resultScrollView = try XCTUnwrap(resultIndicator.observedScrollView as? ResultScrollView)
+    let textOrigin = resultScrollView.container.convert(NSPoint.zero, to: nil)
+    XCTAssertEqual(textOrigin.x, CidaDesign.Spacing.windowHorizontal, accuracy: 0.5, "Result text starts at the inset")
+    XCTAssertEqual(resultKnob.maxX, CidaDesign.Panel.width - CidaScrollIndicator.trailingInset, accuracy: 0.5)
+    let composer = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
+    XCTAssertEqual(composer.textContainerInset.width, CidaDesign.Spacing.windowHorizontal, accuracy: 0.5)
+
     resultIndicator.scroll(toNormalizedValue: 1)
     XCTAssertGreaterThan(resultIndicator.doubleValue, 0.9)
     XCTAssertTrue(isScrolledToBottom(resultScrollView), scrollDescription(resultScrollView))

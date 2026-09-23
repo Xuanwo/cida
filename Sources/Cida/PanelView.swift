@@ -43,6 +43,7 @@ struct PanelView: View {
         ResultPane(
           model: model,
           paneHeight: resultPaneHeight,
+          maxTextHeight: resultTextMaxHeight,
           showsText: showsResultText,
           onContentHeightChange: { height, animated in
             resultHeightAnimated = animated
@@ -88,6 +89,14 @@ struct PanelView: View {
       CidaDesign.Typography.resultLineHeight + CidaDesign.Spacing.resultVertical * 2,
       heightBudget.panelMaxHeight - sourcePaneHeight - CidaDesign.Panel.controlBarHeight
     )
+  }
+
+  /// The result text area at the pane's cap, with the note row's allowance.
+  private var resultTextMaxHeight: CGFloat {
+    let noteAllowance: CGFloat = model.resultNote == nil ? 0 : ResultNoteRow.height + 10
+    return max(
+      CidaDesign.Typography.resultLineHeight,
+      resultPaneMaxHeight - CidaDesign.Spacing.resultVertical * 2 - noteAllowance)
   }
 
   private var showsResultText: Bool {
@@ -349,6 +358,7 @@ private struct BarActionButton: View {
 private struct ResultPane: View {
   let model: AppModel
   let paneHeight: CGFloat
+  let maxTextHeight: CGFloat
   let showsText: Bool
   let onContentHeightChange: @MainActor (CGFloat, Bool) -> Void
 
@@ -360,6 +370,7 @@ private struct ResultPane: View {
           generationState: model.generationState,
           isStale: model.isResultStale,
           followRevision: model.resultFollowRevision,
+          maxVisibleHeight: maxTextHeight,
           onContentHeightChange: onContentHeightChange
         )
         .frame(maxWidth: .infinity)

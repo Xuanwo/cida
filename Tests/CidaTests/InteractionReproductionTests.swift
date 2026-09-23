@@ -225,6 +225,54 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
+  /// A growing pane must not scroll its text up and snap it back on every new
+  /// line: the tail is followed only once the pane has reached its cap.
+  func testStreamingResultDoesNotBounceWhileThePaneGrows() async throws {
+    let source = String(repeating: ">> [ ] Download links are valid and checksums match.\n", count: 80)
+    let piece = "这是一段较长的中文译文，用来观察流式输出时结果栏的高度与滚动位置是否会来回跳动。"
+    let chunks = (0..<100).map { index in
+      (index % 9 == 8 ? "\n" : "") + String(piece.prefix(12 + index % 20))
+    }
+    let model = AppModel(
+      inputText: source,
+      service: DelayedStreamingService(chunks: chunks, delay: .milliseconds(6))
+    )
+    let controller = makeHiddenPanel(model: model)
+    controller.panel.orderBack(nil)
+    let hostingView = try XCTUnwrap(controller.contentView)
+    try await Task.sleep(for: .milliseconds(150))
+
+    let streaming = Task { await model.process(text: source) }
+    var lastScrollY: CGFloat = 0
+    var lastPanelHeight = controller.panel.frame.height
+    var scrollReversals: [String] = []
+    var panelShrinks: [String] = []
+    var scrolledPastTheCap = false
+    let started = Date()
+    while Date().timeIntervalSince(started) < 4, model.result?.phase != .completed {
+      try await Task.sleep(for: .milliseconds(8))
+      guard let scrollView = firstResultScrollView(in: hostingView) else { continue }
+      let scrollY = scrollView.contentView.bounds.origin.y
+      let panelHeight = controller.panel.frame.height
+      if scrollY < lastScrollY - 0.5 {
+        scrollReversals.append("\(lastScrollY) -> \(scrollY)")
+      }
+      if panelHeight < lastPanelHeight - 0.5 {
+        panelShrinks.append("\(lastPanelHeight) -> \(panelHeight)")
+      }
+      if scrollY > 0 { scrolledPastTheCap = true }
+      lastScrollY = scrollY
+      lastPanelHeight = panelHeight
+    }
+    streaming.cancel()
+
+    XCTAssertTrue(scrolledPastTheCap, "The result outgrew the pane and followed its tail")
+    XCTAssertEqual(scrollReversals, [], "The text never jumped back down")
+    XCTAssertEqual(panelShrinks, [], "The panel only grew")
+    XCTAssertEqual(controller.panel.frame.height, PanelHeightBudget.automation.panelMaxHeight, accuracy: 0.5)
+    assertTestProcessIsNotFrontmost()
+  }
+
   // MARK: - Responder chain
 
   func testClickingComposerThenTypingUsesTheRealResponderChain() async throws {
