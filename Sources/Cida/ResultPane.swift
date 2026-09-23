@@ -73,34 +73,20 @@ final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
     super.init(frame: .zero)
     drawsBackground = false
     borderType = .noBorder
-    hasVerticalScroller = false
+    // System overlay scroll bar, on the same edge as the source pane's: the
+    // scroll view spans the pane and the container insets its text.
+    hasVerticalScroller = true
     hasHorizontalScroller = false
     autohidesScrollers = true
     verticalScrollElasticity = .allowed
-    // The indicator hangs past the right edge to line up with the source
-    // pane's (`trailingOutset`); the clip view still clips the text.
-    clipsToBounds = false
     container.autoresizingMask = [.width]
     documentView = container
-    contentView.postsBoundsChangedNotifications = true
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(boundsDidChange(_:)),
-      name: NSView.boundsDidChangeNotification,
-      object: contentView
-    )
-    let indicator = CidaScrollIndicator.install(on: self, configuration: .result)
-    indicator.refresh()
     setAccessibilityIdentifier("result-scroll-view")
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
-  }
-
-  deinit {
-    NotificationCenter.default.removeObserver(self)
   }
 
   override func layout() {
@@ -115,7 +101,6 @@ final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
     if isStreaming, followsTail, paneIsAtItsCap {
       scrollToTail()
     }
-    CidaScrollIndicator.installed(in: self)?.refresh()
   }
 
   func resultHeightWillChange(by delta: CGFloat, animated: Bool) {
@@ -174,10 +159,5 @@ final class ResultScrollView: NSScrollView, ResultHeightChangeHosting {
     let target = max(0, container.frame.height - contentView.bounds.height)
     contentView.scroll(to: NSPoint(x: 0, y: target))
     reflectScrolledClipView(contentView)
-  }
-
-  @objc
-  private func boundsDidChange(_ notification: Notification) {
-    CidaScrollIndicator.installed(in: self)?.refresh()
   }
 }

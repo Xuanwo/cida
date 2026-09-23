@@ -170,7 +170,9 @@ struct ComposerTextEditor: NSViewRepresentable {
     let scrollView = NSScrollView()
     scrollView.drawsBackground = false
     scrollView.borderType = .noBorder
-    scrollView.hasVerticalScroller = false
+    // System overlay scroll bar (Pencil `Spec — 面板模型`): appears while
+    // scrolling and follows the user's scroll-bar preference.
+    scrollView.hasVerticalScroller = true
     scrollView.hasHorizontalScroller = false
     scrollView.autohidesScrollers = true
 
@@ -204,14 +206,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     textView.replaceDocumentFromBinding(text)
 
     scrollView.documentView = textView
-    let scrollIndicator = CidaScrollIndicator.install(
-      on: scrollView,
-      configuration: .composer
-    )
-    scrollIndicator.setForceVisible(
-      ComposerTextMetrics(text: text).presentationState.showsDocumentChrome
-    )
-    scrollIndicator.refresh()
     return scrollView
   }
 
@@ -227,12 +221,6 @@ struct ComposerTextEditor: NSViewRepresentable {
       textView.needsLayout = true
       textView.needsDisplay = true
     }
-    let scrollIndicator = CidaScrollIndicator.install(
-      on: scrollView,
-      configuration: .composer
-    )
-    scrollIndicator.setForceVisible(metrics.presentationState.showsDocumentChrome)
-
     if textView.isPerformingLargeDocumentPaste {
       return
     } else if context.coordinator.consumeNativeBindingEcho() {
@@ -246,7 +234,6 @@ struct ComposerTextEditor: NSViewRepresentable {
       applyTypography(to: textView)
       context.coordinator.publishMetrics(for: text, in: textView)
     }
-    scrollIndicator.refresh()
 
     if context.coordinator.consumeSelectAllRevision(selectAllRevision),
       !textView.isVirtualizingLargeDocument

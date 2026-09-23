@@ -210,7 +210,6 @@ final class InteractionReproductionTests: XCTestCase {
 
     let collapsedFrame = window.frame
     XCTAssertEqual(collapsedFrame.height, 616, accuracy: 4, "Pencil 默认 · DeepSeek is 617 pt tall")
-    XCTAssertNil(firstScroller(in: window.contentView!, identifier: "settings-scroll-indicator"))
 
     model.editingPrompt = .improve
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
@@ -301,12 +300,10 @@ final class InteractionReproductionTests: XCTestCase {
     hostingView.layoutSubtreeIfNeeded()
     let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
     let scrollView = try XCTUnwrap(input.enclosingScrollView)
-    let indicator = try XCTUnwrap(CidaScrollIndicator.installed(in: scrollView))
     try await waitUntil(timeout: .seconds(1)) {
       hostingView.layoutSubtreeIfNeeded()
       scrollView.layoutSubtreeIfNeeded()
-      indicator.refresh()
-      return (indicator.superview?.frame.height ?? 0) > 0 && indicator.isHidden
+      return scrollView.frame.height > 0
     }
     let clickPoint = input.convert(NSPoint(x: 12, y: 12), to: nil)
     let hitView = window.contentView?.hitTest(clickPoint)

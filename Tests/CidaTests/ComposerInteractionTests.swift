@@ -71,8 +71,7 @@ extension InteractionReproductionTests {
       hostingView.layoutSubtreeIfNeeded()
       return abs(inputScrollView.frame.height - sourceCap) <= 0.5
     }
-    XCTAssertFalse(inputScrollView.hasVerticalScroller)
-    XCTAssertFalse(CidaScrollIndicator.installed(in: inputScrollView)?.isHidden ?? true)
+    XCTAssertTrue(inputScrollView.hasVerticalScroller, "The source pane scrolls with the system scroll bar")
     XCTAssertGreaterThan(input.bounds.height, inputScrollView.frame.height)
 
     XCTAssertTrue(
@@ -191,7 +190,7 @@ extension InteractionReproductionTests {
     assertTestProcessIsNotFrontmost()
   }
 
-  func testLongInputAndResultUseThePencilScrollIndicators() async throws {
+  func testLongInputAndResultScrollWithSystemScrollBarsOnOneEdge() async throws {
     let model = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
     model.setResultForTesting(ResultRecord.designLong())
     let controller = makeHiddenPanel(model: model)
@@ -201,188 +200,49 @@ extension InteractionReproductionTests {
     try await Task.sleep(for: .milliseconds(100))
     hostingView.layoutSubtreeIfNeeded()
 
-    let resultIndicator = try XCTUnwrap(
-      firstScroller(in: hostingView, identifier: "result-scroll-indicator")
-    )
-    let composerIndicator = try XCTUnwrap(
-      firstScroller(in: hostingView, identifier: "composer-scroll-indicator")
-    )
-    try await waitUntil(timeout: .seconds(2)) {
-      window.displayIfNeeded()
-      hostingView.layoutSubtreeIfNeeded()
-      resultIndicator.observedScrollView?.layoutSubtreeIfNeeded()
-      resultIndicator.refresh()
-      composerIndicator.refresh()
-      return !resultIndicator.isHidden && !composerIndicator.isHidden
-    }
-    XCTAssertEqual(resultIndicator.knobDrawingRect.width, 4, accuracy: 0.1)
-    XCTAssertEqual(resultIndicator.knobDrawingRect.height, 90, accuracy: 0.1)
-    XCTAssertLessThan(resultIndicator.doubleValue, 0.1, "A completed result starts at its top")
-    XCTAssertEqual(composerIndicator.knobDrawingRect.width, 4, accuracy: 0.1)
-    XCTAssertEqual(composerIndicator.knobDrawingRect.height, 64, accuracy: 0.1)
-
-    // Both indicators hug the panel's right edge; both texts start at the
-    // 28 pt inset, so the panes read as one column.
-    let resultKnob = resultIndicator.convert(resultIndicator.knobDrawingRect, to: nil)
-    let composerKnob = composerIndicator.convert(composerIndicator.knobDrawingRect, to: nil)
-    XCTAssertEqual(resultKnob.maxX, composerKnob.maxX, accuracy: 0.5, "Indicators line up")
-    let resultScrollView = try XCTUnwrap(resultIndicator.observedScrollView as? ResultScrollView)
-    let textOrigin = resultScrollView.container.convert(NSPoint.zero, to: nil)
-    XCTAssertEqual(textOrigin.x, CidaDesign.Spacing.windowHorizontal, accuracy: 0.5, "Result text starts at the inset")
-    XCTAssertEqual(resultKnob.maxX, CidaDesign.Panel.width - CidaScrollIndicator.trailingInset, accuracy: 0.5)
+    let resultScrollView = try XCTUnwrap(firstResultScrollView(in: hostingView))
     let composer = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
+    let composerScrollView = try XCTUnwrap(composer.enclosingScrollView)
+    try await waitUntil(timeout: .seconds(2)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return resultScrollView.container.frame.height > resultScrollView.contentView.bounds.height
+    }
+
+    // Both panes scroll with the system scroll bar; both scroll views reach
+    // the panel's right edge so the bars share it, and both texts start at
+    // the same 28 pt inset. A legacy (always visible) scroll bar narrows the
+    // text column by its own width, as it does in every native view.
+    for scrollView in [resultScrollView, composerScrollView] {
+      XCTAssertTrue(scrollView.hasVerticalScroller)
+      XCTAssertTrue(scrollView.autohidesScrollers)
+      XCTAssertEqual(scrollView.convert(scrollView.bounds, to: nil).maxX, CidaDesign.Panel.width, accuracy: 0.5)
+    }
+    let textColumn = resultScrollView.container.textColumnFrameForTesting
+    XCTAssertEqual(textColumn.minX, CidaDesign.Spacing.windowHorizontal, accuracy: 0.5)
+    XCTAssertEqual(
+      textColumn.width,
+      resultScrollView.container.frame.width - CidaDesign.Spacing.windowHorizontal * 2, accuracy: 0.5)
     XCTAssertEqual(composer.textContainerInset.width, CidaDesign.Spacing.windowHorizontal, accuracy: 0.5)
 
-    resultIndicator.scroll(toNormalizedValue: 1)
-    XCTAssertGreaterThan(resultIndicator.doubleValue, 0.9)
+    XCTAssertEqual(resultScrollView.contentView.bounds.minY, 0, accuracy: 0.5, "A completed result starts at its top")
+
+    // A legacy scroll bar (or any narrower clip) re-wraps the column at once.
+    let layoutsBefore = resultScrollView.container.documentLayoutCount
+    let narrowerWidth = resultScrollView.contentView.bounds.width - 17
+    resultScrollView.container.setFrameSize(
+      NSSize(width: narrowerWidth, height: resultScrollView.container.frame.height))
+    try await waitUntil(timeout: .seconds(1)) {
+      resultScrollView.container.documentLayoutCount > layoutsBefore
+    }
+    XCTAssertEqual(
+      resultScrollView.container.textColumnFrameForTesting.width,
+      narrowerWidth - CidaDesign.Spacing.windowHorizontal * 2, accuracy: 0.5,
+      "The text column re-wraps to the narrower width")
+    let bottom = NSPoint(x: 0, y: resultScrollView.container.frame.height - resultScrollView.contentView.bounds.height)
+    resultScrollView.contentView.scroll(to: bottom)
+    resultScrollView.reflectScrolledClipView(resultScrollView.contentView)
     XCTAssertTrue(isScrolledToBottom(resultScrollView), scrollDescription(resultScrollView))
-    resultIndicator.scroll(toNormalizedValue: 0)
-    XCTAssertLessThan(resultIndicator.doubleValue, 0.1)
-    XCTAssertFalse(isScrolledToBottom(resultScrollView), scrollDescription(resultScrollView))
     window.orderOut(nil)
-    assertTestProcessIsNotFrontmost()
-  }
-
-  func testPencilScrollIndicatorMovesDownFromDocumentTopToBottom() throws {
-    let documentViews: [NSView] = [
-      FlippedTestDocumentView(frame: NSRect(x: 0, y: 0, width: 320, height: 600)),
-      NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 600)),
-    ]
-
-    for documentView in documentViews {
-      let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 120))
-      scrollView.borderType = .noBorder
-      scrollView.hasVerticalScroller = false
-      scrollView.hasHorizontalScroller = false
-      scrollView.documentView = documentView
-      scrollView.layoutSubtreeIfNeeded()
-
-      let indicator = CidaScrollIndicator.install(on: scrollView, configuration: .result)
-      indicator.refresh()
-      let clipView = scrollView.contentView
-      let visibleHeight = clipView.documentVisibleRect.height
-      let topOriginY =
-        documentView.isFlipped
-        ? documentView.bounds.minY
-        : documentView.bounds.maxY - visibleHeight
-      clipView.scroll(to: NSPoint(x: 0, y: topOriginY))
-      scrollView.reflectScrolledClipView(clipView)
-      indicator.refresh()
-
-      XCTAssertTrue(indicator.isFlipped)
-      XCTAssertEqual(indicator.doubleValue, 0, accuracy: 0.001)
-      XCTAssertEqual(
-        indicator.knobDrawingRect.minY,
-        indicator.rect(for: .knobSlot).minY,
-        accuracy: 0.001
-      )
-      let topKnobOriginY = indicator.knobDrawingRect.minY
-
-      let bottomOriginY =
-        documentView.isFlipped
-        ? documentView.bounds.maxY - visibleHeight
-        : documentView.bounds.minY
-      clipView.scroll(to: NSPoint(x: 0, y: bottomOriginY))
-      scrollView.reflectScrolledClipView(clipView)
-      indicator.refresh()
-
-      XCTAssertEqual(indicator.doubleValue, 1, accuracy: 0.001)
-      XCTAssertEqual(
-        indicator.knobDrawingRect.maxY,
-        indicator.rect(for: .knobSlot).maxY,
-        accuracy: 0.001
-      )
-      XCTAssertGreaterThan(indicator.knobDrawingRect.minY, topKnobOriginY)
-    }
-  }
-
-  func testPencilScrollIndicatorsNeverUseSystemOverlayRendering() throws {
-    let mainModel = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
-    mainModel.setResultForTesting(ResultRecord.designLong())
-    let controller = makeHiddenPanel(model: mainModel)
-    let mainHostingView = try XCTUnwrap(controller.contentView)
-
-    RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    mainHostingView.layoutSubtreeIfNeeded()
-
-    let indicators = try [
-      XCTUnwrap(firstScroller(in: mainHostingView, identifier: "result-scroll-indicator")),
-      XCTUnwrap(firstScroller(in: mainHostingView, identifier: "composer-scroll-indicator")),
-    ]
-
-    XCTAssertFalse(CidaScrollIndicator.isCompatibleWithOverlayScrollers)
-    for indicator in indicators {
-      let originalValue = indicator.doubleValue
-      indicator.refresh()
-      indicator.scroll(toNormalizedValue: 0.5)
-      indicator.layoutSubtreeIfNeeded()
-      indicator.displayIfNeeded()
-
-      let systemOverlayLayers =
-        indicator.layer?.sublayers?.filter {
-          String(describing: $0.delegate).contains("OverlayScroller")
-        } ?? []
-      let pencilKnobLayers =
-        indicator.layer?.sublayers?.filter {
-          $0.delegate == nil
-            && abs($0.frame.width - CidaScrollIndicator.knobWidth) <= 0.1
-            && abs($0.frame.height - indicator.configuration.knobLength) <= 0.1
-            && abs($0.cornerRadius - CidaScrollIndicator.knobWidth / 2) <= 0.1
-        } ?? []
-      XCTAssertEqual(indicator.scrollerStyle, .legacy)
-      XCTAssertFalse(
-        indicator.observedScrollView?.hasVerticalScroller ?? true,
-        indicator.configuration.accessibilityIdentifier
-      )
-      XCTAssertTrue(systemOverlayLayers.isEmpty)
-      XCTAssertEqual(pencilKnobLayers.count, 1, indicator.configuration.accessibilityIdentifier)
-      XCTAssertEqual(indicator.layer?.sublayers?.count, 1)
-      XCTAssertEqual(
-        pencilKnobLayers.first?.backgroundColor,
-        CidaScrollIndicator.knobColor.cgColor
-      )
-      XCTAssertEqual(indicator.knobDrawingRect.width, 4, accuracy: 0.1)
-
-      indicator.scroll(toNormalizedValue: originalValue)
-    }
-
-    assertTestProcessIsNotFrontmost()
-  }
-
-  func testPencilScrollIndicatorRemovesScrollerReinstalledDuringLiveScroll() throws {
-    let model = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
-    model.setResultForTesting(ResultRecord.designLong())
-    let controller = makeHiddenPanel(model: model)
-    let hostingView = try XCTUnwrap(controller.contentView)
-
-    RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    hostingView.layoutSubtreeIfNeeded()
-    let indicator = try XCTUnwrap(
-      firstScroller(in: hostingView, identifier: "result-scroll-indicator")
-    )
-    let scrollView = try XCTUnwrap(indicator.observedScrollView)
-
-    scrollView.scrollerStyle = .overlay
-    scrollView.autohidesScrollers = true
-    scrollView.verticalScroller = NSScroller()
-    scrollView.hasVerticalScroller = true
-    XCTAssertTrue(scrollView.hasVerticalScroller)
-
-    NotificationCenter.default.post(
-      name: NSScrollView.didLiveScrollNotification,
-      object: scrollView
-    )
-    XCTAssertFalse(scrollView.hasVerticalScroller)
-    XCTAssertNil(scrollView.verticalScroller)
-
-    scrollView.scrollerStyle = .overlay
-    scrollView.autohidesScrollers = true
-    scrollView.verticalScroller = NSScroller()
-    scrollView.hasVerticalScroller = true
-    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-
-    XCTAssertFalse(scrollView.hasVerticalScroller)
-    XCTAssertNil(scrollView.verticalScroller)
     assertTestProcessIsNotFrontmost()
   }
 

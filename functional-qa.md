@@ -56,7 +56,8 @@ panel, or renderer paths.
 | The source pane did not shrink after deletions | The source height is measured from TextKit 2 layout fragments after every native edit instead of the lazily updated usage bounds. | Composer shrink test with exact 78/52/27 pt heights and the matching panel heights; XCUI growth/shrink journey. |
 | A completed result opened scrolled to its end | The result scroll view follows the tail only while streaming; the first follow revision of a completed result stays at the top. | Height-budget test and the long-input indicator test assert `contentView.bounds.minY == 0`. |
 | A stale result could be copied as if current | `isResultStale` compares source length and text and the action against the record; the note row states what ⏎ will do. | `testEditedSourceMarksTheResultStale`, property test stale parity, XCUI stale note. |
-| The whole panel bobbed on every new line while a result grew | Two causes. The hosting view filled the panel's content view, so while the window animated its height SwiftUI re-centred the content on every step (the source pane rose by half the growth and slid back); the hosting view is now pinned to the top at its final height and the container clips what the window has not revealed. Separately, `ResultScrollView` scrolled to the tail before the pane had grown and the clip view snapped back; it now follows the tail only once the pane has reached its cap (`maxVisibleHeight`). The result indicator hangs 28 pt past its inset scroll view (`trailingOutset`) so it lines up with the source pane's. | `testStreamingResultDoesNotBounceWhileThePaneGrows` samples the source pane's distance from the panel top, the scroll offset, and the panel height every 8 ms and rejects any drift or reversal; the indicator test asserts both knobs share one right edge. |
+| The whole panel bobbed on every new line while a result grew | Two causes. The hosting view filled the panel's content view, so while the window animated its height SwiftUI re-centred the content on every step (the source pane rose by half the growth and slid back); the hosting view is now pinned to the top at its final height and the container clips what the window has not revealed. Separately, `ResultScrollView` scrolled to the tail before the pane had grown and the clip view snapped back; it now follows the tail only once the pane has reached its cap (`maxVisibleHeight`). | `testStreamingResultDoesNotBounceWhileThePaneGrows` samples the source pane's distance from the panel top, the scroll offset, and the panel height every 8 ms and rejects any drift or reversal. |
+| The scroll bars were a custom 4 pt indicator that ignored the system preference | Both panes use the system overlay scroll bar (decided 2026-09-23). The result scroll view spans the pane and `ResultTextContainer` insets its text column, so both bars share the panel's right edge; the custom indicator and its scroller suppression are gone. | `testLongInputAndResultScrollWithSystemScrollBarsOnOneEdge` asserts native scrollers on both scroll views, both reaching the panel edge, and the 28 pt text inset. |
 | The panel showed transparent in the signed Release build | `PanelController.show()` faded the panel in through `NSWindow.animator().alphaValue`, which never progressed in the Release guest; the panel is ordered front at full opacity instead. Only production and the Tart launch reach `show()` (design snapshots use `prepareAutomationPanel`). | Every XCUI journey (the panel must exist), plus the per-launch lifecycle log that records the panel's alpha on show. |
 
 ## Test layers
@@ -69,7 +70,7 @@ panel, or renderer paths.
 | Mutation | temporary clean clone | deliberately reintroduce known faults; designated unit and Release tests must fail |
 | Performance | nonactivating physical-display runner | display-link cadence, main-actor latency, missed budgets, exact workloads, RSS and artifact digest |
 
-The host Swift suite contains 103 tests: 47 model/report tests, 35 native interaction and layout
+The host Swift suite contains 101 tests: 47 model/report tests, 33 native interaction and layout
 tests, 6 mutation invariants, 4 host isolation tests, 4 design-token tests, 3 loopback integration
 tests, 2 suite/matrix manifest tests, and 2 deterministic journey-model tests.
 
@@ -129,6 +130,13 @@ are recorded as diagnostics rather than misclassified as test activity.
   followed the typed `Language` fields and was killed on commit 7b418ff). Results directories:
   `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`; all 8
   killed again on the Settings redesign commit 805366e (`TestResults/settings-mutations-20260923`).
+
+### Tart XCUI run `scrollbars-tart-20260923c`
+
+18 of 18 tests passed with the system scroll bars (app-tree digest
+`024088ccace72277c404b5c67b296325c00d2cb792fcb80bff6a2a7c0895e078`, host suite 101/101). The
+guest uses the legacy scroller style, so the result column is 16 pt narrower there than with
+overlay scroll bars; the column re-wraps to whatever width the scroll view leaves it.
 
 ### Tart XCUI run `settings-tart-20260923f`
 

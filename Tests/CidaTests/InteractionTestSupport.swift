@@ -200,19 +200,6 @@ extension InteractionReproductionTests {
     return controller
   }
 
-  func firstScroller(in view: NSView, identifier: String) -> CidaScrollIndicator? {
-    if let scroller = view as? CidaScrollIndicator,
-      scroller.accessibilityIdentifier() == identifier
-    {
-      return scroller
-    }
-    for child in view.subviews {
-      if let result = firstScroller(in: child, identifier: identifier) {
-        return result
-      }
-    }
-    return nil
-  }
 
   func click(window: NSWindow, at point: NSPoint) {
     Self.clickEventNumber += 1
@@ -303,11 +290,6 @@ final class ResultHeightProbeView: NSView, ResultHeightChangeHosting {
     publishedHeightDeltas.append(delta)
     publishedAnimatedFlags.append(animated)
   }
-}
-
-@MainActor
-final class FlippedTestDocumentView: NSView {
-  override var isFlipped: Bool { true }
 }
 
 struct ImmediateStreamingService: TextProcessingService {

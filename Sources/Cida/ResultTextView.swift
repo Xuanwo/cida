@@ -87,6 +87,14 @@ final class ResultTextCoordinator: NSObject {
       guard let self, let container else { return }
       self.layoutNow(of: container)
     }
+    // A scroll bar appearing (legacy style) or the pane resizing narrows the
+    // column; re-wrap on the next coalesced layout instead of leaving the old
+    // layout clipped. Width changes arrive inside AppKit layout passes, so
+    // they never flush synchronously.
+    container.onWidthChange = { [weak self, weak container] in
+      guard let self, let container else { return }
+      self.scheduleLayout(of: container)
+    }
     guard observedResultStorage !== resultStorage else { return }
 
     NotificationCenter.default.removeObserver(
@@ -287,6 +295,14 @@ final class StreamingResultTextView: NSTextView {}
 @MainActor
 final class ResultTextContainer: NSView {
   static let minimumHeight = CidaDesign.Typography.resultLineHeight
+  /// The text column sits inside the pane's horizontal inset; the container
+  /// itself spans the scroll view so the scroll bar hugs the pane's edge.
+  static let horizontalInset = CidaDesign.Spacing.windowHorizontal
+
+  #if DEBUG
+    /// The text column's frame inside the container, for geometry tests.
+    var textColumnFrameForTesting: NSRect { renderingView.frame }
+  #endif
   private static let minimumStreamingTextViewCapacity: CGFloat = 1_024
 
   /// The language of the text being rendered; it selects the serif face and
@@ -569,7 +585,7 @@ final class ResultTextContainer: NSView {
 
   func updateDocumentLayout() -> CGFloat {
     documentLayoutCount &+= 1
-    let availableWidth = max(1, bounds.width)
+    let availableWidth = max(1, bounds.width - Self.horizontalInset * 2)
     let previousContentTextHeight = contentTextHeight
     let requiresFullRedraw = needsFullTextLayout
     renderingView.setTextContainerWidth(availableWidth)
@@ -604,12 +620,12 @@ final class ResultTextContainer: NSView {
       selectionTextView.setFrameSize(
         NSSize(width: availableWidth, height: textViewHeight)
       )
-      selectionTextView.setFrameOrigin(.zero)
+      selectionTextView.setFrameOrigin(NSPoint(x: Self.horizontalInset, y: 0))
     }
     renderingView.setFrameSize(
       NSSize(width: availableWidth, height: textViewHeight)
     )
-    renderingView.setFrameOrigin(.zero)
+    renderingView.setFrameOrigin(NSPoint(x: Self.horizontalInset, y: 0))
     renderingView.invalidateTextLayout(
       previousContentHeight: previousContentTextHeight,
       contentHeight: contentTextHeight,
@@ -866,7 +882,7 @@ final class ResultTextContainer: NSView {
     let layoutManager = NSLayoutManager()
     let textContainer = NSTextContainer(
       containerSize: NSSize(
-        width: max(1, bounds.width),
+        width: max(1, bounds.width - Self.horizontalInset * 2),
         height: CGFloat.greatestFiniteMagnitude
       )
     )
@@ -917,7 +933,9 @@ final class ResultTextContainer: NSView {
     textView.layerContentsRedrawPolicy = .onSetNeedsDisplay
     textView.layerContentsPlacement = .topLeft
     let height = allocatedTextViewHeight(for: naturalTextHeight)
-    textView.frame = NSRect(x: 0, y: 0, width: max(1, bounds.width), height: height)
+    textView.frame = NSRect(
+      x: Self.horizontalInset, y: 0,
+      width: max(1, bounds.width - Self.horizontalInset * 2), height: height)
     addSubview(textView)
 
     selectionTextStorage = textStorage

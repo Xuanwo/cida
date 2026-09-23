@@ -76,7 +76,7 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   The top edge stays at 20% of the visible screen; growth animates over `motion-height-ms`. The
   panel itself appears and hides at once, like Spotlight.
 - Height budget: the source editor is capped at 30% of the visible screen height minus its insets,
-  the panel at 70%; both panes scroll on their own past their caps with the Pencil 4 pt thumb. A
+  the panel at 70%; both panes scroll on their own past their caps with the system overlay scroll bar, which the static Pencil states do not draw. A
   completed result opens at its top; a streaming result keeps its tail in view until the user
   scrolls away.
 - Typography: the source is Inter 16 / 26 pt lines; the result is Source Serif 4 17.5 / 29 pt

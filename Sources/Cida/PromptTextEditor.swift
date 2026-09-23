@@ -14,7 +14,7 @@ struct PromptTextEditor: NSViewRepresentable {
     let scrollView = NSScrollView()
     scrollView.drawsBackground = false
     scrollView.borderType = .noBorder
-    scrollView.hasVerticalScroller = false
+    scrollView.hasVerticalScroller = true
     scrollView.hasHorizontalScroller = false
     scrollView.autohidesScrollers = true
 

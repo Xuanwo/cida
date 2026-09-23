@@ -384,9 +384,9 @@ private struct ResultPane: View {
       }
       if let note = model.resultNote {
         ResultNoteRow(note: note)
+          .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
       }
     }
-    .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
     .padding(.vertical, CidaDesign.Spacing.resultVertical)
     .frame(maxWidth: .infinity, alignment: .leading)
     .frame(height: paneHeight)
