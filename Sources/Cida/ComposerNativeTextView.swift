@@ -11,6 +11,10 @@ final class ComposerNativeTextView: NSTextView {
 
   var largeDocumentPasteDidBegin: ((ComposerTextMetrics) -> Void)?
   var virtualDocumentDidInstall: ((String, ComposerTextMetrics) -> Void)?
+  /// Called with `hasMarkedText()` whenever an input method starts, updates,
+  /// or ends a composition. Marked text never posts `textDidChange`, so this
+  /// is the only signal that provisional text is on screen.
+  var markedTextDidChange: ((Bool) -> Void)?
 
   private(set) var isPerformingLargeDocumentPaste = false
   private(set) var lastLargeDocumentPasteDurationMilliseconds: Double?
@@ -42,6 +46,20 @@ final class ComposerNativeTextView: NSTextView {
       )
     }
     return ComposerTextMetrics(text: string)
+  }
+
+  override func setMarkedText(
+    _ string: Any,
+    selectedRange: NSRange,
+    replacementRange: NSRange
+  ) {
+    super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
+    markedTextDidChange?(hasMarkedText())
+  }
+
+  override func unmarkText() {
+    super.unmarkText()
+    markedTextDidChange?(hasMarkedText())
   }
 
   override func paste(_ sender: Any?) {

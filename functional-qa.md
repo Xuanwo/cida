@@ -35,7 +35,9 @@ The current core experience contract (Pencil `Spec — 面板模型`) includes:
    clearing, prompt edit/reset, source-language detection, and source-language-preserving
    improvement, all from a standard Settings window.
 9. Input-method safety: the SwiftUI binding is never written back into the editor while a
-   composition (for example pinyin) is in progress.
+   composition (for example pinyin) is in progress, the placeholder hides as soon as marked text
+   appears, and Escape, Tab, and the other panel shortcuts reach the input method first while it
+   composes.
 10. Exact one-million-character input in the isolated performance workload.
 
 Production starts empty and without mock output. Automation redirects only its preferences,

@@ -199,6 +199,9 @@ final class PanelController {
   private func installKeyMonitor() {
     keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
       guard let self, NSApp.keyWindow === self.panel else { return event }
+      // Escape cancels a pinyin composition and Tab may pick a candidate; the
+      // input method must see every key before the panel's shortcuts do.
+      if InputMethodRouting.isComposing(in: self.panel) { return event }
       let modifiers = event.modifierFlags
         .intersection(.deviceIndependentFlagsMask)
         .subtracting(.capsLock)
@@ -240,6 +243,16 @@ final class PanelController {
       return underPointer
     }
     return NSScreen.main
+  }
+}
+
+/// Whether the panel's first responder is a text view with marked text, in
+/// which case the input method owns the keyboard.
+enum InputMethodRouting {
+  @MainActor
+  static func isComposing(in window: NSWindow) -> Bool {
+    guard let textView = window.firstResponder as? NSTextView else { return false }
+    return textView.hasMarkedText()
   }
 }
 

@@ -152,10 +152,20 @@ extension InteractionReproductionTests {
     controller.panel.orderBack(nil)
     _ = controller.panel.makeFirstResponder(input)
 
+    let coordinator = try XCTUnwrap(input.delegate as? ComposerTextEditor.Coordinator)
+    XCTAssertFalse(coordinator.metrics.wrappedValue.hasText)
+
     input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
     XCTAssertTrue(input.hasMarkedText())
     XCTAssertEqual(input.string, "ni")
     XCTAssertEqual(model.inputText, "", "Marked text never reaches the binding")
+    XCTAssertTrue(
+      coordinator.metrics.wrappedValue.isComposing,
+      "The composition counts as text, so the placeholder hides under it")
+    XCTAssertTrue(coordinator.metrics.wrappedValue.hasText)
+    XCTAssertTrue(
+      InputMethodRouting.isComposing(in: controller.panel),
+      "Escape and Tab belong to the input method while it composes")
 
     // Any unrelated state change re-renders the panel content.
     model.requestInputFocus()
@@ -167,6 +177,16 @@ extension InteractionReproductionTests {
     XCTAssertEqual(input.string, "ni")
     input.insertText("你", replacementRange: input.markedRange())
     XCTAssertFalse(input.hasMarkedText())
+    XCTAssertEqual(model.inputText, "你")
+    XCTAssertFalse(coordinator.metrics.wrappedValue.isComposing)
+    XCTAssertTrue(coordinator.metrics.wrappedValue.hasText)
+    XCTAssertFalse(InputMethodRouting.isComposing(in: controller.panel))
+
+    input.setMarkedText("h", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+    XCTAssertTrue(coordinator.metrics.wrappedValue.isComposing)
+    input.setMarkedText("", selectedRange: NSRange(location: 0, length: 0), replacementRange: input.markedRange())
+    XCTAssertFalse(input.hasMarkedText(), "An empty marked string cancels the composition")
+    XCTAssertFalse(coordinator.metrics.wrappedValue.isComposing)
     XCTAssertEqual(model.inputText, "你")
     assertTestProcessIsNotFrontmost()
   }

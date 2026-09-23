@@ -13,6 +13,9 @@ struct ComposerTextMetrics: Equatable, Sendable {
   /// edit while the text is short enough to lay out synchronously. The panel
   /// sizes the source pane from it; `nil` means "not measured".
   var naturalHeight: CGFloat?
+  /// An input method is showing provisional (marked) text that the binding
+  /// and `characterCount` do not include yet.
+  var isComposing = false
 
   init(
     text: String,
@@ -70,8 +73,10 @@ struct ComposerTextMetrics: Equatable, Sendable {
       )
   }
 
+  /// Whether the editor shows anything, so the placeholder must not: committed
+  /// text or an in-progress composition.
   var hasText: Bool {
-    characterCount > 0
+    characterCount > 0 || isComposing
   }
 
   var usesMultilineEditor: Bool {
@@ -302,6 +307,10 @@ struct ComposerTextEditor: NSViewRepresentable {
     func configure(_ textView: ComposerNativeTextView) {
       textView.largeDocumentPasteDidBegin = { [weak self] pasteMetrics in
         self?.publishLargeDocumentMetrics(pasteMetrics)
+      }
+      textView.markedTextDidChange = { [weak self] isComposing in
+        guard let self, self.metrics.wrappedValue.isComposing != isComposing else { return }
+        self.metrics.wrappedValue.isComposing = isComposing
       }
       textView.virtualDocumentDidInstall = { [weak self] document, metrics in
         guard let self else { return }
