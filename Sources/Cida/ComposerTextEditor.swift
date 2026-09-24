@@ -125,13 +125,15 @@ struct ComposerTextMetrics: Equatable, Sendable {
 struct ComposerTextEditor: NSViewRepresentable {
   @Binding var text: String
   @Binding var metrics: ComposerTextMetrics
-  let isFocused: FocusState<Bool>.Binding
   /// Distance from the editor's edges to the text column; the editor spans the
   /// window so its scroll bar stays at the window edge.
   let horizontalInset: CGFloat
   /// Bumped when the whole text should be selected, e.g. when the panel is
   /// shown again with the previous source in it.
   var selectAllRevision = 0
+  /// Bumped when the editor should take keyboard focus, e.g. every time the
+  /// panel is shown, so typing goes straight into the source.
+  var focusRevision = 0
   let onSubmit: @MainActor () -> Bool
   let onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
 
@@ -139,7 +141,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     Coordinator(
       text: $text,
       metrics: $metrics,
-      isFocused: isFocused,
       onSubmit: onSubmit,
       onVirtualDocumentChange: onVirtualDocumentChange
     )
@@ -192,7 +193,6 @@ struct ComposerTextEditor: NSViewRepresentable {
     guard let textView = scrollView.documentView as? ComposerNativeTextView else { return }
     context.coordinator.text = $text
     context.coordinator.metrics = $metrics
-    context.coordinator.isFocused = isFocused
     context.coordinator.onSubmit = onSubmit
     context.coordinator.onVirtualDocumentChange = onVirtualDocumentChange
     if abs(textView.textContainerInset.width - horizontalInset) > 0.5 {
@@ -220,10 +220,12 @@ struct ComposerTextEditor: NSViewRepresentable {
       textView.setSelectedRange(NSRange(location: 0, length: textView.textStorage?.length ?? 0))
     }
 
-    if isFocused.wrappedValue, textView.window?.firstResponder !== textView {
+    // After the update, so the panel has become key by then.
+    if context.coordinator.consumeFocusRevision(focusRevision) {
       Task { @MainActor in
         await Task.yield()
-        textView.window?.makeFirstResponder(textView)
+        guard let window = textView.window, window.firstResponder !== textView else { return }
+        window.makeFirstResponder(textView)
       }
     }
   }
@@ -251,7 +253,6 @@ struct ComposerTextEditor: NSViewRepresentable {
   final class Coordinator: NSObject, NSTextViewDelegate {
     var text: Binding<String>
     var metrics: Binding<ComposerTextMetrics>
-    var isFocused: FocusState<Bool>.Binding
     var onSubmit: @MainActor () -> Bool
     var onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
     private var expectsNativeBindingEcho = false
@@ -259,13 +260,11 @@ struct ComposerTextEditor: NSViewRepresentable {
     init(
       text: Binding<String>,
       metrics: Binding<ComposerTextMetrics>,
-      isFocused: FocusState<Bool>.Binding,
       onSubmit: @escaping @MainActor () -> Bool,
       onVirtualDocumentChange: @escaping @MainActor (String?, Int?, Bool?) -> Void
     ) {
       self.text = text
       self.metrics = metrics
-      self.isFocused = isFocused
       self.onSubmit = onSubmit
       self.onVirtualDocumentChange = onVirtualDocumentChange
     }
@@ -286,14 +285,6 @@ struct ComposerTextEditor: NSViewRepresentable {
           metrics.hasNonWhitespace
         )
       }
-    }
-
-    func textDidBeginEditing(_ notification: Notification) {
-      isFocused.wrappedValue = true
-    }
-
-    func textDidEndEditing(_ notification: Notification) {
-      isFocused.wrappedValue = false
     }
 
     func textDidChange(_ notification: Notification) {
@@ -330,6 +321,14 @@ struct ComposerTextEditor: NSViewRepresentable {
     func consumeSelectAllRevision(_ revision: Int) -> Bool {
       guard revision != lastSelectAllRevision else { return false }
       lastSelectAllRevision = revision
+      return true
+    }
+
+    private var lastFocusRevision = 0
+
+    func consumeFocusRevision(_ revision: Int) -> Bool {
+      guard revision != lastFocusRevision else { return false }
+      lastFocusRevision = revision
       return true
     }
 

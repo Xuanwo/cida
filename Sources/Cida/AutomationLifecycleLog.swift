@@ -40,6 +40,10 @@ final class AutomationLifecycleLog {
       fields.append("panelKey=\(panel.isKeyWindow)")
       fields.append("panelAlpha=\(panel.alphaValue)")
       fields.append("panelFrame=\(NSStringFromRect(panel.frame))")
+      // Typing reaches the source only while the composer is first responder;
+      // XCUI can only say that the panel has keyboard focus.
+      fields.append(
+        "firstResponder=\(panel.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")")
       if let content = panel.contentView {
         fields.append("contentFrame=\(NSStringFromRect(content.frame))")
         if let hosting = content.subviews.first {

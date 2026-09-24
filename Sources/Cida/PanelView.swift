@@ -14,7 +14,6 @@ struct PanelView: View {
   @State private var resultHeightAnimated = false
   @State private var copiedFeedbackTask: Task<Void, Never>?
   @State private var showsCopiedFeedback = false
-  @FocusState private var isInputFocused: Bool
 
   init(
     model: AppModel,
@@ -32,7 +31,6 @@ struct PanelView: View {
       SourcePane(
         model: model,
         metrics: $composerMetrics,
-        isFocused: $isInputFocused,
         editorHeight: sourceEditorHeight
       )
       ControlBar(
@@ -147,7 +145,6 @@ struct PanelView: View {
 private struct SourcePane: View {
   @Bindable var model: AppModel
   @Binding var metrics: ComposerTextMetrics
-  let isFocused: FocusState<Bool>.Binding
   let editorHeight: CGFloat
 
   var body: some View {
@@ -164,9 +161,9 @@ private struct SourcePane: View {
       ComposerTextEditor(
         text: $model.inputText,
         metrics: $metrics,
-        isFocused: isFocused,
         horizontalInset: CidaDesign.Spacing.windowHorizontal,
         selectAllRevision: model.inputSelectAllRequestID,
+        focusRevision: model.inputFocusRequestID,
         onSubmit: { model.submit() },
         onVirtualDocumentChange: { document, utf16Count, hasNonWhitespace in
           model.stageInputDocument(
@@ -187,9 +184,6 @@ private struct SourcePane: View {
     .background(CidaDesign.surface)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("source-pane")
-    .onChange(of: model.inputFocusRequestID) {
-      isFocused.wrappedValue = true
-    }
   }
 }
 
