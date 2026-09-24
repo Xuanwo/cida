@@ -332,6 +332,45 @@ extension InteractionReproductionTests {
     assertTestProcessIsNotFrontmost()
   }
 
+  func testImportedSelectionReplacesTheWholeDocumentEvenAVirtualOne() async throws {
+    let model = AppModel(inputText: "", service: ImmediateStreamingService())
+    let controller = makeHiddenPanel(model: model)
+    let hostingView = try XCTUnwrap(controller.contentView)
+    let input = try XCTUnwrap(
+      firstTextView(in: hostingView, identifier: "composer-input") as? ComposerNativeTextView
+    )
+    let pastedDocument = String(repeating: "Pasted page.\n", count: 9_000)
+    XCTAssertTrue(input.performPaste(pastedDocument))
+    try await waitUntil(timeout: .seconds(1)) {
+      input.isVirtualizingLargeDocument
+        && model.inputDocumentUTF16Count == pastedDocument.utf16.count
+    }
+
+    XCTAssertTrue(model.importSelection("A short selection."))
+    try await waitUntil(timeout: .seconds(1)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return input.string == "A short selection."
+    }
+    XCTAssertFalse(input.isVirtualizingLargeDocument)
+    XCTAssertEqual(model.currentInputDocument, "A short selection.")
+    XCTAssertEqual(model.result?.source, "A short selection.")
+
+    let largeSelection = String(repeating: "Selected paragraph.\n", count: 6_000)
+    XCTAssertTrue(model.importSelection(largeSelection))
+    try await waitUntil(timeout: .seconds(1)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return input.isVirtualizingLargeDocument
+    }
+    XCTAssertEqual(
+      input.documentStringForBinding(), largeSelection,
+      "The selection is the whole document, not spliced into the previous one")
+    XCTAssertEqual(model.inputDocumentUTF16Count, largeSelection.utf16.count)
+    try await waitUntil(timeout: .seconds(2)) { model.result?.phase == .completed }
+    XCTAssertEqual(model.result?.source, largeSelection)
+    XCTAssertFalse(model.isResultStale)
+    assertTestProcessIsNotFrontmost()
+  }
+
   func testCustomEndpointFieldIsEditableWhenCustomIsSelected() throws {
     var settings = CidaSettings.designPreview
     settings.provider = .custom

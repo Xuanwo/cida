@@ -134,6 +134,9 @@ struct ComposerTextEditor: NSViewRepresentable {
   /// Bumped when the editor should take keyboard focus, e.g. every time the
   /// panel is shown, so typing goes straight into the source.
   var focusRevision = 0
+  /// Bumped when the model replaced the whole source; the binding then wins
+  /// over a virtual document or a composition in progress.
+  var replacementRevision = 0
   let onSubmit: @MainActor () -> Bool
   let onVirtualDocumentChange: @MainActor (String?, Int?, Bool?) -> Void
 
@@ -200,7 +203,21 @@ struct ComposerTextEditor: NSViewRepresentable {
       textView.needsLayout = true
       textView.needsDisplay = true
     }
-    if textView.isPerformingLargeDocumentPaste {
+    if context.coordinator.consumeReplacementRevision(replacementRevision) {
+      context.coordinator.discardNativeBindingEcho()
+      context.coordinator.isApplyingBindingReplacement = true
+      if textView.hasMarkedText() {
+        textView.inputContext?.discardMarkedText()
+        textView.unmarkText()
+      }
+      textView.replaceDocumentFromBinding(text)
+      context.coordinator.isApplyingBindingReplacement = false
+      applyTypography(to: textView)
+      // A large document reports its own metrics when it is installed.
+      if !textView.isVirtualizingLargeDocument {
+        context.coordinator.publishMetrics(for: text, in: textView)
+      }
+    } else if textView.isPerformingLargeDocumentPaste {
       return
     } else if context.coordinator.consumeNativeBindingEcho() {
       // The native editor already contains this exact change.
@@ -209,7 +226,9 @@ struct ComposerTextEditor: NSViewRepresentable {
       // contains provisional marked text that the binding never sees, so
       // writing the binding back would cancel the composition.
     } else if !textView.isVirtualizingLargeDocument, textView.string != text {
+      context.coordinator.isApplyingBindingReplacement = true
       textView.replaceDocumentFromBinding(text)
+      context.coordinator.isApplyingBindingReplacement = false
       applyTypography(to: textView)
       context.coordinator.publishMetrics(for: text, in: textView)
     }
@@ -275,7 +294,13 @@ struct ComposerTextEditor: NSViewRepresentable {
       }
       textView.markedTextDidChange = { [weak self] isComposing in
         guard let self, self.metrics.wrappedValue.isComposing != isComposing else { return }
-        self.metrics.wrappedValue.isComposing = isComposing
+        guard self.isApplyingBindingReplacement else {
+          self.metrics.wrappedValue.isComposing = isComposing
+          return
+        }
+        Task { @MainActor [weak self] in
+          self?.metrics.wrappedValue.isComposing = isComposing
+        }
       }
       textView.virtualDocumentDidInstall = { [weak self] document, metrics in
         guard let self else { return }
@@ -316,6 +341,10 @@ struct ComposerTextEditor: NSViewRepresentable {
       return true
     }
 
+    func discardNativeBindingEcho() {
+      expectsNativeBindingEcho = false
+    }
+
     private var lastSelectAllRevision = 0
 
     func consumeSelectAllRevision(_ revision: Int) -> Bool {
@@ -329,6 +358,14 @@ struct ComposerTextEditor: NSViewRepresentable {
     func consumeFocusRevision(_ revision: Int) -> Bool {
       guard revision != lastFocusRevision else { return false }
       lastFocusRevision = revision
+      return true
+    }
+
+    private var lastReplacementRevision = 0
+
+    func consumeReplacementRevision(_ revision: Int) -> Bool {
+      guard revision != lastReplacementRevision else { return false }
+      lastReplacementRevision = revision
       return true
     }
 
@@ -388,8 +425,19 @@ struct ComposerTextEditor: NSViewRepresentable {
       }
     }
 
+    /// True while `updateNSView` installs the binding's document; SwiftUI
+    /// state written then must wait for the update to finish.
+    var isApplyingBindingReplacement = false
+
     private func publishLargeDocumentMetrics(_ completedMetrics: ComposerTextMetrics) {
-      metrics.wrappedValue = completedMetrics.presented(as: .document)
+      let presentedMetrics = completedMetrics.presented(as: .document)
+      guard isApplyingBindingReplacement else {
+        metrics.wrappedValue = presentedMetrics
+        return
+      }
+      Task { @MainActor [weak self] in
+        self?.metrics.wrappedValue = presentedMetrics
+      }
     }
   }
 }

@@ -40,6 +40,68 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.showPanel()
   }
 
+  /// Pencil `Spec — 面板模型` §一 带入选区. The VM cannot grant the
+  /// Accessibility permission, so the selection comes from the scenario
+  /// server through the same shortcut path.
+  func testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone() throws {
+    driver.launch(additionalArguments: [
+      "--automation-selection-endpoint", e2eEnvironment.selectionEndpoint,
+    ])
+    driver.hidePanel()
+
+    try scenarioServer.setSelection("  CIDA_E2E_SELECTION_A\n")
+    driver.showPanel()
+    XCTAssertTrue(
+      driver.waitForTextValue("CIDA_E2E_SELECTION_A", in: driver.composer, timeout: 3),
+      "A new selection replaces the source, trimmed")
+    XCTAssertTrue(driver.translateAction.isSelected)
+    XCTAssertTrue(
+      driver.result(containing: "CIDA_E2E_SELECTION_A_COMPLETE").waitForExistence(timeout: 8),
+      "and is translated without ⏎")
+    driver.waitForCompletion()
+
+    driver.composer.typeText("CIDA_E2E_EDITED")
+    driver.hidePanel()
+    driver.showPanel()
+    XCTAssertEqual(
+      driver.textValue(in: driver.composer), "CIDA_E2E_EDITED",
+      "The selection brought in last time keeps the edited source")
+    XCTAssertTrue(driver.result(containing: "CIDA_E2E_SELECTION_A_COMPLETE").exists)
+    XCTAssertEqual(
+      try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_SELECTION_A" }.count, 1,
+      "The same selection is not requested again")
+
+    try scenarioServer.setSelection(nil)
+    driver.hidePanel()
+    driver.showPanel()
+    XCTAssertEqual(driver.textValue(in: driver.composer), "CIDA_E2E_EDITED", "No selection")
+
+    try scenarioServer.setSelection("CIDA_E2E_SELECTION_GATED")
+    driver.hidePanel()
+    driver.showPanel()
+    XCTAssertTrue(
+      driver.waitForTextValue("CIDA_E2E_SELECTION_GATED", in: driver.composer, timeout: 3))
+    XCTAssertNotNil(
+      try scenarioServer.wait(for: "CIDA_E2E_SELECTION_GATED", status: "headers-sent", timeout: 5))
+    XCTAssertTrue(driver.stopButton.waitForExistence(timeout: 3))
+
+    try scenarioServer.setSelection("CIDA_E2E_SELECTION_B")
+    driver.hidePanel()
+    driver.showPanel()
+    XCTAssertTrue(
+      driver.waitForTextValue("CIDA_E2E_SELECTION_B", in: driver.composer, timeout: 3),
+      "A new selection replaces a running request")
+    let completed = driver.result(containing: "CIDA_E2E_SELECTION_B_COMPLETE")
+    XCTAssertTrue(completed.waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+    try scenarioServer.releaseFirstByte(for: "CIDA_E2E_SELECTION_GATED")
+    XCTAssertNotNil(
+      try scenarioServer.wait(
+        for: "CIDA_E2E_SELECTION_GATED", status: "client-disconnected", timeout: 5),
+      "The superseded request was cancelled")
+    XCTAssertFalse((completed.value as? String)?.contains("SELECTION_GATED") ?? true)
+  }
+
   func testProviderEndpointAndPromptEditingFollowTheSettingsStateMachine() {
     driver.launch(endpointOverride: false)
     driver.openSettings()
@@ -118,6 +180,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(chip.label, "全局快捷键 ⌥ Space")
     XCTAssertFalse(
       driver.app.buttons["settings-shortcut-reset"].exists, "The default has nothing to restore")
+    XCTAssertTrue(
+      driver.app.buttons["settings-selection-access-request"].exists,
+      "Without the Accessibility permission the selection row asks for it")
 
     chip.click()
     XCTAssertTrue(driver.waitForLabel("按下新的全局快捷键", in: chip, timeout: 3), "A click starts recording")

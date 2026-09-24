@@ -34,7 +34,7 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     driver.showPanel()
     driver.openSettings()
     XCTAssertEqual(settingsWindow.frame.width, 560, accuracy: 1)
-    XCTAssertEqual(settingsWindow.frame.height, 616, accuracy: 1, "Pencil 默认 · DeepSeek")
+    XCTAssertEqual(settingsWindow.frame.height, 671, accuracy: 1, "Pencil 默认 · DeepSeek")
 
     let manifest = try VisualBaselineManifest.load(from: e2eEnvironment.sourceRoot)
     let baseline = try manifest.baseline(named: "settings")

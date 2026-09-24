@@ -219,7 +219,7 @@
       "name": "Guide — 画布导读",
       "width": 860,
       "height": 0,
-      "content": "画布结构(自上而下)\n· Spec 行:Guide(本 note)、Spec — 面板模型(面板形态、结构、动作、状态、键位)、Spec — 流式输出动效(缓冲速率、阶段动效、约束)、Spec — 设置(窗口、服务商预设、就绪行、提示词、唤起)。\n· Components 行:Titlebar(仅 Settings 使用)/ Mode Seg / Send Button / Copy Button / Control Bar / Result Note / Motion Label。面板的控制条是 Control Bar 的实例,状态差异只通过实例覆盖(descendants overrides)表达。\n· Screens 行:States — 面板交互(空态 / 输入中 / 生成中 / 完成 / 已复制 / 已修改 / 已停止 / 出错 / 改进 / 再次唤起 / 最大高度,即全部主界面状态)、Motion — 流式输出(T0–T4 过渡关键帧)、States — 设置(默认 / 服务商菜单 / 还差 API Key / 自定义端点 + 编辑提示词)。主界面没有独立的「屏幕」,每个面板状态本身就是一屏。\n\n信源约定\n· 本文件是实现的第一信源:每个主题只有一张 Spec note,规则变更直接改这张 note 与对应 States / Motion 板,不另开版本副本;已废弃的方案直接删除。\n· 所有动效量值(时长 / 曲线 / 速率 / 呼吸参数)是变量面板的 motion-* token,与颜色字号同级;spec note 与 Motion 板中的数值后均标注 token 名,数值冲突时以变量面板为准。\n· Motion 板每帧 = 一个稳定状态;帧间标注 = 过渡的触发条件、变化属性与 token。行为逻辑(速率平滑、滚动锚定、字素簇粒度)见 Spec — 流式输出动效。\n· 实现侧将 motion-* token 一比一映射为常量(CidaMotion),reduced-motion 降级行为见流式板 T4。\n\n开发对接\n· 变量面板即 design token,与实现一一映射:颜色 13 个(无 Dark,含 surface-paper / text-ink / text-control);字体 font-ui / font-body Inter、font-result Source Serif 4、font-result-cjk Noto Serif SC、font-brand Noto Serif SC;字号 caption 11 / label 11.5 / secondary 13 / body 16 / result 17.5 / result-cjk 17;行高 body 1.6 / source 1.55 / result 1.65 / result-cjk 1.85;圆角 window 14(Settings)/ panel 14 / card 8 / seg 7 / chip 6 / seg-item 5;间距 window-x 28 / entry-y 16/ pane-y 18 / result-y 22;面板 panel-width 800 / panel-top-ratio 0.2 / source-max-ratio 0.3 / panel-max-ratio 0.7;动效 motion-* 18 个。设置页少量专用字号(10.5/12/12.5/13.5)保持字面值。\n· QA 截图对比与几何断言所用的节点 id 见 design-qa.md 的清单。"
+      "content": "画布结构(自上而下)\n· Spec 行:Guide(本 note)、Spec — 面板模型(面板形态、结构、动作、状态、键位)、Spec — 流式输出动效(缓冲速率、阶段动效、约束)、Spec — 设置(窗口、服务商预设、就绪行、提示词、唤起与选中文字授权)。\n· Components 行:Titlebar(仅 Settings 使用)/ Mode Seg / Send Button / Copy Button / Control Bar / Result Note / Motion Label。面板的控制条是 Control Bar 的实例,状态差异只通过实例覆盖(descendants overrides)表达。\n· Screens 行:States — 面板交互(空态 / 输入中 / 生成中 / 完成 / 已复制 / 已修改 / 已停止 / 出错 / 改进 / 再次唤起 / 带入选区 / 最大高度,即全部主界面状态)、Motion — 流式输出(T0–T4 过渡关键帧)、States — 设置(默认 / 服务商菜单 / 还差 API Key / 自定义端点 + 编辑提示词 + 选中文字已开启 / 录制快捷键)。主界面没有独立的「屏幕」,每个面板状态本身就是一屏。\n\n信源约定\n· 本文件是实现的第一信源:每个主题只有一张 Spec note,规则变更直接改这张 note 与对应 States / Motion 板,不另开版本副本;已废弃的方案直接删除。\n· 所有动效量值(时长 / 曲线 / 速率 / 呼吸参数)是变量面板的 motion-* token,与颜色字号同级;spec note 与 Motion 板中的数值后均标注 token 名,数值冲突时以变量面板为准。\n· Motion 板每帧 = 一个稳定状态;帧间标注 = 过渡的触发条件、变化属性与 token。行为逻辑(速率平滑、滚动锚定、字素簇粒度)见 Spec — 流式输出动效。\n· 实现侧将 motion-* token 一比一映射为常量(CidaMotion),reduced-motion 降级行为见流式板 T4。\n\n开发对接\n· 变量面板即 design token,与实现一一映射:颜色 13 个(无 Dark,含 surface-paper / text-ink / text-control);字体 font-ui / font-body Inter、font-result Source Serif 4、font-result-cjk Noto Serif SC、font-brand Noto Serif SC;字号 caption 11 / label 11.5 / secondary 13 / body 16 / result 17.5 / result-cjk 17;行高 body 1.6 / source 1.55 / result 1.65 / result-cjk 1.85;圆角 window 14(Settings)/ panel 14 / card 8 / seg 7 / chip 6 / seg-item 5;间距 window-x 28 / entry-y 16/ pane-y 18 / result-y 22;面板 panel-width 800 / panel-top-ratio 0.2 / source-max-ratio 0.3 / panel-max-ratio 0.7;动效 motion-* 18 个。设置页少量专用字号(10.5/12/12.5/13.5)保持字面值。\n· QA 截图对比与几何断言所用的节点 id 见 design-qa.md 的清单。"
     },
     {
       "type": "frame",
@@ -277,7 +277,7 @@
       "name": "Spec — 面板模型",
       "width": 860,
       "height": 0,
-      "content": "面板模型(2026-09-22 在 Proposal C 上确认方向;取代历史时间线与固定窗口)\n\n一、面板\n· Cida 是菜单栏常驻应用,没有 Dock 图标;主界面是无标题栏的浮动面板(nonactivating panel),不激活应用,原应用保持前台。Settings 仍是标准窗口(⌘,),也可从菜单栏图标进入;当前模型显示在菜单栏菜单里,不占面板。\n· 唤起:Option-Space;出现在活动屏幕(前台应用 key window 所在屏幕,否则鼠标所在屏幕)水平居中、顶边在可见高度 20% 处;120ms(motion-icon-in-ms)淡入。\n· 隐藏:Escape、再按 Option-Space、点击面板外、切换应用;立即隐藏,不做动画。隐藏不丢任何状态:原文、结果、主动词下次原样出现。\n· 宽度固定 800,内容左右内缩 28(space-window-x);高度由内容决定,顶边固定只向下生长,上限为屏幕可见高度 70%。\n\n二、结构(自上而下)\n· 原文栏:可编辑,surface 底色,padding 18/28;高度随行数变化,上限为屏幕可见高度 30%,超出后内部滚动、保持光标可见;不显示字数(2026-09-23 删除,对输入没有帮助)。\n· 滚动条:两栏都用系统 overlay scroller(2026-09-23 决定,取代 4pt 自绘指示条):滚动时出现、静止后淡出、悬停变宽;固定 overlay 样式,不随系统「显示滚动条」偏好或外接鼠标切成带轨道的 legacy 滚动条(那会常驻显示并把文字列压窄 16pt);静态设计稿里不画滚动条。结果栏的滚动视图与原文栏一样贯通 800 宽,文字在内部缩进 28,所以两条滚动条贴着同一条面板右缘。\n· 控制条:surface 底色,上下 1px border,padding 10/28。左侧动作选择(翻译 / 改进)与 Tab 提示;右侧一个槽位、一个按钮、三个阶段:空态与输入中为空,生成中「停止 ⌘.」,完成或已停止后「复制结果 ⌘C」。没有发送按钮、语言对、模型芯片和状态文本。\n· 结果栏:bg 底色,padding 18/28,只有结果正文和一行可选的说明(已修改 / 已停止 / 出错);生成期间跟随尾部,用户上滚即解除,滚回底部恢复。\n· 高度变化:所有栏高与面板高度变化用 150ms(motion-height-ms)ease-out 过渡;流式中每换一行面板 +26pt;reduced motion 时不做过渡。两栏都到上限时原文栏取 30%,结果栏取剩余。\n\n三、动作\n· 控制条左侧是动作选择(分段控件):「翻译」「改进」二选一,Tab 切换,⏎ 执行当前动作;没有鼠标用的发送按钮,执行只靠 ⏎。每次唤起面板时动作回到默认「翻译」。\n· 分段控件固定显示「翻译」「改进」,不显示语言方向:源语言在后台自动检测,目标语言取 Settings 语言对里的另一种;改进的输出语言跟随原文。\n· 原文为空时 ⏎ 无效,动作仍可切换。\n· 执行中:右侧槽位 150ms(motion-icon-swap-ms)淡入「停止 ⌘.」,动作选择降为 45% 不可切换。完成后停止交叉淡化为「复制结果」,动作选择复原;再按 ⏎ 重新生成,Tab 换动作后 ⏎ 用另一动作处理同一段原文。\n\n四、状态(见 States — 面板交互)\n· 空态 → 输入中 → 生成中 → 完成 → 已复制;分支:已修改、已停止、出错;再次唤起原文全选。\n· 「复制结果」只在存在可复制结果(完成或已停止)时出现;点击或 ⌘C(原文与结果都无选区时;有选区则复制选区,复制原文即在原文栏选中后 ⌘C)→「✓ 已复制」accent-soft 底,800ms(motion-copied-hold-ms)后复原。⌘C 在有原生选区时保持系统语义。\n· 已修改:原文或动作与生成时不同 → 结果降为 text-secondary,结果栏末尾说明「原文已修改 · ⏎ 重新生成」;不自动重新请求。\n· 已停止 / 出错:已输出文字保留;结果栏末尾说明「已停止 · ⏎ 重新生成」或「请求失败:… ⏎ 重试」(出错说明附带模型名);不弹 alert。\n· 再次唤起:原文全选,直接输入或 ⌘V 即替换,方向键取消选择;结果保留直到下一次提交。\n\n五、键位\nOption-Space 显示 / 隐藏 · Escape 隐藏 · ⏎ 执行当前动作 · Tab 切换动作 · Shift-⏎ 换行 · ⌘C 复制结果 · ⌘. 停止 · ⌘, 设置。\n\n六、不做的事\n· 不持久化记录,应用重启后为空态。\n· 不提供钉住、不允许拖动改变大小或位置。\n· 面板上不切换目标语言和模型,这两项属于 Settings。\n\n七、视觉\n· 面板:surface 白底、radius-panel 14、1px #00000012 描边、双层阴影(0/2/6 8% + 0/28/72 19%)。原文栏与控制条同为 surface,结果栏为 surface-paper 暖纸底,用材质而不是线条区分「输入」与「输出」。\n· 字体分工是这套视觉的核心:原文是 Inter 16 / 1.6 的输入感;结果是排好的正文 — 拉丁文 Source Serif 4 17.5 / 1.65,中文 Noto Serif SC 17 / 1.85,墨色 text-ink;实现侧用 Source Serif 4 + Noto Serif SC 的字体级联处理混排。\n· accent 只出现在三处:分段控件的选中项文字、流式光标、已复制反馈。控制条没有填充色的按钮;「复制结果 / 停止」是白底描边的 pill,文字 text-control。\n\n量值以变量面板 token 为准;reading-width 与 hover 相关 token 随固定窗口一并废弃。"
+      "content": "面板模型(2026-09-22 在 Proposal C 上确认方向;取代历史时间线与固定窗口)\n\n一、面板\n· Cida 是菜单栏常驻应用,没有 Dock 图标;主界面是无标题栏的浮动面板(nonactivating panel),不激活应用,原应用保持前台。Settings 仍是标准窗口(⌘,),也可从菜单栏图标进入;当前模型显示在菜单栏菜单里,不占面板。\n· 唤起:Option-Space;出现在活动屏幕(前台应用 key window 所在屏幕,否则鼠标所在屏幕)水平居中、顶边在可见高度 20% 处;120ms(motion-icon-in-ms)淡入。\n· 带入选区(2026-09-24 决定):Option-Space 唤起前读取前台应用焦点控件的选中文字(辅助功能 API,kAXSelectedText)。读到的文字(去掉首尾空白)与上次带入的不同,就替换原文(全选)、动作回到「翻译」并立即生成,正在进行的请求被取代;与上次带入的相同则按「再次唤起」原样出现,不重复请求也不覆盖在面板里改过的原文。没有选区、焦点是密码框、前台是辞达自己、读取超过 150ms、或未授权辅助功能时,都按没有选区处理,且清空「上次带入」,之后重新选中同一段仍会带入。不模拟 ⌘C、不读剪贴板:读不到选区的应用(部分 Electron / Chrome 页面)照旧手动 ⌘C ⌘V。只有全局快捷键带入;菜单栏「显示辞达」不读选区。授权入口在 Settings「唤起」组。\n· 隐藏:Escape、再按 Option-Space、点击面板外、切换应用;立即隐藏,不做动画。隐藏不丢任何状态:原文、结果、主动词下次原样出现。\n· 宽度固定 800,内容左右内缩 28(space-window-x);高度由内容决定,顶边固定只向下生长,上限为屏幕可见高度 70%。\n\n二、结构(自上而下)\n· 原文栏:可编辑,surface 底色,padding 18/28;高度随行数变化,上限为屏幕可见高度 30%,超出后内部滚动、保持光标可见;不显示字数(2026-09-23 删除,对输入没有帮助)。\n· 滚动条:两栏都用系统 overlay scroller(2026-09-23 决定,取代 4pt 自绘指示条):滚动时出现、静止后淡出、悬停变宽;固定 overlay 样式,不随系统「显示滚动条」偏好或外接鼠标切成带轨道的 legacy 滚动条(那会常驻显示并把文字列压窄 16pt);静态设计稿里不画滚动条。结果栏的滚动视图与原文栏一样贯通 800 宽,文字在内部缩进 28,所以两条滚动条贴着同一条面板右缘。\n· 控制条:surface 底色,上下 1px border,padding 10/28。左侧动作选择(翻译 / 改进)与 Tab 提示;右侧一个槽位、一个按钮、三个阶段:空态与输入中为空,生成中「停止 ⌘.」,完成或已停止后「复制结果 ⌘C」。没有发送按钮、语言对、模型芯片和状态文本。\n· 结果栏:bg 底色,padding 18/28,只有结果正文和一行可选的说明(已修改 / 已停止 / 出错);生成期间跟随尾部,用户上滚即解除,滚回底部恢复。\n· 高度变化:所有栏高与面板高度变化用 150ms(motion-height-ms)ease-out 过渡;流式中每换一行面板 +26pt;reduced motion 时不做过渡。两栏都到上限时原文栏取 30%,结果栏取剩余。\n\n三、动作\n· 控制条左侧是动作选择(分段控件):「翻译」「改进」二选一,Tab 切换,⏎ 执行当前动作;没有鼠标用的发送按钮,执行只靠 ⏎。每次唤起面板时动作回到默认「翻译」。\n· 分段控件固定显示「翻译」「改进」,不显示语言方向:源语言在后台自动检测,目标语言取 Settings 语言对里的另一种;改进的输出语言跟随原文。\n· 原文为空时 ⏎ 无效,动作仍可切换。\n· 执行中:右侧槽位 150ms(motion-icon-swap-ms)淡入「停止 ⌘.」,动作选择降为 45% 不可切换。完成后停止交叉淡化为「复制结果」,动作选择复原;再按 ⏎ 重新生成,Tab 换动作后 ⏎ 用另一动作处理同一段原文。\n\n四、状态(见 States — 面板交互)\n· 空态 → 输入中 → 生成中 → 完成 → 已复制;分支:已修改、已停止、出错;再次唤起原文全选;带入选区直接进入生成中。\n· 「复制结果」只在存在可复制结果(完成或已停止)时出现;点击或 ⌘C(原文与结果都无选区时;有选区则复制选区,复制原文即在原文栏选中后 ⌘C)→「✓ 已复制」accent-soft 底,800ms(motion-copied-hold-ms)后复原。⌘C 在有原生选区时保持系统语义。\n· 已修改:原文或动作与生成时不同 → 结果降为 text-secondary,结果栏末尾说明「原文已修改 · ⏎ 重新生成」;不自动重新请求。\n· 已停止 / 出错:已输出文字保留;结果栏末尾说明「已停止 · ⏎ 重新生成」或「请求失败:… ⏎ 重试」(出错说明附带模型名);不弹 alert。\n· 再次唤起:原文全选,直接输入或 ⌘V 即替换,方向键取消选择;结果保留直到下一次提交。\n\n五、键位\nOption-Space 显示 / 隐藏(有新选区时带入并翻译)· Escape 隐藏 · ⏎ 执行当前动作 · Tab 切换动作 · Shift-⏎ 换行 · ⌘C 复制结果 · ⌘. 停止 · ⌘, 设置。\n\n六、不做的事\n· 不持久化记录,应用重启后为空态。\n· 不提供钉住、不允许拖动改变大小或位置。\n· 面板上不切换目标语言和模型,这两项属于 Settings。\n\n七、视觉\n· 面板:surface 白底、radius-panel 14、1px #00000012 描边、双层阴影(0/2/6 8% + 0/28/72 19%)。原文栏与控制条同为 surface,结果栏为 surface-paper 暖纸底,用材质而不是线条区分「输入」与「输出」。\n· 字体分工是这套视觉的核心:原文是 Inter 16 / 1.6 的输入感;结果是排好的正文 — 拉丁文 Source Serif 4 17.5 / 1.65,中文 Noto Serif SC 17 / 1.85,墨色 text-ink;实现侧用 Source Serif 4 + Noto Serif SC 的字体级联处理混排。\n· accent 只出现在三处:分段控件的选中项文字、流式光标、已复制反馈。控制条没有填充色的按钮;「复制结果 / 停止」是白底描边的 pill,文字 text-control。\n\n量值以变量面板 token 为准;reading-width 与 hover 相关 token 随固定窗口一并废弃。"
     },
     {
       "type": "frame",
@@ -1859,6 +1859,199 @@
         },
         {
           "type": "rectangle",
+          "id": "QzeGh",
+          "name": "Divider",
+          "fill": "$border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "text",
+          "id": "Xlqxu",
+          "name": "Caption",
+          "fill": "$text-secondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "⑩ 带入选区 — 前台应用有新的选中文字时，Option-Space 用它替换原文（全选），动作回到「翻译」并立即生成；选区与上次带入的相同、没有选区、读不到或未授权辅助功能时，按 ⑨ 原样出现",
+          "lineHeight": 1.5,
+          "fontFamily": "$font-ui",
+          "fontSize": "$font-size-label",
+          "fontWeight": "500"
+        },
+        {
+          "type": "frame",
+          "id": "Hftz0",
+          "name": "唤起 · 带入选区",
+          "clip": true,
+          "width": 800,
+          "fill": "$surface",
+          "cornerRadius": "$radius-panel",
+          "stroke": "#00000012",
+          "strokeWidth": 1,
+          "effect": [
+            {
+              "type": "shadow",
+              "shadowType": "outer",
+              "color": "#00000014",
+              "offset": {
+                "x": 0,
+                "y": 2
+              },
+              "blur": 6
+            },
+            {
+              "type": "shadow",
+              "shadowType": "outer",
+              "color": "#1A1A1830",
+              "offset": {
+                "x": 0,
+                "y": 28
+              },
+              "blur": 72
+            }
+          ],
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "XwFSb",
+              "name": "Source Pane",
+              "width": "fill_container",
+              "fill": "$surface",
+              "layout": "vertical",
+              "padding": [
+                "$space-pane-y",
+                "$space-window-x"
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "x6s8CL",
+                  "name": "Selection",
+                  "width": "fill_container",
+                  "fill": "$accent-soft",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dqqvB",
+                      "name": "Source Text",
+                      "fill": "$text-primary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。",
+                      "lineHeight": "$line-height-body",
+                      "fontFamily": "$font-body",
+                      "fontSize": "$font-size-body",
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "bMCf3",
+              "type": "ref",
+              "ref": "mXBP1",
+              "name": "Control Bar",
+              "width": "fill_container",
+              "descendants": {
+                "UHWWl": {
+                  "opacity": 0.45
+                },
+                "B051zi": {
+                  "opacity": 0.45
+                },
+                "FaAaj": {
+                  "enabled": true
+                },
+                "FaAaj/ZYjHT": {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "NLS84",
+                  "name": "Stop Icon",
+                  "fill": "$text-secondary",
+                  "width": 10,
+                  "height": 10
+                },
+                "FaAaj/dblOX": {
+                  "content": "停止"
+                },
+                "FaAaj/TgRYD": {
+                  "content": "⌘."
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "AxAe6",
+              "name": "Result Pane",
+              "width": "fill_container",
+              "fill": "$surface-paper",
+              "layout": "vertical",
+              "gap": 10,
+              "padding": [
+                "$space-result-y",
+                "$space-window-x"
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "w0PQR",
+                  "name": "Streaming Result",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "jhsV1",
+                      "name": "Result Text",
+                      "fill": "$text-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Our system adopts a brand-new storage engine that significantly improves read and write",
+                      "lineHeight": "$line-height-result",
+                      "fontFamily": "$font-result",
+                      "fontSize": "$font-size-result",
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Mv8Gq",
+                      "name": "Tail",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "zYpMo",
+                          "name": "Fading",
+                          "fill": "$text-tertiary",
+                          "content": "performance whi",
+                          "lineHeight": "$line-height-result",
+                          "fontFamily": "$font-result",
+                          "fontSize": "$font-size-result",
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "rectangle",
+                          "id": "F0KxH",
+                          "name": "Cursor",
+                          "fill": "$accent",
+                          "width": 0,
+                          "height": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
           "id": "fDTzk",
           "name": "Divider",
           "fill": "$border",
@@ -1872,7 +2065,7 @@
           "fill": "$text-secondary",
           "textGrowth": "fixed-width",
           "width": "fill_container",
-          "content": "⑩ 最大高度 — 面板上限 = 屏幕可见高度 70%(panel-max-ratio);原文栏上限 30%(source-max-ratio),超出后内部滚动;结果栏拿剩余,生成期间跟随尾部,用户上滚即解除",
+          "content": "⑪ 最大高度 — 面板上限 = 屏幕可见高度 70%(panel-max-ratio);原文栏上限 30%(source-max-ratio),超出后内部滚动;结果栏拿剩余,生成期间跟随尾部,用户上滚即解除",
           "lineHeight": 1.5,
           "fontFamily": "$font-ui",
           "fontSize": "$font-size-label",
@@ -2771,7 +2964,7 @@
       "name": "Spec — 设置",
       "width": 860,
       "height": 0,
-      "content": "设置(2026-09-23 在 Proposal 上确认;取代 Settings 单板与 Settings Row 组件)\n\n一、窗口\n· 标准标题栏窗口(⌘, 或菜单栏「设置…」),宽 560 固定;高度随内容,不滚动;bg 底色,内容左右内缩 28(space-window-x)。\n· 三组,按用户的问题分组:模型(用什么模型)→ 提示词(怎么翻 / 怎么改)→ 唤起(怎么唤起)。组标题 12 semibold text-control;组间 1px border 分隔;行 = 标签列 120 + 24 间距 + 控件列铺满;标签 13.5 text-primary,说明 11.5 text-tertiary;行上下 padding 9。\n· 全部自动保存(250ms 合并),没有保存 / 取消按钮。\n\n二、模型\n· 服务商是菜单,每一项是预设:预设 = 端点 + 建议模型 + 是否需要 Key;列表末尾固定「自定义(OpenAI 兼容)」。当前预设:DeepSeek、OpenAI、Moonshot、智谱 GLM。加服务商只加一行预设,界面不变。\n· 选预设时菜单下方一行说明写实际请求的域名(如 api.deepseek.com · Chat Completions),不显示端点输入;选自定义时出现「端点」行(font-mono,铺满,聚焦 1.5px accent 描边)。\n· 模型:预设 → 建议模型菜单,最后一项「其他…」把这一行换成输入框;自定义 → 输入框。切换服务商时模型回到该预设第一项。\n· API Key:遮罩输入框铺满(font-mono),说明「只存本机钥匙串」;自定义且端点为 localhost / 127.0.0.1 / ::1 时占位「本地端点可留空」。\n· 就绪行(组末尾,6pt 圆点 + 12 text-secondary,本地推导不联网):已就绪(accent 点)/ 还差 API Key(text-tertiary 点)/ 本地端点 · 无需 API Key(accent 点)/ 端点无效(text-tertiary 点)。\n\n三、提示词\n· 折叠:标签 + 首句预览(11.5 text-tertiary,单行截断)+「编辑」边框按钮(surface,border,radius-card);展开:标签 +「恢复默认」文字按钮,编辑区为纸面(surface-paper,radius-card 8,padding 14,Inter 13 / 1.6 text-ink,聚焦 1.5px accent 描边),下方说明「自动保存 · 目标语言与任务由应用传入,不必写占位符」。同一时刻只展开一个;展开与收起随内容改变窗口高度。\n\n四、唤起\n· 全局快捷键:键帽芯片(surface-dim,radius-chip,12 medium text-secondary)是一个按钮,显示当前组合,默认「⌥ Space」;说明「在任何应用里显示辞达」。点击进入录制:芯片改为 surface 底、1.5px accent 描边、text-tertiary「按下新组合…」,说明变为「Esc 取消」;按下带 ⌘/⌥/⌃ 的组合立即保存并重新注册,Esc 或失焦取消;按下不带这些修饰键的按键不结束录制,说明改为「要带 ⌘、⌥ 或 ⌃」。注册失败(被系统或其他应用占用)保留原组合,说明变为「这个组合已被占用,换一个」。组合不是默认值时,芯片左侧出现「恢复默认」文字按钮(12 medium text-secondary)。菜单栏「显示辞达」的快捷键跟随该组合。\n· 开机启动:开关(accent 开 / #DBDBD5 关),失败时系统警告框说明。\n· 页脚居中:辞达(font-brand 12 semibold,字距 2,text-secondary)+「1.0 · 辞达而已矣」(caption,text-tertiary)。\n\n五、强调色只出现在:菜单当前项的 ✓、就绪点、聚焦描边、开关打开。状态见 States — 设置。"
+      "content": "设置(2026-09-23 在 Proposal 上确认;取代 Settings 单板与 Settings Row 组件)\n\n一、窗口\n· 标准标题栏窗口(⌘, 或菜单栏「设置…」),宽 560 固定;高度随内容,不滚动;bg 底色,内容左右内缩 28(space-window-x)。\n· 三组,按用户的问题分组:模型(用什么模型)→ 提示词(怎么翻 / 怎么改)→ 唤起(怎么唤起)。组标题 12 semibold text-control;组间 1px border 分隔;行 = 标签列 120 + 24 间距 + 控件列铺满;标签 13.5 text-primary,说明 11.5 text-tertiary;行上下 padding 9。\n· 全部自动保存(250ms 合并),没有保存 / 取消按钮。\n\n二、模型\n· 服务商是菜单,每一项是预设:预设 = 端点 + 建议模型 + 是否需要 Key;列表末尾固定「自定义(OpenAI 兼容)」。当前预设:DeepSeek、OpenAI、Moonshot、智谱 GLM。加服务商只加一行预设,界面不变。\n· 选预设时菜单下方一行说明写实际请求的域名(如 api.deepseek.com · Chat Completions),不显示端点输入;选自定义时出现「端点」行(font-mono,铺满,聚焦 1.5px accent 描边)。\n· 模型:预设 → 建议模型菜单,最后一项「其他…」把这一行换成输入框;自定义 → 输入框。切换服务商时模型回到该预设第一项。\n· API Key:遮罩输入框铺满(font-mono),说明「只存本机钥匙串」;自定义且端点为 localhost / 127.0.0.1 / ::1 时占位「本地端点可留空」。\n· 就绪行(组末尾,6pt 圆点 + 12 text-secondary,本地推导不联网):已就绪(accent 点)/ 还差 API Key(text-tertiary 点)/ 本地端点 · 无需 API Key(accent 点)/ 端点无效(text-tertiary 点)。\n\n三、提示词\n· 折叠:标签 + 首句预览(11.5 text-tertiary,单行截断)+「编辑」边框按钮(surface,border,radius-card);展开:标签 +「恢复默认」文字按钮,编辑区为纸面(surface-paper,radius-card 8,padding 14,Inter 13 / 1.6 text-ink,聚焦 1.5px accent 描边),下方说明「自动保存 · 目标语言与任务由应用传入,不必写占位符」。同一时刻只展开一个;展开与收起随内容改变窗口高度。\n\n四、唤起\n· 全局快捷键:键帽芯片(surface-dim,radius-chip,12 medium text-secondary)是一个按钮,显示当前组合,默认「⌥ Space」;说明「在任何应用里显示辞达」。点击进入录制:芯片改为 surface 底、1.5px accent 描边、text-tertiary「按下新组合…」,说明变为「Esc 取消」;按下带 ⌘/⌥/⌃ 的组合立即保存并重新注册,Esc 或失焦取消;按下不带这些修饰键的按键不结束录制,说明改为「要带 ⌘、⌥ 或 ⌃」。注册失败(被系统或其他应用占用)保留原组合,说明变为「这个组合已被占用,换一个」。组合不是默认值时,芯片左侧出现「恢复默认」文字按钮(12 medium text-secondary)。菜单栏「显示辞达」的快捷键跟随该组合。\n· 选中文字:Option-Space 带入选区需要辅助功能权限。未授权:说明「需要辅助功能权限」,右侧「去授权」边框按钮(同「编辑」),点击弹出系统授权提示;已授权:说明「唤起时带入并翻译」,右侧「已开启」(12 medium text-secondary)。状态在窗口成为 key 与系统辅助功能列表变化时重新读取,不需要重启;没有开关,取消授权即关闭。\n· 开机启动:开关(accent 开 / #DBDBD5 关),失败时系统警告框说明。\n· 页脚居中:辞达(font-brand 12 semibold,字距 2,text-secondary)+「1.0 · 辞达而已矣」(caption,text-tertiary)。\n\n五、强调色只出现在:菜单当前项的 ✓、就绪点、聚焦描边、开关打开。状态见 States — 设置。"
     },
     {
       "type": "frame",
@@ -2780,7 +2973,7 @@
       "y": 0,
       "name": "States — 设置",
       "width": 1216,
-      "height": 2277,
+      "height": 2393,
       "fill": "#F1F1ED",
       "cornerRadius": 16,
       "layout": "none",
@@ -2806,7 +2999,7 @@
           "fill": "$text-secondary",
           "textGrowth": "fixed-width",
           "width": 1160,
-          "content": "规则见 Spec — 设置。五个状态：默认（DeepSeek 已配置）、服务商菜单展开、还差 API Key、自定义端点 + 编辑改进提示词 + 自定义快捷键、录制快捷键。窗口 560 宽，高度随内容；实现侧 --design-state 对应：settings / settings-missing-key / settings-custom / settings-recording。",
+          "content": "规则见 Spec — 设置。五个状态：默认（DeepSeek 已配置）、服务商菜单展开、还差 API Key、自定义端点 + 编辑改进提示词 + 自定义快捷键 + 已开启选中文字、录制快捷键；除 settings-custom 外，「选中文字」都是未授权的「去授权」。窗口 560 宽，高度随内容；实现侧 --design-state 对应：settings / settings-missing-key / settings-custom / settings-recording。",
           "lineHeight": 1.5,
           "fontFamily": "$font-ui",
           "fontSize": 12.5,
@@ -3516,6 +3709,87 @@
                     },
                     {
                       "type": "frame",
+                      "id": "pnzQI",
+                      "name": "Row 选中文字",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "I1ToFG",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "zggds",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "选中文字",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "repBJ",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "content": "需要辅助功能权限",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "qFQgw",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "ytY1r",
+                              "name": "Button 去授权",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-card",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "padding": [
+                                6,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "luPjW",
+                                  "name": "Label",
+                                  "fill": "$text-control",
+                                  "content": "去授权",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
                       "id": "poX3R",
                       "name": "Row 开机启动",
                       "width": "fill_container",
@@ -3628,7 +3902,7 @@
           "type": "frame",
           "id": "VKwj7",
           "x": 628,
-          "y": 817,
+          "y": 875,
           "name": "自定义端点 · 编辑改进提示词",
           "clip": true,
           "width": 560,
@@ -4391,6 +4665,71 @@
                     },
                     {
                       "type": "frame",
+                      "id": "k5skW",
+                      "name": "Row 选中文字",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "HSI0t",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "k1PYVR",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "选中文字",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "smHWT",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "content": "唤起时带入并翻译",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "CDz4H",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "dtJbF",
+                              "name": "Status 已开启",
+                              "fill": "$text-secondary",
+                              "content": "已开启",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
                       "id": "DXFjG",
                       "name": "Row 开机启动",
                       "width": "fill_container",
@@ -4504,7 +4843,7 @@
           "type": "frame",
           "id": "PA25F",
           "x": 28,
-          "y": 817,
+          "y": 875,
           "name": "还差 API Key",
           "clip": true,
           "width": 560,
@@ -5182,6 +5521,87 @@
                                   "content": "⌥ Space",
                                   "fontFamily": "$font-ui",
                                   "fontSize": 12,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ghy2h",
+                      "name": "Row 选中文字",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "rqn0v",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "maM1o",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "选中文字",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "OpkzZ",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "content": "需要辅助功能权限",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "GeWtE",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "iRXYN",
+                              "name": "Button 去授权",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-card",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "padding": [
+                                6,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "GC7W5",
+                                  "name": "Label",
+                                  "fill": "$text-control",
+                                  "content": "去授权",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12.5,
                                   "fontWeight": "500"
                                 }
                               ]
@@ -5992,6 +6412,87 @@
                     },
                     {
                       "type": "frame",
+                      "id": "E1ugPM",
+                      "name": "Row 选中文字",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "q7NBv",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "iQq96",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "选中文字",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "kvJwH",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "content": "需要辅助功能权限",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "yGt7z",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "hWjKt",
+                              "name": "Button 去授权",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-card",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "padding": [
+                                6,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Kcutu",
+                                  "name": "Label",
+                                  "fill": "$text-control",
+                                  "content": "去授权",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
                       "id": "jftQD",
                       "name": "Row 开机启动",
                       "width": "fill_container",
@@ -6284,7 +6785,7 @@
           "type": "text",
           "id": "gJW5g",
           "x": 28,
-          "y": 791,
+          "y": 849,
           "name": "Caption C",
           "fill": "$text-control",
           "content": "还差 API Key（settings-missing-key）",
@@ -6296,10 +6797,10 @@
           "type": "text",
           "id": "idNOG",
           "x": 628,
-          "y": 791,
+          "y": 849,
           "name": "Caption D",
           "fill": "$text-control",
-          "content": "自定义（OpenAI 兼容）· 本地端点 · 编辑改进提示词 · 自定义快捷键（settings-custom）",
+          "content": "自定义（OpenAI 兼容）· 本地端点 · 编辑改进提示词 · 自定义快捷键 · 选中文字已开启（settings-custom）",
           "fontFamily": "$font-ui",
           "fontSize": 12,
           "fontWeight": "600"
@@ -6308,7 +6809,7 @@
           "type": "frame",
           "id": "QSfT1",
           "x": 28,
-          "y": 1632,
+          "y": 1690,
           "name": "录制快捷键",
           "clip": true,
           "width": 560,
@@ -6998,6 +7499,87 @@
                     },
                     {
                       "type": "frame",
+                      "id": "Hmpwk",
+                      "name": "Row 选中文字",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "cwvMh",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "JZfrA",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "选中文字",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "qKQG7",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "content": "需要辅助功能权限",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "j8CP7q",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "YzjTy",
+                              "name": "Button 去授权",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-card",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "padding": [
+                                6,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "gZONQ",
+                                  "name": "Label",
+                                  "fill": "$text-control",
+                                  "content": "去授权",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
                       "id": "P1iNC",
                       "name": "Row 开机启动",
                       "width": "fill_container",
@@ -7110,7 +7692,7 @@
           "type": "text",
           "id": "xDOGm",
           "x": 28,
-          "y": 1606,
+          "y": 1664,
           "name": "Caption E",
           "fill": "$text-control",
           "content": "录制快捷键（settings-recording）",

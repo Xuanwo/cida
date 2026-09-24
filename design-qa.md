@@ -30,6 +30,7 @@ The panel states inside `oeKVI`, and the `--design-state` that renders each one 
 | 出错 | `mZG8z` | `failed` |
 | 改进 · 完成 | `kYllY` | `improve` |
 | 再次唤起 · 全选 | `N6v3qq` | (selection, no fixture) |
+| 唤起 · 带入选区 | `Hftz0` | (global shortcut, no fixture; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
 | 最大高度 | `U2mUc` | `long` |
 
 The Settings states inside `E86Rv`, and the `--design-state` that renders each one natively:
@@ -39,7 +40,7 @@ The Settings states inside `E86Rv`, and the `--design-state` that renders each o
 | 默认 · DeepSeek 已配置 | `yhtH2` | `settings` |
 | 服务商菜单展开 | `p5EOr` | (open menu, no fixture) |
 | 还差 API Key | `PA25F` | `settings-missing-key` |
-| 自定义端点 · 编辑改进提示词 · 自定义快捷键 | `VKwj7` | `settings-custom` |
+| 自定义端点 · 编辑改进提示词 · 自定义快捷键 · 选中文字已开启 | `VKwj7` | `settings-custom` |
 | 录制快捷键 | `QSfT1` | `settings-recording` |
 
 The Pencil document is the first source: each topic has one Spec note, and a rule change edits that
@@ -59,7 +60,7 @@ image or design file cannot silently reuse an old approval.
 | Baseline | Logical size | Mask |
 | --- | ---: | --- |
 | Panel, empty | 800 × 113 | none |
-| Settings, default | 560 × 616 | native title bar, 46 pt |
+| Settings, default | 560 × 671 | native title bar, 46 pt |
 
 The remaining states are retained as reviewable reference/current comparisons and are protected by
 deterministic geometry and interaction assertions (panel height budget, source cap, result

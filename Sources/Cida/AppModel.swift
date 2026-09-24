@@ -283,6 +283,13 @@ final class AppModel {
   /// Bumped when the whole source should be selected, e.g. when the panel is
   /// shown again with the previous text still in it.
   var inputSelectAllRequestID = 0
+  /// Bumped when the model replaces the whole source (a selection brought in
+  /// by the global shortcut); the editor then drops whatever it holds,
+  /// including a large virtual document.
+  private(set) var inputReplacementRevision = 0
+  /// Whether the Accessibility permission lets the global shortcut read the
+  /// frontmost application's selection.
+  private(set) var isSelectionAccessGranted: Bool
   /// Bumped when the result pane should scroll to the tail of the result.
   private(set) var resultFollowRevision = 0
   private(set) var copyFeedbackRevision = 0
@@ -294,6 +301,10 @@ final class AppModel {
   /// The Settings chip is waiting for the next key press.
   var isRecordingShortcut = false
   private let clearPersistedAPIKey: @MainActor () -> Void
+  private let selectionAccess: SelectionAccess
+  /// The selection the global shortcut brought in last; the same selection
+  /// again leaves the panel as it is.
+  @ObservationIgnored private var lastImportedSelection: String?
   private var processingTask: Task<Void, Never>?
   private var settingsSaveTask: Task<Void, Never>?
   private var lastPersistedAPIKey: String
@@ -320,7 +331,8 @@ final class AppModel {
     clearPersistedAPIKey: @escaping @MainActor () -> Void = {
       SettingsStore.clearAPIKey()
     },
-    applyGlobalShortcut: @escaping @MainActor (GlobalShortcut) -> Bool = { _ in true }
+    applyGlobalShortcut: @escaping @MainActor (GlobalShortcut) -> Bool = { _ in true },
+    selectionAccess: SelectionAccess = .system
   ) {
     self.mode = mode
     self.inputText = inputText
@@ -331,6 +343,8 @@ final class AppModel {
     self.saveSettings = saveSettings
     self.clearPersistedAPIKey = clearPersistedAPIKey
     self.applyGlobalShortcut = applyGlobalShortcut
+    self.selectionAccess = selectionAccess
+    isSelectionAccessGranted = selectionAccess.isGranted()
     lastPersistedAPIKey = settings.apiKey
   }
 
@@ -437,9 +451,52 @@ final class AppModel {
   /// the editor; the previous result is replaced immediately.
   @discardableResult
   func submit() -> Bool {
+    guard hasSubmittableInput, !isProcessing else { return false }
+    startGeneration()
+    return true
+  }
+
+  /// The global shortcut's selection (Pencil `Spec — 面板模型` §一 带入选区).
+  /// A new selection replaces the source and is translated at once,
+  /// superseding a running request. The selection brought in last time
+  /// leaves everything as it is, so the source edited since survives
+  /// summoning the panel again. No selection forgets the last one, so
+  /// selecting the same text again later brings it in again.
+  /// Returns whether the selection was brought in.
+  @discardableResult
+  func importSelection(_ selection: String?) -> Bool {
+    guard let selection else {
+      lastImportedSelection = nil
+      return false
+    }
+    guard selection != lastImportedSelection else { return false }
+    lastImportedSelection = selection
+    inputText = selection
+    stageInputDocument(nil)
+    inputReplacementRevision &+= 1
+    setMode(.translate)
+    startGeneration()
+    return true
+  }
+
+  func refreshSelectionAccess() {
+    let isGranted = selectionAccess.isGranted()
+    if isSelectionAccessGranted != isGranted {
+      isSelectionAccessGranted = isGranted
+    }
+  }
+
+  func requestSelectionAccess() {
+    selectionAccess.request()
+    refreshSelectionAccess()
+  }
+
+  /// Runs the current action on the current source, cancelling any request
+  /// still running; its record is no longer the result, so it finishes
+  /// without touching the panel.
+  private func startGeneration() {
     let requestText = currentInputDocument
     let requestCharacterCount = inputDocumentUTF16Count
-    guard hasSubmittableInput, !isProcessing else { return false }
     processingTask?.cancel()
     let sourceLanguage = TextLanguageDetector.detect(in: requestText) ?? .chinese
     let request = ProcessingRequest(
@@ -455,7 +512,6 @@ final class AppModel {
     processingTask = Task { [weak self] in
       await self?.runGeneration(request: request, record: record)
     }
-    return true
   }
 
   func cancelProcessing() {
@@ -649,10 +705,12 @@ final class AppModel {
       finish(record, phase: .failed(message: error.localizedDescription))
     }
 
+    // A superseded request must not clear the state or the task of the one
+    // that replaced it.
     if generationState.entryID == record.id {
       generationState = .idle
+      processingTask = nil
     }
-    processingTask = nil
   }
 
   private func finish(_ record: ResultRecord, phase: ResultPhase) {

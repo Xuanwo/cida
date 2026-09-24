@@ -123,6 +123,12 @@ driver launches the app with `--automation-lifecycle-log`, so the log records th
 policy, app activation, and the panel's visibility, key status, alpha, and frame at launch, at every
 show, and at every key-window transition: XCUI cannot observe any of that for a non-activating
 panel, and the log is what separates "never shown" from "hid on resign key" or "shown transparent".
+The global shortcut adds `selection-imported` or `selection-kept` before each show it causes.
+
+The guest cannot grant the Accessibility permission, so selection journeys launch the app with
+`--automation-selection-endpoint`, and the global shortcut reads the selection a test set with
+`ScenarioServerClient.setSelection(_:)` (`POST /control/selection`) instead of the frontmost
+application's. The rest of the shortcut path is the production one.
 
 Regenerate the project after adding or removing UI source files:
 

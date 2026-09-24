@@ -47,9 +47,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       },
       applyGlobalShortcut: { [weak self] shortcut in
         self?.applyGlobalShortcut(shortcut) ?? true
-      }
+      },
+      selectionAccess: launchOptions.selectionAccess
     )
   }()
+  private lazy var selectedTextSource: any SelectedTextSource =
+    launchOptions.selectedTextSource
 
   private var panelController: PanelController?
   private var settingsWindowController: NSWindowController?
@@ -61,6 +64,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var inputInteractionProbe: InputInteractionProbe?
   private var lifecycleLog: AutomationLifecycleLog?
   private var didAttemptInteractiveAPIKeyRecovery = false
+  /// A shortcut press is reading the selection; further presses wait for it.
+  private var isReadingSelection = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     FontRegistrar.registerBundledFonts()
@@ -85,7 +90,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     if !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI {
       installStatusItem()
       globalHotKey = GlobalHotKey(shortcut: model.settings.shortcut) { [weak self] in
-        self?.togglePanel()
+        self?.handleGlobalShortcut()
       }
     }
 
@@ -151,12 +156,27 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     showPanelMenuItem?.keyEquivalentModifierMask = shortcut.menuModifierMask
   }
 
-  @objc
-  func togglePanel() {
+  /// The global shortcut hides a visible panel. Otherwise it first reads the
+  /// frontmost application's selection, so a new one appears in the panel
+  /// already being translated (Pencil `Spec — 面板模型` §一 带入选区). The
+  /// menu bar item shows the panel without reading anything.
+  private func handleGlobalShortcut() {
     guard let panelController else { return }
     if panelController.isVisible {
       panelController.hide()
-    } else {
+      return
+    }
+    guard !isReadingSelection else { return }
+    isReadingSelection = true
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      let selection = await SelectedText.read(from: selectedTextSource)
+      isReadingSelection = false
+      guard !panelController.isVisible else { return }
+      // The request may need the Keychain key, which the first show recovers.
+      recoverAPIKeyIfNeeded()
+      let imported = model.importSelection(selection)
+      lifecycleLog?.record(imported ? "selection-imported" : "selection-kept")
       showPanel()
     }
   }
@@ -383,6 +403,7 @@ private struct LaunchOptions {
   let automationOpenAIEndpoint: String?
   let automationSettingsNamespace: String?
   let lifecycleLogURL: URL?
+  let automationSelectionEndpoint: URL?
 
   var isAutomation: Bool {
     explicitlyIsolatedAutomation || snapshotOutputURL != nil
@@ -445,6 +466,17 @@ private struct LaunchOptions {
       }
     #endif
     return OpenAICompatibleTextProcessingService()
+  }
+
+  var selectedTextSource: any SelectedTextSource {
+    if let automationSelectionEndpoint {
+      return ScenarioSelectedTextSource(endpoint: automationSelectionEndpoint)
+    }
+    return AccessibilitySelectedTextSource()
+  }
+
+  var selectionAccess: SelectionAccess {
+    usesDesignFixtures ? .fixed(granted: designState == .settingsCustom) : .system
   }
 
   var initialMode: ProcessingMode {
@@ -523,6 +555,10 @@ private struct LaunchOptions {
     lifecycleLogURL =
       explicitlyIsolatedAutomation
       ? arguments.value(after: "--automation-lifecycle-log").map { URL(fileURLWithPath: $0) }
+      : nil
+    automationSelectionEndpoint =
+      explicitlyIsolatedAutomation
+      ? arguments.value(after: "--automation-selection-endpoint").flatMap(URL.init(string:))
       : nil
     if isE2ETesting {
       guard

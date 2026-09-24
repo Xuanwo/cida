@@ -198,6 +198,9 @@ final class ComposerNativeTextView: NSTextView {
       return
     }
 
+    // The binding is the whole document: start from an empty editor so the
+    // value is not spliced into what the editor held before.
+    clearVirtualDocument()
     installVirtualDocument(
       ComposerPreparedPaste(value),
       replacementRange: NSRange(location: 0, length: 0),

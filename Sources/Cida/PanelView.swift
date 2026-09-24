@@ -164,6 +164,7 @@ private struct SourcePane: View {
         horizontalInset: CidaDesign.Spacing.windowHorizontal,
         selectAllRevision: model.inputSelectAllRequestID,
         focusRevision: model.inputFocusRequestID,
+        replacementRevision: model.inputReplacementRevision,
         onSubmit: { model.submit() },
         onVirtualDocumentChange: { document, utf16Count, hasNonWhitespace in
           model.stageInputDocument(

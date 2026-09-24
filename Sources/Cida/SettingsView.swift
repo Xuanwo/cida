@@ -93,6 +93,7 @@ private struct SettingsBody: View {
       Hairline()
       SettingsGroup(title: "唤起") {
         GlobalShortcutRow(model: model)
+        SelectionAccessRow(model: model)
         LaunchAtLoginRow(model: model)
       }
       AboutFooter()
@@ -534,6 +535,52 @@ private struct ShortcutChip: View {
             .strokeBorder(CidaDesign.accent, lineWidth: 1.5)
         }
       }
+  }
+}
+
+/// The global shortcut brings in the frontmost application's selection only
+/// with the Accessibility permission (Pencil `Spec — 设置` §四). There is no
+/// switch: granting turns it on, revoking in System Settings turns it off.
+private struct SelectionAccessRow: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    SettingsRow(
+      title: "选中文字",
+      caption: model.isSelectionAccessGranted ? "唤起时带入并翻译" : "需要辅助功能权限",
+      alignment: .trailing
+    ) {
+      if model.isSelectionAccessGranted {
+        Text("已开启")
+          .font(CidaDesign.ui(12, weight: .medium))
+          .foregroundStyle(CidaDesign.textSecondary)
+          .accessibilityIdentifier("settings-selection-access-granted")
+      } else {
+        Button("去授权", action: model.requestSelectionAccess)
+          .buttonStyle(SettingsBorderedButtonStyle())
+          .accessibilityIdentifier("settings-selection-access-request")
+      }
+    }
+    // The system does not say when the permission changes for this process;
+    // re-read it when the user comes back to the window and when the list of
+    // allowed applications changes.
+    .onAppear(perform: model.refreshSelectionAccess)
+    .onReceive(
+      NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
+    ) { _ in
+      model.refreshSelectionAccess()
+    }
+    .onReceive(
+      DistributedNotificationCenter.default()
+        .publisher(for: SelectionAccess.didChangeNotification)
+        .receive(on: DispatchQueue.main)
+    ) { _ in
+      Task { @MainActor in
+        // The new state is readable shortly after the notification.
+        try? await Task.sleep(for: .milliseconds(300))
+        model.refreshSelectionAccess()
+      }
+    }
   }
 }
 

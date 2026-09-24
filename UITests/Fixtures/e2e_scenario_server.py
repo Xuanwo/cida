@@ -23,6 +23,9 @@ class ScenarioState:
         self.next_request_id = 1
         self.requests = []
         self.gates = {}
+        # What the app reads as the frontmost application's selection when
+        # the global shortcut summons it (--automation-selection-endpoint).
+        self.selection = None
 
     def begin(self, scenario, request):
         with self.lock:
@@ -98,7 +101,16 @@ class ScenarioState:
             self.requests = []
             self.gates = {}
             self.next_request_id = 1
+            self.selection = None
         event_path.unlink(missing_ok=True)
+
+    def set_selection(self, text):
+        with self.lock:
+            self.selection = text
+
+    def current_selection(self):
+        with self.lock:
+            return self.selection
 
 
 state = ScenarioState()
@@ -193,6 +205,14 @@ def plan_for(submitted_text):
     }
     if submitted_text in plans:
         return plans[submitted_text]
+    if submitted_text.startswith("CIDA_E2E_SELECTION_"):
+        return {
+            "chunks": [
+                f"Translated selection {submitted_text}.\n",
+                f"{submitted_text}_COMPLETE",
+            ],
+            "gateFirstByte": submitted_text.endswith("_GATED"),
+        }
     if submitted_text.startswith("CIDA_E2E_POOL_"):
         return {
             "chunks": [
@@ -207,7 +227,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_GET(self):
-        if urllib.parse.urlparse(self.path).path != "/control/state":
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/automation/selection":
+            self.send_json(200, {"text": state.current_selection()})
+            return
+        if path != "/control/state":
             self.send_error(404)
             return
         self.send_json(200, state.snapshot())
@@ -217,6 +241,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if parsed_path.path == "/control/reset":
             state.reset()
             self.send_json(200, {"reset": True})
+            return
+        if parsed_path.path == "/control/selection":
+            body = self.read_json_body()
+            state.set_selection(body.get("text"))
+            self.send_json(200, {"text": state.current_selection()})
             return
         if parsed_path.path == "/control/release-first-byte":
             body = self.read_json_body()
