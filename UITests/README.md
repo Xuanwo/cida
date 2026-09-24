@@ -52,7 +52,7 @@ the result when nothing is selected, ⌘. stops. There is no send button and no 
 | `ComposerJourneyTests.swift` | responder-chain typing, panel growth and shrink with the source, submit keeps the source, stale marking, source-language-preserving improvement, and Command-C precedence |
 | `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, panel growth, result replacement, stop, inline failure, and recovery |
 | `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, hide, and show invariants |
-| `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, provider presets and the custom endpoint, readiness, and prompt editing |
+| `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, provider presets and the custom endpoint, readiness, prompt editing, and recording the global shortcut |
 | `VisualAndAccessibilityJourneyTests.swift` | approved empty-panel and Settings Pencil pixels and the native semantic accessibility audit |
 
 `Resources/Scenarios/pairwise-environment-v1.json` is a stable-seed pairwise environment matrix.

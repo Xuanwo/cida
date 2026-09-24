@@ -110,6 +110,42 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     )
   }
 
+  func testGlobalShortcutIsRecordedInSettingsAndSummonsThePanel() {
+    driver.launch()
+    driver.openSettings()
+    let chip = driver.app.buttons["settings-shortcut"]
+    XCTAssertTrue(chip.waitForExistence(timeout: 3))
+    XCTAssertEqual(chip.label, "全局快捷键 ⌥ Space")
+    XCTAssertFalse(
+      driver.app.buttons["settings-shortcut-reset"].exists, "The default has nothing to restore")
+
+    chip.click()
+    XCTAssertTrue(driver.waitForLabel("按下新的全局快捷键", in: chip, timeout: 3), "A click starts recording")
+    driver.app.typeKey("t", modifierFlags: [.control, .option])
+    XCTAssertTrue(driver.waitForLabel("全局快捷键 ⌃ ⌥ T", in: chip, timeout: 3), "The next combination is kept")
+    let reset = driver.app.buttons["settings-shortcut-reset"]
+    XCTAssertTrue(reset.waitForExistence(timeout: 3))
+
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))
+    driver.app.typeKey(.space, modifierFlags: .option)
+    XCTAssertFalse(
+      driver.waitForExistence(of: driver.panel, timeout: 1),
+      "The previous combination no longer shows the panel")
+    driver.app.typeKey("t", modifierFlags: [.control, .option])
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5), "The recorded combination shows the panel")
+    XCTAssertTrue(driver.composer.waitForExistence(timeout: 3))
+
+    driver.openSettings()
+    XCTAssertTrue(reset.waitForExistence(timeout: 3))
+    reset.click()
+    XCTAssertTrue(driver.waitForLabel("全局快捷键 ⌥ Space", in: chip, timeout: 3))
+    XCTAssertTrue(reset.waitForNonExistence(timeout: 3), "The default has nothing to restore")
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))
+    driver.showPanel()
+  }
+
   func testFreshAppInstancesDoNotShareSettingsOrCredentials() {
     driver.launch(endpointOverride: false)
     driver.configureCustomEndpoint(

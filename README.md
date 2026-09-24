@@ -1,6 +1,6 @@
 # Cida
 
-Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming OpenAI-compatible Chat Completions APIs (DeepSeek, OpenAI, Moonshot, 智谱 GLM presets, or any custom endpoint). It lives in the menu bar and shows one floating panel on `Option-Space`: the source you typed, the action, and the result.
+Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming OpenAI-compatible Chat Completions APIs (DeepSeek, OpenAI, Moonshot, 智谱 GLM presets, or any custom endpoint). It lives in the menu bar and shows one floating panel on a global shortcut (`Option-Space` by default): the source you typed, the action, and the result.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 The design source is `Design/cida.pen` (`Spec — 面板模型`, `States — 面板交互`, `Motion — 流式输出`).
 
-- `Option-Space`: show or hide the panel from any application. Showing never activates Cida, so the application you came from keeps its focus and gets it back the moment the panel hides. Every appearance starts on 翻译 with the previous source fully selected, so typing or `Command-V` begins a new task.
+- The global shortcut (`Option-Space` by default; record another one in Settings, where a combination the system or another app holds is refused): show or hide the panel from any application. Showing never activates Cida, so the application you came from keeps its focus and gets it back the moment the panel hides. Every appearance starts on 翻译 with the previous source fully selected, so typing or `Command-V` begins a new task.
 - `Return`: run the selected action on the source. The source stays in the editor; the previous result is replaced immediately. `Shift-Return` or `Option-Return` inserts a newline.
 - `Tab`: switch between 翻译 and 改进. The source language is detected from the text; translation targets the other language of the Chinese/English pair, improvement keeps the source language.
 - `Escape`: hide the panel. Clicking outside hides it too. Hiding keeps the source and the result; a running request keeps streaming and is there when the panel comes back.

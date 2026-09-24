@@ -19,7 +19,7 @@ mkdir -p "$implementation_dir" "$qa_dir"
 swift build --package-path "$project_dir"
 
 # Panel states: the capture is the panel at its content height, 800 pt wide.
-for state in empty translate improve stale stopped failed long settings settings-missing-key settings-custom; do
+for state in empty translate improve stale stopped failed long settings settings-missing-key settings-custom settings-recording; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
     --snapshot-output "$implementation_dir/$state.png"

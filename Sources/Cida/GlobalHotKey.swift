@@ -1,12 +1,18 @@
 import Carbon.HIToolbox
 import Foundation
 
+/// The system-wide hot key that shows the panel. It is registered with
+/// Carbon, which delivers the press to this process whichever application
+/// is active. `update(to:)` swaps the combination; a combination the system
+/// or another application already holds is refused and the old one stays.
 final class GlobalHotKey: @unchecked Sendable {
+  private(set) var shortcut: GlobalShortcut
   private var hotKeyReference: EventHotKeyRef?
   private var eventHandlerReference: EventHandlerRef?
   private let action: @MainActor @Sendable () -> Void
 
-  init?(action: @escaping @MainActor @Sendable () -> Void) {
+  init?(shortcut: GlobalShortcut, action: @escaping @MainActor @Sendable () -> Void) {
+    self.shortcut = shortcut
     self.action = action
 
     var eventType = EventTypeSpec(
@@ -24,25 +30,13 @@ final class GlobalHotKey: @unchecked Sendable {
     )
     guard handlerStatus == noErr else { return nil }
 
-    let hotKeyID = EventHotKeyID(
-      signature: Self.fourCharacterCode("CIDA"),
-      id: 1
-    )
-    let registrationStatus = RegisterEventHotKey(
-      UInt32(kVK_Space),
-      UInt32(optionKey),
-      hotKeyID,
-      GetApplicationEventTarget(),
-      0,
-      &hotKeyReference
-    )
-
-    guard registrationStatus == noErr else {
+    guard let reference = Self.register(shortcut) else {
       if let eventHandlerReference {
         RemoveEventHandler(eventHandlerReference)
       }
       return nil
     }
+    hotKeyReference = reference
   }
 
   deinit {
@@ -52,6 +46,40 @@ final class GlobalHotKey: @unchecked Sendable {
     if let eventHandlerReference {
       RemoveEventHandler(eventHandlerReference)
     }
+  }
+
+  /// Re-registers the hot key for a new combination. Returns false, with the
+  /// previous combination still active, when the system refuses the new one.
+  func update(to newShortcut: GlobalShortcut) -> Bool {
+    guard newShortcut != shortcut else { return true }
+    if let hotKeyReference {
+      UnregisterEventHotKey(hotKeyReference)
+    }
+    if let reference = Self.register(newShortcut) {
+      hotKeyReference = reference
+      shortcut = newShortcut
+      return true
+    }
+    hotKeyReference = Self.register(shortcut)
+    return false
+  }
+
+  private static func register(_ shortcut: GlobalShortcut) -> EventHotKeyRef? {
+    let hotKeyID = EventHotKeyID(
+      signature: fourCharacterCode("CIDA"),
+      id: 1
+    )
+    var reference: EventHotKeyRef?
+    let status = RegisterEventHotKey(
+      UInt32(shortcut.keyCode),
+      shortcut.modifiers.carbonFlags,
+      hotKeyID,
+      GetApplicationEventTarget(),
+      0,
+      &reference
+    )
+    guard status == noErr else { return nil }
+    return reference
   }
 
   private static let eventHandler: EventHandlerUPP = { _, _, userData in

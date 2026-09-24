@@ -276,6 +276,8 @@ struct CidaSettings: Codable, Equatable, Sendable {
   var translationPrompt = defaultTranslationPrompt
   var improvementPrompt = defaultImprovementPrompt
   var launchAtLogin = false
+  /// The combination that shows the panel from any application.
+  var shortcut = GlobalShortcut.optionSpace
   private var promptContractVersion = currentPromptContractVersion
 
   /// The endpoint requests go to: the preset's, or a valid http(s) custom URL.
@@ -323,6 +325,7 @@ struct CidaSettings: Codable, Equatable, Sendable {
     case translationPrompt
     case improvementPrompt
     case launchAtLogin
+    case shortcut
     case promptContractVersion
   }
 
@@ -364,6 +367,8 @@ struct CidaSettings: Codable, Equatable, Sendable {
     }
     promptContractVersion = Self.currentPromptContractVersion
     launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+    shortcut =
+      try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
   }
 
   func prompt(for mode: ProcessingMode) -> String {

@@ -11,7 +11,7 @@ again.
 The current core experience contract (Pencil `Spec — 面板模型`) includes:
 
 1. A menu-bar application whose main interface is one borderless, non-activating floating panel:
-   `Option-Space` shows or hides it without taking focus from the application the user came from,
+   the global shortcut (`Option-Space` unless another one was recorded in Settings) shows or hides it without taking focus from the application the user came from,
    Escape and clicking outside hide it, and hiding never loses the source, the result, or a running
    request.
 2. Real native typing, selection, paste, multiline growth, deletion-driven shrink, and Return
@@ -130,6 +130,16 @@ are recorded as diagnostics rather than misclassified as test activity.
   followed the typed `Language` fields and was killed on commit 7b418ff). Results directories:
   `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`; all 8
   killed again on the Settings redesign commit 805366e (`TestResults/settings-mutations-20260923`).
+
+### Tart XCUI run `shortcut-tart-20260924c`
+
+19 of 19 tests passed with the recordable global shortcut (artifact digest
+`0040f520bb56631d5e166707285e54d39ba5cfe577edb734ae3d65ee4c6ce528`, host suite 105/105). The new
+journey records ⌃⌥T in Settings, checks that ⌥Space no longer shows the panel while ⌃⌥T does, and
+restores the default. Two earlier runs on the same feature failed for test-side reasons: XCUI reads
+the chip's accessibility label rather than its text, and a fixed ⌥Space key equivalent in the SwiftUI
+main menu kept answering while Cida was active (the command is gone; the hot key and the menu bar
+item follow the recorded shortcut).
 
 ### Tart XCUI run `count-tart-20260923`
 

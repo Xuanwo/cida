@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import XCTest
 
 @testable import Cida
@@ -539,6 +540,51 @@ final class AppModelTests: XCTestCase {
     model.selectProvider(.custom)
     XCTAssertEqual(model.settings.provider, .custom)
     XCTAssertEqual(model.settings.model, "", "A custom endpoint takes a typed model")
+  }
+
+  func testGlobalShortcutRequiresACommandOptionOrControlModifier() throws {
+    XCTAssertNil(GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifierFlags: []))
+    XCTAssertNil(GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifierFlags: [.shift]))
+    XCTAssertNil(
+      GlobalShortcut(keyCode: UInt16(kVK_Command), modifierFlags: [.command]),
+      "A bare modifier is not a key")
+
+    let shortcut = try XCTUnwrap(
+      GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifierFlags: [.control, .option, .capsLock]))
+    XCTAssertEqual(shortcut.modifiers, [.control, .option])
+    XCTAssertEqual(shortcut.displayText, "⌃ ⌥ T")
+    XCTAssertEqual(shortcut.menuKeyEquivalent, "t")
+    XCTAssertEqual(shortcut.menuModifierMask, [.control, .option])
+    XCTAssertEqual(GlobalShortcut.optionSpace.displayText, "⌥ Space")
+    XCTAssertEqual(GlobalShortcut.optionSpace.menuKeyEquivalent, " ")
+    XCTAssertEqual(
+      GlobalShortcut(keyCode: UInt16(kVK_Return), modifiers: [.shift, .command]).displayText,
+      "⇧ ⌘ ↩")
+  }
+
+  func testSettingsWithoutAShortcutDecodeToOptionSpaceAndACustomOneRoundTrips() throws {
+    let legacy = Data(
+      #"{"apiKey":"","model":"deepseek-chat","translationPrompt":"translate","improvementPrompt":"improve","launchAtLogin":false}"#
+        .utf8)
+    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: legacy).shortcut, .optionSpace)
+
+    var settings = CidaSettings()
+    settings.shortcut = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
+    let encoded = try JSONEncoder().encode(settings)
+    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: encoded), settings)
+  }
+
+  func testSettingsKeepTheCurrentShortcutWhenTheSystemRefusesTheNewOne() {
+    let refused = GlobalShortcut(keyCode: UInt16(kVK_ANSI_Q), modifiers: [.command])
+    let model = AppModel(saveSettings: { _ in }, applyGlobalShortcut: { $0 != refused })
+
+    XCTAssertFalse(model.setShortcut(refused))
+    XCTAssertEqual(model.settings.shortcut, .optionSpace)
+
+    let accepted = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
+    XCTAssertTrue(model.setShortcut(accepted))
+    XCTAssertEqual(model.settings.shortcut, accepted)
+    XCTAssertTrue(model.setShortcut(accepted), "Re-applying the current combination is a no-op")
   }
 
   func testAutomationBundleUsesAnIndependentSettingsNamespace() {

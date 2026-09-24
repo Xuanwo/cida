@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import QuartzCore
 import SwiftUI
 
@@ -17,13 +18,10 @@ struct CidaApplication: App {
         }
         .keyboardShortcut(",", modifiers: .command)
       }
-
-      CommandGroup(after: .newItem) {
-        Button("显示辞达") {
-          appDelegate.togglePanel()
-        }
-        .keyboardShortcut(.space, modifiers: .option)
-      }
+      // The panel is summoned by the system hot key (`GlobalHotKey`) and the
+      // menu bar item, both of which follow the recorded shortcut; a fixed
+      // main-menu key equivalent would keep answering the old one while
+      // Cida is active.
     }
   }
 }
@@ -46,6 +44,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       },
       clearPersistedAPIKey: {
         SettingsStore.clearAPIKey(namespace: settingsStorageNamespace)
+      },
+      applyGlobalShortcut: { [weak self] shortcut in
+        self?.applyGlobalShortcut(shortcut) ?? true
       }
     )
   }()
@@ -53,6 +54,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var panelController: PanelController?
   private var settingsWindowController: NSWindowController?
   private var statusItem: NSStatusItem?
+  private var showPanelMenuItem: NSMenuItem?
   private var globalHotKey: GlobalHotKey?
   private var performanceProbeView: FramePacingProbeNSView?
   private var millionCharacterPasteWorkload: MillionCharacterPasteWorkload?
@@ -82,7 +84,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
     if !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI {
       installStatusItem()
-      globalHotKey = GlobalHotKey { [weak self] in
+      globalHotKey = GlobalHotKey(shortcut: model.settings.shortcut) { [weak self] in
         self?.togglePanel()
       }
     }
@@ -132,6 +134,21 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   ) -> Bool {
     showPanel()
     return true
+  }
+
+  /// Swaps the system hot key; without one (automation) the setting is
+  /// accepted as is. The menu bar item shows the combination that works.
+  private func applyGlobalShortcut(_ shortcut: GlobalShortcut) -> Bool {
+    if let globalHotKey, !globalHotKey.update(to: shortcut) {
+      return false
+    }
+    updateShowPanelMenuItem(for: shortcut)
+    return true
+  }
+
+  private func updateShowPanelMenuItem(for shortcut: GlobalShortcut) {
+    showPanelMenuItem?.keyEquivalent = shortcut.menuKeyEquivalent
+    showPanelMenuItem?.keyEquivalentModifierMask = shortcut.menuModifierMask
   }
 
   @objc
@@ -196,10 +213,11 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       button.setAccessibilityIdentifier("cida-status-item")
     }
     let menu = NSMenu()
-    let show = NSMenuItem(title: "显示辞达", action: #selector(showPanel), keyEquivalent: " ")
-    show.keyEquivalentModifierMask = [.option]
+    let show = NSMenuItem(title: "显示辞达", action: #selector(showPanel), keyEquivalent: "")
     show.target = self
     menu.addItem(show)
+    showPanelMenuItem = show
+    updateShowPanelMenuItem(for: model.settings.shortcut)
     let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)
@@ -241,6 +259,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     #if DEBUG
       if launchOptions.designState == .settingsCustom {
         model.editingPrompt = .improve
+      }
+      if launchOptions.designState == .settingsRecording {
+        model.isRecordingShortcut = true
       }
     #endif
     settingsWindowController = SettingsWindowFactory.makeWindowController(model: model)
@@ -341,9 +362,13 @@ private enum DesignState: String {
   case settings
   case settingsMissingKey = "settings-missing-key"
   case settingsCustom = "settings-custom"
+  case settingsRecording = "settings-recording"
 
   var isSettings: Bool {
-    self == .settings || self == .settingsMissingKey || self == .settingsCustom
+    switch self {
+    case .settings, .settingsMissingKey, .settingsCustom, .settingsRecording: true
+    default: false
+    }
   }
 }
 
@@ -398,6 +423,8 @@ private struct LaunchOptions {
         settings.customEndpoint = "http://127.0.0.1:8080/v1/chat/completions"
         settings.apiKey = ""
         settings.launchAtLogin = true
+        settings.shortcut = GlobalShortcut(
+          keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
       }
     #endif
     if let automationOpenAIEndpoint {
@@ -450,7 +477,7 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
-      case .empty, .streaming, .settings, .settingsMissingKey, .settingsCustom:
+      case .empty, .streaming, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording:
         return nil
       }
     #else
@@ -470,7 +497,7 @@ private struct LaunchOptions {
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:
         ResultRecord.designLongInput
-      case .empty, .settings, .settingsMissingKey, .settingsCustom:
+      case .empty, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording:
         ""
       }
     #else

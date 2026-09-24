@@ -2771,7 +2771,7 @@
       "name": "Spec — 设置",
       "width": 860,
       "height": 0,
-      "content": "设置(2026-09-23 在 Proposal 上确认;取代 Settings 单板与 Settings Row 组件)\n\n一、窗口\n· 标准标题栏窗口(⌘, 或菜单栏「设置…」),宽 560 固定;高度随内容,不滚动;bg 底色,内容左右内缩 28(space-window-x)。\n· 三组,按用户的问题分组:模型(用什么模型)→ 提示词(怎么翻 / 怎么改)→ 唤起(怎么唤起)。组标题 12 semibold text-control;组间 1px border 分隔;行 = 标签列 120 + 24 间距 + 控件列铺满;标签 13.5 text-primary,说明 11.5 text-tertiary;行上下 padding 9。\n· 全部自动保存(250ms 合并),没有保存 / 取消按钮。\n\n二、模型\n· 服务商是菜单,每一项是预设:预设 = 端点 + 建议模型 + 是否需要 Key;列表末尾固定「自定义(OpenAI 兼容)」。当前预设:DeepSeek、OpenAI、Moonshot、智谱 GLM。加服务商只加一行预设,界面不变。\n· 选预设时菜单下方一行说明写实际请求的域名(如 api.deepseek.com · Chat Completions),不显示端点输入;选自定义时出现「端点」行(font-mono,铺满,聚焦 1.5px accent 描边)。\n· 模型:预设 → 建议模型菜单,最后一项「其他…」把这一行换成输入框;自定义 → 输入框。切换服务商时模型回到该预设第一项。\n· API Key:遮罩输入框铺满(font-mono),说明「只存本机钥匙串」;自定义且端点为 localhost / 127.0.0.1 / ::1 时占位「本地端点可留空」。\n· 就绪行(组末尾,6pt 圆点 + 12 text-secondary,本地推导不联网):已就绪(accent 点)/ 还差 API Key(text-tertiary 点)/ 本地端点 · 无需 API Key(accent 点)/ 端点无效(text-tertiary 点)。\n\n三、提示词\n· 折叠:标签 + 首句预览(11.5 text-tertiary,单行截断)+「编辑」边框按钮(surface,border,radius-card);展开:标签 +「恢复默认」文字按钮,编辑区为纸面(surface-paper,radius-card 8,padding 14,Inter 13 / 1.6 text-ink,聚焦 1.5px accent 描边),下方说明「自动保存 · 目标语言与任务由应用传入,不必写占位符」。同一时刻只展开一个;展开与收起随内容改变窗口高度。\n\n四、唤起\n· 全局快捷键:键帽芯片(surface-dim,radius-chip,12 medium text-secondary)显示「⌥ Space」,暂不可改;说明「在任何应用里显示辞达」。\n· 开机启动:开关(accent 开 / #DBDBD5 关),失败时系统警告框说明。\n· 页脚居中:辞达(font-brand 12 semibold,字距 2,text-secondary)+「1.0 · 辞达而已矣」(caption,text-tertiary)。\n\n五、强调色只出现在:菜单当前项的 ✓、就绪点、聚焦描边、开关打开。状态见 States — 设置。"
+      "content": "设置(2026-09-23 在 Proposal 上确认;取代 Settings 单板与 Settings Row 组件)\n\n一、窗口\n· 标准标题栏窗口(⌘, 或菜单栏「设置…」),宽 560 固定;高度随内容,不滚动;bg 底色,内容左右内缩 28(space-window-x)。\n· 三组,按用户的问题分组:模型(用什么模型)→ 提示词(怎么翻 / 怎么改)→ 唤起(怎么唤起)。组标题 12 semibold text-control;组间 1px border 分隔;行 = 标签列 120 + 24 间距 + 控件列铺满;标签 13.5 text-primary,说明 11.5 text-tertiary;行上下 padding 9。\n· 全部自动保存(250ms 合并),没有保存 / 取消按钮。\n\n二、模型\n· 服务商是菜单,每一项是预设:预设 = 端点 + 建议模型 + 是否需要 Key;列表末尾固定「自定义(OpenAI 兼容)」。当前预设:DeepSeek、OpenAI、Moonshot、智谱 GLM。加服务商只加一行预设,界面不变。\n· 选预设时菜单下方一行说明写实际请求的域名(如 api.deepseek.com · Chat Completions),不显示端点输入;选自定义时出现「端点」行(font-mono,铺满,聚焦 1.5px accent 描边)。\n· 模型:预设 → 建议模型菜单,最后一项「其他…」把这一行换成输入框;自定义 → 输入框。切换服务商时模型回到该预设第一项。\n· API Key:遮罩输入框铺满(font-mono),说明「只存本机钥匙串」;自定义且端点为 localhost / 127.0.0.1 / ::1 时占位「本地端点可留空」。\n· 就绪行(组末尾,6pt 圆点 + 12 text-secondary,本地推导不联网):已就绪(accent 点)/ 还差 API Key(text-tertiary 点)/ 本地端点 · 无需 API Key(accent 点)/ 端点无效(text-tertiary 点)。\n\n三、提示词\n· 折叠:标签 + 首句预览(11.5 text-tertiary,单行截断)+「编辑」边框按钮(surface,border,radius-card);展开:标签 +「恢复默认」文字按钮,编辑区为纸面(surface-paper,radius-card 8,padding 14,Inter 13 / 1.6 text-ink,聚焦 1.5px accent 描边),下方说明「自动保存 · 目标语言与任务由应用传入,不必写占位符」。同一时刻只展开一个;展开与收起随内容改变窗口高度。\n\n四、唤起\n· 全局快捷键:键帽芯片(surface-dim,radius-chip,12 medium text-secondary)是一个按钮,显示当前组合,默认「⌥ Space」;说明「在任何应用里显示辞达」。点击进入录制:芯片改为 surface 底、1.5px accent 描边、text-tertiary「按下新组合…」,说明变为「Esc 取消」;按下带 ⌘/⌥/⌃ 的组合立即保存并重新注册,Esc 或失焦取消;按下不带这些修饰键的按键不结束录制,说明改为「要带 ⌘、⌥ 或 ⌃」。注册失败(被系统或其他应用占用)保留原组合,说明变为「这个组合已被占用,换一个」。组合不是默认值时,芯片左侧出现「恢复默认」文字按钮(12 medium text-secondary)。菜单栏「显示辞达」的快捷键跟随该组合。\n· 开机启动:开关(accent 开 / #DBDBD5 关),失败时系统警告框说明。\n· 页脚居中:辞达(font-brand 12 semibold,字距 2,text-secondary)+「1.0 · 辞达而已矣」(caption,text-tertiary)。\n\n五、强调色只出现在:菜单当前项的 ✓、就绪点、聚焦描边、开关打开。状态见 States — 设置。"
     },
     {
       "type": "frame",
@@ -2780,7 +2780,7 @@
       "y": 0,
       "name": "States — 设置",
       "width": 1216,
-      "height": 1640,
+      "height": 2277,
       "fill": "#F1F1ED",
       "cornerRadius": 16,
       "layout": "none",
@@ -2806,7 +2806,7 @@
           "fill": "$text-secondary",
           "textGrowth": "fixed-width",
           "width": 1160,
-          "content": "规则见 Spec — 设置。四个状态：默认（DeepSeek 已配置）、服务商菜单展开、还差 API Key、自定义端点 + 编辑改进提示词。窗口 560 宽，高度随内容；实现侧 --design-state 对应：settings / settings-missing-key / settings-custom。",
+          "content": "规则见 Spec — 设置。五个状态：默认（DeepSeek 已配置）、服务商菜单展开、还差 API Key、自定义端点 + 编辑改进提示词 + 自定义快捷键、录制快捷键。窗口 560 宽，高度随内容；实现侧 --design-state 对应：settings / settings-missing-key / settings-custom / settings-recording。",
           "lineHeight": 1.5,
           "fontFamily": "$font-ui",
           "fontSize": 12.5,
@@ -4348,10 +4348,20 @@
                           "id": "iDdVn",
                           "name": "Control Col",
                           "width": "fill_container",
-                          "gap": 8,
+                          "gap": 12,
                           "justifyContent": "end",
                           "alignItems": "center",
                           "children": [
+                            {
+                              "type": "text",
+                              "id": "p6WvkF",
+                              "name": "Reset",
+                              "fill": "$text-secondary",
+                              "content": "恢复默认",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
                             {
                               "type": "frame",
                               "id": "xDJwX",
@@ -4368,7 +4378,7 @@
                                   "id": "aj5yt",
                                   "name": "Keys",
                                   "fill": "$text-secondary",
-                                  "content": "⌥ Space",
+                                  "content": "⌃ ⌥ T",
                                   "fontFamily": "$font-ui",
                                   "fontSize": 12,
                                   "fontWeight": "500"
@@ -6289,7 +6299,821 @@
           "y": 791,
           "name": "Caption D",
           "fill": "$text-control",
-          "content": "自定义（OpenAI 兼容）· 本地端点 · 编辑改进提示词（settings-custom）",
+          "content": "自定义（OpenAI 兼容）· 本地端点 · 编辑改进提示词 · 自定义快捷键（settings-custom）",
+          "fontFamily": "$font-ui",
+          "fontSize": 12,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "QSfT1",
+          "x": 28,
+          "y": 1632,
+          "name": "录制快捷键",
+          "clip": true,
+          "width": 560,
+          "fill": "$bg",
+          "cornerRadius": "$radius-window",
+          "stroke": "$border",
+          "strokeWidth": 1,
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#00000014",
+            "offset": {
+              "x": 0,
+              "y": 24
+            },
+            "blur": 60
+          },
+          "layout": "vertical",
+          "children": [
+            {
+              "id": "axcoi",
+              "type": "ref",
+              "ref": "YdbKP",
+              "name": "Titlebar",
+              "width": "fill_container",
+              "descendants": {
+                "xKGqk": {
+                  "content": "设置",
+                  "fill": "$text-primary",
+                  "fontFamily": "$font-ui",
+                  "fontSize": "$font-size-secondary",
+                  "fontWeight": "600",
+                  "letterSpacing": 0
+                },
+                "eu34p": {
+                  "width": 49,
+                  "height": 11
+                },
+                "AJydC": {
+                  "enabled": false
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "QvlBm",
+              "name": "Body",
+              "width": "fill_container",
+              "layout": "vertical",
+              "padding": [
+                6,
+                28,
+                24,
+                28
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "JJafr",
+                  "name": "Group 模型",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "padding": [
+                    12,
+                    0,
+                    0,
+                    0
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Tx9R2",
+                      "name": "Group Title",
+                      "fill": "$text-control",
+                      "content": "模型",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Fnc6b",
+                      "name": "Row 服务商",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "wGUbH",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "a6RHT",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "服务商",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "WkGKA",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "fMFPy",
+                              "name": "Provider",
+                              "layout": "vertical",
+                              "gap": 5,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "pz9QO",
+                                  "name": "Menu",
+                                  "fill": "$surface",
+                                  "cornerRadius": "$radius-seg",
+                                  "stroke": "$border",
+                                  "strokeWidth": 1,
+                                  "gap": 6,
+                                  "padding": [
+                                    5,
+                                    10
+                                  ],
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "ryp7o",
+                                      "name": "Value",
+                                      "fill": "$text-primary",
+                                      "content": "DeepSeek",
+                                      "fontFamily": "$font-ui",
+                                      "fontSize": 12.5,
+                                      "fontWeight": "500"
+                                    },
+                                    {
+                                      "type": "icon",
+                                      "id": "D7AbV",
+                                      "name": "Chevron",
+                                      "width": 12,
+                                      "height": 12,
+                                      "icon": "chevron-down",
+                                      "library": "lucide",
+                                      "fill": "$text-tertiary"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "u6kCv",
+                                  "name": "Endpoint Caption",
+                                  "fill": "$text-tertiary",
+                                  "content": "api.deepseek.com · Chat Completions",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": "$font-size-label",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "g0hYW",
+                      "name": "Row API Key",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Nb5Am",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "SPwkP",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "API Key",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "WFz6A",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "content": "只存本机钥匙串",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ZPHfw",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "IQz8w",
+                              "name": "API Key Field",
+                              "width": "fill_container",
+                              "height": 30,
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-seg",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "gap": 8,
+                              "padding": [
+                                0,
+                                10
+                              ],
+                              "justifyContent": "space_between",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "oYx9j",
+                                  "name": "Value",
+                                  "fill": "$text-primary",
+                                  "content": "sk-••••••••••••••••3f2a",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "K6ITys",
+                      "name": "Row 模型",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Z43sM",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "uh2Xc",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "模型",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Z4qJda",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "jnVJy",
+                              "name": "Menu",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-seg",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "gap": 6,
+                              "padding": [
+                                5,
+                                10
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "zuNmh",
+                                  "name": "Value",
+                                  "fill": "$text-primary",
+                                  "content": "deepseek-chat",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "OGVi0",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$text-tertiary"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "C4pX76",
+                      "name": "Status",
+                      "gap": 8,
+                      "padding": [
+                        6,
+                        0,
+                        4,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "qdUk0",
+                          "name": "Dot",
+                          "fill": "$accent",
+                          "width": 6,
+                          "height": 6
+                        },
+                        {
+                          "type": "text",
+                          "id": "F6HNcl",
+                          "name": "Status Text",
+                          "fill": "$text-secondary",
+                          "content": "已就绪",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "DQFZj",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "PDw9i",
+                  "name": "Group 提示词",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "padding": [
+                    20,
+                    0,
+                    0,
+                    0
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "NV5EU",
+                      "name": "Group Title",
+                      "fill": "$text-control",
+                      "content": "提示词",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Unmzo",
+                      "name": "Row 翻译",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        10,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "RZoGQ",
+                          "name": "Label Col",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "OyzmO",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "翻译",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "meiSe",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Translate the user-provided text into the target language…",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "D3e16",
+                          "name": "Control Col",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "m7A9A",
+                              "name": "Button 编辑",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-card",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "padding": [
+                                6,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ODq1d",
+                                  "name": "Label",
+                                  "fill": "$text-control",
+                                  "content": "编辑",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "NXRxW",
+                      "name": "Row 改进",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        10,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "oOfJK",
+                          "name": "Label Col",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "t5X7b",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "改进",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Y1ZRJu",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "You are a writing assistant. Improve the user-provided text…",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "sxiJK",
+                          "name": "Control Col",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "o4YYTd",
+                              "name": "Button 编辑",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-card",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "padding": [
+                                6,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Re8p9",
+                                  "name": "Label",
+                                  "fill": "$text-control",
+                                  "content": "编辑",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "OduoB",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "Y77qm",
+                  "name": "Group 唤起",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "padding": [
+                    20,
+                    0,
+                    0,
+                    0
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "p7bUT",
+                      "name": "Group Title",
+                      "fill": "$text-control",
+                      "content": "唤起",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Y99Fx",
+                      "name": "Row 全局快捷键",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "HKWu1",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Yyonw",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "全局快捷键",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "z2cjsm",
+                              "name": "Caption",
+                              "fill": "$text-tertiary",
+                              "content": "Esc 取消",
+                              "fontFamily": "$font-ui",
+                              "fontSize": "$font-size-label",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "BX4tB",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "hq51a",
+                              "name": "Key Chip",
+                              "fill": "$surface",
+                              "cornerRadius": "$radius-chip",
+                              "stroke": "$accent",
+                              "strokeWidth": 1.5,
+                              "padding": [
+                                4,
+                                9
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "wSLsf",
+                                  "name": "Keys",
+                                  "fill": "$text-tertiary",
+                                  "content": "按下新组合…",
+                                  "fontFamily": "$font-ui",
+                                  "fontSize": 12,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "P1iNC",
+                      "name": "Row 开机启动",
+                      "width": "fill_container",
+                      "gap": 24,
+                      "padding": [
+                        9,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "uYdKV",
+                          "name": "Label Col",
+                          "width": 120,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "zDGlX",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "开机启动",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "D5LA2",
+                          "name": "Control Col",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "I4HiuA",
+                              "name": "Toggle Off",
+                              "width": 34,
+                              "height": 20,
+                              "fill": "#DBDBD5",
+                              "cornerRadius": 10,
+                              "padding": 2,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "ellipse",
+                                  "id": "fQsRW",
+                                  "name": "Knob",
+                                  "fill": "#FFFFFF",
+                                  "width": 16,
+                                  "height": 16
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "rH7dV",
+                  "name": "About Footer",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "padding": [
+                    26,
+                    0,
+                    0,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "uH50p",
+                      "name": "Brand",
+                      "fill": "$text-secondary",
+                      "content": "辞达",
+                      "fontFamily": "$font-brand",
+                      "fontSize": 12,
+                      "fontWeight": "600",
+                      "letterSpacing": 2
+                    },
+                    {
+                      "type": "text",
+                      "id": "rT1OC",
+                      "name": "Version",
+                      "fill": "$text-tertiary",
+                      "content": "1.0 · 辞达而已矣",
+                      "fontFamily": "$font-ui",
+                      "fontSize": "$font-size-caption",
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "xDOGm",
+          "x": 28,
+          "y": 1606,
+          "name": "Caption E",
+          "fill": "$text-control",
+          "content": "录制快捷键（settings-recording）",
           "fontFamily": "$font-ui",
           "fontSize": 12,
           "fontWeight": "600"

@@ -290,6 +290,9 @@ final class AppModel {
   private let service: any TextProcessingService
   private let streamPresentationPolicy: StreamPresentationPolicy
   private let saveSettings: @MainActor (CidaSettings) -> Void
+  private let applyGlobalShortcut: @MainActor (GlobalShortcut) -> Bool
+  /// The Settings chip is waiting for the next key press.
+  var isRecordingShortcut = false
   private let clearPersistedAPIKey: @MainActor () -> Void
   private var processingTask: Task<Void, Never>?
   private var settingsSaveTask: Task<Void, Never>?
@@ -316,7 +319,8 @@ final class AppModel {
     },
     clearPersistedAPIKey: @escaping @MainActor () -> Void = {
       SettingsStore.clearAPIKey()
-    }
+    },
+    applyGlobalShortcut: @escaping @MainActor (GlobalShortcut) -> Bool = { _ in true }
   ) {
     self.mode = mode
     self.inputText = inputText
@@ -326,6 +330,7 @@ final class AppModel {
     self.streamPresentationPolicy = streamPresentationPolicy
     self.saveSettings = saveSettings
     self.clearPersistedAPIKey = clearPersistedAPIKey
+    self.applyGlobalShortcut = applyGlobalShortcut
     lastPersistedAPIKey = settings.apiKey
   }
 
@@ -524,6 +529,17 @@ final class AppModel {
     guard settings.apiKey.isEmpty, !apiKey.isEmpty else { return }
     settings.apiKey = apiKey
     lastPersistedAPIKey = apiKey
+  }
+
+  /// The combination is registered system-wide before it becomes the
+  /// setting, so a combination the system or another application holds is
+  /// refused and the current one keeps working.
+  @discardableResult
+  func setShortcut(_ shortcut: GlobalShortcut) -> Bool {
+    guard shortcut != settings.shortcut else { return true }
+    guard applyGlobalShortcut(shortcut) else { return false }
+    settings.shortcut = shortcut
+    return true
   }
 
   func refreshLaunchAtLoginStatus() {

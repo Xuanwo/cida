@@ -39,7 +39,8 @@ The Settings states inside `E86Rv`, and the `--design-state` that renders each o
 | 默认 · DeepSeek 已配置 | `yhtH2` | `settings` |
 | 服务商菜单展开 | `p5EOr` | (open menu, no fixture) |
 | 还差 API Key | `PA25F` | `settings-missing-key` |
-| 自定义端点 · 编辑改进提示词 | `VKwj7` | `settings-custom` |
+| 自定义端点 · 编辑改进提示词 · 自定义快捷键 | `VKwj7` | `settings-custom` |
+| 录制快捷键 | `QSfT1` | `settings-recording` |
 
 The Pencil document is the first source: each topic has one Spec note, and a rule change edits that
 note and its States or Motion board instead of adding a versioned copy. Exports of the boards and

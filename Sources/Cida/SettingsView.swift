@@ -92,7 +92,7 @@ private struct SettingsBody: View {
       }
       Hairline()
       SettingsGroup(title: "唤起") {
-        GlobalShortcutRow()
+        GlobalShortcutRow(model: model)
         LaunchAtLoginRow(model: model)
       }
       AboutFooter()
@@ -458,17 +458,82 @@ private struct ExpandedPromptRow: View {
 
 // MARK: - 唤起
 
+/// The key chip is the recorder: a click waits for the next combination,
+/// which is registered before it is kept (Pencil `Spec — 设置` §四).
 private struct GlobalShortcutRow: View {
-  var body: some View {
-    SettingsRow(title: "全局快捷键", caption: "在任何应用里显示辞达", alignment: .trailing) {
-      Text("⌥ Space")
-        .font(CidaDesign.ui(12, weight: .medium))
-        .foregroundStyle(CidaDesign.textSecondary)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 4)
-        .background(CidaDesign.surfaceDim)
-        .clipShape(.rect(cornerRadius: CidaDesign.Radius.chip, style: .continuous))
+  @Bindable var model: AppModel
+  @State private var feedback: Feedback?
+
+  /// What the caption says instead of the row's purpose: the recording hint,
+  /// or why the last press changed nothing.
+  private enum Feedback {
+    case missingModifier
+    case rejected
+  }
+
+  private var caption: String {
+    if model.isRecordingShortcut {
+      return feedback == .missingModifier ? "要带 ⌘、⌥ 或 ⌃" : "Esc 取消"
     }
+    return feedback == .rejected ? "这个组合已被占用，换一个" : "在任何应用里显示辞达"
+  }
+
+  var body: some View {
+    SettingsRow(title: "全局快捷键", caption: caption, alignment: .trailing) {
+      HStack(spacing: 12) {
+        if model.settings.shortcut != .optionSpace, !model.isRecordingShortcut {
+          Button("恢复默认") {
+            feedback = nil
+            model.setShortcut(.optionSpace)
+          }
+          .buttonStyle(.plain)
+          .font(CidaDesign.ui(12, weight: .medium))
+          .foregroundStyle(CidaDesign.textSecondary)
+          .accessibilityIdentifier("settings-shortcut-reset")
+        }
+        Button {
+          feedback = nil
+          model.isRecordingShortcut = true
+        } label: {
+          ShortcutChip(
+            text: model.isRecordingShortcut ? "按下新组合…" : model.settings.shortcut.displayText,
+            isRecording: model.isRecordingShortcut)
+        }
+        .buttonStyle(.plain)
+        .background {
+          ShortcutCaptureView(
+            isRecording: $model.isRecordingShortcut,
+            onCapture: { shortcut in
+              feedback = model.setShortcut(shortcut) ? nil : .rejected
+            },
+            onInvalidPress: { feedback = .missingModifier })
+        }
+        .accessibilityLabel(
+          model.isRecordingShortcut ? "按下新的全局快捷键" : "全局快捷键 \(model.settings.shortcut.displayText)")
+        .accessibilityIdentifier("settings-shortcut")
+      }
+    }
+  }
+}
+
+private struct ShortcutChip: View {
+  let text: String
+  let isRecording: Bool
+
+  var body: some View {
+    Text(text)
+      .font(CidaDesign.ui(12, weight: .medium))
+      .foregroundStyle(isRecording ? CidaDesign.textTertiary : CidaDesign.textSecondary)
+      .padding(.horizontal, 9)
+      .padding(.vertical, 4)
+      .background(isRecording ? CidaDesign.surface : CidaDesign.surfaceDim)
+      .clipShape(.rect(cornerRadius: CidaDesign.Radius.chip, style: .continuous))
+      .overlay {
+        if isRecording {
+          RoundedRectangle(cornerRadius: CidaDesign.Radius.chip, style: .continuous)
+            .strokeBorder(CidaDesign.accent, lineWidth: 1.5)
+        }
+      }
   }
 }
 

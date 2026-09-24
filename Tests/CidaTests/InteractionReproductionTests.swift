@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import QuartzCore
 import SwiftUI
 import XCTest
@@ -180,6 +181,66 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertFalse(window.styleMask.contains(.resizable), "Width is fixed; height follows content")
     XCTAssertNotNil(window.standardWindowButton(.closeButton))
     XCTAssertEqual(window.frame.width, SettingsWindowFactory.width, accuracy: 0.5)
+  }
+
+  func testSettingsShortcutRecorderTakesTheNextCombinationAndEscapeCancels() async throws {
+    let applied = AppliedShortcuts()
+    let model = AppModel(
+      settings: .designPreview,
+      saveSettings: { _ in },
+      applyGlobalShortcut: { shortcut in
+        applied.values.append(shortcut)
+        return shortcut.keyCode != UInt16(kVK_ANSI_Q)
+      })
+    let controller = SettingsWindowFactory.makeWindowController(model: model)
+    let window = try XCTUnwrap(controller.window)
+    retainedTestWindows.append(window)
+    window.alphaValue = 0
+    window.orderBack(nil)
+    defer { window.orderOut(nil) }
+    window.contentView?.layoutSubtreeIfNeeded()
+
+    model.isRecordingShortcut = true
+    try await waitUntil(timeout: .seconds(2)) { window.firstResponder is ShortcutCaptureNSView }
+    let recorder = try XCTUnwrap(window.firstResponder as? ShortcutCaptureNSView)
+
+    // Shift alone is not a shortcut: the recorder keeps waiting.
+    recorder.record(keyEvent(kVK_ANSI_T, "t", [.shift]))
+    XCTAssertTrue(model.isRecordingShortcut)
+    XCTAssertEqual(model.settings.shortcut, .optionSpace)
+
+    recorder.record(keyEvent(kVK_ANSI_T, "t", [.control, .option]))
+    let recorded = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
+    XCTAssertEqual(model.settings.shortcut, recorded)
+    XCTAssertEqual(applied.values, [recorded], "The combination is registered before it is kept")
+    try await waitUntil(timeout: .seconds(2)) { !model.isRecordingShortcut }
+    try await waitUntil(timeout: .seconds(2)) { !(window.firstResponder is ShortcutCaptureNSView) }
+
+    model.isRecordingShortcut = true
+    try await waitUntil(timeout: .seconds(2)) { window.firstResponder is ShortcutCaptureNSView }
+    recorder.record(keyEvent(kVK_Escape, "\u{1B}", []))
+    try await waitUntil(timeout: .seconds(2)) { !model.isRecordingShortcut }
+    XCTAssertEqual(model.settings.shortcut, recorded, "Escape keeps the combination")
+
+    // A combination the system refuses leaves the current one in place.
+    model.isRecordingShortcut = true
+    try await waitUntil(timeout: .seconds(2)) { window.firstResponder is ShortcutCaptureNSView }
+    recorder.record(keyEvent(kVK_ANSI_Q, "q", [.command]))
+    try await waitUntil(timeout: .seconds(2)) { !model.isRecordingShortcut }
+    XCTAssertEqual(model.settings.shortcut, recorded)
+    XCTAssertEqual(applied.values.count, 2)
+    assertTestProcessIsNotFrontmost()
+  }
+
+  private final class AppliedShortcuts {
+    var values: [GlobalShortcut] = []
+  }
+
+  private func keyEvent(_ keyCode: Int, _ characters: String, _ flags: NSEvent.ModifierFlags) -> NSEvent {
+    NSEvent.keyEvent(
+      with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+      context: nil, characters: characters, charactersIgnoringModifiers: characters,
+      isARepeat: false, keyCode: UInt16(keyCode))!
   }
 
   func testNativeCloseButtonClosesARealBackgroundSettingsWindow() throws {
