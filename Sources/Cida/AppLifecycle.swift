@@ -405,9 +405,11 @@ private struct LaunchOptions {
     isAutomation && !isE2ETesting
   }
 
+  /// A launch that saves settings starts from them; otherwise quitting would
+  /// write the defaults over what the user chose.
   var initialSettings: CidaSettings {
     var settings =
-      isE2ETesting
+      persistsSettings
       ? SettingsStore.load(namespace: settingsStorageNamespace)
       : CidaSettings()
     #if DEBUG
