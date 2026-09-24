@@ -188,6 +188,7 @@ final class TranslationJourneyPropertyTests: XCTestCase {
     case .completed: "completed"
     case .stopped: "stopped"
     case .failed: "failed"
+    case .unrecognized: "unrecognized"
     }
   }
 

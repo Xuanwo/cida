@@ -576,7 +576,7 @@ final class AppModelTests: XCTestCase {
 
   func testSettingsKeepTheCurrentShortcutWhenTheSystemRefusesTheNewOne() {
     let refused = GlobalShortcut(keyCode: UInt16(kVK_ANSI_Q), modifiers: [.command])
-    let model = AppModel(saveSettings: { _ in }, applyGlobalShortcut: { $0 != refused })
+    let model = AppModel(saveSettings: { _ in }, applyGlobalShortcut: { shortcut, _ in shortcut != refused })
 
     XCTAssertFalse(model.setShortcut(refused))
     XCTAssertEqual(model.settings.shortcut, .optionSpace)

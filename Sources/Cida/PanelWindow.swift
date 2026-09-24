@@ -243,7 +243,7 @@ final class PanelController {
 
   /// The screen under the pointer, which is where the user is working; the
   /// main screen otherwise.
-  private static func activeScreen() -> NSScreen? {
+  static func activeScreen() -> NSScreen? {
     let mouse = NSEvent.mouseLocation
     if let underPointer = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) {
       return underPointer

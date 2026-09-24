@@ -14,6 +14,7 @@ nodes are:
 | Streaming keyframes T0–T4 | `hwlXF` (`Motion — 流式输出`) |
 | Settings rules | `mJ1h8` (`Spec — 设置`) |
 | All Settings states | `E86Rv` (`States — 设置`) |
+| Capture framing overlay | `ZFrn9` (`States — 截图框选`) |
 | Components | `mXBP1` Control Bar, `qZy7Z` Bar Action, `KCEUn` Result Note, `B1Kz01` Mode Seg, `POaFg` Send Button (unused by the panel), `YdbKP` Titlebar (Settings only), `pn8Ym` Motion Label |
 
 The panel states inside `oeKVI`, and the `--design-state` that renders each one natively:
@@ -31,6 +32,7 @@ The panel states inside `oeKVI`, and the `--design-state` that renders each one 
 | 改进 · 完成 | `kYllY` | `improve` |
 | 再次唤起 · 全选 | `N6v3qq` | (selection, no fixture) |
 | 唤起 · 带入选区 | `Hftz0` | (global shortcut, no fixture; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
+| 截图 · 未识别到文字 | `WlrCX` | (capture shortcut, no fixture; XCUI `testCaptureShortcutFramesTextOnAFrozenScreenAndTranslatesIt`) |
 | 最大高度 | `U2mUc` | `long` |
 
 The Settings states inside `E86Rv`, and the `--design-state` that renders each one natively:
@@ -40,7 +42,7 @@ The Settings states inside `E86Rv`, and the `--design-state` that renders each o
 | 默认 · DeepSeek 已配置 | `yhtH2` | `settings` |
 | 服务商菜单展开 | `p5EOr` | (open menu, no fixture) |
 | 还差 API Key | `PA25F` | `settings-missing-key` |
-| 自定义端点 · 编辑改进提示词 · 自定义快捷键 · 选中文字已开启 | `VKwj7` | `settings-custom` |
+| 自定义端点 · 编辑改进提示词 · 自定义快捷键 · 截图与选中文字已授权 | `VKwj7` | `settings-custom` |
 | 录制快捷键 | `QSfT1` | `settings-recording` |
 
 The Pencil document is the first source: each topic has one Spec note, and a rule change edits that
@@ -60,7 +62,7 @@ image or design file cannot silently reuse an old approval.
 | Baseline | Logical size | Mask |
 | --- | ---: | --- |
 | Panel, empty | 800 × 113 | none |
-| Settings, default | 560 × 671 | native title bar, 46 pt |
+| Settings, default | 560 × 726 | native title bar, 46 pt |
 
 The remaining states are retained as reviewable reference/current comparisons and are protected by
 deterministic geometry and interaction assertions (panel height budget, source cap, result

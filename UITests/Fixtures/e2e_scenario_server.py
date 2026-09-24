@@ -205,6 +205,11 @@ def plan_for(submitted_text):
     }
     if submitted_text in plans:
         return plans[submitted_text]
+    if submitted_text == "CIDA CAPTURE SCENARIO":
+        # What Vision reads from UITests/Fixtures/capture-screen.png.
+        return {
+            "chunks": ["Captured text translated.\n", "CIDA_CAPTURE_SCENARIO_COMPLETE"],
+        }
     if submitted_text.startswith("CIDA_E2E_SELECTION_"):
         return {
             "chunks": [

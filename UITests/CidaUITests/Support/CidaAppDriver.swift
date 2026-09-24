@@ -31,6 +31,17 @@ final class CidaAppDriver {
   var resultPane: XCUIElement { element(identifier: "result-pane") }
   var resultText: XCUIElement { app.textViews["result-text"] }
   var settingsWindow: XCUIElement { app.windows["设置"] }
+  /// The capture shortcut's full-screen layer, a borderless panel like the
+  /// main one.
+  var captureOverlay: XCUIElement { app.dialogs["capture-overlay"] }
+  var captureCanvas: XCUIElement { element(identifier: "capture-overlay-canvas") }
+
+  /// Drags a frame on the capture overlay between two points given as
+  /// fractions of the screen.
+  func frameCapture(from start: CGVector, to end: CGVector) {
+    let origin = captureCanvas.coordinate(withNormalizedOffset: start)
+    origin.press(forDuration: 0.1, thenDragTo: captureCanvas.coordinate(withNormalizedOffset: end))
+  }
 
   func resultNote(_ kind: String) -> XCUIElement {
     element(identifier: "result-note-\(kind)")

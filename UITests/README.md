@@ -39,7 +39,8 @@ The app is a menu-bar application whose main interface is a borderless floating 
 | action segment / items | `action-segment`, `action-translate`, `action-improve` |
 | control bar slot | `bar-action-stop`, `bar-action-copy`, `bar-action-copied` |
 | result pane / text | `result-pane`, `result-text` |
-| result notes | `result-note-stale`, `result-note-stopped`, `result-note-failed` |
+| result notes | `result-note-stale`, `result-note-stopped`, `result-note-failed`, `result-note-unrecognized` |
+| capture overlay / canvas | `capture-overlay`, `capture-overlay-canvas` |
 
 ⏎ submits, Tab switches the action, Escape hides, Option-Space shows, ⌘, opens Settings, ⌘C copies
 the result when nothing is selected, ⌘. stops. There is no send button and no title bar.
@@ -52,7 +53,7 @@ the result when nothing is selected, ⌘. stops. There is no send button and no 
 | `ComposerJourneyTests.swift` | responder-chain typing, panel growth and shrink with the source, submit keeps the source, stale marking, source-language-preserving improvement, and Command-C precedence |
 | `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, panel growth, result replacement, stop, inline failure, and recovery |
 | `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, hide, and show invariants |
-| `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, provider presets and the custom endpoint, readiness, prompt editing, and recording the global shortcut |
+| `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, provider presets and the custom endpoint, readiness, prompt editing, recording the global shortcut, bringing in the frontmost selection, and framing text with the capture shortcut |
 | `VisualAndAccessibilityJourneyTests.swift` | approved empty-panel and Settings Pencil pixels and the native semantic accessibility audit |
 
 `Resources/Scenarios/pairwise-environment-v1.json` is a stable-seed pairwise environment matrix.
@@ -129,6 +130,13 @@ The guest cannot grant the Accessibility permission, so selection journeys launc
 `--automation-selection-endpoint`, and the global shortcut reads the selection a test set with
 `ScenarioServerClient.setSelection(_:)` (`POST /control/selection`) instead of the frontmost
 application's. The rest of the shortcut path is the production one.
+
+Screen Recording cannot be granted either, so the capture journey launches the app with
+`--automation-capture-image UITests/Fixtures/capture-screen.png`: the capture shortcut freezes that
+image instead of the display, and the overlay, the XCUI drag, Vision recognition (which reads
+`CIDA CAPTURE SCENARIO`), and the translation run as in production. The capture shortcut adds
+`capture-overlay-shown`, then `capture-imported`, `capture-unrecognized` or `capture-cancelled`,
+to the lifecycle log.
 
 Regenerate the project after adding or removing UI source files:
 

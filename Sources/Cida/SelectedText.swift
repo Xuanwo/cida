@@ -143,29 +143,3 @@ struct ScenarioSelectedTextSource: SelectedTextSource {
     return SelectedText.normalized(payload.text)
   }
 }
-
-/// Whether Cida holds the Accessibility permission that reading selections
-/// needs, and the way to ask for it (Pencil `Spec — 设置` §四).
-struct SelectionAccess: Sendable {
-  let isGranted: @MainActor @Sendable () -> Bool
-  let request: @MainActor @Sendable () -> Void
-
-  /// The system permission; asking shows the system prompt that leads to
-  /// Privacy & Security › Accessibility.
-  static let system = SelectionAccess(
-    isGranted: { AXIsProcessTrusted() },
-    request: {
-      _ = AXIsProcessTrustedWithOptions(
-        ["AXTrustedCheckOptionPrompt": true] as CFDictionary)
-    }
-  )
-
-  /// Design fixtures pin the state so snapshots do not depend on the host.
-  static func fixed(granted: Bool) -> SelectionAccess {
-    SelectionAccess(isGranted: { granted }, request: {})
-  }
-
-  /// Posted by the system when the list of applications allowed to use
-  /// accessibility changes.
-  static let didChangeNotification = Notification.Name("com.apple.accessibility.api")
-}

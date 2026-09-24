@@ -290,6 +290,9 @@ final class AppModel {
   /// Whether the Accessibility permission lets the global shortcut read the
   /// frontmost application's selection.
   private(set) var isSelectionAccessGranted: Bool
+  /// Whether the Screen Recording permission lets the capture shortcut
+  /// freeze the screen.
+  private(set) var isCaptureAccessGranted: Bool
   /// Bumped when the result pane should scroll to the tail of the result.
   private(set) var resultFollowRevision = 0
   private(set) var copyFeedbackRevision = 0
@@ -297,11 +300,20 @@ final class AppModel {
   private let service: any TextProcessingService
   private let streamPresentationPolicy: StreamPresentationPolicy
   private let saveSettings: @MainActor (CidaSettings) -> Void
-  private let applyGlobalShortcut: @MainActor (GlobalShortcut) -> Bool
-  /// The Settings chip is waiting for the next key press.
-  var isRecordingShortcut = false
+  private let applyGlobalShortcut: @MainActor (GlobalShortcut, GlobalShortcutAction) -> Bool
+  private let suspendGlobalShortcuts: @MainActor (Bool) -> Void
+  /// The Settings chip waiting for the next key press. While one records,
+  /// every global shortcut is suspended so any combination reaches it.
+  var recordingShortcut: GlobalShortcutAction? {
+    didSet {
+      if (oldValue == nil) != (recordingShortcut == nil) {
+        suspendGlobalShortcuts(recordingShortcut != nil)
+      }
+    }
+  }
   private let clearPersistedAPIKey: @MainActor () -> Void
-  private let selectionAccess: SelectionAccess
+  private let selectionAccess: SystemPermission
+  private let captureAccess: SystemPermission
   /// The selection the global shortcut brought in last; the same selection
   /// again leaves the panel as it is.
   @ObservationIgnored private var lastImportedSelection: String?
@@ -331,8 +343,12 @@ final class AppModel {
     clearPersistedAPIKey: @escaping @MainActor () -> Void = {
       SettingsStore.clearAPIKey()
     },
-    applyGlobalShortcut: @escaping @MainActor (GlobalShortcut) -> Bool = { _ in true },
-    selectionAccess: SelectionAccess = .system
+    applyGlobalShortcut: @escaping @MainActor (GlobalShortcut, GlobalShortcutAction) -> Bool = {
+      _, _ in true
+    },
+    suspendGlobalShortcuts: @escaping @MainActor (Bool) -> Void = { _ in },
+    selectionAccess: SystemPermission = .accessibility,
+    captureAccess: SystemPermission = .screenRecording
   ) {
     self.mode = mode
     self.inputText = inputText
@@ -343,8 +359,11 @@ final class AppModel {
     self.saveSettings = saveSettings
     self.clearPersistedAPIKey = clearPersistedAPIKey
     self.applyGlobalShortcut = applyGlobalShortcut
+    self.suspendGlobalShortcuts = suspendGlobalShortcuts
     self.selectionAccess = selectionAccess
+    self.captureAccess = captureAccess
     isSelectionAccessGranted = selectionAccess.isGranted()
+    isCaptureAccessGranted = captureAccess.isGranted()
     lastPersistedAPIKey = settings.apiKey
   }
 
@@ -471,12 +490,36 @@ final class AppModel {
     }
     guard selection != lastImportedSelection else { return false }
     lastImportedSelection = selection
-    inputText = selection
+    replaceSource(with: selection)
+    startGeneration()
+    return true
+  }
+
+  /// The text the capture shortcut recognized in the framed part of the
+  /// screen (Pencil `Spec — 面板模型` §一 截图翻译). Recognized text replaces
+  /// the source and is translated at once, superseding a running request.
+  /// A capture without text clears the source and says so under an empty
+  /// result, without a request.
+  func importCapturedText(_ text: String?) {
+    guard let text else {
+      processingTask?.cancel()
+      generationState = .idle
+      replaceSource(with: "")
+      result = ResultRecord(
+        mode: .translate, source: "", outputLanguage: .english, phase: .unrecognized)
+      return
+    }
+    replaceSource(with: text)
+    startGeneration()
+  }
+
+  /// The whole source becomes `text`, with the default action; the editor
+  /// drops whatever it held.
+  private func replaceSource(with text: String) {
+    inputText = text
     stageInputDocument(nil)
     inputReplacementRevision &+= 1
     setMode(.translate)
-    startGeneration()
-    return true
   }
 
   func refreshSelectionAccess() {
@@ -489,6 +532,18 @@ final class AppModel {
   func requestSelectionAccess() {
     selectionAccess.request()
     refreshSelectionAccess()
+  }
+
+  func refreshCaptureAccess() {
+    let isGranted = captureAccess.isGranted()
+    if isCaptureAccessGranted != isGranted {
+      isCaptureAccessGranted = isGranted
+    }
+  }
+
+  func requestCaptureAccess() {
+    captureAccess.request()
+    refreshCaptureAccess()
   }
 
   /// Runs the current action on the current source, cancelling any request
@@ -588,13 +643,19 @@ final class AppModel {
   }
 
   /// The combination is registered system-wide before it becomes the
-  /// setting, so a combination the system or another application holds is
-  /// refused and the current one keeps working.
+  /// setting, so a combination the system, another application or the other
+  /// global shortcut holds is refused and the current one keeps working.
   @discardableResult
-  func setShortcut(_ shortcut: GlobalShortcut) -> Bool {
-    guard shortcut != settings.shortcut else { return true }
-    guard applyGlobalShortcut(shortcut) else { return false }
-    settings.shortcut = shortcut
+  func setShortcut(
+    _ shortcut: GlobalShortcut,
+    for action: GlobalShortcutAction = .showPanel
+  ) -> Bool {
+    guard shortcut != settings.shortcut(for: action) else { return true }
+    let isHeldByAnotherAction = GlobalShortcutAction.allCases.contains {
+      $0 != action && settings.shortcut(for: $0) == shortcut
+    }
+    guard !isHeldByAnotherAction, applyGlobalShortcut(shortcut, action) else { return false }
+    settings.setShortcut(shortcut, for: action)
     return true
   }
 

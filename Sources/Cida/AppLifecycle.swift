@@ -45,20 +45,29 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       clearPersistedAPIKey: {
         SettingsStore.clearAPIKey(namespace: settingsStorageNamespace)
       },
-      applyGlobalShortcut: { [weak self] shortcut in
-        self?.applyGlobalShortcut(shortcut) ?? true
+      applyGlobalShortcut: { [weak self] shortcut, action in
+        self?.applyGlobalShortcut(shortcut, for: action) ?? true
       },
-      selectionAccess: launchOptions.selectionAccess
+      suspendGlobalShortcuts: { [weak self] isSuspended in
+        self?.globalHotKey?.setSuspended(isSuspended)
+        self?.captureHotKey?.setSuspended(isSuspended)
+      },
+      selectionAccess: launchOptions.selectionAccess,
+      captureAccess: launchOptions.captureAccess
     )
   }()
   private lazy var selectedTextSource: any SelectedTextSource =
     launchOptions.selectedTextSource
+  private lazy var screenCaptureSource: any ScreenCaptureSource =
+    launchOptions.screenCaptureSource
 
   private var panelController: PanelController?
   private var settingsWindowController: NSWindowController?
   private var statusItem: NSStatusItem?
   private var showPanelMenuItem: NSMenuItem?
+  private var captureMenuItem: NSMenuItem?
   private var globalHotKey: GlobalHotKey?
+  private var captureHotKey: GlobalHotKey?
   private var performanceProbeView: FramePacingProbeNSView?
   private var millionCharacterPasteWorkload: MillionCharacterPasteWorkload?
   private var inputInteractionProbe: InputInteractionProbe?
@@ -66,6 +75,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var didAttemptInteractiveAPIKeyRecovery = false
   /// A shortcut press is reading the selection; further presses wait for it.
   private var isReadingSelection = false
+  /// The capture shortcut is freezing the screen, waiting for a frame, or
+  /// recognizing text; both shortcuts wait for it.
+  private var isCapturing = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     FontRegistrar.registerBundledFonts()
@@ -92,6 +104,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       globalHotKey = GlobalHotKey(shortcut: model.settings.shortcut) { [weak self] in
         self?.handleGlobalShortcut()
       }
+      captureHotKey = GlobalHotKey(shortcut: model.settings.captureShortcut) { [weak self] in
+        self?.handleCaptureShortcut()
+      }
+      warmUpTextRecognition()
     }
 
     if launchOptions.displaysInteractiveAutomationUI {
@@ -141,19 +157,25 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     return true
   }
 
-  /// Swaps the system hot key; without one (automation) the setting is
-  /// accepted as is. The menu bar item shows the combination that works.
-  private func applyGlobalShortcut(_ shortcut: GlobalShortcut) -> Bool {
-    if let globalHotKey, !globalHotKey.update(to: shortcut) {
+  /// Swaps the action's system hot key; without one (automation) the
+  /// setting is accepted as is. The menu bar items show the combinations
+  /// that work.
+  private func applyGlobalShortcut(
+    _ shortcut: GlobalShortcut,
+    for action: GlobalShortcutAction
+  ) -> Bool {
+    let hotKey = action == .showPanel ? globalHotKey : captureHotKey
+    if let hotKey, !hotKey.update(to: shortcut) {
       return false
     }
-    updateShowPanelMenuItem(for: shortcut)
+    updateMenuItem(for: action, shortcut: shortcut)
     return true
   }
 
-  private func updateShowPanelMenuItem(for shortcut: GlobalShortcut) {
-    showPanelMenuItem?.keyEquivalent = shortcut.menuKeyEquivalent
-    showPanelMenuItem?.keyEquivalentModifierMask = shortcut.menuModifierMask
+  private func updateMenuItem(for action: GlobalShortcutAction, shortcut: GlobalShortcut) {
+    let item = action == .showPanel ? showPanelMenuItem : captureMenuItem
+    item?.keyEquivalent = shortcut.menuKeyEquivalent
+    item?.keyEquivalentModifierMask = shortcut.menuModifierMask
   }
 
   /// The global shortcut hides a visible panel. Otherwise it first reads the
@@ -161,7 +183,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// already being translated (Pencil `Spec — 面板模型` §一 带入选区). The
   /// menu bar item shows the panel without reading anything.
   private func handleGlobalShortcut() {
-    guard let panelController else { return }
+    guard let panelController, !isCapturing else { return }
     if panelController.isVisible {
       panelController.hide()
       return
@@ -178,6 +200,58 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       let imported = model.importSelection(selection)
       lifecycleLog?.record(imported ? "selection-imported" : "selection-kept")
       showPanel()
+    }
+  }
+
+  /// The capture shortcut (Pencil `Spec — 面板模型` §一 截图翻译): freezes
+  /// the screen under the pointer, lets the user frame some text, and shows
+  /// the panel translating what was recognized. Without the Screen Recording
+  /// permission it asks for it instead.
+  @objc
+  func handleCaptureShortcut() {
+    guard !isCapturing, !isReadingSelection else { return }
+    panelController?.hide()
+    model.refreshCaptureAccess()
+    guard model.isCaptureAccessGranted else {
+      model.requestCaptureAccess()
+      return
+    }
+    isCapturing = true
+    Task { @MainActor [weak self] in
+      await self?.captureAndTranslate()
+      self?.isCapturing = false
+    }
+  }
+
+  private func captureAndTranslate() async {
+    guard let screen = PanelController.activeScreen() else { return }
+    let frozenScreen: CGImage
+    do {
+      frozenScreen = try await screenCaptureSource.captureScreen(screen)
+    } catch {
+      lifecycleLog?.record("capture-failed")
+      NSSound.beep()
+      return
+    }
+    lifecycleLog?.record("capture-overlay-shown")
+    guard let region = await CaptureOverlay.selectRegion(of: frozenScreen, on: screen) else {
+      lifecycleLog?.record("capture-cancelled")
+      return
+    }
+    let text = (try? await TextRecognizer.recognizeText(in: region)) ?? nil
+    // The request may need the Keychain key, which the first show recovers.
+    recoverAPIKeyIfNeeded()
+    model.importCapturedText(text)
+    lifecycleLog?.record(text == nil ? "capture-unrecognized" : "capture-imported")
+    showPanel()
+  }
+
+  /// The first recognition in a process loads the models, which takes
+  /// seconds; do it in the background once the app is up.
+  private func warmUpTextRecognition() {
+    Task.detached(priority: .utility) {
+      try? await Task.sleep(for: .seconds(2))
+      await TextRecognizer.warmUp()
     }
   }
 
@@ -237,7 +311,13 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     show.target = self
     menu.addItem(show)
     showPanelMenuItem = show
-    updateShowPanelMenuItem(for: model.settings.shortcut)
+    updateMenuItem(for: .showPanel, shortcut: model.settings.shortcut)
+    let capture = NSMenuItem(
+      title: "截图翻译", action: #selector(handleCaptureShortcut), keyEquivalent: "")
+    capture.target = self
+    menu.addItem(capture)
+    captureMenuItem = capture
+    updateMenuItem(for: .captureText, shortcut: model.settings.captureShortcut)
     let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)
@@ -281,7 +361,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         model.editingPrompt = .improve
       }
       if launchOptions.designState == .settingsRecording {
-        model.isRecordingShortcut = true
+        model.recordingShortcut = .showPanel
       }
     #endif
     settingsWindowController = SettingsWindowFactory.makeWindowController(model: model)
@@ -404,6 +484,7 @@ private struct LaunchOptions {
   let automationSettingsNamespace: String?
   let lifecycleLogURL: URL?
   let automationSelectionEndpoint: URL?
+  let automationCaptureImageURL: URL?
 
   var isAutomation: Bool {
     explicitlyIsolatedAutomation || snapshotOutputURL != nil
@@ -475,8 +556,20 @@ private struct LaunchOptions {
     return AccessibilitySelectedTextSource()
   }
 
-  var selectionAccess: SelectionAccess {
-    usesDesignFixtures ? .fixed(granted: designState == .settingsCustom) : .system
+  var screenCaptureSource: any ScreenCaptureSource {
+    if let automationCaptureImageURL {
+      return FixtureScreenCaptureSource(imageURL: automationCaptureImageURL)
+    }
+    return SystemScreenCaptureSource()
+  }
+
+  var selectionAccess: SystemPermission {
+    usesDesignFixtures ? .fixed(granted: designState == .settingsCustom) : .accessibility
+  }
+
+  var captureAccess: SystemPermission {
+    if usesDesignFixtures { return .fixed(granted: designState == .settingsCustom) }
+    return automationCaptureImageURL == nil ? .screenRecording : .fixed(granted: true)
   }
 
   var initialMode: ProcessingMode {
@@ -559,6 +652,10 @@ private struct LaunchOptions {
     automationSelectionEndpoint =
       explicitlyIsolatedAutomation
       ? arguments.value(after: "--automation-selection-endpoint").flatMap(URL.init(string:))
+      : nil
+    automationCaptureImageURL =
+      explicitlyIsolatedAutomation
+      ? arguments.value(after: "--automation-capture-image").map { URL(fileURLWithPath: $0) }
       : nil
     if isE2ETesting {
       guard

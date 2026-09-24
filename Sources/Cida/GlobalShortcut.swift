@@ -1,9 +1,9 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// The key combination that shows the panel from any application (Pencil
-/// `Spec — 设置` §四). It always carries ⌘, ⌥ or ⌃, so plain typing in
-/// another application can never summon the panel.
+/// A key combination that works from any application: showing the panel or
+/// capturing text on screen (Pencil `Spec — 设置` §四). It always carries ⌘,
+/// ⌥ or ⌃, so plain typing in another application can never trigger it.
 struct GlobalShortcut: Equatable, Hashable, Sendable {
   struct Modifiers: OptionSet, Hashable, Sendable {
     let rawValue: UInt8
@@ -61,6 +61,7 @@ struct GlobalShortcut: Equatable, Hashable, Sendable {
   let modifiers: Modifiers
 
   static let optionSpace = GlobalShortcut(keyCode: UInt16(kVK_Space), modifiers: .option)
+  static let optionS = GlobalShortcut(keyCode: UInt16(kVK_ANSI_S), modifiers: .option)
 
   init(keyCode: UInt16, modifiers: Modifiers) {
     self.keyCode = keyCode
@@ -189,5 +190,21 @@ extension GlobalShortcut: Codable {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(keyCode, forKey: .keyCode)
     try container.encode(modifiers.rawValue, forKey: .modifiers)
+  }
+}
+
+/// What a global shortcut does; each action has its own combination in
+/// Settings, and no two actions may share one.
+enum GlobalShortcutAction: CaseIterable, Sendable {
+  /// Shows or hides the panel, bringing in the frontmost selection.
+  case showPanel
+  /// Freezes the screen, lets the user frame some text, and translates it.
+  case captureText
+
+  var defaultShortcut: GlobalShortcut {
+    switch self {
+    case .showPanel: .optionSpace
+    case .captureText: .optionS
+    }
   }
 }

@@ -158,6 +158,8 @@ enum ResultPhase: Equatable, Sendable {
   case completed
   case stopped
   case failed(message: String)
+  /// A capture held no text, so nothing was requested.
+  case unrecognized
 
   var isTerminal: Bool {
     self != .streaming
@@ -242,6 +244,8 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
       ResultNote(kind: .stopped, text: "已停止 · ⏎ 重新生成")
     case .failed(let message):
       ResultNote(kind: .failed, text: "请求失败：\(message) 按 ⏎ 重试")
+    case .unrecognized:
+      ResultNote(kind: .unrecognized, text: "截图里没有识别到文字")
     }
   }
 }
@@ -251,6 +255,7 @@ struct ResultNote: Equatable, Sendable {
     case stale
     case stopped
     case failed
+    case unrecognized
   }
 
   let kind: Kind
@@ -278,6 +283,8 @@ struct CidaSettings: Codable, Equatable, Sendable {
   var launchAtLogin = false
   /// The combination that shows the panel from any application.
   var shortcut = GlobalShortcut.optionSpace
+  /// The combination that captures text on screen and translates it.
+  var captureShortcut = GlobalShortcut.optionS
   private var promptContractVersion = currentPromptContractVersion
 
   /// The endpoint requests go to: the preset's, or a valid http(s) custom URL.
@@ -326,6 +333,7 @@ struct CidaSettings: Codable, Equatable, Sendable {
     case improvementPrompt
     case launchAtLogin
     case shortcut
+    case captureShortcut
     case promptContractVersion
   }
 
@@ -369,6 +377,22 @@ struct CidaSettings: Codable, Equatable, Sendable {
     launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
     shortcut =
       try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
+    captureShortcut =
+      try container.decodeIfPresent(GlobalShortcut.self, forKey: .captureShortcut) ?? .optionS
+  }
+
+  func shortcut(for action: GlobalShortcutAction) -> GlobalShortcut {
+    switch action {
+    case .showPanel: shortcut
+    case .captureText: captureShortcut
+    }
+  }
+
+  mutating func setShortcut(_ newShortcut: GlobalShortcut, for action: GlobalShortcutAction) {
+    switch action {
+    case .showPanel: shortcut = newShortcut
+    case .captureText: captureShortcut = newShortcut
+    }
   }
 
   func prompt(for mode: ProcessingMode) -> String {

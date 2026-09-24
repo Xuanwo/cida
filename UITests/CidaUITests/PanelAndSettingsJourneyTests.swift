@@ -102,6 +102,49 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse((completed.value as? String)?.contains("SELECTION_GATED") ?? true)
   }
 
+  /// Pencil `Spec — 面板模型` §一 截图翻译. The VM cannot grant Screen
+  /// Recording, so the frozen screen is a fixture image; the overlay, the
+  /// framing drag, Vision recognition, and the translation are the
+  /// production path. Vision's first recognition loads its models, which
+  /// is why the first frame is given time.
+  func testCaptureShortcutFramesTextOnAFrozenScreenAndTranslatesIt() {
+    driver.launch(additionalArguments: [
+      "--automation-capture-image", "\(e2eEnvironment.sourceRoot)/UITests/Fixtures/capture-screen.png",
+    ])
+    driver.hidePanel()
+
+    driver.app.typeKey("s", modifierFlags: .option)
+    XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5), "⌥S freezes the screen")
+    driver.app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(driver.captureOverlay.waitForNonExistence(timeout: 3), "Escape cancels")
+    XCTAssertFalse(driver.panel.exists, "A cancelled capture shows nothing")
+
+    driver.app.typeKey("s", modifierFlags: .option)
+    XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5))
+    driver.frameCapture(from: CGVector(dx: 0.08, dy: 0.14), to: CGVector(dx: 0.72, dy: 0.34))
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 30), "The panel follows recognition")
+    XCTAssertFalse(driver.captureOverlay.exists)
+    XCTAssertTrue(
+      driver.waitForTextValue("CIDA CAPTURE SCENARIO", in: driver.composer, timeout: 5),
+      "The recognized text is the source")
+    XCTAssertTrue(driver.translateAction.isSelected)
+    XCTAssertTrue(
+      driver.result(containing: "CIDA_CAPTURE_SCENARIO_COMPLETE").waitForExistence(timeout: 8),
+      "and is translated without ⏎")
+    driver.waitForCompletion()
+
+    driver.hidePanel()
+    driver.app.typeKey("s", modifierFlags: .option)
+    XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5))
+    driver.frameCapture(from: CGVector(dx: 0.1, dy: 0.6), to: CGVector(dx: 0.9, dy: 0.9))
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 10))
+    XCTAssertTrue(
+      driver.resultNote("unrecognized").waitForExistence(timeout: 3),
+      "A frame without text says so")
+    XCTAssertEqual(driver.textValue(in: driver.composer), "", "and clears the source")
+    XCTAssertFalse(driver.stopButton.exists, "Nothing was requested")
+  }
+
   func testProviderEndpointAndPromptEditingFollowTheSettingsStateMachine() {
     driver.launch(endpointOverride: false)
     driver.openSettings()
@@ -183,6 +226,11 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(
       driver.app.buttons["settings-selection-access-request"].exists,
       "Without the Accessibility permission the selection row asks for it")
+    let captureChip = driver.app.buttons["settings-capture-shortcut"]
+    XCTAssertEqual(captureChip.label, "截图翻译快捷键 ⌥ S")
+    XCTAssertTrue(
+      driver.app.buttons["settings-capture-access-request"].exists,
+      "Without Screen Recording the capture row asks for it")
 
     chip.click()
     XCTAssertTrue(driver.waitForLabel("按下新的全局快捷键", in: chip, timeout: 3), "A click starts recording")

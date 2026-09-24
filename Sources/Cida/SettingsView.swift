@@ -92,7 +92,8 @@ private struct SettingsBody: View {
       }
       Hairline()
       SettingsGroup(title: "唤起") {
-        GlobalShortcutRow(model: model)
+        GlobalShortcutRow(model: model, action: .showPanel)
+        GlobalShortcutRow(model: model, action: .captureText)
         SelectionAccessRow(model: model)
         LaunchAtLoginRow(model: model)
       }
@@ -460,9 +461,12 @@ private struct ExpandedPromptRow: View {
 // MARK: - 唤起
 
 /// The key chip is the recorder: a click waits for the next combination,
-/// which is registered before it is kept (Pencil `Spec — 设置` §四).
+/// which is registered before it is kept (Pencil `Spec — 设置` §四). The
+/// capture row also says whether the Screen Recording permission is there
+/// and asks for it.
 private struct GlobalShortcutRow: View {
   @Bindable var model: AppModel
+  let action: GlobalShortcutAction
   @State private var feedback: Feedback?
 
   /// What the caption says instead of the row's purpose: the recording hint,
@@ -472,47 +476,95 @@ private struct GlobalShortcutRow: View {
     case rejected
   }
 
+  private var isRecording: Bool {
+    model.recordingShortcut == action
+  }
+
+  private var shortcut: GlobalShortcut {
+    model.settings.shortcut(for: action)
+  }
+
+  private var needsCaptureAccess: Bool {
+    action == .captureText && !model.isCaptureAccessGranted
+  }
+
+  private var title: String {
+    action == .showPanel ? "全局快捷键" : "截图翻译"
+  }
+
   private var caption: String {
-    if model.isRecordingShortcut {
+    if isRecording {
       return feedback == .missingModifier ? "要带 ⌘、⌥ 或 ⌃" : "Esc 取消"
     }
-    return feedback == .rejected ? "这个组合已被占用，换一个" : "在任何应用里显示辞达"
+    if feedback == .rejected { return "这个组合已被占用，换一个" }
+    switch action {
+    case .showPanel: return "在任何应用里显示辞达"
+    case .captureText: return needsCaptureAccess ? "需要屏幕录制权限" : "框选屏幕文字并翻译"
+    }
+  }
+
+  private var identifierPrefix: String {
+    action == .showPanel ? "settings-shortcut" : "settings-capture-shortcut"
+  }
+
+  private var accessibilityName: String {
+    action == .showPanel ? "全局快捷键" : "截图翻译快捷键"
   }
 
   var body: some View {
-    SettingsRow(title: "全局快捷键", caption: caption, alignment: .trailing) {
+    SettingsRow(title: title, caption: caption, alignment: .trailing) {
       HStack(spacing: 12) {
-        if model.settings.shortcut != .optionSpace, !model.isRecordingShortcut {
+        if needsCaptureAccess, !isRecording {
+          Button("去授权", action: model.requestCaptureAccess)
+            .buttonStyle(SettingsBorderedButtonStyle())
+            .accessibilityIdentifier("settings-capture-access-request")
+        }
+        if shortcut != action.defaultShortcut, !isRecording {
           Button("恢复默认") {
-            feedback = nil
-            model.setShortcut(.optionSpace)
+            feedback = model.setShortcut(action.defaultShortcut, for: action) ? nil : .rejected
           }
           .buttonStyle(.plain)
           .font(CidaDesign.ui(12, weight: .medium))
           .foregroundStyle(CidaDesign.textSecondary)
-          .accessibilityIdentifier("settings-shortcut-reset")
+          .accessibilityIdentifier("\(identifierPrefix)-reset")
         }
         Button {
           feedback = nil
-          model.isRecordingShortcut = true
+          model.recordingShortcut = action
         } label: {
           ShortcutChip(
-            text: model.isRecordingShortcut ? "按下新组合…" : model.settings.shortcut.displayText,
-            isRecording: model.isRecordingShortcut)
+            text: isRecording ? "按下新组合…" : shortcut.displayText,
+            isRecording: isRecording)
         }
         .buttonStyle(.plain)
         .background {
           ShortcutCaptureView(
-            isRecording: $model.isRecordingShortcut,
-            onCapture: { shortcut in
-              feedback = model.setShortcut(shortcut) ? nil : .rejected
+            isRecording: Binding(
+              get: { model.recordingShortcut == action },
+              set: { recording in
+                if recording {
+                  model.recordingShortcut = action
+                } else if model.recordingShortcut == action {
+                  model.recordingShortcut = nil
+                }
+              }),
+            onCapture: { newShortcut in
+              feedback = model.setShortcut(newShortcut, for: action) ? nil : .rejected
             },
             onInvalidPress: { feedback = .missingModifier })
         }
         .accessibilityLabel(
-          model.isRecordingShortcut ? "按下新的全局快捷键" : "全局快捷键 \(model.settings.shortcut.displayText)")
-        .accessibilityIdentifier("settings-shortcut")
+          isRecording ? "按下新的\(accessibilityName)" : "\(accessibilityName) \(shortcut.displayText)")
+        .accessibilityIdentifier(identifierPrefix)
       }
+    }
+    .onAppear {
+      if action == .captureText { model.refreshCaptureAccess() }
+    }
+    .onReceive(
+      NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
+    ) { _ in
+      if action == .captureText { model.refreshCaptureAccess() }
     }
   }
 }
@@ -572,7 +624,7 @@ private struct SelectionAccessRow: View {
     }
     .onReceive(
       DistributedNotificationCenter.default()
-        .publisher(for: SelectionAccess.didChangeNotification)
+        .publisher(for: SystemPermission.accessibilityDidChangeNotification)
         .receive(on: DispatchQueue.main)
     ) { _ in
       Task { @MainActor in
