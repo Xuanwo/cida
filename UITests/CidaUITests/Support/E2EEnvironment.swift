@@ -106,46 +106,6 @@ enum ProcessRunner {
   }
 }
 
-extension ProcessRunner {
-  struct Result {
-    let status: Int32
-    let output: String
-    let errorOutput: String
-  }
-
-  /// Runs to completion and returns the exit status with both outputs, whatever the status.
-  static func capture(
-    _ executable: String,
-    arguments: [String],
-    environment: [String: String],
-    standardInput: Data? = nil
-  ) throws -> Result {
-    let process = Process()
-    let output = Pipe()
-    let error = Pipe()
-    process.executableURL = URL(fileURLWithPath: executable)
-    process.arguments = arguments
-    process.environment = environment
-    process.standardOutput = output
-    process.standardError = error
-    let input = Pipe()
-    process.standardInput = input
-    try process.run()
-    if let standardInput {
-      input.fileHandleForWriting.write(standardInput)
-    }
-    try input.fileHandleForWriting.close()
-    let outputData = output.fileHandleForReading.readDataToEndOfFile()
-    let errorData = error.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
-    return Result(
-      status: process.terminationStatus,
-      output: String(decoding: outputData, as: UTF8.self),
-      errorOutput: String(decoding: errorData, as: UTF8.self)
-    )
-  }
-}
-
 enum ProcessRunnerError: Error, CustomStringConvertible {
   case failed(executable: String, status: Int32, message: String)
 

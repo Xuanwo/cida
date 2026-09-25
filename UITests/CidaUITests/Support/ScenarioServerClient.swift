@@ -64,6 +64,34 @@ final class ScenarioServerClient {
     return nil
   }
 
+  struct CommandLineResult: Decodable {
+    let status: Int32
+    let output: String
+    let errorOutput: String
+  }
+
+  /// Runs `executable` with `arguments` in the server's unsandboxed process, against the
+  /// settings namespace of the instance under test (see `run_command_line` in the server).
+  func runCommandLine(
+    executable: String, namespace: String, arguments: [String], standardInput: String?
+  ) throws -> CommandLineResult {
+    var body: [String: Any] = [
+      "executable": executable, "namespace": namespace, "arguments": arguments,
+    ]
+    body["stdin"] = standardInput
+    let data = try ProcessRunner.run(
+      "/usr/bin/curl",
+      arguments: [
+        "--fail", "--silent", "--show-error", "--max-time", "100",
+        "-H", "Content-Type: application/json",
+        "--data-binary", "@-",
+        "\(baseURL)/control/command-line",
+      ],
+      standardInput: try JSONSerialization.data(withJSONObject: body)
+    )
+    return try JSONDecoder().decode(CommandLineResult.self, from: data)
+  }
+
   private func request(path: String, body: [String: String]) throws -> Data {
     let payload = try JSONSerialization.data(withJSONObject: body)
     return try ProcessRunner.run(

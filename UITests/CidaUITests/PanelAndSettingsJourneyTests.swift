@@ -206,6 +206,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     ])
     XCTAssertEqual(set.status, 0, set.errorOutput)
     XCTAssertEqual(set.output, "已更新 3 项：endpoint、format、model\n")
+    let stored = try driver.runCommandLine(["config", "show", "--json"])
+    XCTAssertTrue(stored.output.contains(#""complete": true"#), stored.output)
     XCTAssertTrue(
       driver.waitForExistence(of: driver.modelStatus, timeout: 3),
       "The open window refreshes at once")

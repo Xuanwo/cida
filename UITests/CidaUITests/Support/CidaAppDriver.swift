@@ -75,20 +75,16 @@ final class CidaAppDriver {
   var executablePath: String { "\(environment.appPath)/Contents/MacOS/Cida" }
 
   /// Runs the artifact's command line against this instance's settings, the way an AI
-  /// assistant configures Cida; a running instance hears the change.
+  /// assistant configures Cida; a running instance hears the change. The scenario server runs
+  /// it, because a process this sandboxed runner started would keep its settings in the
+  /// runner's container.
   @discardableResult
   func runCommandLine(_ arguments: [String], standardInput: String? = nil) throws
-    -> ProcessRunner.Result
+    -> ScenarioServerClient.CommandLineResult
   {
-    var processEnvironment = ProcessInfo.processInfo.environment
-    processEnvironment["CIDA_ISOLATED_AUTOMATION"] = "1"
-    processEnvironment["CIDA_AUTOMATION_SETTINGS_NAMESPACE"] = settingsNamespace
-    let result = try ProcessRunner.capture(
-      executablePath,
-      arguments: arguments,
-      environment: processEnvironment,
-      standardInput: standardInput.map { Data($0.utf8) }
-    )
+    let result = try ScenarioServerClient(baseURL: environment.controlBaseURL).runCommandLine(
+      executable: executablePath, namespace: settingsNamespace, arguments: arguments,
+      standardInput: standardInput)
     XCTContext.runActivity(named: "Cida \(arguments.joined(separator: " "))") { activity in
       let attachment = XCTAttachment(
         string: "exit \(result.status)\n\(result.output)\(result.errorOutput)")

@@ -323,7 +323,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       if updater.state.automaticallyChecks != automaticUpdates {
         updater.state.setAutomaticallyChecks(automaticUpdates)
       }
-      lifecycleLog?.record("configuration-reloaded")
+      lifecycleLog?.record(
+        "configuration-reloaded model=\(model.settings.modelService.model)"
+          + " host=\(model.settings.modelService.host ?? "none")"
+          + " configured=\(model.isModelServiceConfigured)")
     }
   }
 
