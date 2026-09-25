@@ -207,6 +207,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(set.status, 0, set.errorOutput)
     XCTAssertEqual(set.output, "已更新 3 项：endpoint、format、model\n")
     XCTAssertTrue(
+      driver.waitForExistence(of: driver.modelStatus, timeout: 3),
+      "The open window refreshes at once")
+    XCTAssertTrue(
       driver.waitForValue("已就绪 · 刚刚更新", in: driver.modelStatus, timeout: 3),
       "The open window refreshes at once")
     XCTAssertFalse(driver.modelOnboarding.exists)
@@ -334,6 +337,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse(refused.errorOutput.contains("sk-first-instance"))
     driver.launch(endpointOverride: false)
     driver.openSettings()
+    XCTAssertTrue(driver.waitForExistence(of: driver.modelStatus, timeout: 3))
     XCTAssertTrue(driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 3))
     XCTAssertTrue(
       driver.waitForText(containing: "first-instance-model", in: driver.modelSummary, timeout: 1))

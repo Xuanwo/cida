@@ -119,6 +119,15 @@ enum SettingsStore {
     userDefaults(for: namespace).set(enabled, forKey: automaticUpdatesKey)
   }
 
+  /// Hands this process's writes to the preferences daemon and drops what it cached. Another
+  /// process wrote or will read the settings: the command line calls this before it announces a
+  /// change, and a running Cida before it reloads, since each process caches its preferences.
+  static func synchronize(namespace: String) {
+    // `userDefaults(for:)` uses the standard defaults for the storage namespace.
+    CFPreferencesAppSynchronize(
+      namespace == storageNamespace ? kCFPreferencesCurrentApplication : namespace as CFString)
+  }
+
   static func reset(namespace: String) {
     let defaults = userDefaults(for: namespace)
     defaults.removeObject(forKey: defaultsKey)
@@ -209,7 +218,10 @@ struct ConfigurationStore: Sendable {
           try SMAppService.mainApp.unregister()
         }
       },
-      notifyChange: { ConfigurationChangeNotification.post(namespace: namespace) }
+      notifyChange: {
+        SettingsStore.synchronize(namespace: namespace)
+        ConfigurationChangeNotification.post(namespace: namespace)
+      }
     )
   }
 }

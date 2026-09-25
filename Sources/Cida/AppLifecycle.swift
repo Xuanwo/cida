@@ -309,6 +309,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     configurationChangeObserver = ConfigurationChangeNotification.observe(namespace: namespace) {
       [weak self] in
       guard let self else { return }
+      SettingsStore.synchronize(namespace: namespace)
       var settings = launchOptions.applyingEndpointOverride(
         to: SettingsStore.load(namespace: namespace))
       // A key this launch recovered interactively cannot be read again without asking.

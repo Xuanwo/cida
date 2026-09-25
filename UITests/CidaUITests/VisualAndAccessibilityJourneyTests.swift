@@ -37,6 +37,7 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     driver.launch(endpointOverride: false, additionalArguments: ["--automation-permissions", "denied"])
     driver.openSettings()
     let settingsWindow = driver.settingsWindow
+    XCTAssertTrue(driver.waitForExistence(of: driver.modelStatus, timeout: 3))
     XCTAssertTrue(driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 3))
     let manifest = try VisualBaselineManifest.load(from: e2eEnvironment.sourceRoot)
     let baseline = try manifest.baseline(named: "settings")
