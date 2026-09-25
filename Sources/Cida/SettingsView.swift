@@ -661,10 +661,15 @@ private struct LaunchAtLoginRow: View {
 }
 
 private struct AboutFooter: View {
+  /// The bundle's CFBundleShortVersionString; a release build sets it from its tag. Unbundled
+  /// runs (`swift run`) have none and show only the motto.
+  private let version =
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+
   var body: some View {
     HStack(spacing: 8) {
       CidaWordmark()
-      Text("1.0 · 辞达而已矣")
+      Text(version.map { "\($0) · 辞达而已矣" } ?? "辞达而已矣")
         .font(CidaDesign.ui(11))
         .foregroundStyle(CidaDesign.textTertiary)
     }

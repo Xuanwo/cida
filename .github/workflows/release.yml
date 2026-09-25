@@ -1,0 +1,93 @@
+# Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N for a prerelease) on a commit of main builds, signs,
+# notarizes and publishes Cida as a GitHub release. See "Releasing" in README.md for the
+# secrets it needs and the local gate that comes before the tag.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the version from the tag
+        id: version
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-rc\.[0-9]+)?$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not vX.Y.Z or vX.Y.Z-rc.N"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME is not on main"
+            exit 1
+          fi
+          {
+            echo "version=${BASH_REMATCH[1]}"
+            echo "prerelease=$([[ -n "${BASH_REMATCH[2]}" ]] && echo true || echo false)"
+            echo "build=$(git rev-list --count HEAD)"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Test
+        run: swift test
+
+      - name: Import the Developer ID identity
+        env:
+          CIDA_DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          CIDA_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          identity=$(scripts/ci/import-signing-identity.sh "$RUNNER_TEMP/cida-signing.keychain-db")
+          echo "CIDA_CODESIGN_IDENTITY=$identity" >>"$GITHUB_ENV"
+
+      - name: Build
+        env:
+          CIDA_VERSION: ${{ steps.version.outputs.version }}
+          CIDA_BUILD_NUMBER: ${{ steps.version.outputs.build }}
+        run: scripts/build-app.sh release
+
+      - name: Notarize
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          CIDA_NOTARY_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          CIDA_NOTARY_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+        run: |
+          (umask 077 && printf '%s\n' "$NOTARY_API_KEY" >"$RUNNER_TEMP/cida-notary.p8")
+          CIDA_NOTARY_KEY="$RUNNER_TEMP/cida-notary.p8" scripts/notarize-app.sh build/Cida.app
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          archive="Cida-$VERSION-$BUILD.zip"
+          (cd build && shasum -a 256 "$archive" >"$archive.sha256")
+          flags=(--verify-tag --generate-notes --title "辞达 $GITHUB_REF_NAME")
+          if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" "build/$archive" "build/$archive.sha256" "${flags[@]}"
+
+      - name: Remove the signing material
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/cida-notary.p8"
+          if [[ -f "$RUNNER_TEMP/cida-signing.keychain-db" ]]; then
+            security delete-keychain "$RUNNER_TEMP/cida-signing.keychain-db"
+          fi

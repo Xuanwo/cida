@@ -1,4 +1,6 @@
 #!/bin/zsh
+# Builds and signs build/Cida.app. CIDA_VERSION (CFBundleShortVersionString, e.g. 1.2.0) and
+# CIDA_BUILD_NUMBER (CFBundleVersion) override the values in Resources/Cida-Info.plist.
 set -euo pipefail
 
 script_dir=${0:A:h}
@@ -7,6 +9,15 @@ configuration=${1:-release}
 output_dir="$project_dir/build"
 app_path="$output_dir/Cida.app"
 mkdir -p "$output_dir"
+
+if [[ -n "${CIDA_VERSION:-}" && ! "$CIDA_VERSION" =~ '^[0-9]+\.[0-9]+\.[0-9]+$' ]]; then
+  echo "CIDA_VERSION must be three numbers such as 1.2.0, got $CIDA_VERSION" >&2
+  exit 64
+fi
+if [[ -n "${CIDA_BUILD_NUMBER:-}" && ! "$CIDA_BUILD_NUMBER" =~ '^[1-9][0-9]*$' ]]; then
+  echo "CIDA_BUILD_NUMBER must be a positive integer, got $CIDA_BUILD_NUMBER" >&2
+  exit 64
+fi
 
 signing_identity=${CIDA_CODESIGN_IDENTITY:-}
 if [[ -z "$signing_identity" ]]; then
@@ -47,6 +58,14 @@ bin_path=$(swift build \
 /usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
   "$staging_app/Contents/Info.plist"
 "$script_dir/compile-app-icon.sh" "$staging_app/Contents/Resources"
+if [[ -n "${CIDA_VERSION:-}" ]]; then
+  /usr/bin/plutil -replace CFBundleShortVersionString -string "$CIDA_VERSION" \
+    "$staging_app/Contents/Info.plist"
+fi
+if [[ -n "${CIDA_BUILD_NUMBER:-}" ]]; then
+  /usr/bin/plutil -replace CFBundleVersion -string "$CIDA_BUILD_NUMBER" \
+    "$staging_app/Contents/Info.plist"
+fi
 
 /usr/bin/xattr -cr "$staging_app"
 /usr/bin/codesign --force --deep --sign "$signing_identity" --options runtime "$staging_app"
