@@ -22,6 +22,8 @@
 - **用你自己的模型。** 支持 DeepSeek、OpenAI、Moonshot、智谱 GLM，以及任何兼容 OpenAI 的接口，包括不需要密钥的本地服务。
 - **什么都不留。** API Key 只存在钥匙串里；没有历史记录，没有遥测，截图也不会离开你的 Mac。
 
+![辞达润色一句中文](docs/images/improve.png)
+
 ## 安装
 
 需要 macOS 15 或更新版本。

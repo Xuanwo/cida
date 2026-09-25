@@ -22,6 +22,8 @@ Cida lives in the menu bar. Press <kbd>⌥</kbd> <kbd>Space</kbd> in any app and
 - **Uses your model.** DeepSeek, OpenAI, Moonshot, 智谱 GLM, or any OpenAI-compatible endpoint, including a local server that needs no key.
 - **Keeps nothing.** The API key lives in Keychain. There is no history and no telemetry, and screenshots never leave your Mac.
 
+![Cida improving a Chinese sentence](docs/images/improve.png)
+
 The interface is in Simplified Chinese.
 
 ## Install
