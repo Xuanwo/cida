@@ -21,6 +21,14 @@ Create a signed Release app bundle without launching it:
 scripts/build-app.sh release
 ```
 
+To hand the app to another Mac, notarize it:
+
+```sh
+scripts/notarize-app.sh
+```
+
+It submits `build/Cida.app` to Apple's notary service, staples the ticket, checks that Gatekeeper accepts the app as notarized, and writes `build/Cida-<version>-<build>.zip`. It reads credentials from the notarytool keychain profile `cida-notary` (or `CIDA_NOTARY_PROFILE`), created once with `xcrun notarytool store-credentials cida-notary --apple-id <id> --team-id 3GMS63N4BQ` and an app-specific password.
+
 The production bundle is written to `build/Cida.app`. It uses a stable Developer ID signature so its Keychain identity survives rebuilds. Provider keys are stored only in Keychain; prompts, model IDs, the custom endpoint, and other non-secret preferences are stored in UserDefaults. Nothing else is persisted: the panel starts empty on every launch, and no record of past requests is written anywhere.
 
 The provider menu lists presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM), each a fixed Chat Completions endpoint with suggested models, plus 自定义（OpenAI 兼容）, which exposes an editable endpoint and model ID. Loopback endpoints such as `http://127.0.0.1:8080/v1/chat/completions` and `http://localhost:8080/v1/chat/completions` may omit the API key. Non-local endpoints still require one. The model group ends in a readiness line derived locally from the provider, endpoint, model, and key.
