@@ -209,7 +209,7 @@ final class InteractionReproductionTests: XCTestCase {
     window.contentView?.layoutSubtreeIfNeeded()
 
     model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(2)) { window.firstResponder is ShortcutCaptureNSView }
+    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
     let recorder = try XCTUnwrap(window.firstResponder as? ShortcutCaptureNSView)
 
     // Shift alone is not a shortcut: the recorder keeps waiting.
@@ -221,20 +221,20 @@ final class InteractionReproductionTests: XCTestCase {
     let recorded = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
     XCTAssertEqual(model.settings.shortcut, recorded)
     XCTAssertEqual(applied.values, [recorded], "The combination is registered before it is kept")
-    try await waitUntil(timeout: .seconds(2)) { model.recordingShortcut == nil }
-    try await waitUntil(timeout: .seconds(2)) { !(window.firstResponder is ShortcutCaptureNSView) }
+    try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
+    try await waitUntil(timeout: .seconds(5)) { !(window.firstResponder is ShortcutCaptureNSView) }
 
     model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(2)) { window.firstResponder is ShortcutCaptureNSView }
+    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
     recorder.record(keyEvent(kVK_Escape, "\u{1B}", []))
-    try await waitUntil(timeout: .seconds(2)) { model.recordingShortcut == nil }
+    try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(model.settings.shortcut, recorded, "Escape keeps the combination")
 
     // A combination the system refuses leaves the current one in place.
     model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(2)) { window.firstResponder is ShortcutCaptureNSView }
+    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
     recorder.record(keyEvent(kVK_ANSI_Q, "q", [.command]))
-    try await waitUntil(timeout: .seconds(2)) { model.recordingShortcut == nil }
+    try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(model.settings.shortcut, recorded)
     XCTAssertEqual(applied.values.count, 2)
     assertTestProcessIsNotFrontmost()

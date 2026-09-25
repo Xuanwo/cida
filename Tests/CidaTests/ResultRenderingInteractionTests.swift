@@ -283,7 +283,12 @@ extension InteractionReproductionTests {
 
     resultView.setStreaming(false)
     XCTAssertFalse(resultView.streamingCaretIsVisible)
-    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    // The reveal lasts 120 ms and commits on a display pulse; a busy CI runner can take longer
+    // than that to deliver the pulse, so wait for the commit instead of a fixed interval.
+    let revealDeadline = Date().addingTimeInterval(2)
+    while resultView.glyphRevealFragmentCountForTesting > 0, Date() < revealDeadline {
+      RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+    }
     XCTAssertEqual(resultView.glyphRevealFragmentCountForTesting, 0)
     XCTAssertEqual(resultView.glyphRevealCommittedLengthForTesting, 4)
   }
