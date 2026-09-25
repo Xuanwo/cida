@@ -2,7 +2,10 @@
 
 import http.server
 import json
+import os
 import pathlib
+import pwd
+import subprocess
 import sys
 import threading
 import time
@@ -114,6 +117,8 @@ def plan_for(submitted_text):
         "CIDA_UI_E2E_COMPLETE",
     ]
     plans = {
+        # What Settings' 检查 and `Cida check` send (ModelServiceCheck.source).
+        "hello": {"chunks": ["你好"]},
         "CIDA_RELEASE_ARTIFACT_SMOKE": {
             "chunks": ["Signed release artifact response.\n", "CIDA_UI_E2E_COMPLETE"],
         },
@@ -223,6 +228,40 @@ def plan_for(submitted_text):
     return {"chunks": default_chunks, "initialDelay": 0.2}
 
 
+def run_command_line(request):
+    """Runs the artifact's command line for a journey, as an assistant in Terminal would.
+
+    The XCUI runner is sandboxed, and so is every process it starts: their preferences and
+    Keychain items land in the runner's container, where the instance under test never looks.
+    This server runs outside the sandbox, so the command line runs here.
+    """
+    executable = str(request.get("executable", ""))
+    namespace = str(request.get("namespace", ""))
+    if not executable.endswith(".app/Contents/MacOS/Cida") or not namespace.startswith(
+        "com.xuanwo.Cida.Automation."
+    ):
+        return {"status": -1, "output": "", "errorOutput": "refused"}
+    account = pwd.getpwuid(os.getuid())
+    completed = subprocess.run(
+        [executable, *[str(argument) for argument in request.get("arguments", [])]],
+        input=str(request.get("stdin") or "").encode("utf-8"),
+        capture_output=True,
+        timeout=90,
+        env={
+            "HOME": account.pw_dir,
+            "USER": account.pw_name,
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            "CIDA_ISOLATED_AUTOMATION": "1",
+            "CIDA_AUTOMATION_SETTINGS_NAMESPACE": namespace,
+        },
+    )
+    return {
+        "status": completed.returncode,
+        "output": completed.stdout.decode("utf-8", "replace"),
+        "errorOutput": completed.stderr.decode("utf-8", "replace"),
+    }
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -238,6 +277,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if parsed_path.path == "/control/reset":
             state.reset()
             self.send_json(200, {"reset": True})
+            return
+        if parsed_path.path == "/control/command-line":
+            self.send_json(200, run_command_line(self.read_json_body()))
             return
         if parsed_path.path == "/control/release-first-byte":
             body = self.read_json_body()

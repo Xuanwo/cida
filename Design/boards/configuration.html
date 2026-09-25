@@ -45,12 +45,12 @@
 辞达的命令行：/Applications/Cida.app/Contents/MacOS/Cida
 当前配置：还没配置
 
-请这样做:
+请这样做：
 1. 问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。
 2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。
 3. 用 `Cida config set 字段=值 …` 一次写入。
 4. API Key 不要让我发给你，也不要打印或写进文件：请我先复制 Key，再运行 `pbpaste | Cida config set api-key --stdin`；Key 已经在环境变量或文件里时，用 `--env` 或 `--file`。
-5. 运行 `Cida check`;失败时用 `Cida check --verbose` 找原因、修改配置，直到通过。
+5. 运行 `Cida check`；失败时用 `Cida check --verbose` 找原因、修改配置，直到通过。
 6. 最后用 `Cida config show` 告诉我配置结果。
 
 如果你不能运行命令，就把每一步的命令写给我，我粘贴到「终端」里运行，再把输出贴给你。</div>
@@ -76,7 +76,7 @@ auth       bearer <span class="dim">（随 format）</span></pre></div>
 
   <p class="caption">⑥ 助手自己闭环 — 明文 Key 被拒并告诉它该怎么做；check 失败时 --verbose 给出实际请求与服务商原文，Key 一律替换为 ••••</p>
   <div class="terminal" data-state="configuration-agent-errors"><div class="chrome"><i></i><i></i><i></i></div><pre><span class="cmd">Cida config set api-key=sk-1234…</span>
-<span class="bad">✗ api-key 不接受写在命令里的值</span>，改用 --stdin、--file 或 --env，例如:
+<span class="bad">✗ api-key 不接受写在命令里的值</span>，改用 --stdin、--file 或 --env，例如：
   pbpaste | Cida config set api-key --stdin
 
 <span class="cmd">Cida check --verbose</span>

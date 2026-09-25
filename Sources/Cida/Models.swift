@@ -35,84 +35,6 @@ enum Language: String, CaseIterable, Codable, Sendable {
   }
 }
 
-/// A model service. Every preset is one OpenAI-compatible Chat Completions
-/// endpoint with its suggested models; `custom` points Cida at any compatible
-/// server, including a local one. Adding a provider is one more preset here
-/// (`Design/spec/settings.md`).
-enum ModelProvider: String, CaseIterable, Codable, Sendable {
-  case deepSeek = "DeepSeek"
-  case openAI = "OpenAI"
-  case moonshot = "Moonshot"
-  case zhipu = "Zhipu"
-  case custom = "Custom"
-
-  var displayName: String {
-    switch self {
-    case .deepSeek: "DeepSeek"
-    case .openAI: "OpenAI"
-    case .moonshot: "Moonshot"
-    case .zhipu: "智谱 GLM"
-    case .custom: "自定义（OpenAI 兼容）"
-    }
-  }
-
-  /// The preset's Chat Completions endpoint; `nil` for `custom`, whose
-  /// endpoint lives in `CidaSettings.customEndpoint`.
-  var presetEndpoint: URL? {
-    switch self {
-    case .deepSeek: URL(string: "https://api.deepseek.com/chat/completions")
-    case .openAI: URL(string: "https://api.openai.com/v1/chat/completions")
-    case .moonshot: URL(string: "https://api.moonshot.cn/v1/chat/completions")
-    case .zhipu: URL(string: "https://open.bigmodel.cn/api/paas/v4/chat/completions")
-    case .custom: nil
-    }
-  }
-
-  /// Shown under the provider menu so the user knows where requests go.
-  var endpointCaption: String? {
-    presetEndpoint?.host().map { "\($0) · Chat Completions" }
-  }
-
-  var suggestedModels: [String] {
-    switch self {
-    case .deepSeek: ["deepseek-chat", "deepseek-reasoner"]
-    case .openAI: ["gpt-5", "gpt-5-mini"]
-    case .moonshot: ["kimi-k3", "kimi-k2.6"]
-    case .zhipu: ["glm-5.3", "glm-5.3-flash"]
-    case .custom: []
-    }
-  }
-
-  var isCustom: Bool {
-    self == .custom
-  }
-}
-
-/// What the model group can tell without a network request (the readiness
-/// row of `Spec — 设置`).
-enum SettingsReadiness: Equatable, Sendable {
-  case ready
-  case missingAPIKey
-  case localEndpoint
-  case invalidEndpoint
-  case missingModel
-
-  var text: String {
-    switch self {
-    case .ready: "已就绪"
-    case .missingAPIKey: "还差 API Key"
-    case .localEndpoint: "本地端点 · 无需 API Key"
-    case .invalidEndpoint: "端点无效"
-    case .missingModel: "还差模型"
-    }
-  }
-
-  /// Whether requests can be sent as configured.
-  var isReady: Bool {
-    self == .ready || self == .localEndpoint
-  }
-}
-
 struct ProcessingRequest: Equatable, Sendable {
   let text: String
   let mode: ProcessingMode
@@ -264,8 +186,7 @@ struct ResultNote: Equatable, Sendable {
   static let stale = ResultNote(kind: .stale, text: "原文已修改 · ⏎ 重新生成")
 }
 
-struct CidaSettings: Codable, Equatable, Sendable {
-  static let officialOpenAIEndpoint = ModelProvider.openAI.presetEndpoint!.absoluteString
+struct CidaSettings: Equatable, Sendable {
   static let defaultTranslationPrompt =
     "Translate the user-provided text into the target language specified by the application. Preserve meaning, tone, and terminology. Return only the translated text."
   static let defaultImprovementPrompt =
@@ -273,11 +194,10 @@ struct CidaSettings: Codable, Equatable, Sendable {
 
   private static let currentPromptContractVersion = 2
 
-  var provider: ModelProvider = .deepSeek
+  /// Where requests go and how they are shaped; written by the command line.
+  var modelService = ModelConfiguration()
+  /// The key from the Keychain. It is never written with the rest of the settings.
   var apiKey = ""
-  var model = "deepseek-chat"
-  /// The Chat Completions URL used when `provider` is `.custom`.
-  var customEndpoint = ""
   var translationPrompt = defaultTranslationPrompt
   var improvementPrompt = defaultImprovementPrompt
   var launchAtLogin = false
@@ -285,101 +205,18 @@ struct CidaSettings: Codable, Equatable, Sendable {
   var shortcut = GlobalShortcut.optionSpace
   /// The combination that captures text on screen and translates it.
   var captureShortcut = GlobalShortcut.optionS
-  private var promptContractVersion = currentPromptContractVersion
 
-  /// The endpoint requests go to: the preset's, or a valid http(s) custom URL.
-  var resolvedEndpoint: URL? {
-    if let preset = provider.presetEndpoint { return preset }
-    let value = customEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard
-      let candidate = URL(string: value),
-      let scheme = candidate.scheme?.lowercased(),
-      ["http", "https"].contains(scheme),
-      candidate.host != nil
-    else {
-      return nil
-    }
-    return candidate
+  /// Whether requests can be sent (`Design/spec/configuration.md`): a valid endpoint, a model,
+  /// and a key unless the endpoint is on this Mac or `auth` is `none`.
+  var isModelServiceComplete: Bool {
+    modelService.isComplete(hasAPIKey: !apiKey.isEmpty)
   }
 
-  /// A custom endpoint on this machine, which may omit the API key.
-  var usesLocalEndpoint: Bool {
-    guard
-      provider.isCustom,
-      let url = resolvedEndpoint,
-      let rawHost = url.host(percentEncoded: false)?.lowercased()
-    else {
-      return false
-    }
-    let host = rawHost.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
-    return host == "localhost" || host == "127.0.0.1" || host == "::1"
-  }
-
-  var readiness: SettingsReadiness {
-    if resolvedEndpoint == nil { return .invalidEndpoint }
-    if model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .missingModel }
-    if usesLocalEndpoint { return .localEndpoint }
-    if apiKey.isEmpty { return .missingAPIKey }
-    return .ready
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case provider
-    case apiKey
-    case model
-    /// Historic key: it held the OpenAI endpoint before providers became presets.
-    case customEndpoint = "openAIEndpoint"
-    case translationPrompt
-    case improvementPrompt
-    case launchAtLogin
-    case shortcut
-    case captureShortcut
-    case promptContractVersion
+  var modelServiceFingerprint: String {
+    modelService.fingerprint(apiKey: apiKey)
   }
 
   init() {}
-
-  init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    let decodedProvider =
-      try container.decodeIfPresent(ModelProvider.self, forKey: .provider) ?? .deepSeek
-    apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
-    model = try container.decodeIfPresent(String.self, forKey: .model) ?? "deepseek-chat"
-    let decodedEndpoint =
-      try container.decodeIfPresent(String.self, forKey: .customEndpoint) ?? ""
-    // Before presets, "OpenAI" with a non-official endpoint was the way to
-    // reach any compatible server; that configuration is now `custom`.
-    if decodedProvider == .openAI, !decodedEndpoint.isEmpty,
-      decodedEndpoint != Self.officialOpenAIEndpoint
-    {
-      provider = .custom
-      customEndpoint = decodedEndpoint
-    } else {
-      provider = decodedProvider
-      customEndpoint = decodedProvider.isCustom ? decodedEndpoint : ""
-    }
-    let decodedPromptContractVersion =
-      try container.decodeIfPresent(Int.self, forKey: .promptContractVersion) ?? 1
-    let decodedTranslationPrompt =
-      try container.decodeIfPresent(String.self, forKey: .translationPrompt)
-      ?? Self.defaultTranslationPrompt
-    let decodedImprovementPrompt =
-      try container.decodeIfPresent(String.self, forKey: .improvementPrompt)
-      ?? Self.defaultImprovementPrompt
-    if decodedPromptContractVersion < Self.currentPromptContractVersion {
-      translationPrompt = Self.migratingLegacyPrompt(decodedTranslationPrompt)
-      improvementPrompt = Self.migratingLegacyPrompt(decodedImprovementPrompt)
-    } else {
-      translationPrompt = decodedTranslationPrompt
-      improvementPrompt = decodedImprovementPrompt
-    }
-    promptContractVersion = Self.currentPromptContractVersion
-    launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
-    shortcut =
-      try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
-    captureShortcut =
-      try container.decodeIfPresent(GlobalShortcut.self, forKey: .captureShortcut) ?? .optionS
-  }
 
   func shortcut(for action: GlobalShortcutAction) -> GlobalShortcut {
     switch action {
@@ -413,12 +250,80 @@ struct CidaSettings: Codable, Equatable, Sendable {
   }
 
   #if DEBUG
+    /// The configured service the design boards show: deepseek-chat on DeepSeek's Chat
+    /// Completions endpoint, with a key.
     static var designPreview: CidaSettings {
       var settings = CidaSettings()
+      settings.modelService.endpoint = "https://api.deepseek.com/chat/completions"
+      settings.modelService.model = "deepseek-chat"
       settings.apiKey = "sk-preview-key-3f2a"
       return settings
     }
   #endif
+}
+
+extension CidaSettings: Codable {
+  private enum CodingKeys: String, CodingKey {
+    case modelService
+    case translationPrompt
+    case improvementPrompt
+    case launchAtLogin
+    case shortcut
+    case captureShortcut
+    case promptContractVersion
+    /// 1.0's provider preset, model and custom endpoint; read once to build `modelService`.
+    case legacyProvider = "provider"
+    case legacyModel = "model"
+    case legacyEndpoint = "openAIEndpoint"
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    if let modelService = try container.decodeIfPresent(
+      ModelConfiguration.self, forKey: .modelService)
+    {
+      self.modelService = modelService
+    } else if container.contains(.legacyProvider) || container.contains(.legacyModel)
+      || container.contains(.legacyEndpoint)
+    {
+      modelService = ModelConfiguration.migrating(
+        legacyProvider: try container.decodeIfPresent(String.self, forKey: .legacyProvider),
+        model: try container.decodeIfPresent(String.self, forKey: .legacyModel),
+        endpoint: try container.decodeIfPresent(String.self, forKey: .legacyEndpoint)
+      )
+    }
+    let decodedPromptContractVersion =
+      try container.decodeIfPresent(Int.self, forKey: .promptContractVersion) ?? 1
+    let decodedTranslationPrompt =
+      try container.decodeIfPresent(String.self, forKey: .translationPrompt)
+      ?? Self.defaultTranslationPrompt
+    let decodedImprovementPrompt =
+      try container.decodeIfPresent(String.self, forKey: .improvementPrompt)
+      ?? Self.defaultImprovementPrompt
+    if decodedPromptContractVersion < Self.currentPromptContractVersion {
+      translationPrompt = Self.migratingLegacyPrompt(decodedTranslationPrompt)
+      improvementPrompt = Self.migratingLegacyPrompt(decodedImprovementPrompt)
+    } else {
+      translationPrompt = decodedTranslationPrompt
+      improvementPrompt = decodedImprovementPrompt
+    }
+    launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+    shortcut =
+      try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
+    captureShortcut =
+      try container.decodeIfPresent(GlobalShortcut.self, forKey: .captureShortcut) ?? .optionS
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(modelService, forKey: .modelService)
+    try container.encode(translationPrompt, forKey: .translationPrompt)
+    try container.encode(improvementPrompt, forKey: .improvementPrompt)
+    try container.encode(launchAtLogin, forKey: .launchAtLogin)
+    try container.encode(shortcut, forKey: .shortcut)
+    try container.encode(captureShortcut, forKey: .captureShortcut)
+    try container.encode(Self.currentPromptContractVersion, forKey: .promptContractVersion)
+  }
 }
 
 #if DEBUG

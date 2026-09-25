@@ -110,18 +110,7 @@ private struct SettingsBody: View {
   var body: some View {
     VStack(spacing: 0) {
       SettingsGroup(title: "模型", isFirst: true) {
-        ProviderRow(model: model)
-        if model.settings.provider.isCustom {
-          EndpointRow(model: model)
-        }
-        if model.settings.provider.isCustom {
-          ModelRow(model: model)
-          APIKeyRow(model: model)
-        } else {
-          APIKeyRow(model: model)
-          ModelRow(model: model)
-        }
-        ReadinessRow(readiness: model.settings.readiness)
+        ModelServiceGroup(model: model)
       }
       Hairline()
       SettingsGroup(title: "提示词") {
@@ -227,191 +216,201 @@ private struct SettingsLabel: View {
   }
 }
 
-private struct SettingsMenu<Value: Hashable>: View {
-  let valueLabel: String
-  let values: [Value]
-  let title: (Value) -> String
-  let onSelect: (Value) -> Void
-
-  var body: some View {
-    Menu {
-      ForEach(values, id: \.self) { value in
-        Button(title(value)) { onSelect(value) }
-      }
-    } label: {
-      HStack(spacing: 6) {
-        Text(valueLabel)
-          .font(CidaDesign.ui(12.5, weight: .medium))
-          .foregroundStyle(CidaDesign.textPrimary)
-        Image(systemName: "chevron.down")
-          .font(.system(size: 7.5, weight: .semibold))
-          .frame(width: 12, height: 12)
-          .foregroundStyle(CidaDesign.textTertiary)
-      }
-      .padding(.horizontal, 10)
-      .frame(height: 25)
-      .background(CidaDesign.surface)
-      .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
-          .strokeBorder(CidaDesign.border, lineWidth: 1)
-      }
-    }
-    .menuIndicator(.hidden)
-    .buttonStyle(.plain)
-    .fixedSize()
-  }
-}
-
-/// A bordered text field that fills its column; the border turns accent while
-/// it has focus.
-private struct SettingsTextField: View {
-  @Binding var text: String
-  let placeholder: String
-  let accessibilityIdentifier: String
-  var usesMonospacedFont = true
-  @FocusState private var isFocused: Bool
-
-  var body: some View {
-    TextField(placeholder, text: $text)
-      .textFieldStyle(.plain)
-      .font(usesMonospacedFont ? CidaDesign.mono(11.5) : CidaDesign.ui(12.5))
-      .foregroundStyle(CidaDesign.textPrimary)
-      .focused($isFocused)
-      .padding(.horizontal, 10)
-      .frame(maxWidth: .infinity)
-      .frame(height: 30)
-      .background(CidaDesign.surface)
-      .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
-          .strokeBorder(isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: isFocused ? 1.5 : 1)
-      }
-      .accessibilityIdentifier(accessibilityIdentifier)
-  }
-}
-
+/// The bordered button of every row; highlighted, it is the copied feedback on `accent-soft`.
 private struct SettingsBorderedButtonStyle: ButtonStyle {
+  var isHighlighted = false
+
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .font(CidaDesign.ui(12.5, weight: .medium))
-      .foregroundStyle(CidaDesign.textControl)
+      .foregroundStyle(isHighlighted ? CidaDesign.accent : CidaDesign.textControl)
       .padding(.horizontal, 12)
       .frame(height: 30)
-      .background(CidaDesign.surface.opacity(configuration.isPressed ? 0.7 : 1))
+      .background(
+        (isHighlighted ? CidaDesign.accentSoft : CidaDesign.surface)
+          .opacity(configuration.isPressed ? 0.7 : 1)
+      )
       .clipShape(.rect(cornerRadius: CidaDesign.Radius.card, style: .continuous))
       .overlay {
-        RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
-          .strokeBorder(CidaDesign.border, lineWidth: 1)
+        if !isHighlighted {
+          RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+            .strokeBorder(CidaDesign.border, lineWidth: 1)
+        }
       }
   }
 }
 
 // MARK: - 模型
 
-private struct ProviderRow: View {
+/// The model service is configured by an AI assistant through the command line; this group
+/// shows where it stands and copies the prompt (`Design/spec/configuration.md` §四).
+private struct ModelServiceGroup: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    SettingsRow(title: "服务商") {
-      VStack(alignment: .leading, spacing: 5) {
-        SettingsMenu(
-          valueLabel: model.settings.provider.displayName,
-          values: ModelProvider.allCases,
-          title: \.displayName,
-          onSelect: model.selectProvider
-        )
-        .accessibilityIdentifier("settings-provider-menu")
-        if let caption = model.settings.provider.endpointCaption {
-          Text(caption)
+    if model.isModelServiceConfigured {
+      ModelServiceRow(model: model)
+      if let note = model.modelServiceStatus.failureNote {
+        ModelServiceFailureNote(text: note)
+      }
+      SettingsRow(title: "调整配置", caption: "交给 AI 助手", alignment: .trailing) {
+        CopyConfigurationPromptButton(model: model)
+      }
+    } else {
+      ModelServiceOnboardingCard(model: model)
+    }
+  }
+}
+
+/// No service yet: one sheet of paper that says what to do next.
+private struct ModelServiceOnboardingCard: View {
+  @Bindable var model: AppModel
+
+  private var caption: String {
+    model.hasCopiedConfigurationPrompt
+      ? "已复制。粘贴给你的 AI 助手，配好后这里会自动更新。"
+      // One sentence a line, as the board sets it at this width.
+      : "复制配置提示词，交给 Claude Code、Codex 等 AI 助手。\n它会问你用哪家服务，配好后自己检查。"
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 24) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("还没有模型服务")
+          .font(CidaDesign.ui(13.5, weight: .medium))
+          .foregroundStyle(CidaDesign.textPrimary)
+          .frame(height: 20)
+        Text(caption)
+          .font(CidaDesign.ui(11.5))
+          .foregroundStyle(CidaDesign.textTertiary)
+          // The board's 17 pt lines: 3 pt between lines and half of it above and below.
+          .lineSpacing(3)
+          .padding(.vertical, 1.5)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("settings-model-onboarding-caption")
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      CopyConfigurationPromptButton(model: model)
+    }
+    .padding(.vertical, 16)
+    .padding(.horizontal, 18)
+    .background(CidaDesign.surfacePaper)
+    .clipShape(.rect(cornerRadius: CidaDesign.Radius.card, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+        .strokeBorder(CidaDesign.border, lineWidth: 1)
+    }
+    .padding(.top, 10)
+    .padding(.bottom, 12)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("settings-model-onboarding")
+  }
+}
+
+/// 模型服务: the status under the label, the model and where it runs, and 检查.
+private struct ModelServiceRow: View {
+  @Bindable var model: AppModel
+
+  private var status: ModelServiceStatus { model.modelServiceStatus }
+
+  private var statusText: String {
+    model.isModelServiceRecentlyUpdated ? "\(status.caption) · 刚刚更新" : status.caption
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 24) {
+      VStack(alignment: .leading, spacing: 3) {
+        Text("模型服务")
+          .font(CidaDesign.ui(13.5))
+          .foregroundStyle(CidaDesign.textPrimary)
+          .frame(height: 20)
+        HStack(spacing: 6) {
+          Circle()
+            .fill(status.isReady ? CidaDesign.accent : CidaDesign.textTertiary)
+            .frame(width: 6, height: 6)
+          Text(statusText)
             .font(CidaDesign.ui(11.5))
             .foregroundStyle(CidaDesign.textTertiary)
-            .accessibilityIdentifier("settings-provider-endpoint-caption")
+            .lineLimit(1)
+            .fixedSize()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("settings-model-status")
       }
-    }
-  }
-}
+      .frame(width: 120, alignment: .leading)
 
-private struct EndpointRow: View {
-  @Bindable var model: AppModel
-
-  var body: some View {
-    SettingsRow(title: "端点", caption: "OpenAI 格式的接口") {
-      SettingsTextField(
-        text: $model.settings.customEndpoint,
-        placeholder: "http://127.0.0.1:8080/v1/chat/completions",
-        accessibilityIdentifier: "settings-endpoint"
-      )
-    }
-  }
-}
-
-/// Presets offer their models in a menu whose last item switches to a typed
-/// model; a custom endpoint always takes a typed model.
-private struct ModelRow: View {
-  @Bindable var model: AppModel
-
-  private var suggestions: [String] {
-    model.settings.provider.suggestedModels
-  }
-
-  private var showsField: Bool {
-    model.settings.provider.isCustom || !suggestions.contains(model.settings.model)
-  }
-
-  var body: some View {
-    SettingsRow(title: "模型") {
-      if showsField {
-        SettingsTextField(
-          text: $model.settings.model,
-          placeholder: "模型 ID",
-          accessibilityIdentifier: "settings-model"
-        )
-      } else {
-        SettingsMenu(
-          valueLabel: model.settings.model,
-          values: suggestions + [""],
-          title: { $0.isEmpty ? "其他…" : $0 },
-          onSelect: { model.settings.model = $0 }
-        )
-        .accessibilityIdentifier("settings-model-menu")
+      HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 3) {
+          Text(model.settings.modelService.model)
+            .font(CidaDesign.ui(13.5))
+            .foregroundStyle(CidaDesign.textPrimary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(height: 20)
+          Text(model.settings.modelService.hostAndFormat)
+            .font(CidaDesign.ui(11.5))
+            .foregroundStyle(CidaDesign.textTertiary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("settings-model-summary")
+        Spacer(minLength: 8)
+        Button(status == .checking ? "检查中…" : "检查") {
+          Task { await model.checkModelService() }
+        }
+        .buttonStyle(SettingsBorderedButtonStyle())
+        .disabled(status == .checking)
+        .accessibilityIdentifier("settings-model-check")
       }
+      .frame(maxWidth: .infinity)
     }
+    .padding(.vertical, 9)
   }
 }
 
-private struct APIKeyRow: View {
-  @Bindable var model: AppModel
+/// Under a failed check, starting at the control column: what failed and how to fix it.
+private struct ModelServiceFailureNote: View {
+  let text: String
 
   var body: some View {
-    SettingsRow(title: "API Key", caption: "只存本机钥匙串") {
-      MaskedAPIKeyField(
-        apiKey: $model.settings.apiKey,
-        placeholder: model.settings.usesLocalEndpoint ? "本地端点可留空" : "粘贴 API Key"
-      )
-    }
-  }
-}
-
-/// What the model group can tell without a request: a 6 pt dot and one line.
-private struct ReadinessRow: View {
-  let readiness: SettingsReadiness
-
-  var body: some View {
-    HStack(spacing: 8) {
-      Circle()
-        .fill(readiness.isReady ? CidaDesign.accent : CidaDesign.textTertiary)
-        .frame(width: 6, height: 6)
-      Text(readiness.text)
-        .font(CidaDesign.ui(12))
+    HStack(alignment: .top, spacing: 8) {
+      LucideIcon(.circleAlert, size: 13)
+        .foregroundStyle(CidaDesign.textTertiary)
+        .padding(.top, 2)
+      Text(text)
+        .font(CidaDesign.ui(11.5))
         .foregroundStyle(CidaDesign.textSecondary)
+        .lineSpacing(3)
+        .padding(.vertical, 1.5)
+        .fixedSize(horizontal: false, vertical: true)
     }
-    .padding(.top, 6)
-    .padding(.bottom, 4)
+    .padding(.leading, 144)
+    .padding(.top, -2)
+    .padding(.bottom, 6)
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("settings-readiness")
+    .accessibilityIdentifier("settings-model-failure")
+  }
+}
+
+/// Copies the configuration prompt; for 800 ms it says ✓ 已复制 on `accent-soft`, like the
+/// panel's copied feedback.
+private struct CopyConfigurationPromptButton: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    let isCopied = model.isShowingConfigurationPromptCopied
+    Button(action: model.copyConfigurationPrompt) {
+      HStack(spacing: 6) {
+        LucideIcon(isCopied ? .check : .copy, size: 12)
+          .foregroundStyle(isCopied ? CidaDesign.accent : CidaDesign.textSecondary)
+        Text(isCopied ? "已复制" : "复制配置提示词")
+      }
+    }
+    .buttonStyle(SettingsBorderedButtonStyle(isHighlighted: isCopied))
+    .accessibilityLabel(isCopied ? "已复制" : "复制配置提示词")
+    .accessibilityIdentifier("settings-copy-configuration-prompt")
   }
 }
 
@@ -749,50 +748,5 @@ private struct AboutFooter: View {
     }
     .frame(maxWidth: .infinity)
     .padding(.top, 26)
-  }
-}
-
-// MARK: - API key field
-
-struct MaskedAPIKeyField: View {
-  @Binding var apiKey: String
-  var placeholder = "粘贴 API Key"
-  @FocusState private var isFocused: Bool
-
-  var body: some View {
-    ZStack(alignment: .leading) {
-      SecureField(placeholder, text: $apiKey)
-        .textFieldStyle(.plain)
-        .font(CidaDesign.mono(11.5))
-        .foregroundStyle(isFocused || apiKey.isEmpty ? CidaDesign.textPrimary : Color.clear)
-        .focused($isFocused)
-        .accessibilityIdentifier("settings-api-key-editor")
-
-      if !isFocused, !apiKey.isEmpty {
-        Text(maskedValue)
-          .font(CidaDesign.mono(11.5))
-          .foregroundStyle(CidaDesign.textPrimary)
-          .lineLimit(1)
-          .allowsHitTesting(false)
-      }
-    }
-    .padding(.horizontal, 10)
-    .frame(maxWidth: .infinity)
-    .frame(height: 30)
-    .background(CidaDesign.surface)
-    .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
-        .strokeBorder(isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: isFocused ? 1.5 : 1)
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel("API Key")
-  }
-
-  private var maskedValue: String {
-    guard !apiKey.isEmpty else { return "" }
-    let prefix = apiKey.hasPrefix("sk-") ? "sk-" : ""
-    let suffix = String(apiKey.suffix(min(4, apiKey.count)))
-    return "\(prefix)••••••••••••••••\(suffix)"
   }
 }

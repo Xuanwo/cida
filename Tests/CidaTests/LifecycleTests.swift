@@ -70,7 +70,7 @@ final class LifecycleTests: XCTestCase {
     var settings = CidaSettings()
     settings.apiKey = ""
     let model = AppModel(
-      inputText: "Consistency", settings: settings, service: OpenAICompatibleTextProcessingService())
+      inputText: "Consistency", settings: settings, service: ModelServiceClient())
     XCTAssertTrue(model.needsModelConfiguration)
 
     XCTAssertTrue(model.submit())
@@ -88,8 +88,10 @@ final class LifecycleTests: XCTestCase {
 
   func testAConfiguredServiceNeedsNoWelcome() {
     var settings = CidaSettings()
+    settings.modelService.endpoint = "https://api.deepseek.com/chat/completions"
+    settings.modelService.model = "deepseek-chat"
     settings.apiKey = "test-key"
-    let model = AppModel(settings: settings, service: OpenAICompatibleTextProcessingService())
+    let model = AppModel(settings: settings, service: ModelServiceClient())
     XCTAssertFalse(model.needsModelConfiguration)
     XCTAssertFalse(
       AppModel(service: ImmediateStreamingService()).needsModelConfiguration,

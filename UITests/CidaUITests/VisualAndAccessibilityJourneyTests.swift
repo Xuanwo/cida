@@ -22,25 +22,29 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     }
   }
 
-  /// The approved image is Settings before any permission is granted; the
-  /// guest grants both, so the launch pins them to "not granted".
+  /// The approved image is Settings with the board's deepseek-chat service and before any
+  /// permission is granted; the command line configures the service before launch, and the
+  /// guest grants both permissions, so the launch pins them to "not granted".
   func testSettingsMatchesTheApprovedDesignBaseline() throws {
+    let set = try driver.runCommandLine([
+      "config", "set", "endpoint=https://api.deepseek.com/chat/completions",
+      "format=chat-completions", "model=deepseek-chat",
+    ])
+    XCTAssertEqual(set.status, 0, set.errorOutput)
+    let key = try driver.runCommandLine(
+      ["config", "set", "api-key", "--stdin"], standardInput: "sk-preview-key-3f2a")
+    XCTAssertEqual(key.status, 0, key.errorOutput)
     driver.launch(endpointOverride: false, additionalArguments: ["--automation-permissions", "denied"])
     driver.openSettings()
     let settingsWindow = driver.settingsWindow
-
-    let apiKey = driver.app.secureTextFields["settings-api-key-editor"]
-    driver.replaceText(in: apiKey, with: "sk-preview-key-3f2a")
-    settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
-    XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
-    driver.showPanel()
-    driver.openSettings()
+    XCTAssertTrue(driver.waitForExistence(of: driver.modelStatus, timeout: 3))
+    XCTAssertTrue(driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 3))
     let manifest = try VisualBaselineManifest.load(from: e2eEnvironment.sourceRoot)
     let baseline = try manifest.baseline(named: "settings")
     XCTAssertEqual(settingsWindow.frame.width, CGFloat(baseline.logicalWidth), accuracy: 1)
     XCTAssertEqual(
       settingsWindow.frame.height, CGFloat(baseline.logicalHeight), accuracy: 1,
-      "The approved 默认 · DeepSeek state")
+      "The approved 默认 state")
     try XCTContext.runActivity(named: "Design visual baseline: settings") { activity in
       try PixelDiff.assertScreenshot(
         settingsWindow.screenshot(),

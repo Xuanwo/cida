@@ -56,7 +56,7 @@ enum ModelPromptBuilder {
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let parameterData = try encoder.encode(parameters)
     guard let parameterJSON = String(data: parameterData, encoding: .utf8) else {
-      throw TextProcessingError.invalidRequest
+      throw ModelServiceError.invalidRequest
     }
 
     let systemMessage = """

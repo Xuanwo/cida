@@ -57,22 +57,52 @@ final class CidaAppDriver {
     element(identifier: "result-note-\(kind)")
   }
 
-  func settingsProviderMenu(in settingsWindow: XCUIElement? = nil) -> XCUIElement {
-    let root = settingsWindow ?? self.settingsWindow
-    return root.menuButtons.matching(
-      NSPredicate(
-        format: "identifier == %@ AND label IN %@",
-        "settings-provider-menu",
-        Self.providerLabels
-      )
-    ).firstMatch
+  // Settings' 模型 group (`Design/spec/configuration.md` §四).
+  var modelOnboarding: XCUIElement { element(identifier: "settings-model-onboarding") }
+  var modelOnboardingCaption: XCUIElement {
+    element(identifier: "settings-model-onboarding-caption")
+  }
+  /// A combined row: its text is the element's value.
+  var modelStatus: XCUIElement { element(identifier: "settings-model-status") }
+  var modelSummary: XCUIElement { element(identifier: "settings-model-summary") }
+  var modelFailure: XCUIElement { element(identifier: "settings-model-failure") }
+  var modelCheckButton: XCUIElement { app.buttons["settings-model-check"] }
+  var copyConfigurationPromptButton: XCUIElement {
+    app.buttons["settings-copy-configuration-prompt"]
   }
 
-  /// `ModelProvider.displayName` of every preset plus the custom entry.
-  static let providerLabels = ["DeepSeek", "OpenAI", "Moonshot", "智谱 GLM", "自定义（OpenAI 兼容）"]
-  static let customProviderLabel = "自定义（OpenAI 兼容）"
+  /// The executable inside the artifact, which is also its command line.
+  var executablePath: String { "\(environment.appPath)/Contents/MacOS/Cida" }
 
-  var readinessRow: XCUIElement { element(identifier: "settings-readiness") }
+  /// Runs the artifact's command line against this instance's settings, the way an AI
+  /// assistant configures Cida; a running instance hears the change. The scenario server runs
+  /// it, because a process this sandboxed runner started would keep its settings in the
+  /// runner's container.
+  @discardableResult
+  func runCommandLine(_ arguments: [String], standardInput: String? = nil) throws
+    -> ScenarioServerClient.CommandLineResult
+  {
+    let result = try ScenarioServerClient(baseURL: environment.controlBaseURL).runCommandLine(
+      executable: executablePath, namespace: settingsNamespace, arguments: arguments,
+      standardInput: standardInput)
+    XCTContext.runActivity(named: "Cida \(arguments.joined(separator: " "))") { activity in
+      let attachment = XCTAttachment(
+        string: "exit \(result.status)\n\(result.output)\(result.errorOutput)")
+      attachment.name = "command-line"
+      attachment.lifetime = .keepAlways
+      activity.add(attachment)
+    }
+    return result
+  }
+
+  /// Points this instance at the loopback scenario server through the command line.
+  func configureModelService(model: String = "cida-ui-mock-model") throws {
+    let result = try runCommandLine([
+      "config", "set", "endpoint=\(environment.endpoint)", "format=chat-completions",
+      "model=\(model)",
+    ])
+    XCTAssertEqual(result.status, 0, result.errorOutput)
+  }
 
   func launch(
     endpointOverride: Bool = true,
@@ -192,29 +222,6 @@ final class CidaAppDriver {
     ).firstMatch
   }
 
-  /// Points Settings at a custom (OpenAI-compatible) endpoint.
-  func configureCustomEndpoint(
-    endpoint: String,
-    model: String = "cida-ui-mock-model",
-    apiKey: String = "sk-isolated-ui-test"
-  ) {
-    openSettings()
-    let providerMenu = settingsProviderMenu(in: settingsWindow)
-    XCTAssertTrue(providerMenu.waitForExistence(timeout: 5))
-    if providerMenu.label != Self.customProviderLabel {
-      providerMenu.click()
-      let customItem = app.menuItems[Self.customProviderLabel]
-      XCTAssertTrue(customItem.waitForExistence(timeout: 5))
-      customItem.click()
-    }
-
-    replaceText(in: app.textFields["settings-endpoint"], with: endpoint)
-    replaceText(in: app.textFields["settings-model"], with: model)
-    replaceText(in: app.secureTextFields["settings-api-key-editor"], with: apiKey)
-    settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
-    XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
-  }
-
   // MARK: - Waits
 
   func waitForValue(
@@ -301,6 +308,21 @@ final class CidaAppDriver {
       sample: { element.exists },
       matches: { $0 },
       describe: { $0 ? "exists" : "missing" }
+    )
+  }
+
+  /// A static text's string, which XCUI reports as its value or, failing that, its label.
+  func waitForText(
+    containing fragment: String,
+    in element: XCUIElement,
+    timeout: TimeInterval
+  ) -> Bool {
+    wait(
+      description: "text containing '\(fragment)' for \(element.identifier)",
+      timeout: timeout,
+      sample: { (element.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? element.label },
+      matches: { $0.contains(fragment) },
+      describe: { $0 }
     )
   }
 

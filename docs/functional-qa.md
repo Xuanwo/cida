@@ -31,11 +31,13 @@ The current core experience contract (`Design/spec/panel.md`) includes:
    request explains itself inline and Return retries.
 7. Native Command-C precedence: a selection keeps the system copy; without one, Command-C copies
    the result.
-8. Provider presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM) plus a custom OpenAI-compatible
-   endpoint with a typed model, a locally derived readiness line, Keychain API-key persistence and
-   clearing, prompt edit/reset, source-language detection, and source-language-preserving
-   improvement, all from a fixed-width Settings window whose height follows its content. Settings
-   saved before presets (`OpenAI` with a non-official endpoint) load as the custom provider.
+8. A generic model configuration (endpoint; Chat Completions, Responses or Anthropic Messages;
+   model; auth header; extra headers and body) set through the command line by an AI assistant
+   from the prompt Settings copies, with the key read from stdin, a file or an environment
+   variable into Keychain and `check` sending one real request; Settings shows the status, a check
+   and the prompt. Also prompt edit/reset, source-language detection, and source-language-
+   preserving improvement, in a fixed-width Settings window whose height follows its content.
+   Settings saved by 1.0 (provider presets) load as the equivalent configuration.
 9. Input-method safety: the SwiftUI binding is never written back into the editor while a
    composition (for example pinyin) is in progress, the placeholder hides as soon as marked text
    appears, and Escape, Tab, and the other panel shortcuts reach the input method first while it

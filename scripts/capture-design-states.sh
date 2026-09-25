@@ -21,7 +21,10 @@ mkdir -p "$implementation_dir" "$qa_dir"
 swift build --package-path "$project_dir"
 
 # Panel states: the capture is the panel at its content height, 800 pt wide.
-for state in empty translate improve stale stopped failed long settings settings-missing-key settings-custom settings-recording settings-update-available \
+for state in empty translate improve stale stopped failed long \
+  settings settings-custom settings-recording settings-update-available \
+  settings-config-unset settings-config-copied settings-config-ready settings-config-updated \
+  settings-config-checking settings-config-failed \
   lifecycle-welcome lifecycle-welcome-submitted lifecycle-update-checking lifecycle-update-found \
   lifecycle-update-downloading lifecycle-update-ready lifecycle-update-current \
   lifecycle-update-failed lifecycle-update-read-only; do
