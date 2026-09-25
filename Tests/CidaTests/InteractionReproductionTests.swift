@@ -12,7 +12,15 @@ final class InteractionReproductionTests: XCTestCase {
   var retainedTestWindows: [NSWindow] = []
   var retainedPanelControllers: [PanelController] = []
 
+  /// These tests assert on the motion a user sees, so they run with Reduce Motion off whatever
+  /// the host's setting is.
+  override func setUp() async throws {
+    try await super.setUp()
+    CidaMotion.reducesMotionOverride = false
+  }
+
   override func tearDown() async throws {
+    CidaMotion.reducesMotionOverride = nil
     CATransaction.flush()
     let retainedContentViews = retainedTestWindows.compactMap(\.contentView)
     for controller in retainedPanelControllers {

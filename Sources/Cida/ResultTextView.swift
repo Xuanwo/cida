@@ -469,7 +469,7 @@ final class ResultTextContainer: NSView {
         lastLine.map { abs($0.minY - previous.minY) > 0.5 } ?? false
       } ?? false
     let animates =
-      window != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+      window != nil && !CidaMotion.reducesMotion
     if animates {
       beginGlyphReveal(characterRange: appendedRange)
     } else {
@@ -569,7 +569,7 @@ final class ResultTextContainer: NSView {
       // revealed glyphs finish their own fade.
       scheduleFinalGlyphRevealCommit()
       caretLayer.removeAnimation(forKey: "waiting-pulse")
-      if window == nil || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+      if window == nil || CidaMotion.reducesMotion {
         caretLayer.opacity = 0
       } else {
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -713,7 +713,7 @@ final class ResultTextContainer: NSView {
     pendingNaturalHeightAnimated =
       pendingNaturalHeightAnimated
       || (isStreaming && window != nil
-        && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        && !CidaMotion.reducesMotion)
     guard !intrinsicSizeInvalidationIsScheduled else { return }
     intrinsicSizeInvalidationIsScheduled = true
     let generation = naturalHeightPublicationGeneration
@@ -772,7 +772,7 @@ final class ResultTextContainer: NSView {
     let shouldPulse =
       window != nil
       && (textStorage?.length ?? 0) == 0
-      && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+      && !CidaMotion.reducesMotion
     if shouldPulse, caretLayer.animation(forKey: "waiting-pulse") == nil {
       let pulse = CABasicAnimation(keyPath: "opacity")
       pulse.fromValue = CidaMotion.cursorMinimumOpacity

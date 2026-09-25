@@ -209,11 +209,21 @@ enum CidaMotion {
     )
   }
 
+  /// Tests that assert on motion pin this, so the host's Reduce Motion setting (on by default
+  /// on CI runners) does not decide what they see.
+  @MainActor static var reducesMotionOverride: Bool?
+
+  /// Whether to drop motion: the system's Reduce Motion setting unless a test pinned it.
+  @MainActor
+  static var reducesMotion: Bool {
+    reducesMotionOverride ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+  }
+
   /// Motion is dropped when the system reduces motion or the view is not in a
   /// window; static durations keep the same end state.
   @MainActor
   static func resolvedDuration(_ seconds: TimeInterval, in window: NSWindow?) -> TimeInterval {
-    guard window != nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+    guard window != nil, !reducesMotion else {
       return 0
     }
     return seconds

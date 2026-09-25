@@ -41,7 +41,7 @@ final class StatusItemMark {
         button.image = image(caretOpacity: 1)
         return
       }
-      if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+      if CidaMotion.reducesMotion {
         button.image = image(caretOpacity: CGFloat(CidaMotion.cursorMinimumOpacity))
         return
       }
