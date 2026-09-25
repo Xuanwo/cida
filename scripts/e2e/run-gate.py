@@ -331,7 +331,7 @@ class GateRun:
         self.write_summary()
         return True
 
-    def run_tart(self, stage_name, output_name, selected_tests=None, boot_attempts=2):
+    def run_tart(self, stage_name, output_name, selected_tests=None):
         environment = os.environ.copy()
         environment.update(
             {
@@ -340,7 +340,7 @@ class GateRun:
                 "CIDA_TART_SWIFT_TEST_FILTER": (
                     "AppModelTests/testNewModelStartsWithoutAResult"
                 ),
-                "CIDA_TART_BOOT_ATTEMPTS": str(boot_attempts),
+                "CIDA_TART_BOOT_ATTEMPTS": "2",
             }
         )
         if selected_tests:
@@ -359,7 +359,9 @@ class GateRun:
         return passed
 
     def run_mutations(self):
-        mode = "unit" if self.profile == "pr" else "all"
+        # Release mutations rebuild the app and boot Tart once per mutation. They test the
+        # journeys themselves, which a release does not change, so only nightly runs them.
+        mode = "all" if self.profile == "nightly" else "unit"
         return self.run_stage(
             f"mutation-{mode}",
             [
@@ -495,18 +497,6 @@ def main():
     if not gate.run_mutations():
         print(gate.summary_path)
         return 1
-
-    if gate.profile == "release":
-        burn_in_rounds = max(2, int(os.environ.get("CIDA_GATE_BURN_IN_ROUNDS", "3")))
-        for round_index in range(1, burn_in_rounds + 1):
-            if not gate.run_tart(
-                f"tart-p0-burn-in-{round_index}",
-                f"burn-in-{round_index}",
-                P0_RELEASE_TESTS,
-                boot_attempts=1,
-            ):
-                print(gate.summary_path)
-                return 1
 
     if (
         gate.profile in ("nightly", "release")

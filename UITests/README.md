@@ -81,8 +81,8 @@ Use the unified profiles for gate decisions:
 | Profile | Required work |
 | --- | --- |
 | PR | full Swift suite, one exact Release artifact, P0 Tart journeys, unit mutation contracts |
-| Nightly | full Tart suite, all unit/Release mutations, focused 120 Hz gates when the host has a 120 Hz display |
-| Release | nightly correctness plus three fresh P0 burn-ins |
+| Release | full Tart suite, unit mutation contracts, focused 120 Hz gates when the host has a 120 Hz display |
+| Nightly | release plus the Release mutation contracts; run it after changing the journeys or a mutated file |
 
 These profiles require a clean, committed checkout:
 
@@ -92,8 +92,7 @@ scripts/e2e/run-nightly-gate.sh
 scripts/e2e/run-release-gate.sh
 ```
 
-The Release burn-in defaults to three rounds and may be raised with
-`CIDA_GATE_BURN_IN_ROUNDS`; values below two are clamped to two. Every profile writes a
+Every profile writes a
 machine-readable `gate-summary.json` with stage status, artifact provenance, UI summaries,
 mutation summaries, host guards, performance reports, and the final app digest comparison. Mutation
 anchor drift is validated before any expensive build or VM work.

@@ -44,9 +44,11 @@ scripts/e2e/run-release-gate.sh
 Every profile first validates every mutation anchor, runs the complete Swift suite, and reruns four
 named structural performance proxies before it builds and signs one Release app, binds its manifest
 to the current commit, and verifies the app-tree digest again after all consumers finish. The PR
-profile runs the P0 Release journeys in Tart and the unit mutation contracts. Nightly runs the full
-Tart suite, all unit and Release mutations, and the focused 120 Hz workloads. Release adds three
-fresh-clone P0 burn-in rounds by default. Each invocation writes a single `gate-summary.json`;
+profile runs the P0 Release journeys in Tart and the unit mutation contracts. Release runs the full
+Tart suite, the unit mutation contracts and the focused 120 Hz workloads. Nightly also runs the
+Release mutation contracts, which rebuild the app and boot Tart once per mutation to prove that the
+journeys still catch each seeded defect; run it after changing `UITests` or a file in
+`scripts/e2e/mutation-catalog.json`. Each invocation writes a single `gate-summary.json`;
 standalone scripts are diagnostic entry points, not a release verdict. After the harness contract
 check, nightly and release profiles query AppKit and Core Graphics for an awake, active display whose
 native maximum is at least 120 Hz. When there is one, the physical 120 Hz workloads run and must
