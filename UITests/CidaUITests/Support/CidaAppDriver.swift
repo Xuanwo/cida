@@ -29,6 +29,10 @@ final class CidaAppDriver {
   var copyButton: XCUIElement { app.buttons["bar-action-copy"] }
   var copiedButton: XCUIElement { app.buttons["bar-action-copied"] }
   var resultPane: XCUIElement { element(identifier: "result-pane") }
+  /// The menu bar mark; XCUI may report it as a status item or as its button.
+  var statusItem: XCUIElement {
+    app.descendants(matching: .any).matching(identifier: "cida-status-item").firstMatch
+  }
   var resultText: XCUIElement { app.textViews["result-text"] }
   var settingsWindow: XCUIElement { app.windows["设置"] }
   /// The capture shortcut's full-screen layer, a borderless panel like the
@@ -223,6 +227,17 @@ final class CidaAppDriver {
       timeout: timeout,
       sample: { element.value as? String },
       matches: { $0 == expectedValue },
+      describe: { $0 ?? "nil" }
+    )
+  }
+
+  /// Whether the menu bar caret breathes: its accessibility value says 正在生成.
+  func waitForStatusItem(breathing: Bool, timeout: TimeInterval = 3) -> Bool {
+    wait(
+      description: "status item \(breathing ? "breathing" : "resting")",
+      timeout: timeout,
+      sample: { self.statusItem.value as? String },
+      matches: { ($0 == "正在生成") == breathing },
       describe: { $0 ?? "nil" }
     )
   }

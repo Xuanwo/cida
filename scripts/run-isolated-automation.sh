@@ -57,6 +57,7 @@ else
   /usr/bin/ditto "$resource_bundle" "$app_path/Contents/Resources/Cida_Cida.bundle"
   /usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
     "$app_path/Contents/Info.plist"
+  "$script_dir/compile-app-icon.sh" "$app_path/Contents/Resources"
   /usr/bin/plutil -replace CFBundleIdentifier -string "$bundle_identifier" \
     "$app_path/Contents/Info.plist"
   /usr/bin/plutil -replace CFBundleDisplayName -string "辞达测试" \

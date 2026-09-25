@@ -46,6 +46,7 @@ bin_path=$(swift build \
   "$staging_app/Contents/Resources/Cida_Cida.bundle"
 /usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
   "$staging_app/Contents/Info.plist"
+"$script_dir/compile-app-icon.sh" "$staging_app/Contents/Resources"
 
 /usr/bin/xattr -cr "$staging_app"
 /usr/bin/codesign --force --deep --sign "$signing_identity" --options runtime "$staging_app"

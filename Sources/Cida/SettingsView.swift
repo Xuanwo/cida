@@ -663,10 +663,7 @@ private struct LaunchAtLoginRow: View {
 private struct AboutFooter: View {
   var body: some View {
     HStack(spacing: 8) {
-      Text("辞达")
-        .font(CidaDesign.brand(12, weight: .semibold))
-        .tracking(2)
-        .foregroundStyle(CidaDesign.textSecondary)
+      CidaWordmark()
       Text("1.0 · 辞达而已矣")
         .font(CidaDesign.ui(11))
         .foregroundStyle(CidaDesign.textTertiary)

@@ -15,6 +15,62 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ---- Brand (spec/brand.md) --------------------------------------------- */
+
+/* 辞达 with the accent caret after it: 0.8 em tall, 1.5 wide, a little low. */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-brand);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+}
+.wordmark::after {
+  content: "";
+  width: 1.5px;
+  height: 9.6px;
+  background: var(--accent);
+  transform: translateY(0.72px);
+}
+
+/* The app icon as the system draws it without Liquid Glass: the paper tile,
+ * then the ink and caret layers of Resources/AppIcon.icon. */
+.app-icon {
+  position: relative;
+  display: inline-block;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 22.5%;
+  background: var(--surface-paper);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.app-icon img { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.brand-icons, .brand-menubars, .brand-wordmarks { display: flex; align-self: flex-start; align-items: center; gap: 32px; }
+.brand-wordmarks .footer { padding-top: 0; }
+
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 280px;
+  height: 24px;
+  padding: 0 12px;
+  justify-content: flex-end;
+  border-radius: 6px;
+  background: #F2F2F0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #000000;
+}
+.status-mark { position: relative; width: 18px; height: 18px; }
+.status-mark img { position: absolute; inset: 0; width: 18px; height: 18px; }
+.status-mark.breathing img + img { opacity: var(--motion-cursor-opacity-min); }
+.menubar.dark { background: #2A2A28; color: #FFFFFF; }
+.menubar.dark img { filter: invert(1); }
+
 /* ---- Boards ---------------------------------------------------------- */
 
 .board {
@@ -380,13 +436,6 @@ body {
   gap: 8px;
   padding-top: 26px;
 }
-.footer .brand {
-  font-family: var(--font-brand);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: var(--text-secondary);
-}
 .footer small { font-size: var(--font-size-caption); color: var(--text-tertiary); }
 
 .popover {
@@ -474,5 +523,4 @@ body {
   color: var(--text-control);
   white-space: nowrap;
 }
-.capture-hint .brand { font-family: var(--font-brand); font-size: 12px; font-weight: 600; letter-spacing: 2px; color: var(--text-secondary); }
-.capture-hint .rule { width: 1px; height: 12px; background: var(--border); }
+.capture-hint.static { position: static; transform: none; }

@@ -64,11 +64,38 @@ final class DesignTokenTests: XCTestCase {
     }
   }
 
+  /// The app icon's light appearance is ink on paper with the accent caret (spec/brand.md);
+  /// its colours are written by hand in icon.json and by the generator in the layers.
+  func testAppIconColorsMatchTheDesignTokens() throws {
+    let tokens = try Self.designTokens()
+    let iconURL = Self.projectRoot.appendingPathComponent("Resources/AppIcon.icon")
+    let json = try String(
+      contentsOf: iconURL.appendingPathComponent("icon.json"), encoding: .utf8)
+    let lightFill = try XCTUnwrap(
+      json.range(of: #""solid" : "srgb:[0-9.,]+""#, options: .regularExpression))
+    XCTAssertEqual(
+      Self.hex(fromIconSolid: String(json[lightFill])), try XCTUnwrap(tokens["surface-paper"]))
+
+    for (layer, token) in [("glyph", "text-ink"), ("caret", "accent")] {
+      let svg = try String(
+        contentsOf: iconURL.appendingPathComponent("Assets/\(layer).svg"), encoding: .utf8)
+      XCTAssertTrue(svg.contains("fill=\"\(try XCTUnwrap(tokens[token]))\""), layer)
+    }
+  }
+
+  private static let projectRoot = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+
+  /// `"solid" : "srgb:r,g,b,a"` with components in 0...1, as `#RRGGBB`.
+  private static func hex(fromIconSolid declaration: String) -> String {
+    let components = declaration.split(separator: ":").last!.split(separator: ",").prefix(3)
+    return "#" + components.map { String(format: "%02X", Int((Double($0)! * 255).rounded())) }
+      .joined()
+  }
+
   /// `--name: value;` declarations of the design token file.
   private static func designTokens() throws -> [String: String] {
-    let url = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-      .appendingPathComponent("Design/boards/tokens.css")
+    let url = projectRoot.appendingPathComponent("Design/boards/tokens.css")
     let css = try String(contentsOf: url, encoding: .utf8)
     var tokens: [String: String] = [:]
     for line in css.split(separator: "\n") {

@@ -12,6 +12,7 @@ one HTML board per topic under `Design/boards`, drawn from the shared `tokens.cs
 | Capture framing overlay | `spec/panel.md` §一 截图翻译 | `boards/capture.html` |
 | Streaming buffer and motion, keyframes T0–T4 | `spec/streaming-motion.md` | `boards/streaming-motion.html` |
 | Settings | `spec/settings.md` | `boards/settings-states.html` |
+| Brand: mark, app icon, menu bar image, wordmark | `spec/brand.md` | `boards/brand.html` |
 
 Each state carries a `data-state` name; the ones the app can render with `--design-state` are
 compared natively:

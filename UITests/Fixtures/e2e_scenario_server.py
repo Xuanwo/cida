@@ -147,6 +147,13 @@ def plan_for(submitted_text):
             "delays": [0.0, 0.05, 30.0],
         },
         "CIDA_E2E_ERROR": {"status": 500, "body": "controlled upstream failure"},
+        "CIDA_E2E_BACKGROUND_GATED": {
+            "chunks": [
+                "Result that arrives behind the hidden panel.\n",
+                "CIDA_E2E_BACKGROUND_GATED_COMPLETE",
+            ],
+            "gateFirstByte": True,
+        },
         "CIDA_E2E_POOL_GATED": {
             "chunks": [
                 "Fresh result after pool exhaustion.\n",

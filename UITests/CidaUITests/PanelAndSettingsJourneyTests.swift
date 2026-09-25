@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
-  func testPanelHidesOnEscapeReturnsOnOptionSpaceAndKeepsItsState() {
+  func testPanelHidesOnEscapeReturnsOnOptionSpaceAndKeepsItsState() throws {
     driver.launch()
     let frame = driver.panel.frame
     XCTAssertEqual(frame.width, 800, accuracy: 1)
@@ -28,6 +28,22 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(
       driver.textValue(in: driver.composer), "X",
       "The source is fully selected on show, so typing replaces it")
+
+    // A request keeps running behind the hidden panel, and the menu bar caret
+    // breathes until it is done (Design/spec/brand.md §三).
+    driver.submit("CIDA_E2E_BACKGROUND_GATED", expectsStreamingState: true)
+    XCTAssertNotNil(
+      try scenarioServer.wait(
+        for: "CIDA_E2E_BACKGROUND_GATED", status: "headers-sent", timeout: 5))
+    XCTAssertTrue(
+      driver.waitForStatusItem(breathing: false), "The panel shows the request itself")
+    driver.hidePanel()
+    XCTAssertTrue(driver.waitForStatusItem(breathing: true), "The hidden request breathes")
+    try scenarioServer.releaseFirstByte(for: "CIDA_E2E_BACKGROUND_GATED")
+    XCTAssertTrue(
+      driver.waitForStatusItem(breathing: false, timeout: 8), "A finished request rests")
+    driver.showPanel()
+    XCTAssertTrue(driver.result(containing: "CIDA_E2E_BACKGROUND_GATED_COMPLETE").exists)
 
     driver.openSettings()
     XCTAssertTrue(driver.panel.waitForNonExistence(timeout: 3), "Settings takes the panel away")

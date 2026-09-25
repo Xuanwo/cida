@@ -1,5 +1,7 @@
 # Cida
 
+<img src="Design/rendered/states/brand-icon.png" width="128" alt="辞达: 辞 followed by the streaming caret">
+
 Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming OpenAI-compatible Chat Completions APIs (DeepSeek, OpenAI, Moonshot, 智谱 GLM presets, or any custom endpoint). It lives in the menu bar and shows one floating panel on a global shortcut (`Option-Space` by default): the source you typed, the action, and the result.
 
 ## Requirements

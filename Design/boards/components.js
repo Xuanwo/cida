@@ -118,7 +118,7 @@ class CidaSettings extends HTMLElement {
           <div class="group"><h3>模型</h3>${provider}${custom ? endpoint + model + key : key + model}${readiness}</div>
           <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>
           <div class="group"><h3>唤起</h3>${shortcut}${capture}${selection}${launch}</div>
-          <div class="footer"><span class="brand">辞达</span><small>1.0 · 辞达而已矣</small></div>
+          <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>
         </div>
         ${popover}
       </section>`;
@@ -150,7 +150,7 @@ class CidaFrozenScreen extends HTMLElement {
         ${window()}
         <div class="veil"></div>
         ${lifted}
-        <div class="capture-hint"><span class="brand">辞达</span><i class="rule"></i><span>拖动框选要翻译的文字 · Esc 取消</span></div>
+        <div class="capture-hint"><span class="wordmark">辞达</span><span>拖动框选要翻译的文字 · Esc 取消</span></div>
       </section>`;
   }
 }

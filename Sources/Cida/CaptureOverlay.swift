@@ -356,20 +356,14 @@ extension CaptureGeometry {
   }
 }
 
-/// The pill at the panel's height: the brand mark, a hairline, what to do.
+/// The pill at the panel's height: the wordmark, then what to do.
 struct CaptureHint: View {
   /// Room around the pill for its shadow inside the hosting view.
   static let shadowMargin: CGFloat = 40
 
   var body: some View {
     HStack(spacing: 12) {
-      Text("辞达")
-        .font(CidaDesign.brand(12, weight: .semibold))
-        .tracking(2)
-        .foregroundStyle(CidaDesign.textSecondary)
-      Rectangle()
-        .fill(CidaDesign.border)
-        .frame(width: 1, height: 12)
+      CidaWordmark()
       Text("拖动框选要翻译的文字 · Esc 取消")
         .font(CidaDesign.ui(12.5, weight: .medium))
         .foregroundStyle(CidaDesign.textControl)

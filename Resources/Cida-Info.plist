@@ -8,6 +8,10 @@
     <string>辞达</string>
     <key>CFBundleExecutable</key>
     <string>Cida</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.xuanwo.Cida</string>
     <key>CFBundleInfoDictionaryVersion</key>

@@ -62,6 +62,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var panelController: PanelController?
   private var settingsWindowController: NSWindowController?
   private var statusItem: NSStatusItem?
+  private var statusItemMark: StatusItemMark?
   private var showPanelMenuItem: NSMenuItem?
   private var captureMenuItem: NSMenuItem?
   private var globalHotKey: GlobalHotKey?
@@ -297,13 +298,16 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private func installStatusItem() {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     if let button = item.button {
-      if let image = NSImage(systemSymbolName: "translate", accessibilityDescription: "辞达") {
-        button.image = image
-      } else {
+      statusItemMark = StatusItemMark(button: button)
+      if statusItemMark == nil {
         button.title = "辞"
       }
       button.setAccessibilityIdentifier("cida-status-item")
     }
+    panelController?.onVisibilityChange = { [weak self] _ in
+      self?.updateStatusItemBreathing()
+    }
+    observeGenerationForStatusItem()
     let menu = NSMenu()
     let show = NSMenuItem(title: "显示辞达", action: #selector(showPanel), keyEquivalent: "")
     show.target = self
@@ -325,6 +329,27 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     menu.addItem(quit)
     item.menu = menu
     statusItem = item
+  }
+
+  /// The menu bar caret breathes while a request runs behind a hidden panel
+  /// (`Design/spec/brand.md` §三).
+  private func updateStatusItemBreathing() {
+    guard let statusItemMark else { return }
+    let isBreathing = model.isProcessing && !(panelController?.isVisible ?? false)
+    guard statusItemMark.isBreathing != isBreathing else { return }
+    statusItemMark.isBreathing = isBreathing
+    lifecycleLog?.record(isBreathing ? "status-item-breathing" : "status-item-resting")
+  }
+
+  private func observeGenerationForStatusItem() {
+    withObservationTracking {
+      _ = model.isProcessing
+    } onChange: { [weak self] in
+      Task { @MainActor in
+        self?.updateStatusItemBreathing()
+        self?.observeGenerationForStatusItem()
+      }
+    }
   }
 
   /// Non-interactive automation keeps the panel off the user's screen: probes

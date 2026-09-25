@@ -49,6 +49,7 @@ mkdir -p "$staging_app/Contents/MacOS" "$staging_app/Contents/Resources"
 /usr/bin/ditto "$resource_bundle" "$staging_app/Contents/Resources/Cida_Cida.bundle"
 /usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
   "$staging_app/Contents/Info.plist"
+"$script_dir/compile-app-icon.sh" "$staging_app/Contents/Resources"
 /usr/bin/plutil -replace CFBundleIdentifier -string "$bundle_identifier" \
   "$staging_app/Contents/Info.plist"
 /usr/bin/plutil -replace CFBundleDisplayName -string "辞达测试" \

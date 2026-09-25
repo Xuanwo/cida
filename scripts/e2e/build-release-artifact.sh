@@ -39,6 +39,7 @@ mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
   "$app_path/Contents/Resources/Cida_Cida.bundle"
 /usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
   "$app_path/Contents/Info.plist"
+"$project_dir/scripts/compile-app-icon.sh" "$app_path/Contents/Resources"
 /usr/bin/xattr -cr "$app_path"
 
 signing_identity=${CIDA_CODESIGN_IDENTITY:-}

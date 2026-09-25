@@ -67,6 +67,8 @@ final class PanelController {
   /// probe and snapshot panels stay put so automation keeps a stable target.
   private let hidesOnResignKey: Bool
   private let openSettings: @MainActor () -> Void
+  /// Told after every show and hide, whichever path caused it.
+  var onVisibilityChange: (@MainActor (_ isVisible: Bool) -> Void)?
 
   init(
     model: AppModel,
@@ -152,11 +154,13 @@ final class PanelController {
     panel.makeKeyAndOrderFront(nil)
     model.requestInputFocus()
     model.requestInputSelectAll()
+    onVisibilityChange?(true)
   }
 
   func hide() {
     guard panel.isVisible else { return }
     panel.orderOut(nil)
+    onVisibilityChange?(false)
   }
 
   func toggle() {

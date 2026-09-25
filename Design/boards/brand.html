@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>States — 品牌</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+</head>
+<body>
+<!-- Rules: ../spec/brand.md. The images are the files the app ships:
+     Resources/AppIcon.icon/Assets and Sources/Cida/Resources/Brand. -->
+<main class="board" data-board="brand">
+  <div class="board-title">States — 品牌</div>
+  <p class="caption">规则见 spec/brand.md。标志是「辞」(Noto Serif SC 700,text-ink)后跟一枚 accent 光标,与结果栏的流式光标是同一个元素。应用图标是 surface-paper 底上的平面墨字(不加 Liquid Glass);暗色外观为 text-ink 底、surface-paper 字、#5E9C7C 光标,由 AppIcon.icon 编译,这里不画。菜单栏是单色模板图,由系统着色;面板隐藏而请求还在生成时,只有光标按 motion-breathe-ms 在 0.3 与 1 之间呼吸,完成后停在 1。字标「辞达」后同样跟一枚 accent 光标,用在设置页脚和截图提示胶囊。</p>
+  <div class="state-label">应用图标 · 1024 画布按 256 / 64 / 32 / 16 显示</div>
+  <section class="brand-icons" data-state="brand-icon-sizes">
+    <span class="app-icon" style="--size: 256px" data-state="brand-icon"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+    <span class="app-icon" style="--size: 64px"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+    <span class="app-icon" style="--size: 32px"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+    <span class="app-icon" style="--size: 16px"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+  </section>
+  <div class="state-label">菜单栏 · 浅色 / 深色 / 面板隐藏时请求仍在生成(光标呼吸,此帧为最暗 0.3)</div>
+  <section class="brand-menubars" data-state="brand-menubar">
+    <div class="menubar"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
+    <div class="menubar dark"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
+    <div class="menubar"><span class="status-mark breathing"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
+  </section>
+  <div class="state-label">字标 · 设置页脚 / 截图提示胶囊</div>
+  <section class="brand-wordmarks" data-state="brand-wordmark">
+    <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>拖动框选要翻译的文字 · Esc 取消</span></div>
+  </section>
+</main>
+</body>
+</html>
