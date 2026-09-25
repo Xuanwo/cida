@@ -103,6 +103,9 @@ class CidaSettings extends HTMLElement {
       ? row("选中文字", "唤起时带入并翻译", `<span class="status">已开启</span>`, "end")
       : row("选中文字", "需要辅助功能权限", `<span class="button">去授权</span>`, "end");
     const launch = row("开机启动", "", `<span class="toggle${is("launch", "on") ? " on" : ""}"></span>`, "end");
+    const updates = is("update", "available")
+      ? row("自动检查更新", "新版本 1.1.0 可以安装", `<span class="button">安装…</span><span class="toggle on"></span>`, "end spaced")
+      : row("自动检查更新", "每天检查一次", `<span class="button">检查更新</span><span class="toggle on"></span>`, "end spaced");
 
     const popover = is("menu", "open")
       ? `<div class="popover" style="left: 172px; top: 107px">
@@ -118,6 +121,7 @@ class CidaSettings extends HTMLElement {
           <div class="group"><h3>模型</h3>${provider}${custom ? endpoint + model + key : key + model}${readiness}</div>
           <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>
           <div class="group"><h3>唤起</h3>${shortcut}${capture}${selection}${launch}</div>
+          <div class="group"><h3>更新</h3>${updates}</div>
           <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>
         </div>
         ${popover}
@@ -156,3 +160,23 @@ class CidaFrozenScreen extends HTMLElement {
 }
 
 customElements.define("cida-frozen-screen", CidaFrozenScreen);
+
+// The menu bar item's menu (spec/updates.md §二): <cida-status-menu update="available">.
+class CidaStatusMenu extends HTMLElement {
+  connectedCallback() {
+    const available = this.getAttribute("update") === "available";
+    const item = (title, key = "") => `<span class="item"><b>${title}</b><kbd>${key}</kbd></span>`;
+    this.outerHTML = `
+      <section class="status-menu-scene" data-state="${this.getAttribute("state")}">
+        <div class="menubar"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
+        <div class="status-menu">
+          ${item("显示辞达", "⌥Space")}${item("截图翻译", "⌥S")}${item("设置…", "⌘,")}
+          ${available ? item("安装新版本 1.1.0…") : item("检查更新…")}
+          <i class="separator"></i>
+          ${item("退出辞达", "⌘Q")}
+        </div>
+      </section>`;
+  }
+}
+
+customElements.define("cida-status-menu", CidaStatusMenu);

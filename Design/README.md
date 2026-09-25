@@ -11,6 +11,7 @@ a versioned copy.
 | Streaming: buffering rate, phase motion, constraints | [`spec/streaming-motion.md`](spec/streaming-motion.md) | [`boards/streaming-motion.html`](boards/streaming-motion.html) |
 | Settings: window, providers, readiness, prompts, shortcuts, permissions | [`spec/settings.md`](spec/settings.md) | [`boards/settings-states.html`](boards/settings-states.html) |
 | Brand: mark, app icon, menu bar image, wordmark | [`spec/brand.md`](spec/brand.md) | [`boards/brand.html`](boards/brand.html) |
+| Updates: checks, channels, update reminders, menu bar menu | [`spec/updates.md`](spec/updates.md) | [`boards/updates.html`](boards/updates.html) |
 
 ## Boards
 

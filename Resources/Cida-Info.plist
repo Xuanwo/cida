@@ -39,5 +39,17 @@
     </dict>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
+    <key>SUFeedURL</key>
+    <string>https://cida-releases.xuanwo.io/appcast.xml</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <key>SUEnableSystemProfiling</key>
+    <false/>
+    <key>SURequireSignedFeed</key>
+    <true/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
 </dict>
 </plist>

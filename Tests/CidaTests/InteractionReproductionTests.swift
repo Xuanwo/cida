@@ -179,7 +179,8 @@ final class InteractionReproductionTests: XCTestCase {
   // MARK: - Settings window
 
   func testSettingsWindowIsAFixedWidthTitledWindowSizedByItsContent() throws {
-    let controller = SettingsWindowFactory.makeWindowController(model: AppModel(settings: .designPreview))
+    let controller = SettingsWindowFactory.makeWindowController(
+      model: AppModel(settings: .designPreview), updates: UpdateState())
     let window = try XCTUnwrap(controller.window)
     retainedTestWindows.append(window)
 
@@ -200,7 +201,7 @@ final class InteractionReproductionTests: XCTestCase {
         applied.values.append(shortcut)
         return shortcut.keyCode != UInt16(kVK_ANSI_Q)
       })
-    let controller = SettingsWindowFactory.makeWindowController(model: model)
+    let controller = SettingsWindowFactory.makeWindowController(model: model, updates: UpdateState())
     let window = try XCTUnwrap(controller.window)
     retainedTestWindows.append(window)
     window.alphaValue = 0
@@ -253,7 +254,7 @@ final class InteractionReproductionTests: XCTestCase {
 
   func testNativeCloseButtonClosesARealBackgroundSettingsWindow() throws {
     let (window, _) = makeNativeWindow(
-      rootView: SettingsWindowView(model: AppModel()),
+      rootView: SettingsWindowView(model: AppModel(), updates: UpdateState()),
       size: CGSize(width: 560, height: 660)
     )
     window.alphaValue = 0
@@ -268,9 +269,34 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
-  func testSettingsWindowHeightFollowsItsContentFromAFixedTopEdge() throws {
+  /// A screen whose visible height is below the window's natural height (a 13-inch MacBook with
+  /// the Dock) scrolls the groups under the titlebar instead of running behind the Dock.
+  func testSettingsScrollsInsteadOfOutgrowingASmallScreen() throws {
+    // Heights are measured in the bundled faces, whichever test ran first.
+    FontRegistrar.registerBundledFonts()
     let model = AppModel(settings: .designPreview)
-    let controller = SettingsWindowFactory.makeWindowController(model: model)
+    let controller = SettingsWindowFactory.makeWindowController(
+      model: model, updates: UpdateState(), maxContentHeight: 600)
+    let window = try XCTUnwrap(controller.window)
+    retainedTestWindows.append(window)
+    window.alphaValue = 0
+    window.orderBack(nil)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+
+    XCTAssertEqual(window.frame.height, 600, accuracy: 1)
+
+    model.editingPrompt = .improve
+    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+    XCTAssertEqual(window.frame.height, 600, accuracy: 1, "An open prompt sheet scrolls too")
+    assertTestProcessIsNotFrontmost()
+  }
+
+  func testSettingsWindowHeightFollowsItsContentFromAFixedTopEdge() throws {
+    // Heights are measured in the bundled faces, whichever test ran first.
+    FontRegistrar.registerBundledFonts()
+    let model = AppModel(settings: .designPreview)
+    let controller = SettingsWindowFactory.makeWindowController(
+      model: model, updates: UpdateState(), maxContentHeight: 2_000)
     let window = try XCTUnwrap(controller.window)
     retainedTestWindows.append(window)
     window.alphaValue = 0
@@ -278,7 +304,7 @@ final class InteractionReproductionTests: XCTestCase {
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
     let collapsedFrame = window.frame
-    XCTAssertEqual(collapsedFrame.height, 726, accuracy: 4, "The board's 默认 · DeepSeek is 729 pt tall")
+    XCTAssertEqual(collapsedFrame.height, 819, accuracy: 4, "The board's 默认 · DeepSeek is 822 pt tall")
 
     model.editingPrompt = .improve
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))

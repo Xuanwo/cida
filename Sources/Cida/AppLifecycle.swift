@@ -63,6 +63,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var settingsWindowController: NSWindowController?
   private var statusItem: NSStatusItem?
   private var statusItemMark: StatusItemMark?
+  private var checkForUpdatesMenuItem: NSMenuItem?
+  private let updater = CidaUpdater()
   private var showPanelMenuItem: NSMenuItem?
   private var captureMenuItem: NSMenuItem?
   private var globalHotKey: GlobalHotKey?
@@ -107,6 +109,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         self?.handleCaptureShortcut()
       }
       warmUpTextRecognition()
+    }
+    // Only a user's own launch talks to the update feed; automation and E2E never do.
+    if !launchOptions.isAutomation, CidaUpdater.isConfigured() {
+      updater.start()
     }
 
     if launchOptions.displaysInteractiveAutomationUI {
@@ -323,12 +329,35 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)
+    let checkForUpdates = NSMenuItem(
+      title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+    checkForUpdates.target = self
+    checkForUpdates.setAccessibilityIdentifier("status-menu-check-for-updates")
+    menu.addItem(checkForUpdates)
+    checkForUpdatesMenuItem = checkForUpdates
+    observeAvailableUpdateForMenu()
     menu.addItem(.separator())
     let quit = NSMenuItem(title: "退出辞达", action: #selector(quit), keyEquivalent: "q")
     quit.target = self
     menu.addItem(quit)
     item.menu = menu
     statusItem = item
+  }
+
+  @objc
+  func checkForUpdates() {
+    updater.state.checkForUpdates()
+  }
+
+  /// A version found by a scheduled check turns 检查更新… into its install item
+  /// (`Design/spec/updates.md` §二).
+  private func observeAvailableUpdateForMenu() {
+    let version = withObservationTracking {
+      updater.state.availableVersion
+    } onChange: { [weak self] in
+      Task { @MainActor in self?.observeAvailableUpdateForMenu() }
+    }
+    checkForUpdatesMenuItem?.title = version.map { "安装新版本 \($0)…" } ?? "检查更新…"
   }
 
   /// The menu bar caret breathes while a request runs behind a hidden panel
@@ -386,8 +415,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       if launchOptions.designState == .settingsRecording {
         model.recordingShortcut = .showPanel
       }
+      if launchOptions.designState == .settingsUpdateAvailable {
+        updater.state.availableVersion = "1.1.0"
+      }
     #endif
-    settingsWindowController = SettingsWindowFactory.makeWindowController(model: model)
+    settingsWindowController = SettingsWindowFactory.makeWindowController(
+      model: model, updates: updater.state)
   }
 
   private func installPerformanceProbeIfNeeded() {
@@ -486,10 +519,13 @@ private enum DesignState: String {
   case settingsMissingKey = "settings-missing-key"
   case settingsCustom = "settings-custom"
   case settingsRecording = "settings-recording"
+  case settingsUpdateAvailable = "settings-update-available"
 
   var isSettings: Bool {
     switch self {
-    case .settings, .settingsMissingKey, .settingsCustom, .settingsRecording: true
+    case .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
+      .settingsUpdateAvailable:
+      true
     default: false
     }
   }
@@ -615,7 +651,8 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
-      case .empty, .streaming, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording:
+      case .empty, .streaming, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
+        .settingsUpdateAvailable:
         return nil
       }
     #else
@@ -635,7 +672,8 @@ private struct LaunchOptions {
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:
         ResultRecord.designLongInput
-      case .empty, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording:
+      case .empty, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
+        .settingsUpdateAvailable:
         ""
       }
     #else

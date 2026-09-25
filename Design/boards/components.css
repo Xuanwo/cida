@@ -524,3 +524,26 @@ body {
   white-space: nowrap;
 }
 .capture-hint.static { position: static; transform: none; }
+
+/* ---- Menu bar menu (spec/updates.md) ------------------------------------ */
+
+.status-menu-scene { position: relative; width: 320px; height: 210px; }
+.status-menu-scene .menubar { width: 320px; }
+.status-menu {
+  position: absolute;
+  top: 28px;
+  right: 92px;
+  display: flex;
+  flex-direction: column;
+  width: 196px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--panel-shadow);
+  font-size: 13px;
+}
+.status-menu .item { display: flex; justify-content: space-between; padding: 3px 9px; border-radius: 5px; }
+.status-menu .item b { font-weight: 400; color: var(--text-primary); }
+.status-menu .item kbd { font-family: var(--font-ui); color: var(--text-secondary); }
+.status-menu .separator { height: 1px; margin: 5px 9px; background: var(--border); }

@@ -40,7 +40,7 @@ extension InteractionReproductionTests {
       saveSettings: { settings in persistedSettings = settings }
     )
     let (_, hostingView) = makeHiddenWindow(
-      rootView: SettingsWindowView(model: model),
+      rootView: SettingsWindowView(model: model, updates: UpdateState()),
       size: CGSize(width: 560, height: 660)
     )
 
@@ -377,7 +377,7 @@ extension InteractionReproductionTests {
     settings.model = "local-model"
     let model = AppModel(settings: settings)
     let (_, hostingView) = makeHiddenWindow(
-      rootView: SettingsWindowView(model: model),
+      rootView: SettingsWindowView(model: model, updates: UpdateState()),
       size: CGSize(width: 560, height: 800)
     )
 

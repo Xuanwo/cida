@@ -200,6 +200,21 @@ else
     >"$results_dir/release-artifact-build.log" 2>&1
   host_progress "host-release-artifact-build-finished"
 fi
+# Tart's shared folder does not carry the symbolic links inside Sparkle.framework, so the
+# guest receives the artifact as one archive that ditto restores intact.
+/bin/rm -f "$shared_artifact_root.zip"
+/usr/bin/ditto -c -k "$shared_artifact_root" "$shared_artifact_root.zip"
+# The guest has no network, so its `swift test` resolves package dependencies from the host's
+# SwiftPM cache: the cached repositories and binary artifacts of every pinned package.
+swiftpm_cache="$HOME/Library/Caches/org.swift.swiftpm"
+swift package resolve --package-path "$project_dir" --disable-keychain >/dev/null
+pinned=$(/usr/bin/python3 -c '
+import json, sys
+print("|".join(pin["identity"] for pin in json.load(open(sys.argv[1]))["pins"]))
+' "$project_dir/Package.resolved")
+cached_entries=(${(f)"$(cd "$swiftpm_cache" && /bin/ls -d repositories/* artifacts/* 2>/dev/null \
+  | /usr/bin/grep -i -E "$pinned")"})
+/usr/bin/tar -C "$swiftpm_cache" -cf "$results_dir/swiftpm-cache.tar" "${cached_entries[@]}"
 "$project_dir/scripts/e2e/host-session-snapshot.swift" >"$host_before_path"
 if ! start_host_monitor; then
   echo "Host artifact monitor failed to start" >&2
@@ -257,7 +272,9 @@ while (( attempt <= boot_attempts )); do
   host_progress "host-clone-started attempt=${attempt}"
   tart clone "$golden_vm" "$run_vm"
   # Keep the clone identity stable while giving concurrent test VMs distinct networking state.
-  tart set "$run_vm" --random-mac
+  # The virtual display offers a 14-inch MacBook Pro's 1512 × 982 pt, which the guest switches
+  # to before the journeys (scripts/e2e/set-display-mode.swift).
+  tart set "$run_vm" --random-mac --display 1512x982pt
   host_progress "host-clone-finished attempt=${attempt}"
 
   : >"$run_log"

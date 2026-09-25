@@ -13,6 +13,7 @@ one HTML board per topic under `Design/boards`, drawn from the shared `tokens.cs
 | Streaming buffer and motion, keyframes T0–T4 | `spec/streaming-motion.md` | `boards/streaming-motion.html` |
 | Settings | `spec/settings.md` | `boards/settings-states.html` |
 | Brand: mark, app icon, menu bar image, wordmark | `spec/brand.md` | `boards/brand.html` |
+| Updates: checks, channels, update reminders, menu bar menu | `spec/updates.md` | `boards/updates.html` |
 
 Each state carries a `data-state` name; the ones the app can render with `--design-state` are
 compared natively:
@@ -36,6 +37,8 @@ compared natively:
 | 设置 · 还差 API Key | `settings-missing-key` | `settings-missing-key` |
 | 设置 · 自定义端点 · 编辑改进提示词 · 自定义快捷键 · 已授权 | `settings-custom` | `settings-custom` |
 | 设置 · 录制快捷键 | `settings-recording` | `settings-recording` |
+| 设置 · 有新版本可以安装 | `settings-update-available` | `settings-update-available` |
+| 菜单栏菜单 · 平时 / 发现新版本 | `status-menu` / `status-menu-update-available` | (native menu, no fixture) |
 | 截图框选 · 拖动前 / 框选中 / 暗屏 | `capture-veiled` / `capture-lifted` / `capture-lifted-dark` | (overlay; XCUI attaches `capture-overlay-veiled`) |
 
 `swift scripts/render-design.swift` renders every board off screen to `Design/rendered/boards` and

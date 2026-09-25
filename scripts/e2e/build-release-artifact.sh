@@ -32,14 +32,7 @@ bin_path=$(swift build \
   --configuration release \
   --show-bin-path)
 
-mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
-/usr/bin/install -m 755 "$bin_path/Cida" "$app_path/Contents/MacOS/Cida"
-/usr/bin/ditto \
-  "$bin_path/Cida_Cida.bundle" \
-  "$app_path/Contents/Resources/Cida_Cida.bundle"
-/usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
-  "$app_path/Contents/Info.plist"
-"$project_dir/scripts/compile-app-icon.sh" "$app_path/Contents/Resources"
+"$project_dir/scripts/assemble-app.sh" "$bin_path/Cida" "$app_path"
 /usr/bin/xattr -cr "$app_path"
 
 signing_identity=${CIDA_CODESIGN_IDENTITY:-}
@@ -75,9 +68,7 @@ case "$signature_timestamp" in
     ;;
 esac
 
-/usr/bin/codesign --force --deep --sign "$signing_identity" --options runtime \
-  "${timestamp_arguments[@]}" "$app_path"
-/usr/bin/codesign --verify --deep --strict "$app_path"
+"$project_dir/scripts/sign-app.sh" "$app_path" "$signing_identity" "${timestamp_arguments[@]}"
 /usr/bin/plutil -lint "$app_path/Contents/Info.plist" >/dev/null
 
 bundle_identifier=$(

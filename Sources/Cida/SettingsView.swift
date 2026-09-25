@@ -1,43 +1,80 @@
 import AppKit
 import SwiftUI
 
-/// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): three groups
-/// that answer, in order, which model, how to translate or improve, and how
-/// to summon the panel. Everything saves itself; the window is as tall as
-/// its content.
+/// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): four groups
+/// that answer, in order, which model, how to translate or improve, how to summon the panel,
+/// and how Cida stays current. Everything saves itself; the window is as tall as its content.
 struct SettingsWindowView: View {
   @Bindable var model: AppModel
+  let updates: UpdateState
+  /// The tallest the window's content may be; below the titlebar the groups scroll past it.
+  @State private var maxContentHeight: CGFloat
+  /// The groups' natural height, measured on every layout.
+  @State private var bodyHeight: CGFloat?
 
-  init(model: AppModel) {
+  init(
+    model: AppModel, updates: UpdateState,
+    maxContentHeight: CGFloat = SettingsWindowFactory.screenContentHeight()
+  ) {
     self.model = model
+    self.updates = updates
+    _maxContentHeight = State(initialValue: maxContentHeight)
   }
 
   var body: some View {
     WindowSurface {
       VStack(spacing: 0) {
         SettingsTitlebar()
-        SettingsBody(model: model)
+        ScrollView(.vertical) {
+          SettingsBody(model: model, updates: updates)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bodyHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(
+          height: bodyHeight.map {
+            min($0, maxContentHeight - SettingsWindowFactory.titlebarHeight)
+          })
       }
     }
     .frame(width: SettingsWindowFactory.width)
     .fixedSize(horizontal: false, vertical: true)
+    .onReceive(
+      NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+    ) { _ in
+      maxContentHeight = SettingsWindowFactory.screenContentHeight()
+    }
   }
 }
 
 /// Builds the Settings window around a hosting controller whose preferred
 /// content size drives the window height, so expanding a prompt grows the
-/// window instead of scrolling it.
+/// window instead of scrolling it, up to the screen's visible height (minus the
+/// menu bar and the Dock); a smaller screen scrolls the groups instead.
 @MainActor
 enum SettingsWindowFactory {
   static let width: CGFloat = 560
   static let titlebarHeight: CGFloat = 46
 
-  static func makeWindowController(model: AppModel) -> NSWindowController {
-    let hostingController = NSHostingController(rootView: SettingsWindowView(model: model))
+  /// The visible height of the screen Settings opens on, where the Dock and the menu bar leave
+  /// room for windows.
+  static func screenContentHeight() -> CGFloat {
+    NSScreen.main?.visibleFrame.height ?? .greatestFiniteMagnitude
+  }
+
+  static func makeWindowController(
+    model: AppModel, updates: UpdateState,
+    maxContentHeight: CGFloat = screenContentHeight()
+  ) -> NSWindowController {
+    let hostingController = NSHostingController(
+      rootView: SettingsWindowView(
+        model: model, updates: updates, maxContentHeight: maxContentHeight))
     hostingController.sizingOptions = [.preferredContentSize]
     // The titlebar is drawn by `SettingsTitlebar` inside the content; without
     // this SwiftUI would add the system titlebar's safe area to the height.
     hostingController.safeAreaRegions = []
+    // The first pass measures the groups; the second sizes the window from them.
+    hostingController.view.layoutSubtreeIfNeeded()
+    hostingController.view.layoutSubtreeIfNeeded()
     let initialSize = hostingController.view.fittingSize
     let window = CidaWindowFactory.makeWindow(
       size: CGSize(width: width, height: initialSize.height),
@@ -68,6 +105,7 @@ private struct SettingsTitlebar: View {
 
 private struct SettingsBody: View {
   @Bindable var model: AppModel
+  let updates: UpdateState
 
   var body: some View {
     VStack(spacing: 0) {
@@ -96,6 +134,10 @@ private struct SettingsBody: View {
         GlobalShortcutRow(model: model, action: .captureText)
         SelectionAccessRow(model: model)
         LaunchAtLoginRow(model: model)
+      }
+      Hairline()
+      SettingsGroup(title: "更新") {
+        AutomaticUpdatesRow(updates: updates)
       }
       AboutFooter()
     }
@@ -657,6 +699,38 @@ private struct LaunchAtLoginRow: View {
       .accessibilityIdentifier("settings-launch-at-login-toggle")
     }
     .onAppear(perform: model.refreshLaunchAtLoginStatus)
+  }
+}
+
+/// One row (`Design/spec/settings.md` §五): checking daily is a switch, checking now or
+/// installing what a scheduled check found is the button beside it.
+private struct AutomaticUpdatesRow: View {
+  let updates: UpdateState
+
+  var body: some View {
+    SettingsRow(
+      title: "自动检查更新",
+      caption: updates.availableVersion.map { "新版本 \($0) 可以安装" } ?? "每天检查一次",
+      alignment: .trailing
+    ) {
+      HStack(spacing: 12) {
+        Button(updates.availableVersion == nil ? "检查更新" : "安装…", action: updates.checkForUpdates)
+          .buttonStyle(SettingsBorderedButtonStyle())
+          .accessibilityIdentifier("settings-check-for-updates")
+        Toggle(
+          "",
+          isOn: Binding(
+            get: { updates.automaticallyChecks },
+            set: { updates.setAutomaticallyChecks($0) }
+          )
+        )
+        .labelsHidden()
+        .toggleStyle(.switch)
+        .tint(CidaDesign.accent)
+        .controlSize(.mini)
+        .accessibilityIdentifier("settings-automatic-updates-toggle")
+      }
+    }
   }
 }
 

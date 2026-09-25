@@ -35,11 +35,12 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
     driver.showPanel()
     driver.openSettings()
-    XCTAssertEqual(settingsWindow.frame.width, 560, accuracy: 1)
-    XCTAssertEqual(settingsWindow.frame.height, 726, accuracy: 1, "The board's 默认 · DeepSeek state")
-
     let manifest = try VisualBaselineManifest.load(from: e2eEnvironment.sourceRoot)
     let baseline = try manifest.baseline(named: "settings")
+    XCTAssertEqual(settingsWindow.frame.width, CGFloat(baseline.logicalWidth), accuracy: 1)
+    XCTAssertEqual(
+      settingsWindow.frame.height, CGFloat(baseline.logicalHeight), accuracy: 1,
+      "The approved 默认 · DeepSeek state")
     try XCTContext.runActivity(named: "Design visual baseline: settings") { activity in
       try PixelDiff.assertScreenshot(
         settingsWindow.screenshot(),

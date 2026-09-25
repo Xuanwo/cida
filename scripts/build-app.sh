@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Builds and signs build/Cida.app. CIDA_VERSION (CFBundleShortVersionString, e.g. 1.2.0) and
-# CIDA_BUILD_NUMBER (CFBundleVersion) override the values in Resources/Cida-Info.plist.
+# CIDA_BUILD_NUMBER (CFBundleVersion) override the values in Resources/Cida-Info.plist;
+# CIDA_UPDATE_CHANNEL=beta marks a release candidate, whose updates include later candidates.
 set -euo pipefail
 
 script_dir=${0:A:h}
@@ -16,6 +17,10 @@ if [[ -n "${CIDA_VERSION:-}" && ! "$CIDA_VERSION" =~ '^[0-9]+\.[0-9]+\.[0-9]+$' 
 fi
 if [[ -n "${CIDA_BUILD_NUMBER:-}" && ! "$CIDA_BUILD_NUMBER" =~ '^[1-9][0-9]*$' ]]; then
   echo "CIDA_BUILD_NUMBER must be a positive integer, got $CIDA_BUILD_NUMBER" >&2
+  exit 64
+fi
+if [[ -n "${CIDA_UPDATE_CHANNEL:-}" && "$CIDA_UPDATE_CHANNEL" != beta ]]; then
+  echo "CIDA_UPDATE_CHANNEL must be beta or unset, got $CIDA_UPDATE_CHANNEL" >&2
   exit 64
 fi
 
@@ -38,9 +43,6 @@ staging_root=$(mktemp -d "$output_dir/.cida-production-build.XXXXXX")
 trap '/bin/rm -r "$staging_root"' EXIT
 staging_app="$staging_root/Cida.app"
 
-mkdir -p "$staging_app/Contents/MacOS"
-mkdir -p "$staging_app/Contents/Resources"
-
 swift build \
   --package-path "$project_dir" \
   --configuration "$configuration" \
@@ -51,13 +53,7 @@ bin_path=$(swift build \
   --configuration "$configuration" \
   --show-bin-path)
 
-/usr/bin/install -m 755 "$bin_path/Cida" "$staging_app/Contents/MacOS/Cida"
-/usr/bin/ditto \
-  "$bin_path/Cida_Cida.bundle" \
-  "$staging_app/Contents/Resources/Cida_Cida.bundle"
-/usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
-  "$staging_app/Contents/Info.plist"
-"$script_dir/compile-app-icon.sh" "$staging_app/Contents/Resources"
+"$script_dir/assemble-app.sh" "$bin_path/Cida" "$staging_app"
 if [[ -n "${CIDA_VERSION:-}" ]]; then
   /usr/bin/plutil -replace CFBundleShortVersionString -string "$CIDA_VERSION" \
     "$staging_app/Contents/Info.plist"
@@ -66,10 +62,12 @@ if [[ -n "${CIDA_BUILD_NUMBER:-}" ]]; then
   /usr/bin/plutil -replace CFBundleVersion -string "$CIDA_BUILD_NUMBER" \
     "$staging_app/Contents/Info.plist"
 fi
+if [[ "${CIDA_UPDATE_CHANNEL:-}" == beta ]]; then
+  /usr/bin/plutil -replace CidaUpdateChannel -string beta "$staging_app/Contents/Info.plist"
+fi
 
 /usr/bin/xattr -cr "$staging_app"
-/usr/bin/codesign --force --deep --sign "$signing_identity" --options runtime "$staging_app"
-/usr/bin/codesign --verify --deep --strict "$staging_app"
+"$script_dir/sign-app.sh" "$staging_app" "$signing_identity"
 /usr/bin/plutil -lint "$staging_app/Contents/Info.plist"
 
 designated_requirement=$(/usr/bin/codesign -dr - "$staging_app" 2>&1)

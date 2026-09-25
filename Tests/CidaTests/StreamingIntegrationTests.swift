@@ -86,7 +86,7 @@ final class StreamingIntegrationTests: XCTestCase {
     )
 
     let (settingsWindow, settingsHost) = makeHiddenHost(
-      SettingsWindowView(model: model),
+      SettingsWindowView(model: model, updates: UpdateState()),
       size: CGSize(width: 560, height: 800)
     )
     let endpointField = try XCTUnwrap(

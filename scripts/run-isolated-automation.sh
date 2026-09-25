@@ -33,31 +33,13 @@ else
     exit 66
   fi
 
-  binary_dir=${binary_path:h}
-  resource_bundle="$binary_dir/Cida_Cida.bundle"
-  if [[ ! -d "$resource_bundle" ]]; then
-    app_resources="${binary_dir:h}/Resources/Cida_Cida.bundle"
-    if [[ -d "$app_resources" ]]; then
-      resource_bundle=$app_resources
-    fi
-  fi
-  if [[ ! -d "$resource_bundle" ]]; then
-    echo "Cida resource bundle is missing: $resource_bundle" >&2
-    exit 66
-  fi
-
   automation_root=$(mktemp -d "${TMPDIR:-/tmp}/cida-isolated-automation.XXXXXX")
   trap '/bin/rm -r "$automation_root"' EXIT
 
   app_path="$automation_root/Cida Automation.app"
   bundle_identifier="com.xuanwo.Cida.Automation.run$$"
 
-  mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
-  /usr/bin/install -m 755 "$binary_path" "$app_path/Contents/MacOS/Cida"
-  /usr/bin/ditto "$resource_bundle" "$app_path/Contents/Resources/Cida_Cida.bundle"
-  /usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" \
-    "$app_path/Contents/Info.plist"
-  "$script_dir/compile-app-icon.sh" "$app_path/Contents/Resources"
+  "$script_dir/assemble-app.sh" "$binary_path" "$app_path"
   /usr/bin/plutil -replace CFBundleIdentifier -string "$bundle_identifier" \
     "$app_path/Contents/Info.plist"
   /usr/bin/plutil -replace CFBundleDisplayName -string "辞达测试" \
@@ -73,8 +55,7 @@ else
     exit 70
   fi
 
-  /usr/bin/codesign --force --deep --sign - "$app_path"
-  /usr/bin/codesign --verify --deep --strict "$app_path"
+  "$script_dir/sign-app.sh" "$app_path" -
 fi
 
 power_source=$(

@@ -97,13 +97,22 @@ mkdir -p "$work_root"
 failure_category="artifact"
 failure_phase="guest-artifact-verification"
 failure_detail="The guest could not stage or verify the Release artifact."
-/usr/bin/ditto "$shared_artifact_root" "$artifact_root"
+# The host shares the artifact as an archive: Tart's shared folder does not carry the symbolic
+# links inside Sparkle.framework.
+shared_artifact_archive="$shared_artifact_root.zip"
+shared_archive_digest=$(/usr/bin/shasum -a 256 "$shared_artifact_archive" | /usr/bin/awk '{print $1}')
+/usr/bin/ditto -x -k "$shared_artifact_archive" "$artifact_root"
 
 artifact_digest=$(
   "$project_dir/scripts/e2e/verify-release-artifact.sh" \
     "$artifact_root" --require-developer-id
 )
 progress "release-artifact-verified digest=$artifact_digest"
+
+# Without network, `swift test` resolves the pinned packages from the host's SwiftPM cache.
+swiftpm_cache="$HOME/Library/Caches/org.swift.swiftpm"
+/bin/mkdir -p "$swiftpm_cache"
+/usr/bin/tar -C "$swiftpm_cache" -xf "$results_dir/swiftpm-cache.tar"
 
 cd "$project_dir"
 swift_test_log="$results_dir/swift-test.log"
@@ -276,6 +285,15 @@ capture_approvals="$HOME/Library/Group Containers/group.com.apple.replayd/Screen
 /bin/sleep 1
 progress "guest-permissions-granted"
 
+# The golden image keeps a 1024 × 768 pt resolution; the journeys run on a 14-inch MacBook
+# Pro's 1512 × 982 pt screen, which holds the full-height Settings window above the Dock.
+failure_category="infrastructure"
+failure_phase="guest-display"
+failure_detail="The guest could not switch its display to 1512 × 982 pt."
+/usr/bin/swift "$project_dir/scripts/e2e/set-display-mode.swift" 1512 982 >/dev/null
+/bin/sleep 2
+progress "guest-display-configured"
+
 progress "xcui-test-started"
 failure_category="ui-assertion-or-crash"
 failure_phase="xcui-test"
@@ -328,12 +346,9 @@ if [[ "$verified_digest" != "$artifact_digest" ]]; then
 fi
 progress "release-artifact-reverified digest=$verified_digest"
 
-shared_digest=$(
-  "$project_dir/scripts/e2e/verify-release-artifact.sh" \
-    "$shared_artifact_root" --require-developer-id
-)
-if [[ "$shared_digest" != "$artifact_digest" ]]; then
+shared_digest=$(/usr/bin/shasum -a 256 "$shared_artifact_archive" | /usr/bin/awk '{print $1}')
+if [[ "$shared_digest" != "$shared_archive_digest" ]]; then
   echo "Shared release artifact changed while XCUI was running" >&2
   exit 1
 fi
-progress "shared-release-artifact-reverified digest=$shared_digest"
+progress "shared-release-artifact-reverified archive=$shared_digest"
