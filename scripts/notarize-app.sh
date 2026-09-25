@@ -4,30 +4,14 @@
 #
 #   scripts/notarize-app.sh [path/to/Cida.app]
 #
-# Credentials come from an App Store Connect API key when CIDA_NOTARY_KEY (path to the .p8),
-# CIDA_NOTARY_KEY_ID and CIDA_NOTARY_ISSUER are set, as in CI. Otherwise they come from a
-# notarytool keychain profile, cida-notary unless CIDA_NOTARY_PROFILE names another. Create it
-# once with:
-#
-#   xcrun notarytool store-credentials cida-notary --apple-id <id> --team-id 3GMS63N4BQ
+# scripts/submit-notarization.sh does the submission and describes the credentials it reads:
+# an App Store Connect API key in CI, the notarytool keychain profile cida-notary locally.
 set -euo pipefail
 
 script_dir=${0:A:h}
 project_dir=${script_dir:h}
 app_path=${1:-"$project_dir/build/Cida.app"}
 app_path=${app_path:A}
-if [[ -n "${CIDA_NOTARY_KEY:-}" ]]; then
-  if [[ -z "${CIDA_NOTARY_KEY_ID:-}" || -z "${CIDA_NOTARY_ISSUER:-}" ]]; then
-    echo "CIDA_NOTARY_KEY needs CIDA_NOTARY_KEY_ID and CIDA_NOTARY_ISSUER" >&2
-    exit 64
-  fi
-  credentials=(--key "$CIDA_NOTARY_KEY" --key-id "$CIDA_NOTARY_KEY_ID" --issuer "$CIDA_NOTARY_ISSUER")
-  credentials_source="API key $CIDA_NOTARY_KEY_ID"
-else
-  credentials=(--keychain-profile "${CIDA_NOTARY_PROFILE:-cida-notary}")
-  credentials_source="profile ${CIDA_NOTARY_PROFILE:-cida-notary}"
-fi
-
 if [[ ! -d "$app_path" ]]; then
   echo "No app at $app_path; build one with scripts/build-app.sh release" >&2
   exit 66
@@ -50,20 +34,7 @@ trap '/bin/rm -r "$work_dir"' EXIT
 submission_zip="$work_dir/Cida.zip"
 /usr/bin/ditto -c -k --keepParent "$app_path" "$submission_zip"
 
-echo "Submitting ${app_path:t} to the notary service ($credentials_source)…"
-submission=$(
-  /usr/bin/xcrun notarytool submit "$submission_zip" \
-    "${credentials[@]}" \
-    --wait \
-    --output-format json
-)
-submission_id=$(/usr/bin/plutil -extract id raw - <<<"$submission")
-submission_status=$(/usr/bin/plutil -extract status raw - <<<"$submission")
-if [[ "$submission_status" != "Accepted" ]]; then
-  echo "Notarization $submission_id ended as $submission_status:" >&2
-  /usr/bin/xcrun notarytool log "$submission_id" "${credentials[@]}" >&2 || true
-  exit 70
-fi
+"$script_dir/submit-notarization.sh" "$submission_zip"
 
 /usr/bin/xcrun stapler staple "$app_path"
 /usr/bin/xcrun stapler validate "$app_path"
@@ -80,5 +51,5 @@ archive_path="${app_path:h}/Cida-$version-$build.zip"
 /bin/rm -f "$archive_path"
 /usr/bin/ditto -c -k --keepParent "$app_path" "$archive_path"
 
-echo "Notarized ($submission_id) and stapled: $app_path"
+echo "Notarized and stapled: $app_path"
 echo "$archive_path"

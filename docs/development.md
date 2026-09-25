@@ -19,7 +19,15 @@ To hand the app to another Mac, notarize it:
 scripts/notarize-app.sh
 ```
 
-It submits `build/Cida.app` to Apple's notary service, staples the ticket, checks that Gatekeeper accepts the app as notarized, and writes `build/Cida-<version>-<build>.zip`. Locally it reads credentials from the notarytool keychain profile `cida-notary` (or `CIDA_NOTARY_PROFILE`), created once with `xcrun notarytool store-credentials cida-notary --apple-id <id> --team-id <team>` and an app-specific password.
+It submits `build/Cida.app` to Apple's notary service, staples the ticket, checks that Gatekeeper accepts the app as notarized, and writes `build/Cida-<version>-<build>.zip`. Locally it reads credentials from the notarytool keychain profile `cida-notary` (or `CIDA_NOTARY_PROFILE`), created once with `xcrun notarytool store-credentials cida-notary --apple-id <id> --team-id <team>` and an app-specific password; `scripts/submit-notarization.sh` holds that submission for both the app and the DMG.
+
+To pack the notarized app the way new users install it:
+
+```sh
+scripts/build-dmg.sh build/Cida.app build/Cida-<version>-<build>.dmg
+```
+
+It lays out the volume 辞达 as `Design/spec/lifecycle.md` §二 describes: a 600 × 400 Finder window on `Design/rendered/states/dmg-background.png` (turned into a TIFF with a 1x and a 2x representation), Cida.app and a link to /Applications named 应用程序 side by side at 128 pt. [dmgbuild](https://github.com/dmgbuild/dmgbuild), pinned by version and hash, writes that layout into the volume's `.DS_Store` without opening Finder; the script installs it into `build/dmgbuild-<version>` with Python 3.10 or newer (`CIDA_PYTHON` picks another interpreter). The DMG is compressed with LZFSE through `diskutil image`, signed with the app's Developer ID identity, notarized and stapled. It reads the same notary credentials as `scripts/notarize-app.sh`.
 
 Provider keys are stored only in Keychain; prompts, model IDs, the custom endpoint, and other non-secret preferences are stored in UserDefaults. Nothing else is persisted: the panel starts empty on every launch, and no record of past requests is written anywhere.
 
@@ -84,17 +92,20 @@ The strict performance gates require a detected 120 Hz-capable display, at least
 
 ## Releasing
 
-Pushing a tag `vX.Y.Z` on a commit of `main` publishes a release through `.github/workflows/release.yml`; `vX.Y.Z-rc.N` publishes a prerelease. On a `macos-26` runner the workflow runs `swift test`, builds with the tag's version and the commit count as the build number, signs with the Developer ID identity, notarizes, attaches `Cida-<version>-<build>.zip` and its SHA-256 to a GitHub release with generated notes, and publishes the zip as an update (`scripts/ci/publish-update.sh`).
+Pushing a tag `vX.Y.Z` on a commit of `main` publishes a release through `.github/workflows/release.yml`; `vX.Y.Z-rc.N` publishes a prerelease. On a `macos-26` runner the workflow reads the update notes, runs `swift test`, builds with the tag's version and the commit count as the build number, signs with the Developer ID identity, notarizes the app, builds, notarizes and staples `Cida-<version>-<build>.dmg` (`scripts/build-dmg.sh`), attaches the DMG and its SHA-256 to a GitHub release whose notes are the update notes, and publishes the zip as an update and the DMG as the download (`scripts/ci/publish-update.sh`). The zip is only Sparkle's archive and is not attached to the GitHub release.
+
+Every version needs update notes before it is tagged: `docs/releases/<X.Y.Z>.md`, written by hand in Chinese for users, one item per line starting with `- ` (`Design/spec/lifecycle.md` §六). A candidate `vX.Y.Z-rc.N` uses the notes of `X.Y.Z`. The workflow stops before building when the file is missing or has a line that is not an item (`scripts/ci/release-notes.py`); the notes go into the feed as plain text, one item per line, and Cida shows them in its panel.
 
 Updates follow `Design/spec/updates.md`. The R2 bucket `cida-releases`, served at `https://cida-releases.xuanwo.io` with a Cloudflare cache rule that honours each object's `Cache-Control`, holds:
 
 | Key | Cache | Written |
 | --- | --- | --- |
-| `appcast.xml` | 5 minutes | last, after the zip, EdDSA-signed |
-| `releases/<version>-<build>/Cida-<version>-<build>.zip` | a year, immutable | first |
-| `latest/Cida.zip` | 5 minutes | for releases only; the READMEs' download link |
+| `appcast.xml` | 5 minutes | last, EdDSA-signed |
+| `releases/<version>-<build>/Cida-<version>-<build>.zip` | a year, immutable | first; the archive Sparkle installs |
+| `releases/<version>-<build>/Cida-<version>-<build>.dmg` | a year, immutable | second; every version's installer |
+| `latest/Cida.dmg` | 5 minutes | for releases only, before the feed; the READMEs' download link |
 
-A release candidate's item carries Sparkle's `beta` channel, and its bundle carries `CidaUpdateChannel = beta`, so only candidates look for candidates. The item's notes are the `feat:` and `fix:` commit subjects since the previous release (or, for a candidate, the previous tag). The EdDSA private key signs every zip and the feed; the app trusts only the public key in `Resources/Cida-Info.plist` (`SUPublicEDKey`). Losing the private key means shipped copies can no longer be updated, so keep the login keychain item "Private key for signing Sparkle updates" (service `https://sparkle-project.org`, account `cida`) backed up; Sparkle's `sign_update --account cida` signs with it locally.
+A release candidate's item carries Sparkle's `beta` channel, and its bundle carries `CidaUpdateChannel = beta`, so only candidates look for candidates. The EdDSA private key signs every zip and the feed; the app trusts only the public key in `Resources/Cida-Info.plist` (`SUPublicEDKey`). Losing the private key means shipped copies can no longer be updated, so keep the login keychain item "Private key for signing Sparkle updates" (service `https://sparkle-project.org`, account `cida`) backed up; Sparkle's `sign_update --account cida` signs with it locally.
 
 GitHub's runners cannot run the Tart journeys, so run the release gate on the commit before tagging it:
 

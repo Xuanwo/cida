@@ -1,5 +1,6 @@
 # Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N for a prerelease) on a commit of main builds, signs,
-# notarizes and publishes Cida as a GitHub release and as an update on cida-releases.xuanwo.io. See "Releasing" in docs/development.md for the
+# notarizes and publishes Cida as a GitHub release with its DMG and as an update on
+# cida-releases.xuanwo.io. See "Releasing" in docs/development.md for the update notes and
 # secrets it needs and the local gate that comes before the tag.
 name: Release
 
@@ -40,10 +41,18 @@ jobs:
             echo "build=$(git rev-list --count HEAD)"
           } >>"$GITHUB_OUTPUT"
 
+      # docs/releases/<X.Y.Z>.md is written by hand for users; a candidate uses the notes of the
+      # version it will become. Reading them first keeps a tag without notes from building.
+      - name: Read the update notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python3 scripts/ci/release-notes.py "$VERSION" >"$RUNNER_TEMP/update-notes.txt"
+
       - name: Show the toolchain
         run: |
           xcodebuild -version
           swift --version
+          python3 --version
 
       - name: Test
         run: swift test
@@ -72,6 +81,16 @@ jobs:
           (umask 077 && printf '%s\n' "$NOTARY_API_KEY" >"$RUNNER_TEMP/cida-notary.p8")
           CIDA_NOTARY_KEY="$RUNNER_TEMP/cida-notary.p8" scripts/notarize-app.sh build/Cida.app
 
+      - name: Build the DMG
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+          CIDA_NOTARY_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          CIDA_NOTARY_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+        run: |
+          CIDA_NOTARY_KEY="$RUNNER_TEMP/cida-notary.p8" \
+            scripts/build-dmg.sh build/Cida.app "build/Cida-$VERSION-$BUILD.dmg"
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -79,11 +98,12 @@ jobs:
           BUILD: ${{ steps.version.outputs.build }}
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
-          archive="Cida-$VERSION-$BUILD.zip"
-          (cd build && shasum -a 256 "$archive" >"$archive.sha256")
-          flags=(--verify-tag --generate-notes --title "辞达 $GITHUB_REF_NAME")
+          # The DMG is what people download; the zip is only the Sparkle archive on R2.
+          disk_image="Cida-$VERSION-$BUILD.dmg"
+          (cd build && shasum -a 256 "$disk_image" >"$disk_image.sha256")
+          flags=(--verify-tag --notes-file "docs/releases/$VERSION.md" --title "辞达 $GITHUB_REF_NAME")
           if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" "build/$archive" "build/$archive.sha256" "${flags[@]}"
+          gh release create "$GITHUB_REF_NAME" "build/$disk_image" "build/$disk_image.sha256" "${flags[@]}"
 
       - name: Publish the update
         env:
@@ -94,15 +114,8 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          # The update notes are the user-facing commits since the version its users run: the
-          # previous release for a release, the previous tag of any kind for a candidate.
-          exclude=()
-          if [[ "$CHANNEL" == release ]]; then exclude=(--exclude '*-rc.*'); fi
-          previous=$(git describe --tags --abbrev=0 "${exclude[@]}" "$GITHUB_REF_NAME^" 2>/dev/null || true)
-          git log --format=%s ${previous:+"$previous.."}"$GITHUB_REF_NAME" \
-            | grep -E '^(feat|fix)(\(.+\))?: ' >"$RUNNER_TEMP/update-notes.txt" || true
-          scripts/ci/publish-update.sh "build/Cida-$VERSION-$BUILD.zip" "$VERSION" "$BUILD" "$CHANNEL" \
-            "$RUNNER_TEMP/update-notes.txt"
+          scripts/ci/publish-update.sh "build/Cida-$VERSION-$BUILD.zip" "build/Cida-$VERSION-$BUILD.dmg" \
+            "$VERSION" "$BUILD" "$CHANNEL" "$RUNNER_TEMP/update-notes.txt"
 
       - name: Remove the signing material
         if: always()
