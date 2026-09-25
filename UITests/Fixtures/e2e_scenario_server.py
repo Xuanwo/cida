@@ -114,6 +114,8 @@ def plan_for(submitted_text):
         "CIDA_UI_E2E_COMPLETE",
     ]
     plans = {
+        # What Settings' 检查 and `Cida check` send (ModelServiceCheck.source).
+        "hello": {"chunks": ["你好"]},
         "CIDA_RELEASE_ARTIFACT_SMOKE": {
             "chunks": ["Signed release artifact response.\n", "CIDA_UI_E2E_COMPLETE"],
         },

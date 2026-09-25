@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -173,24 +174,73 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse(driver.stopButton.exists, "Nothing was requested")
   }
 
-  func testProviderEndpointAndPromptEditingFollowTheSettingsStateMachine() {
+  /// `Design/spec/configuration.md` §四: Settings starts with the onboarding card, copies the
+  /// prompt, and follows what the artifact's own command line writes and checks while the
+  /// window stays open. Prompts are still edited in Settings.
+  func testModelServiceFollowsTheCommandLineAndPromptsEditInSettings() throws {
     driver.launch(endpointOverride: false)
     driver.openSettings()
     let settingsWindow = driver.settingsWindow
 
-    let providerMenu = driver.settingsProviderMenu(in: settingsWindow)
-    XCTAssertEqual(providerMenu.label, "DeepSeek")
-    XCTAssertFalse(driver.app.textFields["settings-endpoint"].exists, "Presets hide the endpoint")
+    XCTAssertTrue(driver.modelOnboarding.waitForExistence(timeout: 3), "No service yet")
+    XCTAssertFalse(driver.modelStatus.exists)
+    let copy = driver.copyConfigurationPromptButton
+    XCTAssertEqual(copy.label, "复制配置提示词")
+    copy.click()
+    XCTAssertTrue(driver.waitForLabel("已复制", in: copy, timeout: 0.6), "✓ 已复制 right away")
+    let prompt = NSPasteboard.general.string(forType: .string) ?? ""
+    XCTAssertTrue(prompt.hasPrefix("帮我配置辞达（macOS 上的翻译与改写应用）使用的模型服务。"))
+    XCTAssertTrue(prompt.contains("辞达的命令行：\(driver.executablePath)"), prompt)
+    XCTAssertTrue(prompt.contains("当前配置：还没配置"))
+    XCTAssertTrue(driver.waitForLabel("复制配置提示词", in: copy, timeout: 2), "…for 800 ms")
     XCTAssertTrue(
-      driver.element(identifier: "settings-provider-endpoint-caption").exists,
-      "Presets name the host requests go to")
-    XCTAssertTrue(driver.readinessRow.waitForExistence(timeout: 3))
+      driver.waitForText(
+        containing: "已复制。粘贴给你的 AI 助手，配好后这里会自动更新。",
+        in: driver.modelOnboardingCaption, timeout: 1),
+      "The card says what comes next until a service arrives")
+
+    // The assistant configures the service while Settings stays open.
+    let set = try driver.runCommandLine([
+      "config", "set", "endpoint=\(e2eEnvironment.endpoint)", "format=chat-completions",
+      "model=cida-ui-mock-model",
+    ])
+    XCTAssertEqual(set.status, 0, set.errorOutput)
+    XCTAssertEqual(set.output, "已更新 3 项：endpoint、format、model\n")
     XCTAssertTrue(
-      driver.waitForValue("还差 API Key", in: driver.readinessRow, timeout: 3),
-      "Readiness is derived from the empty key")
-    let launchAtLogin = driver.element(identifier: "settings-launch-at-login-toggle")
-    XCTAssertTrue(launchAtLogin.exists)
-    XCTAssertEqual(launchAtLogin.elementType, .checkBox)
+      driver.waitForValue("已就绪 · 刚刚更新", in: driver.modelStatus, timeout: 3),
+      "The open window refreshes at once")
+    XCTAssertFalse(driver.modelOnboarding.exists)
+    XCTAssertTrue(
+      driver.waitForText(containing: "cida-ui-mock-model", in: driver.modelSummary, timeout: 1))
+    XCTAssertTrue(
+      driver.waitForText(containing: "127.0.0.1 · Chat Completions", in: driver.modelSummary, timeout: 1))
+    XCTAssertTrue(
+      driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 5), "刚刚更新 lasts 3 s")
+
+    // 检查 sends the same request as `Cida check`.
+    driver.modelCheckButton.click()
+    XCTAssertNotNil(try scenarioServer.wait(for: "hello", status: "completed", timeout: 10))
+    XCTAssertTrue(driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 5))
+    XCTAssertFalse(driver.modelFailure.exists)
+
+    // A failing command-line check shows up with its reason and the remedy.
+    let unreachable = try driver.runCommandLine([
+      "config", "set", "endpoint=http://127.0.0.1:9/v1/chat/completions",
+    ])
+    XCTAssertEqual(unreachable.status, 0)
+    let check = try driver.runCommandLine(["check"])
+    XCTAssertEqual(check.status, 69, check.output)
+    XCTAssertTrue(check.output.hasPrefix("✗ 检查失败 · 连不上服务"), check.output)
+    XCTAssertTrue(
+      driver.waitForValue("检查失败 · 刚刚更新", in: driver.modelStatus, timeout: 3))
+    XCTAssertTrue(
+      driver.waitForText(
+        containing: "连不上服务。复制配置提示词，让 AI 助手修好。", in: driver.modelFailure, timeout: 2))
+    try driver.configureModelService()
+    XCTAssertTrue(
+      driver.waitForValue("已就绪 · 刚刚更新", in: driver.modelStatus, timeout: 3),
+      "A changed configuration is 已就绪 until it is checked")
+    XCTAssertFalse(driver.modelFailure.exists)
 
     XCTAssertFalse(driver.app.textViews["settings-prompt-editor-improve"].exists, "Prompts start collapsed")
     driver.app.buttons["settings-prompt-edit-improve"].click()
@@ -208,6 +258,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       driver.app.textViews["settings-prompt-editor-improve"].value as? String,
       customPrompt
     )
+    let show = try driver.runCommandLine(["config", "show", "--json"])
+    XCTAssertTrue(show.output.contains(customPrompt), "Settings and the command line share one store")
+    XCTAssertTrue(show.output.contains(#""model": "cida-ui-mock-model""#), "and Settings kept it")
 
     let resetPrompt = driver.app.buttons["settings-prompt-reset-improve"]
     XCTAssertTrue(resetPrompt.waitForExistence(timeout: 3))
@@ -221,26 +274,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
         timeout: 3
       )
     )
-
-    providerMenu.click()
-    let customItem = driver.app.menuItems[CidaAppDriver.customProviderLabel]
-    XCTAssertTrue(customItem.waitForExistence(timeout: 3))
-    customItem.click()
-    XCTAssertEqual(
-      driver.settingsProviderMenu(in: settingsWindow).label, CidaAppDriver.customProviderLabel)
-    let endpoint = driver.app.textFields["settings-endpoint"]
-    XCTAssertTrue(endpoint.waitForExistence(timeout: 3), "Custom shows the endpoint field")
-    XCTAssertTrue(driver.app.textFields["settings-model"].exists, "Custom takes a typed model")
-    XCTAssertTrue(driver.waitForValue("端点无效", in: driver.readinessRow, timeout: 3))
-
-    driver.replaceText(in: driver.app.textFields["settings-model"], with: "local-model")
-    driver.replaceText(in: endpoint, with: "http://127.0.0.1:8080/v1/chat/completions")
-    XCTAssertTrue(
-      driver.waitForValue("本地端点 · 无需 API Key", in: driver.readinessRow, timeout: 3))
-    XCTAssertEqual(
-      driver.app.secureTextFields["settings-api-key-editor"].placeholderValue,
-      "本地端点可留空"
-    )
+    let launchAtLogin = driver.element(identifier: "settings-launch-at-login-toggle")
+    XCTAssertTrue(launchAtLogin.exists)
+    XCTAssertEqual(launchAtLogin.elementType, .checkBox)
   }
 
   func testGlobalShortcutIsRecordedInSettingsAndSummonsThePanel() {
@@ -287,13 +323,20 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.showPanel()
   }
 
-  func testFreshAppInstancesDoNotShareSettingsOrCredentials() {
+  func testFreshAppInstancesDoNotShareSettingsOrCredentials() throws {
+    try driver.configureModelService(model: "first-instance-model")
+    let key = try driver.runCommandLine(
+      ["config", "set", "api-key", "--stdin"], standardInput: "sk-first-instance")
+    XCTAssertEqual(key.status, 0, key.errorOutput)
+    XCTAssertEqual(key.output, "已把 API Key 存进钥匙串\n")
+    let refused = try driver.runCommandLine(["config", "set", "api-key=sk-first-instance"])
+    XCTAssertEqual(refused.status, 64, "A key written in the command is refused")
+    XCTAssertFalse(refused.errorOutput.contains("sk-first-instance"))
     driver.launch(endpointOverride: false)
-    driver.configureCustomEndpoint(
-      endpoint: e2eEnvironment.endpoint,
-      model: "first-instance-model",
-      apiKey: "sk-first-instance"
-    )
+    driver.openSettings()
+    XCTAssertTrue(driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 3))
+    XCTAssertTrue(
+      driver.waitForText(containing: "first-instance-model", in: driver.modelSummary, timeout: 1))
     driver.terminate()
 
     let secondNamespace = e2eEnvironment.uniqueSettingsNamespace(for: name + "-second")
@@ -308,11 +351,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     secondDriver.launch(endpointOverride: false)
     secondDriver.openSettings()
-    let settingsWindow = secondDriver.settingsWindow
-    XCTAssertEqual(secondDriver.settingsProviderMenu(in: settingsWindow).label, "DeepSeek")
-    XCTAssertEqual(
-      secondDriver.app.secureTextFields["settings-api-key-editor"].value as? String,
-      ""
-    )
+    XCTAssertTrue(secondDriver.modelOnboarding.waitForExistence(timeout: 3))
+    let show = try secondDriver.runCommandLine(["config", "show", "--json"])
+    XCTAssertTrue(show.output.contains(#""api-key": "unset""#), show.output)
+    XCTAssertFalse(show.output.contains("first-instance-model"))
   }
 }
