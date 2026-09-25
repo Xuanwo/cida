@@ -142,6 +142,24 @@ final class LifecycleTests: XCTestCase {
     XCTAssertEqual(readOnly.note, "辞达正从磁盘映像运行，没法更新。把它拖进「应用程序」后再打开")
   }
 
+  func testNotesReadAsAChangelogAndEqualVersionsShowTheirBuilds() {
+    let found = CidaUpdateDriver.foundMessage(
+      version: "1.1.0", currentVersion: "1.0.0", notes: ["第一条"])
+    XCTAssertEqual(found.bodyCaption, "更新内容")
+    XCTAssertNil(
+      CidaUpdateDriver.foundMessage(version: "1.1.0", currentVersion: "1.0.0", notes: []).bodyCaption,
+      "No notes, no caption")
+
+    let candidates = CidaUpdateDriver.versionLabels(
+      new: "1.1.0", newBuild: "146", current: "1.1.0", currentBuild: "145")
+    XCTAssertEqual(candidates.new, "1.1.0（146）")
+    XCTAssertEqual(candidates.current, "1.1.0（145）")
+    let release = CidaUpdateDriver.versionLabels(
+      new: "1.2.0", newBuild: "160", current: "1.1.0", currentBuild: "146")
+    XCTAssertEqual(release.new, "1.2.0")
+    XCTAssertEqual(release.current, "1.1.0")
+  }
+
   func testFailureReasonsAreShortChinese() {
     XCTAssertEqual(
       CidaUpdateDriver.reason(for: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)),

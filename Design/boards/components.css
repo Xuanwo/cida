@@ -260,8 +260,9 @@ body {
 
 .source.statement .muted { color: var(--text-tertiary); }
 .result .aside { font-size: var(--font-size-caption); line-height: 1.5; color: var(--text-tertiary); }
-.result .text.notes p { margin: 0; }
-.result .text.notes p::before { content: "· "; color: var(--text-tertiary); }
+/* A wrapped item hangs under its own text, not under the bullet. */
+.result .text.notes p { margin: 0; padding-left: 1em; text-indent: -1em; }
+.result .text.notes p::before { content: "·"; display: inline-block; width: 1em; text-indent: 0; color: var(--text-tertiary); }
 
 /* The DMG's Finder window (spec/lifecycle.md §二). dmg-background is the image the DMG ships;
    Finder draws the two icons over it at (150, 210) and (450, 210). */

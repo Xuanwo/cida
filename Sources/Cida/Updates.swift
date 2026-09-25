@@ -132,12 +132,16 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
   private let state: UpdateState
   private weak var presenter: UpdatePresenter?
   private let currentVersion: String
+  private let currentBuild: String
   private let isRunningFromReadOnlyLocation: Bool
   /// Starts a user-initiated check; set once the updater exists.
   var checkForUpdates: @MainActor () -> Void = {}
 
   private var phase = Phase.checking
+  /// The new version as the statements name it.
   private var version = ""
+  /// This copy's version as the statements name it next to `version`.
+  private var currentLabel = ""
   private var notes: [String] = []
   private var expectedLength: UInt64 = 0
   private var receivedLength: UInt64 = 0
@@ -155,6 +159,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     self.state = state
     self.presenter = presenter
     currentVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    currentBuild = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
     isRunningFromReadOnlyLocation = Self.isReadOnlyLocation(bundle.bundleURL)
     super.init()
   }
@@ -170,8 +175,20 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
       statement: "辞达 \(version) 可以安装",
       statementDetail: currentVersion.isEmpty ? nil : " · 当前 \(currentVersion)",
       choices: installChoices,
-      body: notes.isEmpty ? .none : .lines(notes)
+      body: notes.isEmpty ? .none : .lines(notes),
+      bodyCaption: notes.isEmpty ? nil : notesCaption
     )
+  }
+
+  static let notesCaption = "更新内容"
+
+  /// The version the statements name: the build joins it while both versions read the same
+  /// (between release candidates), so 1.1.0 (146) never reads as 1.1.0 over 1.1.0.
+  static func versionLabels(
+    new: String, newBuild: String, current: String, currentBuild: String
+  ) -> (new: String, current: String) {
+    guard new == current, !newBuild.isEmpty, !currentBuild.isEmpty else { return (new, current) }
+    return ("\(new)（\(newBuild)）", "\(current)（\(currentBuild)）")
   }
 
   static func checkingMessage() -> PanelMessage {
@@ -186,6 +203,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
       statement: percent.map { "正在下载辞达 \(version) · \($0)%" } ?? "正在校验…",
       choices: installChoices,
       body: notes.isEmpty ? .none : .lines(notes),
+      bodyCaption: notes.isEmpty ? nil : notesCaption,
       isWorking: true,
       slot: .stop
     )
@@ -300,13 +318,15 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     reply: @escaping (SPUUserUpdateChoice) -> Void
   ) {
     phase = .found
-    version = appcastItem.displayVersionString
+    (version, currentLabel) = Self.versionLabels(
+      new: appcastItem.displayVersionString, newBuild: appcastItem.versionString,
+      current: currentVersion, currentBuild: currentBuild)
     notes = ReleaseNotes.lines(from: appcastItem.itemDescription)
     let bringsUp = updateState.userInitiated || presenter?.mayPresentScheduledUpdate == true
 
     if isRunningFromReadOnlyLocation {
       show(
-        Self.readOnlyMessage(version: version, currentVersion: currentVersion, notes: notes),
+        Self.readOnlyMessage(version: version, currentVersion: currentLabel, notes: notes),
         bringsUp: bringsUp,
         handler: PanelMessageHandler(
           choose: { [weak self] _ in
@@ -319,7 +339,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     }
 
     show(
-      Self.foundMessage(version: version, currentVersion: currentVersion, notes: notes),
+      Self.foundMessage(version: version, currentVersion: currentLabel, notes: notes),
       bringsUp: bringsUp,
       handler: PanelMessageHandler(
         choose: { [weak self] index in
@@ -372,7 +392,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
         || error.code == Int(SUError.runningTranslocated.rawValue)
     {
       show(
-        Self.readOnlyMessage(version: version, currentVersion: currentVersion, notes: notes),
+        Self.readOnlyMessage(version: version, currentVersion: currentLabel, notes: notes),
         handler: PanelMessageHandler(
           choose: { [weak self] _ in
             acknowledgement()
@@ -384,7 +404,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
 
     let message = Self.failedMessage(
       from: latest?.message
-        ?? Self.foundMessage(version: version, currentVersion: currentVersion, notes: notes),
+        ?? Self.foundMessage(version: version, currentVersion: currentLabel, notes: notes),
       note: "\(failureTitle)：\(Self.reason(for: error)) · ⏎ 重试")
     show(
       message,

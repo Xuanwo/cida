@@ -26,6 +26,8 @@ struct PanelMessage: Equatable, Sendable {
   var choices: [String]
   var selectedChoice = 0
   var body: Body = .none
+  /// A caption above the body naming what it is, e.g. 更新内容 over release notes.
+  var bodyCaption: String?
   /// Work is in progress: the choices dim and the paper ends in the streaming caret.
   var isWorking = false
   var slot: Slot = .none
@@ -33,7 +35,7 @@ struct PanelMessage: Equatable, Sendable {
   var note: String?
 
   var hasPaper: Bool {
-    body != .none || isWorking || note != nil
+    body != .none || isWorking || note != nil || bodyCaption != nil
   }
 }
 

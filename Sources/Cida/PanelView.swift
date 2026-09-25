@@ -616,6 +616,13 @@ private struct PanelMessageView: View {
   private var paper: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 10) {
+        if let caption = message.bodyCaption {
+          Text(caption)
+            .font(CidaDesign.mainUI(11))
+            .foregroundStyle(CidaDesign.textTertiary)
+            .frame(height: 16.5)
+            .accessibilityIdentifier("message-body-caption")
+        }
         paperBody
         if let note = message.note {
           ResultNoteRow(note: ResultNote(kind: .failed, text: note))
@@ -649,9 +656,9 @@ private struct PanelMessageView: View {
   }
 }
 
-/// Serif paper text in the result pane's Chinese setting (Noto Serif SC 17 / 31): one paragraph
-/// per line, optionally each after a quiet bullet, ending in the streaming caret. The lines are
-/// one Text so the leading between them is the same as inside a wrapped line.
+/// Serif paper text in the result pane's Chinese setting (Noto Serif SC 17 / 31): a paragraph, or
+/// a list whose wrapped items hang under their own text rather than under the bullet, ending in
+/// the streaming caret.
 private struct PaperText: View {
   let lines: [String]
   var bulleted = false
@@ -670,28 +677,49 @@ private struct PaperText: View {
     0,
     CidaDesign.Typography.resultLineHeightCJK - NSLayoutManager().defaultLineHeight(for: font)
   )
+  /// The bullet column: one em of the result size.
+  private static let bulletWidth = CidaDesign.Typography.resultSizeCJK
 
   var body: some View {
     if showsCaret && !reduceMotion {
       TimelineView(.animation) { context in
-        paragraph(
+        content(
           caretOpacity: Double(
             StatusItemMark.caretOpacity(after: context.date.timeIntervalSinceReferenceDate)))
       }
     } else {
-      paragraph(caretOpacity: showsCaret ? 1 : nil)
+      content(caretOpacity: showsCaret ? 1 : nil)
     }
   }
 
-  private func paragraph(caretOpacity: Double?) -> some View {
-    var composed = Text("")
-    for (index, line) in lines.enumerated() {
-      if index > 0 { composed = composed + Text("\n") }
+  private func content(caretOpacity: Double?) -> some View {
+    Group {
       if bulleted {
-        composed = composed + Text("· ").foregroundStyle(CidaDesign.textTertiary)
+        VStack(alignment: .leading, spacing: Self.lineSpacing) {
+          ForEach(lines.indices, id: \.self) { index in
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+              Text("·")
+                .font(Font(Self.font))
+                .foregroundStyle(CidaDesign.textTertiary)
+                .frame(width: Self.bulletWidth, alignment: .leading)
+              paragraph(lines[index], caretOpacity: index == lines.count - 1 ? caretOpacity : nil)
+            }
+          }
+        }
+      } else {
+        paragraph(lines.joined(separator: "\n"), caretOpacity: caretOpacity)
       }
-      composed = composed + Text(line).foregroundStyle(CidaDesign.textInk)
     }
+    // CSS line-height puts half the leading above the first line and below the last. The
+    // caret's descent would deepen the last line; the paper does not grow for it.
+    .padding(.top, Self.lineSpacing / 2)
+    .padding(.bottom, Self.lineSpacing / 2 - (caretOpacity == nil ? 0 : Self.caretDescent))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private func paragraph(_ text: String, caretOpacity: Double?) -> some View {
+    var composed = Text(text).foregroundStyle(CidaDesign.textInk)
     if let caretOpacity {
       // Like the result pane's caret: 2 pt past the text, 4 pt below the baseline.
       composed = composed + Text(Image(nsImage: Self.caret(opacity: caretOpacity)))
@@ -700,10 +728,6 @@ private struct PaperText: View {
     return composed
       .font(Font(Self.font))
       .lineSpacing(Self.lineSpacing)
-      // CSS line-height puts half the leading above the first line and below the last. The
-      // caret's descent would deepen the last line; the paper does not grow for it.
-      .padding(.top, Self.lineSpacing / 2)
-      .padding(.bottom, Self.lineSpacing / 2 - (caretOpacity == nil ? 0 : Self.caretDescent))
       .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
   }

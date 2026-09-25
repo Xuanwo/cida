@@ -606,9 +606,9 @@ extension CidaAppDelegate: UpdatePresenter {
     /// The lifecycle states of `States — 生命周期` (`Design/boards/lifecycle.html`).
     fileprivate func presentDesignStateMessage() {
       let notes = [
-        "辞达会自己检查并安装新版本，更新说明就写在这里。",
+        "模型服务改由 AI 助手配置：在设置里复制提示词，交给 Claude Code、Codex 等助手，它会帮你配好。",
         "开机启动时不再弹出面板。",
-        "模型服务交给 AI 助手配置，在设置里复制提示词即可。",
+        "现在也能直接使用 Anthropic Claude 的模型。",
       ]
       let found = CidaUpdateDriver.foundMessage(
         version: "1.1.0", currentVersion: "1.0.0", notes: notes)
