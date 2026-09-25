@@ -1,6 +1,8 @@
 // Parts that repeat across states, as small custom elements so a state reads
 // as what differs: <cida-bar mode action processing> and <cida-note kind>.
 
+// The panel's own actions by default; a lifecycle panel (spec/lifecycle.md §一) passes its
+// choices as options="移到「应用程序」|暂不" with selected="0", and a status text for the slot.
 class CidaBar extends HTMLElement {
   connectedCallback() {
     const mode = this.getAttribute("mode") ?? "translate";
@@ -10,15 +12,22 @@ class CidaBar extends HTMLElement {
       stop: `<div class="bar-action"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
       copy: `<div class="bar-action"><i class="icon icon-copy"></i><span class="label">复制结果</span><span class="key">⌘C</span></div>`,
       copied: `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制</span></div>`,
+      settings: `<div class="bar-action"><span class="label">打开设置</span><span class="key">⌘,</span></div>`,
+      status: `<span class="bar-status">${this.getAttribute("status") ?? ""}</span>`,
     };
+    const options = this.getAttribute("options")?.split("|") ?? ["翻译", "改进"];
+    const selected = this.hasAttribute("options")
+      ? Number(this.getAttribute("selected") ?? 0)
+      : (mode === "improve" ? 1 : 0);
+    const segments = options
+      .map((option, index) => `<span${index === selected ? ' class="on"' : ""}>${option}</span>`)
+      .join("");
+    const hint = options.length > 1 ? `<span class="tab-hint">⇥ 切换</span>` : "";
     this.outerHTML = `
       <div class="bar${this.hasAttribute("processing") ? " processing" : ""}">
         <div class="action-group">
-          <div class="seg">
-            <span${mode === "translate" ? ' class="on"' : ""}>翻译</span>
-            <span${mode === "improve" ? ' class="on"' : ""}>改进</span>
-          </div>
-          <span class="tab-hint">⇥ 切换</span>
+          <div class="seg">${segments}</div>
+          ${hint}
         </div>
         ${actions[action]}
       </div>`;

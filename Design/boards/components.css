@@ -214,6 +214,7 @@ body {
   background: var(--text-secondary);
 }
 .bar-action.copied { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+.bar-status { font-size: var(--font-size-label); color: var(--text-tertiary); }
 
 .result {
   display: flex;
@@ -254,6 +255,98 @@ body {
   color: var(--text-secondary);
 }
 .note .icon { width: 13px; height: 13px; color: var(--text-tertiary); }
+
+/* ---- Lifecycle panels (spec/lifecycle.md) ------------------------------ */
+
+.source.statement .muted { color: var(--text-tertiary); }
+.result .aside { font-size: var(--font-size-caption); line-height: 1.5; color: var(--text-tertiary); }
+.result .text.notes p { margin: 0; }
+.result .text.notes p::before { content: "· "; color: var(--text-tertiary); }
+
+/* The DMG's Finder window (spec/lifecycle.md §二). dmg-background is the image the DMG ships;
+   Finder draws the two icons over it at (150, 210) and (450, 210). */
+.dmg-window {
+  position: relative;
+  width: 600px;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--panel-edge), var(--panel-shadow);
+}
+.dmg-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.dmg-titlebar i { width: 12px; height: 12px; border-radius: 50%; background: var(--surface-dim); box-shadow: inset 0 0 0 1px var(--border); }
+.dmg-titlebar span { flex: 1; text-align: center; margin-right: 60px; }
+.dmg-background {
+  position: relative;
+  width: 600px;
+  height: 400px;
+  background: var(--surface-paper);
+}
+.dmg-background .headline {
+  position: absolute;
+  top: 56px;
+  width: 100%;
+  text-align: center;
+  font-family: var(--font-result-cjk);
+  font-size: 22px;
+  color: var(--text-ink);
+}
+.dmg-background .arrow {
+  position: absolute;
+  top: 209px;
+  left: 236px;
+  width: 128px;
+  height: 1px;
+  background: var(--text-tertiary);
+}
+.dmg-background .arrow::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-top: 1px solid var(--text-tertiary);
+  border-right: 1px solid var(--text-tertiary);
+  transform: rotate(45deg);
+}
+.dmg-background .footnote {
+  position: absolute;
+  bottom: 48px;
+  width: 100%;
+  text-align: center;
+  font-size: var(--font-size-caption);
+  color: var(--text-tertiary);
+}
+.dmg-icon {
+  position: absolute;
+  top: 174px;
+  width: 128px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.dmg-icon.app { left: 86px; }
+.dmg-icon.folder { left: 386px; }
+.dmg-icon .app-icon, .dmg-icon .folder-icon { display: block; margin: 0 auto 6px; }
+.dmg-icon .folder-icon {
+  width: 104px;
+  height: 84px;
+  margin-top: 10px;
+  border-radius: 10px;
+  background: linear-gradient(#8cc9f2, #5aa9e4);
+  box-shadow: inset 0 14px 0 -4px #a9d8f7;
+}
 
 .motion-note {
   display: flex;
