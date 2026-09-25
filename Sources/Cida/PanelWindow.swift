@@ -136,6 +136,10 @@ final class PanelController {
   /// Shows the panel on the active screen. Every appearance resets the action
   /// to 翻译 and selects the whole source, so typing or ⌘V starts a new task.
   func show() {
+    if model.panelMessage == nil, model.needsModelConfiguration {
+      // The welcome may have been answered with ⏎ in an earlier appearance.
+      model.clearConfigurationReminder()
+    }
     if let screen = Self.activeScreen() {
       heightBudget = PanelHeightBudget(visibleScreenHeight: screen.visibleFrame.height)
       applyRootView()
@@ -157,9 +161,12 @@ final class PanelController {
     onVisibilityChange?(true)
   }
 
+  /// Every way of hiding the panel answers a message on it with its last choice
+  /// (`Design/spec/lifecycle.md` §一).
   func hide() {
     guard panel.isVisible else { return }
     panel.orderOut(nil)
+    model.dismissPanelMessage()
     onVisibilityChange?(false)
   }
 
@@ -200,7 +207,8 @@ final class PanelController {
       heightBudget: heightBudget,
       onContentHeightChange: { [weak self] height, animated in
         self?.setContentHeight(height, animated: animated)
-      }
+      },
+      openSettings: openSettings
     )
   }
 
@@ -230,6 +238,22 @@ final class PanelController {
       if modifiers == .command, event.charactersIgnoringModifiers == "," {
         self.openSettings()
         return nil
+      }
+
+      if self.model.panelMessage != nil {
+        switch event.keyCode {
+        case 48 where modifiers.isEmpty:
+          self.model.selectNextPanelMessageChoice()
+          return nil
+        case 36 where modifiers.isEmpty, 76 where modifiers.isEmpty:
+          self.model.performPanelMessageChoice()
+          return nil
+        case 53 where modifiers.isEmpty:
+          self.hide()
+          return nil
+        default:
+          return nil
+        }
       }
 
       switch event.keyCode {

@@ -87,7 +87,8 @@ extension InteractionReproductionTests {
   }
 
   func testComposerShrinksAsNativeMultilineInputIsDeleted() async throws {
-    let model = AppModel(inputText: "")
+    // A configured service: without one the empty panel also carries the welcome.
+    let model = AppModel(inputText: "", service: ImmediateStreamingService())
     let controller = makeHiddenPanel(model: model)
     let hostingView = try XCTUnwrap(controller.contentView)
     let panel = controller.panel

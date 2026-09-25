@@ -9,10 +9,24 @@ protocol TextProcessingService: Sendable {
     _ request: ProcessingRequest,
     settings: CidaSettings
   ) -> AsyncThrowingStream<String, Error>
+
+  /// Whether `settings` hold everything this service needs to send a request. Until they do,
+  /// the panel welcomes the user instead of sending (`Design/spec/lifecycle.md` §三).
+  func isConfigured(by settings: CidaSettings) -> Bool
+}
+
+extension TextProcessingService {
+  /// A service that talks to no model service needs no configuration.
+  func isConfigured(by settings: CidaSettings) -> Bool { true }
 }
 
 #if DEBUG
   struct PreviewTextProcessingService: TextProcessingService {
+    /// Design states show the welcome exactly when the real service would.
+    func isConfigured(by settings: CidaSettings) -> Bool {
+      settings.readiness.isReady
+    }
+
     func stream(
       _ request: ProcessingRequest,
       settings: CidaSettings
@@ -76,6 +90,10 @@ protocol TextProcessingService: Sendable {
 #endif
 
 struct OpenAICompatibleTextProcessingService: TextProcessingService {
+  func isConfigured(by settings: CidaSettings) -> Bool {
+    settings.readiness.isReady
+  }
+
   func stream(
     _ request: ProcessingRequest,
     settings: CidaSettings
@@ -296,6 +314,12 @@ final class AppModel {
   /// Bumped when the result pane should scroll to the tail of the result.
   private(set) var resultFollowRevision = 0
   private(set) var copyFeedbackRevision = 0
+  /// What Cida is saying in the panel in place of the translation panes
+  /// (`Design/spec/lifecycle.md` §一); the source, action and result wait underneath.
+  private(set) var panelMessage: PanelMessage?
+  @ObservationIgnored private var panelMessageHandler: PanelMessageHandler?
+  /// ⏎ was pressed before a model service was configured (`Design/spec/lifecycle.md` §三).
+  private(set) var showsConfigurationReminder = false
 
   private let service: any TextProcessingService
   private let streamPresentationPolicy: StreamPresentationPolicy
@@ -369,6 +393,70 @@ final class AppModel {
 
   var modelStatus: String {
     settings.model
+  }
+
+  /// No request can be sent until a model service is configured; the empty panel welcomes the
+  /// user instead (`Design/spec/lifecycle.md` §三).
+  var needsModelConfiguration: Bool {
+    !service.isConfigured(by: settings)
+  }
+
+  // MARK: - Panel messages
+
+  /// Shows `message` in the panel, replacing any earlier message and its handler.
+  func present(_ message: PanelMessage, handler: PanelMessageHandler) {
+    panelMessage = message
+    panelMessageHandler = handler
+  }
+
+  /// Changes the message on screen, if it is still the one of `kind`.
+  func updatePanelMessage(kind: String, _ change: (inout PanelMessage) -> Void) {
+    guard var message = panelMessage, message.kind == kind else { return }
+    change(&message)
+    panelMessage = message
+  }
+
+  func clearConfigurationReminder() {
+    showsConfigurationReminder = false
+  }
+
+  /// Takes the message away without telling its owner, which already knows.
+  func clearPanelMessage() {
+    panelMessage = nil
+    panelMessageHandler = nil
+  }
+
+  func selectPanelMessageChoice(_ index: Int) {
+    guard var message = panelMessage, !message.isWorking, message.choices.indices.contains(index)
+    else { return }
+    message.selectedChoice = index
+    panelMessage = message
+  }
+
+  /// Tab: the next choice, wrapping around.
+  func selectNextPanelMessageChoice() {
+    guard let message = panelMessage, message.choices.count > 1 else { return }
+    selectPanelMessageChoice((message.selectedChoice + 1) % message.choices.count)
+  }
+
+  /// ⏎: performs the selected choice.
+  func performPanelMessageChoice() {
+    guard let message = panelMessage, !message.isWorking, let handler = panelMessageHandler
+    else { return }
+    handler.choose(message.selectedChoice)
+  }
+
+  /// ⌘.: stops the work the message shows.
+  func stopPanelMessage() {
+    guard panelMessage?.slot == .stop else { return }
+    panelMessageHandler?.stop()
+  }
+
+  /// The panel went away while showing a message: the owner hears it as the last choice.
+  func dismissPanelMessage() {
+    guard let handler = panelMessageHandler else { return }
+    clearPanelMessage()
+    handler.dismiss()
   }
 
   /// The source language of the current input, detected from the text; the
@@ -550,6 +638,12 @@ final class AppModel {
   /// still running; its record is no longer the result, so it finishes
   /// without touching the panel.
   private func startGeneration() {
+    guard !needsModelConfiguration else {
+      processingTask?.cancel()
+      showsConfigurationReminder = true
+      return
+    }
+    showsConfigurationReminder = false
     let requestText = currentInputDocument
     let requestCharacterCount = inputDocumentUTF16Count
     processingTask?.cancel()
@@ -569,7 +663,12 @@ final class AppModel {
     }
   }
 
+  /// ⌘. and 停止: stops a message's work while one is shown, the request otherwise.
   func cancelProcessing() {
+    if panelMessage != nil {
+      stopPanelMessage()
+      return
+    }
     processingTask?.cancel()
   }
 

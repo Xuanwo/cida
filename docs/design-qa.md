@@ -40,6 +40,9 @@ compared natively:
 | 设置 · 有新版本可以安装 | `settings-update-available` | `settings-update-available` |
 | 菜单栏菜单 · 平时 / 发现新版本 | `status-menu` / `status-menu-update-available` | (native menu, no fixture) |
 | 截图框选 · 拖动前 / 框选中 / 暗屏 | `capture-veiled` / `capture-lifted` / `capture-lifted-dark` | (overlay; XCUI attaches `capture-overlay-veiled`) |
+| DMG 窗口 / 背景图 | `dmg-window` / `dmg-background` | (Finder; the background ships in the DMG) |
+| 第一次使用 · 欢迎 / 没配置就回车 | `lifecycle-welcome` / `lifecycle-welcome-submitted` | same |
+| 更新 · 检查中 / 发现新版本 / 下载中 / 准备好 / 已是最新 / 出错 / 磁盘映像里运行 | `lifecycle-update-checking` / `-found` / `-downloading` / `-ready` / `-current` / `-failed` / `-read-only` | same |
 
 `swift scripts/render-design.swift` renders every board off screen to `Design/rendered/boards` and
 every state to `Design/rendered/states` at 2x. `scripts/capture-design-states.sh` renders the boards,

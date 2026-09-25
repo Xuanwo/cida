@@ -4,29 +4,48 @@ import SwiftUI
 /// The panel's content: source pane, control bar, result pane (`Design/spec/panel.md`
 /// §二 and `Design/boards/panel-states.html`). The view computes the height
 /// it wants from the two panes and reports it, so the panel can grow from its
-/// top edge instead of the content adapting to a fixed window.
+/// top edge instead of the content adapting to a fixed window. While Cida has
+/// something to say (`Design/spec/lifecycle.md`), the same three panes carry
+/// that message instead.
 struct PanelView: View {
   let model: AppModel
   let heightBudget: PanelHeightBudget
   var onContentHeightChange: @MainActor (CGFloat, Bool) -> Void = { _, _ in }
+  var openSettings: @MainActor () -> Void = {}
   @State private var composerMetrics: ComposerTextMetrics
   @State private var resultContentHeight: CGFloat = CidaDesign.Typography.resultLineHeight
   @State private var resultHeightAnimated = false
   @State private var copiedFeedbackTask: Task<Void, Never>?
   @State private var showsCopiedFeedback = false
+  @State private var welcomeHeight: CGFloat = 0
 
   init(
     model: AppModel,
     heightBudget: PanelHeightBudget,
-    onContentHeightChange: @escaping @MainActor (CGFloat, Bool) -> Void = { _, _ in }
+    onContentHeightChange: @escaping @MainActor (CGFloat, Bool) -> Void = { _, _ in },
+    openSettings: @escaping @MainActor () -> Void = {}
   ) {
     self.model = model
     self.heightBudget = heightBudget
     self.onContentHeightChange = onContentHeightChange
+    self.openSettings = openSettings
     _composerMetrics = State(initialValue: ComposerTextMetrics(text: model.inputText))
   }
 
   var body: some View {
+    if let message = model.panelMessage {
+      PanelMessageView(
+        model: model,
+        message: message,
+        heightBudget: heightBudget,
+        onContentHeightChange: onContentHeightChange
+      )
+    } else {
+      translationPanes
+    }
+  }
+
+  private var translationPanes: some View {
     VStack(spacing: 0) {
       SourcePane(
         model: model,
@@ -35,8 +54,14 @@ struct PanelView: View {
       )
       ControlBar(
         model: model,
-        presentation: barActionPresentation
+        presentation: barActionPresentation,
+        closesWithHairline: model.result != nil || showsWelcome,
+        openSettings: openSettings
       )
+      if showsWelcome {
+        WelcomePane(model: model)
+          .onGeometryChange(for: CGFloat.self, of: \.size.height) { welcomeHeight = $0 }
+      }
       if model.result != nil {
         ResultPane(
           model: model,
@@ -54,6 +79,7 @@ struct PanelView: View {
     .background(CidaDesign.surface)
     .onAppear { publishHeight(animated: false) }
     .onChange(of: idealHeight) { publishHeight(animated: resultHeightAnimated) }
+    .onChange(of: model.panelMessage == nil) { publishHeight(animated: false) }
     .onChange(of: model.copyFeedbackRevision) { showCopiedFeedback() }
     .onChange(of: model.result?.id) { showsCopiedFeedback = false }
     // No identifier on this stack: SwiftUI would push it down onto the pane
@@ -113,6 +139,12 @@ struct PanelView: View {
   private var idealHeight: CGFloat {
     sourcePaneHeight + CidaDesign.Panel.controlBarHeight
       + (model.result == nil ? 0 : resultPaneHeight)
+      + (showsWelcome ? welcomeHeight : 0)
+  }
+
+  /// No model service yet and nothing to show: the paper pane welcomes the user.
+  private var showsWelcome: Bool {
+    model.result == nil && model.needsModelConfiguration
   }
 
   private func publishHeight(animated: Bool) {
@@ -125,7 +157,8 @@ struct PanelView: View {
     .resolve(
       isProcessing: model.isProcessing,
       canCopyResult: model.canCopyResult,
-      showsCopiedFeedback: showsCopiedFeedback
+      showsCopiedFeedback: showsCopiedFeedback,
+      showsWelcome: showsWelcome
     )
   }
 
@@ -193,28 +226,48 @@ private struct SourcePane: View {
 private struct ControlBar: View {
   let model: AppModel
   let presentation: BarActionPresentation
+  let closesWithHairline: Bool
+  let openSettings: @MainActor () -> Void
 
   var body: some View {
     HStack(spacing: 8) {
       ModeSegmentedControl(model: model, isEnabled: !model.isProcessing)
-      Text("⇥ 切换")
-        .font(CidaDesign.mainUI(11))
-        .foregroundStyle(CidaDesign.hint)
-        .opacity(model.isProcessing ? 0.45 : 1)
-        .accessibilityHidden(true)
+      TabHint(isDimmed: model.isProcessing)
       Spacer(minLength: 12)
-      BarActionButton(model: model, presentation: presentation)
+      BarActionButton(model: model, presentation: presentation, openSettings: openSettings)
     }
-    .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
-    .frame(height: CidaDesign.Panel.controlBarHeight)
-    .frame(maxWidth: .infinity)
-    .background(CidaDesign.surface)
-    .overlay(alignment: .top) { Hairline() }
-    .overlay(alignment: .bottom) {
-      if model.result != nil { Hairline() }
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("control-bar")
+    .modifier(ControlBarChrome(closesWithHairline: closesWithHairline))
+  }
+}
+
+/// The control bar's frame and rules, shared by the translation and message panels.
+private struct ControlBarChrome: ViewModifier {
+  let closesWithHairline: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+      .frame(height: CidaDesign.Panel.controlBarHeight)
+      .frame(maxWidth: .infinity)
+      .background(CidaDesign.surface)
+      .overlay(alignment: .top) { Hairline() }
+      .overlay(alignment: .bottom) {
+        if closesWithHairline { Hairline() }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier("control-bar")
+  }
+}
+
+private struct TabHint: View {
+  let isDimmed: Bool
+
+  var body: some View {
+    Text("⇥ 切换")
+      .font(CidaDesign.mainUI(11))
+      .foregroundStyle(CidaDesign.hint)
+      .opacity(isDimmed ? 0.45 : 1)
+      .accessibilityHidden(true)
   }
 }
 
@@ -223,18 +276,40 @@ struct ModeSegmentedControl: View {
   var isEnabled = true
 
   var body: some View {
+    PanelSegmentedControl(
+      titles: ProcessingMode.allCases.map(\.title),
+      selected: ProcessingMode.allCases.firstIndex(of: model.mode) ?? 0,
+      identifiers: ProcessingMode.allCases.map { "action-\($0.rawValue)" },
+      isEnabled: isEnabled,
+      onSelect: { model.setMode(ProcessingMode.allCases[$0]) }
+    )
+    .accessibilityLabel("动作")
+    .accessibilityIdentifier("action-segment")
+  }
+}
+
+/// The control bar's segmented control: the panel's two actions, or a message's choices.
+struct PanelSegmentedControl: View {
+  let titles: [String]
+  let selected: Int
+  let identifiers: [String]
+  var isEnabled = true
+  let onSelect: @MainActor (Int) -> Void
+
+  var body: some View {
     HStack(spacing: 2) {
-      ForEach(ProcessingMode.allCases, id: \.self) { mode in
+      ForEach(titles.indices, id: \.self) { index in
+        let isSelected = index == selected
         Button {
-          model.setMode(mode)
+          onSelect(index)
         } label: {
-          Text(mode.title)
-            .font(CidaDesign.mainUI(11.5, weight: model.mode == mode ? .semibold : .medium))
-            .foregroundStyle(model.mode == mode ? CidaDesign.accent : CidaDesign.textSecondary)
+          Text(titles[index])
+            .font(CidaDesign.mainUI(11.5, weight: isSelected ? .semibold : .medium))
+            .foregroundStyle(isSelected ? CidaDesign.accent : CidaDesign.textSecondary)
             .padding(.horizontal, 11)
             .padding(.vertical, 4)
             .background {
-              if model.mode == mode {
+              if isSelected {
                 RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
                   .fill(CidaDesign.surface)
                   .overlay {
@@ -245,8 +320,8 @@ struct ModeSegmentedControl: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(model.mode == mode ? .isSelected : [])
-        .accessibilityIdentifier("action-\(mode.rawValue)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(identifiers[index])
       }
     }
     .padding(2)
@@ -256,8 +331,6 @@ struct ModeSegmentedControl: View {
     .disabled(!isEnabled)
     .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: isEnabled)
     .accessibilityElement(children: .contain)
-    .accessibilityLabel("动作")
-    .accessibilityIdentifier("action-segment")
   }
 }
 
@@ -266,6 +339,7 @@ struct ModeSegmentedControl: View {
 private struct BarActionButton: View {
   let model: AppModel
   let presentation: BarActionPresentation
+  var openSettings: @MainActor () -> Void = {}
 
   var body: some View {
     ZStack {
@@ -290,6 +364,12 @@ private struct BarActionButton: View {
         pill(identifier: "bar-action-copied", label: "已复制", key: nil, accent: true) {
           LucideIcon(.check, size: 12).foregroundStyle(CidaDesign.accent)
         } action: {}
+      case .openSettings:
+        pill(identifier: "bar-action-open-settings", label: "打开设置", key: "⌘,", accent: false) {
+          EmptyView()
+        } action: {
+          openSettings()
+        }
       }
     }
     .animation(.easeOut(duration: CidaMotion.iconSwapSeconds), value: presentation)
@@ -412,6 +492,232 @@ struct ResultNoteRow: View {
     case .stopped: "stopped"
     case .failed: "failed"
     case .unrecognized: "unrecognized"
+    }
+  }
+}
+
+// MARK: - Welcome
+
+/// The paper pane of an empty panel before a model service is configured
+/// (`Design/spec/lifecycle.md` §三).
+private struct WelcomePane: View {
+  let model: AppModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      PaperText(["辞达需要一个模型服务。打开设置，复制配置提示词交给你的 AI 助手，它会帮你配好。"])
+      // ⏎ without a model service swaps the shortcuts for what is missing.
+      if model.showsConfigurationReminder {
+        ResultNoteRow(note: ResultNote(kind: .failed, text: "还没配置模型服务 · ⌘, 打开设置"))
+      } else {
+        Text(shortcutsLine)
+          .font(CidaDesign.mainUI(11))
+          .foregroundStyle(CidaDesign.textTertiary)
+          // The caption's 1.5 line height.
+          .frame(height: 16.5)
+          .accessibilityIdentifier("welcome-shortcuts")
+      }
+    }
+    .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+    .padding(.vertical, CidaDesign.Spacing.resultVertical)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .fixedSize(horizontal: false, vertical: true)
+    .background(CidaDesign.surfacePaper)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("welcome-pane")
+  }
+
+  private var shortcutsLine: String {
+    func compact(_ shortcut: GlobalShortcut) -> String {
+      (shortcut.modifiers.symbols + [shortcut.keyDisplayName]).joined()
+    }
+    return "\(compact(model.settings.shortcut)) 随时唤起 · \(compact(model.settings.captureShortcut)) 截图翻译 · 辞达住在菜单栏"
+  }
+}
+
+// MARK: - Messages
+
+/// A message in the panel's own shape (`Design/spec/lifecycle.md` §一): the statement in the
+/// source pane, the choices in the control bar, the reason or the notes on paper. It reports the
+/// height it needs like the translation panes do; notes taller than the panel allows scroll.
+private struct PanelMessageView: View {
+  let model: AppModel
+  let message: PanelMessage
+  let heightBudget: PanelHeightBudget
+  let onContentHeightChange: @MainActor (CGFloat, Bool) -> Void
+  @State private var paperContentHeight: CGFloat = 0
+
+  var body: some View {
+    VStack(spacing: 0) {
+      statement
+      bar
+      if message.hasPaper {
+        paper
+      }
+    }
+    .frame(width: CidaDesign.Panel.width)
+    .background(CidaDesign.surface)
+    .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
+      onContentHeightChange(height, true)
+    }
+  }
+
+  private var statementHeight: CGFloat {
+    CidaDesign.Panel.compactEditorHeight + CidaDesign.Spacing.paneVertical * 2
+  }
+
+  private var statement: some View {
+    (Text(message.statement).foregroundStyle(CidaDesign.textPrimary)
+      + Text(message.statementDetail ?? "").foregroundStyle(CidaDesign.textTertiary))
+      .font(CidaDesign.body(CidaDesign.Typography.bodySize))
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, minHeight: CidaDesign.Panel.compactEditorHeight, alignment: .leading)
+      .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+      .padding(.vertical, CidaDesign.Spacing.paneVertical)
+      .background(CidaDesign.surface)
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier("message-statement")
+  }
+
+  private var bar: some View {
+    HStack(spacing: 8) {
+      PanelSegmentedControl(
+        titles: message.choices,
+        selected: message.selectedChoice,
+        identifiers: message.choices.indices.map { "message-choice-\($0)" },
+        isEnabled: !message.isWorking,
+        onSelect: { index in
+          model.selectPanelMessageChoice(index)
+          model.performPanelMessageChoice()
+        }
+      )
+      .accessibilityLabel("选择")
+      .accessibilityIdentifier("message-choices")
+      if message.choices.count > 1 {
+        TabHint(isDimmed: message.isWorking)
+      }
+      Spacer(minLength: 12)
+      BarActionButton(
+        model: model,
+        presentation: message.slot == .stop ? .stop : .none
+      )
+    }
+    .modifier(ControlBarChrome(closesWithHairline: message.hasPaper))
+  }
+
+  /// The paper pane's cap: whatever the panel's height budget leaves under the statement and bar.
+  private var paperMaxHeight: CGFloat {
+    max(
+      CidaDesign.Typography.resultLineHeightCJK + CidaDesign.Spacing.resultVertical * 2,
+      heightBudget.panelMaxHeight - statementHeight - CidaDesign.Panel.controlBarHeight
+    )
+  }
+
+  private var paper: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 10) {
+        paperBody
+        if let note = message.note {
+          ResultNoteRow(note: ResultNote(kind: .failed, text: note))
+        }
+      }
+      .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+      .padding(.vertical, CidaDesign.Spacing.resultVertical)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .onGeometryChange(for: CGFloat.self, of: \.size.height) { paperContentHeight = $0 }
+    }
+    .scrollBounceBehavior(.basedOnSize)
+    .scrollIndicators(.automatic)
+    .frame(height: min(paperContentHeight, paperMaxHeight))
+    .background(CidaDesign.surfacePaper)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("message-paper")
+  }
+
+  @ViewBuilder
+  private var paperBody: some View {
+    switch message.body {
+    case .none:
+      if message.isWorking {
+        PaperText([""], showsCaret: true)
+      }
+    case .text(let text):
+      PaperText([text], showsCaret: message.isWorking)
+    case .lines(let lines):
+      PaperText(lines, bulleted: true, showsCaret: message.isWorking)
+    }
+  }
+}
+
+/// Serif paper text in the result pane's Chinese setting (Noto Serif SC 17 / 31): one paragraph
+/// per line, optionally each after a quiet bullet, ending in the streaming caret. The lines are
+/// one Text so the leading between them is the same as inside a wrapped line.
+private struct PaperText: View {
+  let lines: [String]
+  var bulleted = false
+  var showsCaret = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  init(_ lines: [String], bulleted: Bool = false, showsCaret: Bool = false) {
+    self.lines = lines
+    self.bulleted = bulleted
+    self.showsCaret = showsCaret
+  }
+
+  private static let font = CidaDesign.appKitResult(for: .chinese)
+  /// What TextKit adds between lines to reach the design's 31 pt line height.
+  private static let lineSpacing = max(
+    0,
+    CidaDesign.Typography.resultLineHeightCJK - NSLayoutManager().defaultLineHeight(for: font)
+  )
+
+  var body: some View {
+    if showsCaret && !reduceMotion {
+      TimelineView(.animation) { context in
+        paragraph(
+          caretOpacity: Double(
+            StatusItemMark.caretOpacity(after: context.date.timeIntervalSinceReferenceDate)))
+      }
+    } else {
+      paragraph(caretOpacity: showsCaret ? 1 : nil)
+    }
+  }
+
+  private func paragraph(caretOpacity: Double?) -> some View {
+    var composed = Text("")
+    for (index, line) in lines.enumerated() {
+      if index > 0 { composed = composed + Text("\n") }
+      if bulleted {
+        composed = composed + Text("· ").foregroundStyle(CidaDesign.textTertiary)
+      }
+      composed = composed + Text(line).foregroundStyle(CidaDesign.textInk)
+    }
+    if let caretOpacity {
+      // Like the result pane's caret: 2 pt past the text, 4 pt below the baseline.
+      composed = composed + Text(Image(nsImage: Self.caret(opacity: caretOpacity)))
+        .baselineOffset(-Self.caretDescent)
+    }
+    return composed
+      .font(Font(Self.font))
+      .lineSpacing(Self.lineSpacing)
+      // CSS line-height puts half the leading above the first line and below the last. The
+      // caret's descent would deepen the last line; the paper does not grow for it.
+      .padding(.top, Self.lineSpacing / 2)
+      .padding(.bottom, Self.lineSpacing / 2 - (caretOpacity == nil ? 0 : Self.caretDescent))
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private static let caretDescent: CGFloat = 4
+
+  /// The caret with 2 pt of room before it, as the board's `margin-left: 2px`.
+  private static func caret(opacity: Double) -> NSImage {
+    let gap: CGFloat = 2
+    let size = NSSize(width: gap + CidaMotion.cursorWidth, height: CidaMotion.cursorHeight)
+    return NSImage(size: size, flipped: false) { rect in
+      CidaDesign.Palette.accent.appKit.withAlphaComponent(opacity).setFill()
+      NSRect(x: gap, y: 0, width: CidaMotion.cursorWidth, height: rect.height).fill()
+      return true
     }
   }
 }

@@ -64,7 +64,7 @@
     <div class="result"><div class="text cjk notes">
       <p>辞达会自己检查并安装新版本，更新说明就写在这里。</p>
       <p>开机启动时不再弹出面板。</p>
-      <p>还没填 API Key 时，面板会告诉你从哪里开始。</p>
+      <p>模型服务交给 AI 助手配置，在设置里复制提示词即可。</p>
     </div></div>
   </section>
   <section class="panel" data-state="lifecycle-update-downloading">
@@ -73,7 +73,7 @@
     <div class="result"><div class="text cjk notes">
       <p>辞达会自己检查并安装新版本，更新说明就写在这里。</p>
       <p>开机启动时不再弹出面板。</p>
-      <p>还没填 API Key 时，面板会告诉你从哪里开始。<span class="cursor"></span></p>
+      <p>模型服务交给 AI 助手配置，在设置里复制提示词即可。<span class="cursor"></span></p>
     </div></div>
   </section>
   <section class="panel" data-state="lifecycle-update-ready">
@@ -87,12 +87,12 @@
   </section>
   <section class="panel" data-state="lifecycle-update-failed">
     <div class="source statement">辞达 1.1.0 可以安装<span class="muted"> · 当前 1.0.0</span></div>
-    <cida-bar options="安装并重启|稍后|跳过这个版本"></cida-bar>
+    <cida-bar options="重试|稍后"></cida-bar>
     <div class="result">
       <div class="text cjk notes">
         <p>辞达会自己检查并安装新版本，更新说明就写在这里。</p>
       </div>
-      <cida-note kind="failed">下载失败：网络连接已中断 · ⏎ 重试</cida-note>
+      <cida-note kind="failed">下载失败：网络连接失败 · ⏎ 重试</cida-note>
     </div>
   </section>
   <section class="panel" data-state="lifecycle-update-read-only">

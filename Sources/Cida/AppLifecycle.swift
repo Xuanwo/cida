@@ -79,6 +79,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// The capture shortcut is freezing the screen, waiting for a frame, or
   /// recognizing text; both shortcuts wait for it.
   private var isCapturing = false
+  /// When the user opened Cida themselves; a scheduled check that finds an update soon after
+  /// may bring the panel up (`Design/spec/lifecycle.md` §四).
+  private var launchedByUserAt: Date?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     FontRegistrar.registerBundledFonts()
@@ -112,7 +115,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
     // Only a user's own launch talks to the update feed; automation and E2E never do.
     if !launchOptions.isAutomation, CidaUpdater.isConfigured() {
-      updater.start()
+      updater.start(presenter: self)
     }
 
     if launchOptions.displaysInteractiveAutomationUI {
@@ -131,9 +134,16 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       }
     } else if launchOptions.designState.isSettings {
       showSettings()
-    } else {
+    } else if LaunchSource.current() == .user {
+      // At login and after an update Cida stays in the menu bar.
+      launchedByUserAt = Date()
       showPanel()
     }
+    #if DEBUG
+      if launchOptions.isAutomation {
+        presentDesignStateMessage()
+      }
+    #endif
 
     if let outputURL = launchOptions.snapshotOutputURL {
       let targetWindow: NSWindow? =
@@ -505,6 +515,93 @@ final class CidaWindow: NSWindow {
   override var canBecomeMain: Bool { true }
 }
 
+// MARK: - Updates in the panel
+
+extension CidaAppDelegate: UpdatePresenter {
+  func presentUpdate(_ message: PanelMessage, handler: PanelMessageHandler) {
+    model.present(message, handler: handler)
+    if panelController?.isVisible != true {
+      showPanel()
+    }
+  }
+
+  func updateUpdateMessage(kind: String, _ change: (inout PanelMessage) -> Void) {
+    model.updatePanelMessage(kind: kind, change)
+  }
+
+  func finishUpdateMessage() {
+    guard model.panelMessage?.kind.hasPrefix("update-") == true else { return }
+    model.clearPanelMessage()
+    panelController?.hide()
+  }
+
+  var mayPresentScheduledUpdate: Bool {
+    guard let launchedByUserAt else { return false }
+    return Date().timeIntervalSince(launchedByUserAt) < 60
+  }
+
+  #if DEBUG
+    /// The lifecycle states of `States — 生命周期` (`Design/boards/lifecycle.html`).
+    fileprivate func presentDesignStateMessage() {
+      let notes = [
+        "辞达会自己检查并安装新版本，更新说明就写在这里。",
+        "开机启动时不再弹出面板。",
+        "模型服务交给 AI 助手配置，在设置里复制提示词即可。",
+      ]
+      let found = CidaUpdateDriver.foundMessage(
+        version: "1.1.0", currentVersion: "1.0.0", notes: notes)
+      let message: PanelMessage? =
+        switch launchOptions.designState {
+        case .lifecycleUpdateChecking: CidaUpdateDriver.checkingMessage()
+        case .lifecycleUpdateFound: found
+        case .lifecycleUpdateDownloading:
+          CidaUpdateDriver.downloadingMessage(version: "1.1.0", percent: 38, notes: notes)
+        case .lifecycleUpdateReady: CidaUpdateDriver.readyMessage(version: "1.1.0")
+        case .lifecycleUpdateCurrent: CidaUpdateDriver.currentMessage(version: "1.1.0")
+        case .lifecycleUpdateFailed:
+          CidaUpdateDriver.failedMessage(
+            from: CidaUpdateDriver.foundMessage(
+              version: "1.1.0", currentVersion: "1.0.0", notes: [notes[0]]),
+            note: "下载失败：网络连接失败 · ⏎ 重试")
+        case .lifecycleUpdateReadOnly:
+          CidaUpdateDriver.readOnlyMessage(
+            version: "1.1.0", currentVersion: "1.0.0", notes: [notes[0]])
+        default: nil
+        }
+      if let message {
+        model.present(message, handler: PanelMessageHandler(choose: { _ in }, dismiss: {}))
+      }
+      if launchOptions.designState == .lifecycleWelcomeSubmitted {
+        model.submit()
+      }
+    }
+  #endif
+}
+
+/// Why Cida is starting (`Design/spec/lifecycle.md` §四): only a launch the user asked for
+/// brings the panel up.
+enum LaunchSource: Equatable {
+  case user
+  case login
+  case relaunchAfterUpdate
+
+  @MainActor
+  static func current(defaults: UserDefaults = .standard) -> LaunchSource {
+    if defaults.bool(forKey: CidaUpdater.relaunchedAfterUpdateKey) {
+      defaults.removeObject(forKey: CidaUpdater.relaunchedAfterUpdateKey)
+      return .relaunchAfterUpdate
+    }
+    // Login items open with this property on the launch event, SMAppService's included.
+    if let event = NSAppleEventManager.shared().currentAppleEvent,
+      event.eventID == kAEOpenApplication,
+      event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    {
+      return .login
+    }
+    return .user
+  }
+}
+
 /// The panel states of `States — 面板交互` that automation can start in.
 private enum DesignState: String {
   case empty
@@ -520,6 +617,20 @@ private enum DesignState: String {
   case settingsCustom = "settings-custom"
   case settingsRecording = "settings-recording"
   case settingsUpdateAvailable = "settings-update-available"
+  case lifecycleWelcome = "lifecycle-welcome"
+  case lifecycleWelcomeSubmitted = "lifecycle-welcome-submitted"
+  case lifecycleUpdateChecking = "lifecycle-update-checking"
+  case lifecycleUpdateFound = "lifecycle-update-found"
+  case lifecycleUpdateDownloading = "lifecycle-update-downloading"
+  case lifecycleUpdateReady = "lifecycle-update-ready"
+  case lifecycleUpdateCurrent = "lifecycle-update-current"
+  case lifecycleUpdateFailed = "lifecycle-update-failed"
+  case lifecycleUpdateReadOnly = "lifecycle-update-read-only"
+
+  /// The empty panel before a model service is configured.
+  var isWelcome: Bool {
+    self == .lifecycleWelcome || self == .lifecycleWelcomeSubmitted
+  }
 
   var isSettings: Bool {
     switch self {
@@ -578,7 +689,7 @@ private struct LaunchOptions {
       if usesDesignFixtures {
         settings = CidaSettings.designPreview
       }
-      if usesDesignFixtures, designState == .settingsMissingKey {
+      if usesDesignFixtures, designState == .settingsMissingKey || designState.isWelcome {
         settings.apiKey = ""
       }
       if usesDesignFixtures, designState == .settingsCustom {
@@ -652,7 +763,10 @@ private struct LaunchOptions {
       case .long:
         return ResultRecord.designLong()
       case .empty, .streaming, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
-        .settingsUpdateAvailable:
+        .settingsUpdateAvailable, .lifecycleWelcome, .lifecycleWelcomeSubmitted,
+        .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
+        .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
+        .lifecycleUpdateReadOnly:
         return nil
       }
     #else
@@ -672,8 +786,12 @@ private struct LaunchOptions {
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:
         ResultRecord.designLongInput
+      case .lifecycleWelcomeSubmitted:
+        "Consistency is the last refuge of the unimaginative."
       case .empty, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
-        .settingsUpdateAvailable:
+        .settingsUpdateAvailable, .lifecycleWelcome, .lifecycleUpdateChecking,
+        .lifecycleUpdateFound, .lifecycleUpdateDownloading, .lifecycleUpdateReady,
+        .lifecycleUpdateCurrent, .lifecycleUpdateFailed, .lifecycleUpdateReadOnly:
         ""
       }
     #else
