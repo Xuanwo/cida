@@ -3,12 +3,11 @@
 # EdDSA key, uploads it to the R2 bucket cida-releases, adds it to appcast.xml and signs the
 # feed. A release (not a candidate) also becomes latest/Cida.zip, the READMEs' download link.
 #
-#   SPARKLE_ED_PRIVATE_KEY=<exported key> CIDA_RELEASES_TOKEN=<GitHub Actions OIDC token> \
+#   SPARKLE_ED_PRIVATE_KEY=<exported key> AWS_ACCESS_KEY_ID=<R2 key> AWS_SECRET_ACCESS_KEY=<R2 secret> \
 #   scripts/ci/publish-update.sh <zip> <version> <build> <release|beta> [notes file]
 #
-# Files go through infra/releases-publisher, which accepts only an OIDC token that GitHub
-# issued to this repository's release workflow for a version tag (audience cida-releases).
-# The zip goes up first and the feed last, so the feed never points at a missing file.
+# The R2 key is an API token limited to Object Read & Write on cida-releases. The zip goes up
+# first and the feed last, so the feed never points at a missing file.
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
@@ -24,7 +23,7 @@ if [[ "$channel" != release && "$channel" != beta ]]; then
   echo "channel must be release or beta, got $channel" >&2
   exit 64
 fi
-for variable in SPARKLE_ED_PRIVATE_KEY CIDA_RELEASES_TOKEN; do
+for variable in SPARKLE_ED_PRIVATE_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
   if [[ -z "${(P)variable:-}" ]]; then
     echo "$variable is required" >&2
     exit 64
@@ -32,17 +31,23 @@ for variable in SPARKLE_ED_PRIVATE_KEY CIDA_RELEASES_TOKEN; do
 done
 
 script_dir=${0:A:h}
-publisher=${CIDA_RELEASES_PUBLISHER:-https://cida-releases-publisher.xuanwo.workers.dev}
+bucket=cida-releases
+endpoint=https://d100c32126daec20555857d36239c412.r2.cloudflarestorage.com
 public_host=https://cida-releases.xuanwo.io
 sparkle_version=2.10.0
 sparkle_sha256=c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c
 
+export AWS_DEFAULT_REGION=auto
+# R2 rejects the checksums newer AWS CLIs send by default.
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+s3() { aws --endpoint-url "$endpoint" "$@"; }
+
 # put <file> <key> <content type> <cache control> [content disposition]
 put() {
-  local headers=(-H "Authorization: Bearer $CIDA_RELEASES_TOKEN" -H "Content-Type: $3" -H "Cache-Control: $4")
-  [[ -n "${5:-}" ]] && headers+=(-H "Content-Disposition: $5")
-  /usr/bin/curl --fail-with-body --silent --show-error --retry 3 -X PUT \
-    --data-binary "@$1" "${headers[@]}" "$publisher/objects/$2"
+  local arguments=(--only-show-errors --content-type "$3" --cache-control "$4")
+  [[ -n "${5:-}" ]] && arguments+=(--content-disposition "$5")
+  s3 s3 cp "${arguments[@]}" "$1" "s3://$bucket/$2"
 }
 
 work=$(mktemp -d)
@@ -69,17 +74,13 @@ if [[ -z "$signature" || -z "$length" ]]; then
 fi
 
 # The feed is read from the bucket, not the CDN, whose copy can be minutes old.
-feed_status=$(/usr/bin/curl --silent --show-error --retry 3 -o "$work/current.xml" -w '%{http_code}' \
-  -H "Authorization: Bearer $CIDA_RELEASES_TOKEN" "$publisher/objects/appcast.xml")
-case "$feed_status" in
-  200) ;;
-  404) /bin/rm -f "$work/current.xml" ;;
-  *)
-    echo "Reading the current feed failed with HTTP $feed_status:" >&2
-    /bin/cat "$work/current.xml" >&2
-    exit 70
-    ;;
-esac
+if s3 s3api head-object --bucket "$bucket" --key appcast.xml >/dev/null 2>"$work/head.err"; then
+  s3 s3 cp --only-show-errors "s3://$bucket/appcast.xml" "$work/current.xml"
+elif ! /usr/bin/grep -q '(404)' "$work/head.err"; then
+  echo "Reading the current feed failed:" >&2
+  /bin/cat "$work/head.err" >&2
+  exit 70
+fi
 
 key="releases/$version-$build/${archive:t}"
 appcast_arguments=(

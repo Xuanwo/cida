@@ -92,8 +92,6 @@ Updates follow `Design/spec/updates.md`. The R2 bucket `cida-releases`, served a
 | `releases/<version>-<build>/Cida-<version>-<build>.zip` | a year, immutable | first |
 | `latest/Cida.zip` | 5 minutes | for releases only; the READMEs' download link |
 
-No credential for the bucket exists anywhere. The workflow uploads through `infra/releases-publisher`, a Worker at `https://cida-releases-publisher.xuanwo.workers.dev` bound to the bucket, which accepts only the OpenID Connect token GitHub Actions issues to this repository's `release.yml` for a version tag (audience `cida-releases`), and only the three kinds of keys above. Redeploy it with `npx wrangler deploy` in that directory after changing it; `npm test` there runs its tests.
-
 A release candidate's item carries Sparkle's `beta` channel, and its bundle carries `CidaUpdateChannel = beta`, so only candidates look for candidates. The item's notes are the `feat:` and `fix:` commit subjects since the previous release (or, for a candidate, the previous tag). The EdDSA private key signs every zip and the feed; the app trusts only the public key in `Resources/Cida-Info.plist` (`SUPublicEDKey`). Losing the private key means shipped copies can no longer be updated, so keep the login keychain item "Private key for signing Sparkle updates" (service `https://sparkle-project.org`, account `cida`) backed up; Sparkle's `sign_update --account cida` signs with it locally.
 
 GitHub's runners cannot run the Tart journeys, so run the release gate on the commit before tagging it:
@@ -112,6 +110,8 @@ The workflow reads these repository secrets:
 | `NOTARY_API_KEY_ID` | That key's ID |
 | `NOTARY_API_ISSUER` | The issuer ID shown above the team keys |
 | `SPARKLE_ED_PRIVATE_KEY` | Sparkle's EdDSA private key: base64 of the 32-byte Ed25519 seed |
+| `R2_ACCESS_KEY_ID` | The access key of an R2 API token with Object Read & Write on the bucket `cida-releases` only |
+| `R2_SECRET_ACCESS_KEY` | That token's secret access key |
 
 `scripts/ci/import-signing-identity.sh` imports the identity into a keychain of the job's own, which the workflow deletes when it ends.
 

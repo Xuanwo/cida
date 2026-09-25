@@ -13,7 +13,6 @@ Working rules for anyone changing Cida, human or agent. [`docs/development.md`](
 | `Resources` | `Cida-Info.plist` and the app icon (`AppIcon.icon`) |
 | `scripts` | Building, signing, notarizing, design rendering and the verification gates |
 | `docs` | Development notes, QA records and the README demo (`docs/images/demo.gif`) |
-| `infra/releases-publisher` | The Worker the release workflow uploads updates through |
 
 ## Design comes first
 

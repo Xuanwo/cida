@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: write
-  # The OIDC token that infra/releases-publisher accepts in place of any stored R2 credential.
-  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -93,13 +91,9 @@ jobs:
           BUILD: ${{ steps.version.outputs.build }}
           CHANNEL: ${{ steps.version.outputs.prerelease == 'true' && 'beta' || 'release' }}
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          CIDA_RELEASES_TOKEN=$(curl --fail --silent --show-error \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=cida-releases" \
-            | python3 -c 'import json, sys; print(json.load(sys.stdin)["value"])')
-          echo "::add-mask::$CIDA_RELEASES_TOKEN"
-          export CIDA_RELEASES_TOKEN
           # The update notes are the user-facing commits since the version its users run: the
           # previous release for a release, the previous tag of any kind for a candidate.
           exclude=()
