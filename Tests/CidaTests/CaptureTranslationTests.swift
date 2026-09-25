@@ -56,6 +56,38 @@ final class CaptureTranslationTests: XCTestCase {
     XCTAssertEqual(clamped, CGRect(x: 1400, y: 0, width: 40, height: 20))
   }
 
+  func testTheSheetShowsTheFramedPartOfTheFrozenScreen() {
+    let rect = CaptureGeometry.contentsRect(
+      for: CGRect(x: 144, y: 450, width: 288, height: 90), in: CGSize(width: 1440, height: 900))
+    XCTAssertEqual(rect.minX, 0.1, accuracy: 0.0001)
+    XCTAssertEqual(rect.minY, 0.5, accuracy: 0.0001, "Bottom-left origin, like the view")
+    XCTAssertEqual(rect.width, 0.2, accuracy: 0.0001)
+    XCTAssertEqual(rect.height, 0.1, accuracy: 0.0001)
+  }
+
+  func testLightScreensAreVeiledWithPaperAndDarkOnesWithInk() throws {
+    let light = try XCTUnwrap(Self.filledImage(gray: 0.96))
+    let dark = try XCTUnwrap(Self.filledImage(gray: 0.12))
+    XCTAssertEqual(CaptureVeil(forScreen: light), .paper)
+    XCTAssertEqual(CaptureVeil(forScreen: dark), .ink)
+    XCTAssertEqual(CaptureVeil.averageLuminance(of: light), 0.96, accuracy: 0.02)
+    XCTAssertEqual(CaptureVeil(averageLuminance: 0.49), .ink)
+    XCTAssertEqual(CaptureVeil(averageLuminance: 0.5), .paper)
+  }
+
+  private static func filledImage(gray: CGFloat) -> CGImage? {
+    guard
+      let context = CGContext(
+        data: nil, width: 64, height: 40, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+    else {
+      return nil
+    }
+    context.setFillColor(red: gray, green: gray, blue: gray, alpha: 1)
+    context.fill(CGRect(x: 0, y: 0, width: 64, height: 40))
+    return context.makeImage()
+  }
+
   // MARK: - The panel after a capture
 
   func testRecognizedTextReplacesTheSourceAndIsTranslatedAtOnce() async throws {
