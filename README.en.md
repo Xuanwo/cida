@@ -6,7 +6,7 @@
 
 <p align="center">
   Translate and polish text anywhere on your Mac, with the language model you choose.<br>
-  <a href="https://github.com/Xuanwo/cida/releases/latest">Download</a> · <a href="README.md">简体中文</a>
+  <a href="https://cida-releases.xuanwo.io/latest/Cida.dmg">Download</a> · <a href="README.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -25,13 +25,13 @@ The interface is in Simplified Chinese.
 
 ## Install
 
-You need macOS 15 or newer and an API key for a language model service.
+You need macOS 15 or newer and a language model service.
 
-1. Download the zip from the [latest release](https://github.com/Xuanwo/cida/releases/latest). It is signed with a Developer ID and notarized by Apple.
-2. Unzip it, move **Cida.app** to Applications and open it. Cida lives in the menu bar, not the Dock.
-3. Press <kbd>⌘</kbd> <kbd>,</kbd>, choose a provider and paste your API key.
+1. Download [Cida.dmg](https://cida-releases.xuanwo.io/latest/Cida.dmg). It is signed with a Developer ID and notarized by Apple.
+2. Open the DMG, drag 辞达 into Applications (应用程序), then open it from Launchpad or Spotlight. Cida lives in the menu bar, not the Dock.
+3. Press <kbd>⌘</kbd> <kbd>,</kbd>, click 复制配置提示词 to copy the configuration prompt, and give it to an AI assistant such as Claude Code or Codex. It asks which service you want, configures Cida through its [command line](#command-line) and runs `check` to confirm the model answers.
 
-DeepSeek, OpenAI, Moonshot and 智谱 GLM are built in, and any endpoint compatible with OpenAI Chat Completions works too; a model running on your Mac (such as `http://127.0.0.1:8080`) needs no key. Cida is free; your provider charges for the requests.
+Your API key never passes through the assistant: it asks you to copy the key and run one command that stores it in the Keychain. Cida speaks OpenAI Chat Completions, Responses and Anthropic Messages; a model running on your Mac (such as `http://127.0.0.1:8080`) needs no key. Cida is free; your provider charges for the requests.
 
 Two permissions are optional. Turn them on with 去授权 in the 唤起 section of Settings:
 
@@ -43,7 +43,7 @@ Two permissions are optional. Turn them on with 去授权 in the 唤起 section 
 ## Privacy
 
 - The API key is stored only in the macOS Keychain.
-- There is no history and no telemetry; requests go only to the provider you chose.
+- There is no history and no telemetry; translation and improvement requests go only to the provider you chose.
 - Screenshots are recognized on your Mac with Apple's Vision and never leave it.
 
 ## Keys
@@ -57,6 +57,29 @@ Two permissions are optional. Turn them on with 去授权 in the 唤起 section 
 | <kbd>Esc</kbd> | Hide the panel |
 
 Both global shortcuts can be recorded again in Settings.
+
+## Command line
+
+The executable inside the app is Cida's command line; there is nothing else to install. It shares its configuration with the running Cida, which picks up every change at once:
+
+```sh
+cida=/Applications/Cida.app/Contents/MacOS/Cida
+$cida config schema                        # every field, its values and what it does
+$cida config show
+$cida config set model=deepseek-chat       # several fields at once; unset and reset too
+pbpaste | $cida config set api-key --stdin
+$cida check --verbose                      # one real request; on failure, the request and response
+```
+
+Every command takes `--json`. The API key is read only from `--stdin`, `--file` or `--env`; a key written as an argument is refused. [`Design/spec/configuration.md`](Design/spec/configuration.md) describes every field.
+
+## Updates
+
+Cida checks `https://cida-releases.xuanwo.io/appcast.xml` once a day. When a new version is out, its panel shows the update notes and installs the update once you agree. The check sends no system information, and you can turn it off in the 更新 section of Settings.
+
+## Uninstall
+
+Quit Cida and move it from Applications to the Trash. To remove every trace, also delete the Keychain Access item named `com.xuanwo.Cida` and `~/Library/Preferences/com.xuanwo.Cida.plist`.
 
 ## Contributing
 
