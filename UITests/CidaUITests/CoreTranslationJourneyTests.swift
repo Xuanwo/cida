@@ -32,6 +32,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(
       driver.result(containing: "CIDA_E2E_RESULT_A_COMPLETE").waitForExistence(timeout: 8))
     driver.waitForCompletion()
+    assertResultIsPainted("CIDA-E2E-010 completed result A")
 
     driver.submit("CIDA_E2E_DELAYED_RESULT_B", expectsStreamingState: true)
     XCTAssertNotNil(
@@ -74,6 +75,35 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(completed.waitForExistence(timeout: 8))
     XCTAssertFalse((completed.value as? String)?.contains("RESULT_A") ?? true)
     driver.waitForCompletion()
+    assertResultIsPainted("CIDA-E2E-010 completed result B")
+  }
+
+  /// A completed result has to reach the screen, not only the accessibility tree: a result layer
+  /// that stops redrawing keeps the right value while the pane stays blank. Painted text leaves
+  /// thousands of ink pixels in the pane; an empty pane leaves none. Glyphs are committed to the
+  /// layer once their reveal ends, so the pane is sampled until they appear.
+  private func assertResultIsPainted(_ name: String) {
+    XCTContext.runActivity(named: "\(name) is painted") { activity in
+      let pane = driver.resultPane
+      var screenshot = pane.screenshot()
+      var inkPixels = 0
+      let deadline = Date().addingTimeInterval(2)
+      repeat {
+        screenshot = pane.screenshot()
+        inkPixels = VisualOracle.neutralDarkPixelCount(
+          in: screenshot,
+          logicalWidth: pane.frame.width,
+          topPoints: pane.frame.height - 16
+        )
+        if inkPixels >= 1_000 { break }
+        Thread.sleep(forTimeInterval: 0.2)
+      } while Date() < deadline
+      let attachment = XCTAttachment(screenshot: screenshot)
+      attachment.name = name
+      attachment.lifetime = .keepAlways
+      activity.add(attachment)
+      XCTAssertGreaterThanOrEqual(inkPixels, 1_000, "\(name) is not painted in the result pane")
+    }
   }
 
   func testConsecutiveSubmissionsReplaceTheResultWithoutLeakingText() throws {

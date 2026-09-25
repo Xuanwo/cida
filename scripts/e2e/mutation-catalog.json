@@ -3,7 +3,7 @@
   "mutations": [
     {
       "id": "result-layer-never-redraws",
-      "description": "Restore the stale compositor policy that never redraws the streaming result layer.",
+      "description": "Restore the compositor policy that never redraws the result layer, so completed text never reaches the screen.",
       "contracts": ["CIDA-E2E-010"],
       "file": "Sources/Cida/ResultTextView.swift",
       "before": "    wantsLayer = true\n    layerContentsRedrawPolicy = .onSetNeedsDisplay\n    layer?.masksToBounds = true\n    setAccessibilityRole(.textArea)",
