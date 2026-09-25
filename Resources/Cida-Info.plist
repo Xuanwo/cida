@@ -41,6 +41,8 @@
     <true/>
     <key>SUFeedURL</key>
     <string>https://cida-releases.xuanwo.io/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>cuDWWLaKLGV+1Htdb2KAcrYbt5tZxpnLnJ6XW+rYSCI=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUScheduledCheckInterval</key>
