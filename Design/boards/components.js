@@ -107,7 +107,7 @@ class CidaSettings extends HTMLElement {
     const popover = is("menu", "open")
       ? `<div class="popover" style="left: 172px; top: 107px">
            <span class="current">DeepSeek<i class="icon icon-check"></i></span>
-           <span>OpenAI</span><span>Moonshot</span><span>智谱 GLM</span><span>自定义（OpenAI 兼容）</span>
+           <span>OpenAI</span><span>Moonshot</span><span>Kimi For Coding</span><span>智谱 GLM</span><span>自定义（OpenAI 兼容）</span>
          </div>`
       : "";
 

@@ -90,7 +90,7 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   completion, and the slot crossfading between 停止 and 复制结果 over 150 ms.
 - Settings follows `Spec — 设置`: a fixed-width (560 pt) titled window whose height follows its
   content (no scrolling), with three groups in the order of the user's questions. The provider is
-  a menu of presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM) plus 自定义（OpenAI 兼容）; presets show
+  a menu of presets (DeepSeek, OpenAI, Moonshot, Kimi For Coding, 智谱 GLM) plus 自定义（OpenAI 兼容）; presets show
   the host they call under the menu, and only 自定义 shows the endpoint field. Fields fill the
   control column; the model group ends in a locally derived readiness line (已就绪 / 还差 API Key /
   本地端点 · 无需 API Key / 端点无效); prompts collapse to a one-line preview with `编辑` and expand

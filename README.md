@@ -29,7 +29,7 @@
 2. 解压，把 **Cida.app** 拖进「应用程序」后打开。辞达只在菜单栏显示图标，不占用 Dock。
 3. 按 <kbd>⌘</kbd> <kbd>,</kbd> 打开设置，选择服务商并填入 API Key。
 
-内置 DeepSeek、OpenAI、Moonshot、智谱 GLM，也可以填任何兼容 OpenAI Chat Completions 的接口；在本机运行的模型（例如 `http://127.0.0.1:8080`）不需要 Key。辞达本身免费，模型调用按服务商的价格计费。
+内置 DeepSeek、OpenAI、Moonshot、Kimi For Coding（Kimi Code 订阅套餐）、智谱 GLM，也可以填任何兼容 OpenAI Chat Completions 的接口；在本机运行的模型（例如 `http://127.0.0.1:8080`）不需要 Key。辞达本身免费，模型调用按服务商的价格计费。
 
 两个权限都是可选的，在设置的「唤起」一栏点「去授权」即可开启：
 

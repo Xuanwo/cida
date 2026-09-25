@@ -31,7 +31,7 @@ You need macOS 15 or newer and an API key for a language model service.
 2. Unzip it, move **Cida.app** to Applications and open it. Cida lives in the menu bar, not the Dock.
 3. Press <kbd>⌘</kbd> <kbd>,</kbd>, choose a provider and paste your API key.
 
-DeepSeek, OpenAI, Moonshot and 智谱 GLM are built in, and any endpoint compatible with OpenAI Chat Completions works too; a model running on your Mac (such as `http://127.0.0.1:8080`) needs no key. Cida is free; your provider charges for the requests.
+DeepSeek, OpenAI, Moonshot, Kimi For Coding (the Kimi Code subscription) and 智谱 GLM are built in, and any endpoint compatible with OpenAI Chat Completions works too; a model running on your Mac (such as `http://127.0.0.1:8080`) needs no key. Cida is free; your provider charges for the requests.
 
 Two permissions are optional. Turn them on with 去授权 in the 唤起 section of Settings:
 

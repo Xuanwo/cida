@@ -69,7 +69,7 @@ final class CidaAppDriver {
   }
 
   /// `ModelProvider.displayName` of every preset plus the custom entry.
-  static let providerLabels = ["DeepSeek", "OpenAI", "Moonshot", "智谱 GLM", "自定义（OpenAI 兼容）"]
+  static let providerLabels = ["DeepSeek", "OpenAI", "Moonshot", "Kimi For Coding", "智谱 GLM", "自定义（OpenAI 兼容）"]
   static let customProviderLabel = "自定义（OpenAI 兼容）"
 
   var readinessRow: XCUIElement { element(identifier: "settings-readiness") }

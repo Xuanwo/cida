@@ -43,6 +43,7 @@ enum ModelProvider: String, CaseIterable, Codable, Sendable {
   case deepSeek = "DeepSeek"
   case openAI = "OpenAI"
   case moonshot = "Moonshot"
+  case kimiCodePlan = "KimiCodePlan"
   case zhipu = "Zhipu"
   case custom = "Custom"
 
@@ -51,6 +52,7 @@ enum ModelProvider: String, CaseIterable, Codable, Sendable {
     case .deepSeek: "DeepSeek"
     case .openAI: "OpenAI"
     case .moonshot: "Moonshot"
+    case .kimiCodePlan: "Kimi For Coding"
     case .zhipu: "智谱 GLM"
     case .custom: "自定义（OpenAI 兼容）"
     }
@@ -63,6 +65,7 @@ enum ModelProvider: String, CaseIterable, Codable, Sendable {
     case .deepSeek: URL(string: "https://api.deepseek.com/chat/completions")
     case .openAI: URL(string: "https://api.openai.com/v1/chat/completions")
     case .moonshot: URL(string: "https://api.moonshot.cn/v1/chat/completions")
+    case .kimiCodePlan: URL(string: "https://api.kimi.com/coding/v1/chat/completions")
     case .zhipu: URL(string: "https://open.bigmodel.cn/api/paas/v4/chat/completions")
     case .custom: nil
     }
@@ -78,6 +81,7 @@ enum ModelProvider: String, CaseIterable, Codable, Sendable {
     case .deepSeek: ["deepseek-chat", "deepseek-reasoner"]
     case .openAI: ["gpt-5", "gpt-5-mini"]
     case .moonshot: ["kimi-k3", "kimi-k2.6"]
+    case .kimiCodePlan: ["kimi-for-coding", "k3"]
     case .zhipu: ["glm-5.3", "glm-5.3-flash"]
     case .custom: []
     }

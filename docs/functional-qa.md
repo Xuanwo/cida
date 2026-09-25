@@ -31,7 +31,7 @@ The current core experience contract (`Design/spec/panel.md`) includes:
    request explains itself inline and Return retries.
 7. Native Command-C precedence: a selection keeps the system copy; without one, Command-C copies
    the result.
-8. Provider presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM) plus a custom OpenAI-compatible
+8. Provider presets (DeepSeek, OpenAI, Moonshot, Kimi For Coding, 智谱 GLM) plus a custom OpenAI-compatible
    endpoint with a typed model, a locally derived readiness line, Keychain API-key persistence and
    clearing, prompt edit/reset, source-language detection, and source-language-preserving
    improvement, all from a fixed-width Settings window whose height follows its content. Settings
