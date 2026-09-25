@@ -117,29 +117,3 @@ struct AccessibilitySelectedTextSource: SelectedTextSource {
     return value as? String
   }
 }
-
-/// Isolated UI automation cannot hold the Accessibility permission; it reads
-/// the selection a test set on its scenario server instead.
-struct ScenarioSelectedTextSource: SelectedTextSource {
-  let endpoint: URL
-
-  /// A loaded test VM answers slower than an application on a real desktop.
-  var readDeadline: Duration { .seconds(2) }
-
-  private struct Payload: Decodable {
-    let text: String?
-  }
-
-  @MainActor
-  func currentSelection() async -> String? {
-    var request = URLRequest(url: endpoint)
-    request.timeoutInterval = 2
-    guard
-      let (data, _) = try? await URLSession.shared.data(for: request),
-      let payload = try? JSONDecoder().decode(Payload.self, from: data)
-    else {
-      return nil
-    }
-    return SelectedText.normalized(payload.text)
-  }
-}

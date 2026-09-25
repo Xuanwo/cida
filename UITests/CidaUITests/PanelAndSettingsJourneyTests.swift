@@ -40,17 +40,19 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.showPanel()
   }
 
-  /// `Design/spec/panel.md` §一 带入选区. The VM cannot grant the
-  /// Accessibility permission, so the selection comes from the scenario
-  /// server through the same shortcut path.
+  /// `Design/spec/panel.md` §一 带入选区, through the real Accessibility
+  /// path: the guest grants Cida the permission, and the selection lives in
+  /// the source application's editor.
   func testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone() throws {
-    driver.launch(additionalArguments: [
-      "--automation-selection-endpoint", e2eEnvironment.selectionEndpoint,
-    ])
+    driver.launch()
     driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
 
-    try scenarioServer.setSelection("  CIDA_E2E_SELECTION_A\n")
-    driver.showPanel()
+    source.select("  CIDA_E2E_SELECTION_A ")
+    source.press(.space, modifierFlags: .option)
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
     XCTAssertTrue(
       driver.waitForTextValue("CIDA_E2E_SELECTION_A", in: driver.composer, timeout: 3),
       "A new selection replaces the source, trimmed")
@@ -62,7 +64,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     driver.composer.typeText("CIDA_E2E_EDITED")
     driver.hidePanel()
-    driver.showPanel()
+    source.press(.space, modifierFlags: .option)
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
     XCTAssertEqual(
       driver.textValue(in: driver.composer), "CIDA_E2E_EDITED",
       "The selection brought in last time keeps the edited source")
@@ -71,25 +74,26 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_SELECTION_A" }.count, 1,
       "The same selection is not requested again")
 
-    try scenarioServer.setSelection(nil)
     driver.hidePanel()
-    driver.showPanel()
+    source.clearSelection()
+    source.press(.space, modifierFlags: .option)
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
     XCTAssertEqual(driver.textValue(in: driver.composer), "CIDA_E2E_EDITED", "No selection")
 
-    try scenarioServer.setSelection("CIDA_E2E_SELECTION_GATED")
     driver.hidePanel()
-    driver.showPanel()
+    source.select("CIDA_E2E_SELECTION_GATED")
+    source.press(.space, modifierFlags: .option)
     XCTAssertTrue(
-      driver.waitForTextValue("CIDA_E2E_SELECTION_GATED", in: driver.composer, timeout: 3))
+      driver.waitForTextValue("CIDA_E2E_SELECTION_GATED", in: driver.composer, timeout: 5))
     XCTAssertNotNil(
       try scenarioServer.wait(for: "CIDA_E2E_SELECTION_GATED", status: "headers-sent", timeout: 5))
     XCTAssertTrue(driver.stopButton.waitForExistence(timeout: 3))
 
-    try scenarioServer.setSelection("CIDA_E2E_SELECTION_B")
     driver.hidePanel()
-    driver.showPanel()
+    source.select("CIDA_E2E_SELECTION_B")
+    source.press(.space, modifierFlags: .option)
     XCTAssertTrue(
-      driver.waitForTextValue("CIDA_E2E_SELECTION_B", in: driver.composer, timeout: 3),
+      driver.waitForTextValue("CIDA_E2E_SELECTION_B", in: driver.composer, timeout: 5),
       "A new selection replaces a running request")
     let completed = driver.result(containing: "CIDA_E2E_SELECTION_B_COMPLETE")
     XCTAssertTrue(completed.waitForExistence(timeout: 8))
@@ -102,26 +106,34 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse((completed.value as? String)?.contains("SELECTION_GATED") ?? true)
   }
 
-  /// `Design/spec/panel.md` §一 截图翻译. The VM cannot grant Screen
-  /// Recording, so the frozen screen is a fixture image; the overlay, the
-  /// framing drag, Vision recognition, and the translation are the
-  /// production path. Vision's first recognition loads its models, which
-  /// is why the first frame is given time.
-  func testCaptureShortcutFramesTextOnAFrozenScreenAndTranslatesIt() {
-    driver.launch(additionalArguments: [
-      "--automation-capture-image", "\(e2eEnvironment.sourceRoot)/UITests/Fixtures/capture-screen.png",
-    ])
+  /// `Design/spec/panel.md` §一 截图翻译, through the real ScreenCaptureKit
+  /// path: the guest grants Cida Screen Recording, the capture shortcut
+  /// freezes the guest's display, and Vision reads the source application's
+  /// line of text. Vision's first recognition loads its models, which is why
+  /// the first frame is given time.
+  func testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt() {
+    driver.launch()
     driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    let textFrame = source.captureText.frame.insetBy(dx: -16, dy: -12)
+    let blankFrame = source.blankArea.frame.insetBy(dx: 24, dy: 24)
 
-    driver.app.typeKey("s", modifierFlags: .option)
+    source.press("s", modifierFlags: .option)
     XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5), "⌥S freezes the screen")
     driver.app.typeKey(.escape, modifierFlags: [])
     XCTAssertTrue(driver.captureOverlay.waitForNonExistence(timeout: 3), "Escape cancels")
     XCTAssertFalse(driver.panel.exists, "A cancelled capture shows nothing")
 
-    driver.app.typeKey("s", modifierFlags: .option)
+    source.press("s", modifierFlags: .option)
     XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5))
-    driver.frameCapture(from: CGVector(dx: 0.08, dy: 0.14), to: CGVector(dx: 0.72, dy: 0.34))
+    XCTAssertTrue(driver.element(identifier: "capture-overlay-hint").exists, "The hint pill names the task")
+    let veiled = XCTAttachment(screenshot: driver.captureOverlay.screenshot())
+    veiled.name = "capture-overlay-veiled"
+    veiled.lifetime = .keepAlways
+    add(veiled)
+    driver.frameCapture(around: textFrame)
     XCTAssertTrue(driver.panel.waitForExistence(timeout: 30), "The panel follows recognition")
     XCTAssertFalse(driver.captureOverlay.exists)
     XCTAssertTrue(
@@ -134,9 +146,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.waitForCompletion()
 
     driver.hidePanel()
-    driver.app.typeKey("s", modifierFlags: .option)
+    source.press("s", modifierFlags: .option)
     XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5))
-    driver.frameCapture(from: CGVector(dx: 0.1, dy: 0.6), to: CGVector(dx: 0.9, dy: 0.9))
+    driver.frameCapture(around: blankFrame)
     XCTAssertTrue(driver.panel.waitForExistence(timeout: 10))
     XCTAssertTrue(
       driver.resultNote("unrecognized").waitForExistence(timeout: 3),
@@ -224,13 +236,13 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse(
       driver.app.buttons["settings-shortcut-reset"].exists, "The default has nothing to restore")
     XCTAssertTrue(
-      driver.app.buttons["settings-selection-access-request"].exists,
-      "Without the Accessibility permission the selection row asks for it")
+      driver.element(identifier: "settings-selection-access-granted").exists,
+      "The guest granted Accessibility, and the selection row reads it")
     let captureChip = driver.app.buttons["settings-capture-shortcut"]
     XCTAssertEqual(captureChip.label, "截图翻译快捷键 ⌥ S")
-    XCTAssertTrue(
+    XCTAssertFalse(
       driver.app.buttons["settings-capture-access-request"].exists,
-      "Without Screen Recording the capture row asks for it")
+      "The guest granted Screen Recording, so the capture row asks for nothing")
 
     chip.click()
     XCTAssertTrue(driver.waitForLabel("按下新的全局快捷键", in: chip, timeout: 3), "A click starts recording")

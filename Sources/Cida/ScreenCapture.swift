@@ -1,22 +1,15 @@
 import AppKit
-import ImageIO
 import ScreenCaptureKit
-
-/// Where the capture shortcut gets the frozen screen it lets the user frame
-/// text on (`Design/spec/panel.md` §一 截图翻译).
-protocol ScreenCaptureSource: Sendable {
-  /// The whole of `screen` at its native pixel size, without the pointer.
-  @MainActor func captureScreen(_ screen: NSScreen) async throws -> CGImage
-}
 
 enum ScreenCaptureError: Error {
   case displayUnavailable
-  case unreadableImage
 }
 
-/// Captures a display through ScreenCaptureKit; needs the Screen Recording
-/// permission.
-struct SystemScreenCaptureSource: ScreenCaptureSource {
+/// Freezes the screen the capture shortcut lets the user frame text on
+/// (`Design/spec/panel.md` §一 截图翻译): the whole of a display at its native
+/// pixel size, without the pointer, through ScreenCaptureKit. Needs the
+/// Screen Recording permission.
+struct SystemScreenCaptureSource {
   @MainActor
   func captureScreen(_ screen: NSScreen) async throws -> CGImage {
     guard
@@ -38,23 +31,5 @@ struct SystemScreenCaptureSource: ScreenCaptureSource {
     return try await SCScreenshotManager.captureImage(
       contentFilter: SCContentFilter(display: display, excludingWindows: []),
       configuration: configuration)
-  }
-}
-
-/// Isolated UI automation cannot hold the Screen Recording permission; it
-/// freezes a fixture image instead, and the rest of the capture path runs
-/// as in production.
-struct FixtureScreenCaptureSource: ScreenCaptureSource {
-  let imageURL: URL
-
-  @MainActor
-  func captureScreen(_ screen: NSScreen) async throws -> CGImage {
-    guard
-      let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-      let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
-    else {
-      throw ScreenCaptureError.unreadableImage
-    }
-    return image
   }
 }

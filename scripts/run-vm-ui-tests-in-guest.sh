@@ -247,6 +247,35 @@ if ! /usr/bin/pgrep -x testmanagerd >/dev/null; then
   exit 70
 fi
 
+# Grant the permissions a user grants in System Settings, so selection import
+# (Accessibility) and the capture shortcut (Screen Recording) run their
+# production paths. The golden image has SIP disabled, which lets root write
+# the system TCC database; tccd reloads it when restarted.
+failure_category="infrastructure"
+failure_phase="guest-permissions"
+failure_detail="The guest could not grant Cida Accessibility and Screen Recording."
+tcc_database="/Library/Application Support/com.apple.TCC/TCC.db"
+granted_at=$(/bin/date +%s)
+for service in kTCCServiceAccessibility kTCCServiceScreenCapture; do
+  /usr/bin/sudo -n /usr/bin/sqlite3 "$tcc_database" \
+    "INSERT OR REPLACE INTO access
+       (service, client, client_type, auth_value, auth_reason, auth_version, csreq, flags,
+        last_modified, last_reminded)
+     VALUES ('$service', 'com.xuanwo.Cida', 0, 2, 4, 1, NULL, 0, $granted_at, $granted_at);"
+done
+/usr/bin/sudo -n /usr/bin/killall tccd >/dev/null 2>&1 || true
+# ScreenCaptureKit also asks once whether an app with Screen Recording may
+# bypass the system window picker; the answer lives in the user's replayd
+# container, keyed by executable path, and would otherwise be frozen into the
+# first capture.
+capture_approvals="$HOME/Library/Group Containers/group.com.apple.replayd/ScreenCaptureApprovals.plist"
+/bin/mkdir -p "${capture_approvals:h}"
+/usr/bin/defaults write "$capture_approvals" "$app_path/Contents/MacOS/Cida" \
+  -date "4000-01-01 00:00:00 +0000"
+/usr/bin/killall replayd >/dev/null 2>&1 || true
+/bin/sleep 1
+progress "guest-permissions-granted"
+
 progress "xcui-test-started"
 failure_category="ui-assertion-or-crash"
 failure_phase="xcui-test"

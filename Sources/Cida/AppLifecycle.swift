@@ -56,10 +56,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       captureAccess: launchOptions.captureAccess
     )
   }()
-  private lazy var selectedTextSource: any SelectedTextSource =
-    launchOptions.selectedTextSource
-  private lazy var screenCaptureSource: any ScreenCaptureSource =
-    launchOptions.screenCaptureSource
+  private let selectedTextSource = AccessibilitySelectedTextSource()
+  private let screenCaptureSource = SystemScreenCaptureSource()
 
   private var panelController: PanelController?
   private var settingsWindowController: NSWindowController?
@@ -483,8 +481,9 @@ private struct LaunchOptions {
   let automationOpenAIEndpoint: String?
   let automationSettingsNamespace: String?
   let lifecycleLogURL: URL?
-  let automationSelectionEndpoint: URL?
-  let automationCaptureImageURL: URL?
+  /// UI automation pins both permissions to "not granted" for a Settings
+  /// pixel baseline, whatever the guest has granted.
+  let automationDeniesPermissions: Bool
 
   var isAutomation: Bool {
     explicitlyIsolatedAutomation || snapshotOutputURL != nil
@@ -549,27 +548,14 @@ private struct LaunchOptions {
     return OpenAICompatibleTextProcessingService()
   }
 
-  var selectedTextSource: any SelectedTextSource {
-    if let automationSelectionEndpoint {
-      return ScenarioSelectedTextSource(endpoint: automationSelectionEndpoint)
-    }
-    return AccessibilitySelectedTextSource()
-  }
-
-  var screenCaptureSource: any ScreenCaptureSource {
-    if let automationCaptureImageURL {
-      return FixtureScreenCaptureSource(imageURL: automationCaptureImageURL)
-    }
-    return SystemScreenCaptureSource()
-  }
-
   var selectionAccess: SystemPermission {
-    usesDesignFixtures ? .fixed(granted: designState == .settingsCustom) : .accessibility
+    if usesDesignFixtures { return .fixed(granted: designState == .settingsCustom) }
+    return automationDeniesPermissions ? .fixed(granted: false) : .accessibility
   }
 
   var captureAccess: SystemPermission {
     if usesDesignFixtures { return .fixed(granted: designState == .settingsCustom) }
-    return automationCaptureImageURL == nil ? .screenRecording : .fixed(granted: true)
+    return automationDeniesPermissions ? .fixed(granted: false) : .screenRecording
   }
 
   var initialMode: ProcessingMode {
@@ -649,14 +635,9 @@ private struct LaunchOptions {
       explicitlyIsolatedAutomation
       ? arguments.value(after: "--automation-lifecycle-log").map { URL(fileURLWithPath: $0) }
       : nil
-    automationSelectionEndpoint =
+    automationDeniesPermissions =
       explicitlyIsolatedAutomation
-      ? arguments.value(after: "--automation-selection-endpoint").flatMap(URL.init(string:))
-      : nil
-    automationCaptureImageURL =
-      explicitlyIsolatedAutomation
-      ? arguments.value(after: "--automation-capture-image").map { URL(fileURLWithPath: $0) }
-      : nil
+      && arguments.value(after: "--automation-permissions") == "denied"
     if isE2ETesting {
       guard
         let requestedAutomationSettingsNamespace,

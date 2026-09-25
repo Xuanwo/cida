@@ -23,9 +23,6 @@ class ScenarioState:
         self.next_request_id = 1
         self.requests = []
         self.gates = {}
-        # What the app reads as the frontmost application's selection when
-        # the global shortcut summons it (--automation-selection-endpoint).
-        self.selection = None
 
     def begin(self, scenario, request):
         with self.lock:
@@ -101,16 +98,7 @@ class ScenarioState:
             self.requests = []
             self.gates = {}
             self.next_request_id = 1
-            self.selection = None
         event_path.unlink(missing_ok=True)
-
-    def set_selection(self, text):
-        with self.lock:
-            self.selection = text
-
-    def current_selection(self):
-        with self.lock:
-            return self.selection
 
 
 state = ScenarioState()
@@ -206,7 +194,7 @@ def plan_for(submitted_text):
     if submitted_text in plans:
         return plans[submitted_text]
     if submitted_text == "CIDA CAPTURE SCENARIO":
-        # What Vision reads from UITests/Fixtures/capture-screen.png.
+        # What Vision reads from the source application's line of text.
         return {
             "chunks": ["Captured text translated.\n", "CIDA_CAPTURE_SCENARIO_COMPLETE"],
         }
@@ -233,9 +221,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
-        if path == "/automation/selection":
-            self.send_json(200, {"text": state.current_selection()})
-            return
         if path != "/control/state":
             self.send_error(404)
             return
@@ -246,11 +231,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if parsed_path.path == "/control/reset":
             state.reset()
             self.send_json(200, {"reset": True})
-            return
-        if parsed_path.path == "/control/selection":
-            body = self.read_json_body()
-            state.set_selection(body.get("text"))
-            self.send_json(200, {"text": state.current_selection()})
             return
         if parsed_path.path == "/control/release-first-byte":
             body = self.read_json_body()

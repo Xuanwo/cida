@@ -36,11 +36,17 @@ final class CidaAppDriver {
   var captureOverlay: XCUIElement { app.dialogs["capture-overlay"] }
   var captureCanvas: XCUIElement { element(identifier: "capture-overlay-canvas") }
 
-  /// Drags a frame on the capture overlay between two points given as
-  /// fractions of the screen.
-  func frameCapture(from start: CGVector, to end: CGVector) {
-    let origin = captureCanvas.coordinate(withNormalizedOffset: start)
-    origin.press(forDuration: 0.1, thenDragTo: captureCanvas.coordinate(withNormalizedOffset: end))
+  /// Drags a frame on the capture overlay around `rect`, given in screen
+  /// coordinates as XCUI reports element frames.
+  func frameCapture(around rect: CGRect) {
+    let canvas = captureCanvas.frame
+    func offset(_ x: CGFloat, _ y: CGFloat) -> CGVector {
+      CGVector(dx: (x - canvas.minX) / canvas.width, dy: (y - canvas.minY) / canvas.height)
+    }
+    let origin = captureCanvas.coordinate(withNormalizedOffset: offset(rect.minX, rect.minY))
+    origin.press(
+      forDuration: 0.1,
+      thenDragTo: captureCanvas.coordinate(withNormalizedOffset: offset(rect.maxX, rect.maxY)))
   }
 
   func resultNote(_ kind: String) -> XCUIElement {
@@ -369,3 +375,52 @@ class CidaReleaseUITestCase: XCTestCase {
     try await super.tearDown()
   }
 }
+
+/// The UI test host standing in for the application the user works in: its
+/// editor holds the selection the global shortcut reads, and its window is
+/// what the capture shortcut freezes.
+@MainActor
+final class SourceApplication {
+  let app = XCUIApplication()
+
+  var editor: XCUIElement { app.textViews.firstMatch }
+  var captureText: XCUIElement { app.staticTexts["source-capture-text"] }
+  var blankArea: XCUIElement {
+    app.descendants(matching: .any).matching(identifier: "source-blank").firstMatch
+  }
+
+  /// Launches with a window: an earlier journey's termination can leave saved
+  /// state that reopens the app without one.
+  func launch() {
+    app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+    app.launch()
+    if !editor.waitForExistence(timeout: 5) {
+      app.typeKey("n", modifierFlags: .command)
+    }
+    XCTAssertTrue(editor.waitForExistence(timeout: 10), "The source application shows its editor")
+  }
+
+  /// Replaces the editor's text with `text` and selects all of it.
+  func select(_ text: String) {
+    editor.click()
+    editor.typeKey("a", modifierFlags: .command)
+    editor.typeText(text)
+    editor.typeKey("a", modifierFlags: .command)
+  }
+
+  /// Leaves the caret in the editor with nothing selected.
+  func clearSelection() {
+    editor.click()
+    editor.typeKey(.rightArrow, modifierFlags: [])
+  }
+
+  /// A global shortcut pressed while this application is in front.
+  func press(_ key: XCUIKeyboardKey, modifierFlags: XCUIElement.KeyModifierFlags) {
+    app.typeKey(key, modifierFlags: modifierFlags)
+  }
+
+  func press(_ key: String, modifierFlags: XCUIElement.KeyModifierFlags) {
+    app.typeKey(key, modifierFlags: modifierFlags)
+  }
+}
+

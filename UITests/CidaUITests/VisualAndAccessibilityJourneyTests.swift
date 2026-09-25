@@ -22,8 +22,10 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     }
   }
 
+  /// The approved image is Settings before any permission is granted; the
+  /// guest grants both, so the launch pins them to "not granted".
   func testSettingsMatchesTheApprovedDesignBaseline() throws {
-    driver.launch(endpointOverride: false)
+    driver.launch(endpointOverride: false, additionalArguments: ["--automation-permissions", "denied"])
     driver.openSettings()
     let settingsWindow = driver.settingsWindow
 

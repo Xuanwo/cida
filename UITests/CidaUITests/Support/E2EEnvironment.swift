@@ -8,11 +8,6 @@ struct E2EEnvironment {
   let endpoint: String
   let controlBaseURL: String
   let recordPath: String
-  /// The scenario server route the app reads selections from
-  /// (`--automation-selection-endpoint`).
-  var selectionEndpoint: String {
-    "\(controlBaseURL)/automation/selection"
-  }
   /// Directory exported to the host with the run; per-launch lifecycle logs land here.
   var lifecycleLogDirectory: String {
     (recordPath as NSString).deletingLastPathComponent + "/lifecycle"

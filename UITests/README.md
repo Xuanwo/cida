@@ -126,17 +126,15 @@ show, and at every key-window transition: XCUI cannot observe any of that for a 
 panel, and the log is what separates "never shown" from "hid on resign key" or "shown transparent".
 The global shortcut adds `selection-imported` or `selection-kept` before each show it causes.
 
-The guest cannot grant the Accessibility permission, so selection journeys launch the app with
-`--automation-selection-endpoint`, and the global shortcut reads the selection a test set with
-`ScenarioServerClient.setSelection(_:)` (`POST /control/selection`) instead of the frontmost
-application's. The rest of the shortcut path is the production one.
-
-Screen Recording cannot be granted either, so the capture journey launches the app with
-`--automation-capture-image UITests/Fixtures/capture-screen.png`: the capture shortcut freezes that
-image instead of the display, and the overlay, the XCUI drag, Vision recognition (which reads
-`CIDA CAPTURE SCENARIO`), and the translation run as in production. The capture shortcut adds
-`capture-overlay-shown`, then `capture-imported`, `capture-unrecognized` or `capture-cancelled`,
-to the lifecycle log.
+Before the XCUI run the guest grants Cida Accessibility and Screen Recording by writing the system
+TCC database (the golden image has SIP disabled) and restarting `tccd`. Selection and capture
+journeys therefore run their production paths against the UI test host, which stands in for the
+application the user works in: the global shortcut reads the selection in its editor through the
+Accessibility API, and the capture shortcut freezes the guest's display with ScreenCaptureKit and
+recognizes the host's line of text with Vision. The Settings pixel baseline shows the state before
+any permission is granted, so it launches with `--automation-permissions denied`. The capture
+shortcut adds `capture-overlay-shown`, then `capture-imported`, `capture-unrecognized` or
+`capture-cancelled`, to the lifecycle log.
 
 Regenerate the project after adding or removing UI source files:
 

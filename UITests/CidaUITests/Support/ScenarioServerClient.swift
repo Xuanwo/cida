@@ -29,12 +29,6 @@ final class ScenarioServerClient {
     )
   }
 
-  /// What the app reads as the frontmost application's selection the next
-  /// time the global shortcut summons it; nil means nothing is selected.
-  func setSelection(_ text: String?) throws {
-    _ = try request(path: "/control/selection", body: ["text": text ?? NSNull()])
-  }
-
   func state() throws -> [ScenarioRequestState] {
     let data = try ProcessRunner.run(
       "/usr/bin/curl",
@@ -70,7 +64,7 @@ final class ScenarioServerClient {
     return nil
   }
 
-  private func request(path: String, body: [String: Any]) throws -> Data {
+  private func request(path: String, body: [String: String]) throws -> Data {
     let payload = try JSONSerialization.data(withJSONObject: body)
     return try ProcessRunner.run(
       "/usr/bin/curl",
