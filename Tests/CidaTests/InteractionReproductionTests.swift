@@ -241,6 +241,29 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
+  /// Recording can start before the recorder is in a window (Settings attaches its scroll
+  /// view's content later); it must still hold the keyboard once it arrives.
+  func testSettingsShortcutRecorderTakesTheKeyboardWhenItReachesAWindow() throws {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false)
+    window.isReleasedWhenClosed = false
+    window.alphaValue = 0
+    retainedTestWindows.append(window)
+    let recorder = ShortcutCaptureNSView()
+
+    recorder.wantsKeyFocus = true
+    XCTAssertNil(recorder.window)
+    window.contentView?.addSubview(recorder)
+    XCTAssertTrue(window.firstResponder === recorder)
+
+    recorder.wantsKeyFocus = false
+    XCTAssertFalse(window.firstResponder === recorder)
+    assertTestProcessIsNotFrontmost()
+  }
+
   private final class AppliedShortcuts {
     var values: [GlobalShortcut] = []
   }

@@ -19,14 +19,7 @@ struct ShortcutCaptureView: NSViewRepresentable {
     view.onCapture = onCapture
     view.onInvalidPress = onInvalidPress
     view.onEnd = { isRecording = false }
-    guard let window = view.window else { return }
-    if isRecording {
-      if window.firstResponder !== view {
-        window.makeFirstResponder(view)
-      }
-    } else if window.firstResponder === view {
-      window.makeFirstResponder(nil)
-    }
+    view.wantsKeyFocus = isRecording
   }
 }
 
@@ -35,7 +28,30 @@ final class ShortcutCaptureNSView: NSView {
   var onInvalidPress: @MainActor () -> Void = {}
   var onEnd: @MainActor () -> Void = {}
 
+  /// Recording holds the keyboard. SwiftUI may set this before the view is in a window (the
+  /// Settings content sits in a scroll view that attaches it later), so the view takes the focus
+  /// again once it arrives in one.
+  var wantsKeyFocus = false {
+    didSet { applyKeyFocus() }
+  }
+
   override var acceptsFirstResponder: Bool { true }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    applyKeyFocus()
+  }
+
+  private func applyKeyFocus() {
+    guard let window else { return }
+    if wantsKeyFocus {
+      if window.firstResponder !== self {
+        window.makeFirstResponder(self)
+      }
+    } else if window.firstResponder === self {
+      window.makeFirstResponder(nil)
+    }
+  }
 
   override func keyDown(with event: NSEvent) {
     _ = record(event)
