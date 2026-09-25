@@ -12,6 +12,7 @@ one HTML board per topic under `Design/boards`, drawn from the shared `tokens.cs
 | Capture framing overlay | `spec/panel.md` §一 截图翻译 | `boards/capture.html` |
 | Streaming buffer and motion, keyframes T0–T4 | `spec/streaming-motion.md` | `boards/streaming-motion.html` |
 | Settings | `spec/settings.md` | `boards/settings-states.html` |
+| Model service configuration: the command line, Settings' 模型 group, the prompt | `spec/configuration.md` | `boards/configuration.html` |
 | Brand: mark, app icon, menu bar image, wordmark | `spec/brand.md` | `boards/brand.html` |
 | Updates: checks, channels, update reminders, menu bar menu | `spec/updates.md` | `boards/updates.html` |
 
@@ -33,11 +34,16 @@ compared natively:
 | ⑪ 截图 · 未识别到文字 | `capture-unrecognized` | (capture shortcut; XCUI `testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt`) |
 | ⑫ 最大高度 | `long` | `long` |
 | 设置 · 默认 | `settings` | `settings` |
-| 设置 · 服务商菜单展开 | `settings-provider-menu` | (open menu, no fixture) |
-| 设置 · 还差 API Key | `settings-missing-key` | `settings-missing-key` |
-| 设置 · 自定义端点 · 编辑改进提示词 · 自定义快捷键 · 已授权 | `settings-custom` | `settings-custom` |
+| 设置 · 编辑改进提示词 · 自定义快捷键 · 已授权 · 开机启动 | `settings-custom` | `settings-custom` |
 | 设置 · 录制快捷键 | `settings-recording` | `settings-recording` |
 | 设置 · 有新版本可以安装 | `settings-update-available` | `settings-update-available` |
+| 配置 · 还没有模型服务 | `settings-config-unset` | `settings-config-unset` |
+| 配置 · 已复制提示词 | `settings-config-copied` | `settings-config-copied` |
+| 配置 · 已就绪 | `settings-config-ready` | `settings-config-ready` |
+| 配置 · 助手刚改完 | `settings-config-updated` | `settings-config-updated` |
+| 配置 · 检查中 | `settings-config-checking` | `settings-config-checking` |
+| 配置 · 检查失败 | `settings-config-failed` | `settings-config-failed` |
+| 配置 · 提示词全文 / 助手的一次配置 / 助手自己闭环 | `configuration-prompt` / `configuration-agent-session` / `configuration-agent-errors` | (text and command-line output; `ModelConfigurationTests` and `CommandLineInterfaceTests` pin the strings) |
 | 菜单栏菜单 · 平时 / 发现新版本 | `status-menu` / `status-menu-update-available` | (native menu, no fixture) |
 | 截图框选 · 拖动前 / 框选中 / 暗屏 | `capture-veiled` / `capture-lifted` / `capture-lifted-dark` | (overlay; XCUI attaches `capture-overlay-veiled`) |
 
@@ -57,7 +63,7 @@ render once the boards are rendered again.
 | Baseline | Logical size | Mask |
 | --- | ---: | --- |
 | Panel, empty | 800 × 113 | none |
-| Settings, default | 560 × 726 | native title bar, 46 pt |
+| Settings, default | 560 × 744 | native title bar, 46 pt |
 
 The remaining states are retained as reviewable reference/current comparisons and are protected by
 deterministic geometry and interaction assertions (panel height budget, source cap, result
@@ -92,13 +98,17 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   reveal behind the caret, 150 ms height growth of the pane and the panel, 200 ms caret fade on
   completion, and the slot crossfading between 停止 and 复制结果 over 150 ms.
 - Settings follows `Spec — 设置`: a fixed-width (560 pt) titled window whose height follows its
-  content (no scrolling), with three groups in the order of the user's questions. The provider is
-  a menu of presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM) plus 自定义（OpenAI 兼容）; presets show
-  the host they call under the menu, and only 自定义 shows the endpoint field. Fields fill the
-  control column; the model group ends in a locally derived readiness line (已就绪 / 还差 API Key /
-  本地端点 · 无需 API Key / 端点无效); prompts collapse to a one-line preview with `编辑` and expand
-  into a `surface-paper` sheet (Inter 13 / 21 pt lines in `text-ink`, accent focus ring). Accent
-  appears only on the menu's current item, the readiness dot, focus rings, and the switch.
+  content up to the screen's visible height, with four groups in the order of the user's
+  questions. The 模型 group follows `spec/configuration.md` §四: without a complete configuration
+  it is one `surface-paper` card (还没有模型服务, the caption, and 复制配置提示词, which shows
+  `✓ 已复制` on `accent-soft` for 800 ms and turns the caption into the next step until a
+  configuration arrives); with one it is the 模型服务 row (a 6 pt status dot and 已就绪 / 正在检查… /
+  检查失败 under the label, `· 刚刚更新` for three seconds after the command line changed it, the
+  model over `<host> · <format>`, and 检查 / 检查中…), a failure line under it when the latest
+  check of this configuration failed, and 调整配置 with the same copy button. Prompts collapse to a
+  one-line preview with `编辑` and expand into a `surface-paper` sheet (Inter 13 / 21 pt lines in
+  `text-ink`, accent focus ring). Accent appears only on the ready dot, the copied feedback, focus
+  rings, and the switch.
 
 ## Executable evidence
 
