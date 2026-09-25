@@ -112,11 +112,11 @@
     },
     {
       "id": "improvement-reuses-translation-source-language",
-      "description": "Send the translation source/target languages during improvement so the model follows the selector instead of the input text.",
+      "description": "Send the user's two translation languages during improvement so the model translates instead of keeping the input's language.",
       "contracts": ["CIDA-E2E-009"],
       "file": "Sources/Cida/ModelPrompt.swift",
-      "before": "    case .improve:\n      languageBehavior = .preserveSource\n      sourceLanguage = nil\n      targetLanguage = nil",
-      "after": "    case .improve:\n      languageBehavior = .preserveSource\n      sourceLanguage = request.sourceLanguage\n      targetLanguage = request.targetLanguage",
+      "before": "    case .improve:\n      languageBehavior = .preserveSource\n      myLanguage = nil\n      foreignLanguage = nil",
+      "after": "    case .improve:\n      languageBehavior = .preserveSource\n      myLanguage = request.myLanguage\n      foreignLanguage = request.foreignLanguage",
       "occurrences": 1,
       "unitTests": [
         "AppModelTests/testPromptBuilderSeparatesTypedParametersFromTheUserDocument"
