@@ -3,8 +3,10 @@
 
 The new item goes first. An item with the same build number is replaced, so publishing a
 release candidate and then the release from one commit, or rerunning a job, leaves one item.
-Release candidates carry the beta channel; releases carry none. The release notes are the
-given lines as an HTML list.
+Release candidates carry the beta channel; releases carry none. The update notes
+(release-notes.py) go into the item's <description> as plain text, one item per line, marked
+sparkle:format="plain-text" so Sparkle does not read them as HTML; Cida lays the lines out in
+its own panel.
 
     update-appcast.py --appcast current.xml --output appcast.xml --version 1.1.0 --build 140 \
         --url https://.../Cida-1.1.0-140.zip --length 19000000 --signature <EdDSA> \
@@ -15,7 +17,6 @@ A missing --appcast file starts a new feed. Signing the feed is left to Sparkle'
 
 import argparse
 import email.utils
-import html
 import pathlib
 import sys
 import xml.etree.ElementTree as ElementTree
@@ -61,11 +62,9 @@ def load_channel(path):
     return ElementTree.ElementTree(root), channel
 
 
-def notes_html(lines):
+def notes_text(lines):
     items = [line.strip() for line in lines if line.strip()]
-    if not items:
-        return None
-    return "<ul>" + "".join(f"<li>{html.escape(item)}</li>" for item in items) + "</ul>"
+    return "\n".join(items) or None
 
 
 def make_item(arguments, notes):
@@ -80,7 +79,7 @@ def make_item(arguments, notes):
     if arguments.channel:
         ElementTree.SubElement(item, sparkle("channel")).text = arguments.channel
     if notes:
-        ElementTree.SubElement(item, "description").text = notes
+        ElementTree.SubElement(item, "description", {sparkle("format"): "plain-text"}).text = notes
     ElementTree.SubElement(
         item,
         "enclosure",
@@ -100,7 +99,7 @@ def main(arguments):
     for item in channel.findall("item"):
         if item.findtext(sparkle("version")) == arguments.build:
             channel.remove(item)
-    notes = notes_html(arguments.notes.read_text(encoding="utf-8").splitlines()) if arguments.notes else None
+    notes = notes_text(arguments.notes.read_text(encoding="utf-8").splitlines()) if arguments.notes else None
     first_item = next(
         (index for index, child in enumerate(list(channel)) if child.tag == "item"), len(channel)
     )

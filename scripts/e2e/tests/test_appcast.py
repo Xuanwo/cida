@@ -75,13 +75,20 @@ class AppcastTests(unittest.TestCase):
         self.assertEqual([item.findtext(f"{SPARKLE}version") for item in items], ["150", "140"])
         self.assertIsNone(items[0].find(f"{SPARKLE}channel"))
 
-    def test_release_notes_become_an_escaped_html_list(self):
-        items = self.publish("1.1.0", "140", notes="feat: translate <selected> text\n\nfix: keep & restore\n")
+    def test_update_notes_are_plain_text_lines_marked_for_sparkle(self):
+        items = self.publish("1.1.0", "140", notes="翻译 <选中> 的文字\n\n保留 & 恢复\n")
 
-        self.assertEqual(
-            items[0].findtext("description"),
-            "<ul><li>feat: translate &lt;selected&gt; text</li><li>fix: keep &amp; restore</li></ul>",
+        description = items[0].find("description")
+        self.assertEqual(description.text, "翻译 <选中> 的文字\n保留 & 恢复")
+        self.assertEqual(description.get(f"{SPARKLE}format"), "plain-text")
+        self.assertIn(
+            "&lt;选中&gt;", self.feed.read_text(encoding="utf-8"), "The feed escapes the text as XML"
         )
+
+    def test_an_item_without_notes_has_no_description(self):
+        items = self.publish("1.1.0", "140")
+
+        self.assertIsNone(items[0].find("description"))
 
 
 if __name__ == "__main__":

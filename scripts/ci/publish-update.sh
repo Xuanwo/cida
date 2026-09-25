@@ -1,24 +1,34 @@
 #!/bin/zsh
 # Publishes a notarized Cida zip as an update (Design/spec/updates.md): signs it with Sparkle's
 # EdDSA key, uploads it to the R2 bucket cida-releases, adds it to appcast.xml and signs the
-# feed. A release (not a candidate) also becomes latest/Cida.zip, the READMEs' download link.
+# feed. The DMG (scripts/build-dmg.sh) is kept next to the zip, and a release (not a
+# candidate) also makes it latest/Cida.dmg, the READMEs' download link
+# (Design/spec/lifecycle.md §二).
 #
 #   SPARKLE_ED_PRIVATE_KEY=<exported key> AWS_ACCESS_KEY_ID=<R2 key> AWS_SECRET_ACCESS_KEY=<R2 secret> \
-#   scripts/ci/publish-update.sh <zip> <version> <build> <release|beta> [notes file]
+#   scripts/ci/publish-update.sh <zip> <dmg> <version> <build> <release|beta> [notes file]
 #
-# The R2 key is an API token limited to Object Read & Write on cida-releases. The zip goes up
-# first and the feed last, so the feed never points at a missing file.
+# The notes file holds one line per item (scripts/ci/release-notes.py). The R2 key is an API
+# token limited to Object Read & Write on cida-releases. The zip goes up first and the feed
+# last, so the feed never points at a missing file.
 set -euo pipefail
 
-if [[ $# -lt 4 ]]; then
-  echo "usage: $0 <zip> <version> <build> <release|beta> [notes file]" >&2
+if [[ $# -lt 5 ]]; then
+  echo "usage: $0 <zip> <dmg> <version> <build> <release|beta> [notes file]" >&2
   exit 64
 fi
 archive=${1:A}
-version=$2
-build=$3
-channel=$4
-notes=${5:-}
+disk_image=${2:A}
+version=$3
+build=$4
+channel=$5
+notes=${6:-}
+for file in "$archive" "$disk_image"; do
+  if [[ ! -f "$file" ]]; then
+    echo "No file at $file" >&2
+    exit 66
+  fi
+done
 if [[ "$channel" != release && "$channel" != beta ]]; then
   echo "channel must be release or beta, got $channel" >&2
   exit 64
@@ -82,7 +92,8 @@ elif ! /usr/bin/grep -q '(404)' "$work/head.err"; then
   exit 70
 fi
 
-key="releases/$version-$build/${archive:t}"
+release_dir="releases/$version-$build"
+key="$release_dir/${archive:t}"
 appcast_arguments=(
   --appcast "$work/current.xml" --output "$work/appcast.xml"
   --version "$version" --build "$build"
@@ -94,9 +105,11 @@ appcast_arguments=(
 sign "$work/appcast.xml" >/dev/null
 
 put "$archive" "$key" application/zip "public, max-age=31536000, immutable"
+put "$disk_image" "$release_dir/${disk_image:t}" application/x-apple-diskimage \
+  "public, max-age=31536000, immutable"
 if [[ "$channel" == release ]]; then
-  put "$archive" latest/Cida.zip application/zip "public, max-age=300" \
-    "attachment; filename=\"Cida-$version.zip\""
+  put "$disk_image" latest/Cida.dmg application/x-apple-diskimage "public, max-age=300" \
+    "attachment; filename=\"Cida-$version.dmg\""
 fi
 put "$work/appcast.xml" appcast.xml "application/xml; charset=utf-8" "public, max-age=300"
 
