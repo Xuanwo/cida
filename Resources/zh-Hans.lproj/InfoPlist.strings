@@ -1,0 +1,3 @@
+/* The name Finder, Launchpad and system prompts show; the bundle stays Cida.app. */
+"CFBundleDisplayName" = "辞达";
+"CFBundleName" = "辞达";

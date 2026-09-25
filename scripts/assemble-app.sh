@@ -50,4 +50,8 @@ mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources" "$app_path/Co
 /bin/rm -rf "$app_path/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" \
   "$app_path/Contents/Frameworks/Sparkle.framework/XPCServices"
 /usr/bin/install -m 644 "$project_dir/Resources/Cida-Info.plist" "$app_path/Contents/Info.plist"
+# The localized display name (辞达) that Finder shows for Cida.app.
+for localization in "$project_dir"/Resources/*.lproj(N); do
+  /usr/bin/ditto "$localization" "$app_path/Contents/Resources/${localization:t}"
+done
 "$script_dir/compile-app-icon.sh" "$app_path/Contents/Resources"

@@ -46,6 +46,8 @@ else
     "$app_path/Contents/Info.plist"
   /usr/bin/plutil -replace CFBundleName -string "辞达测试" \
     "$app_path/Contents/Info.plist"
+  # The localized name (辞达) would hide the test name from the system.
+  /bin/rm -rf "$app_path"/Contents/Resources/*.lproj(N)
 
   actual_identifier=$(
     /usr/bin/plutil -extract CFBundleIdentifier raw "$app_path/Contents/Info.plist"
