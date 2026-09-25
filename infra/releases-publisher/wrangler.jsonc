@@ -1,0 +1,11 @@
+{
+  // Deploy with `npx wrangler deploy` from this directory; see src/index.js for what it accepts.
+  "name": "cida-releases-publisher",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-20",
+  "workers_dev": true,
+  "r2_buckets": [
+    { "binding": "RELEASES", "bucket_name": "cida-releases" }
+  ],
+  "observability": { "enabled": true }
+}

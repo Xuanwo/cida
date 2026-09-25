@@ -8,3 +8,5 @@ __pycache__/
 *.pyc
 .DS_Store
 *.xcuserstate
+node_modules/
+.wrangler/

@@ -1,5 +1,5 @@
 # Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N for a prerelease) on a commit of main builds, signs,
-# notarizes and publishes Cida as a GitHub release. See "Releasing" in docs/development.md for the
+# notarizes and publishes Cida as a GitHub release and as an update on cida-releases.xuanwo.io. See "Releasing" in docs/development.md for the
 # secrets it needs and the local gate that comes before the tag.
 name: Release
 
@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: write
+  # The OIDC token that infra/releases-publisher accepts in place of any stored R2 credential.
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -60,6 +62,7 @@ jobs:
         env:
           CIDA_VERSION: ${{ steps.version.outputs.version }}
           CIDA_BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          CIDA_UPDATE_CHANNEL: ${{ steps.version.outputs.prerelease == 'true' && 'beta' || '' }}
         run: scripts/build-app.sh release
 
       - name: Notarize
@@ -83,6 +86,29 @@ jobs:
           flags=(--verify-tag --generate-notes --title "辞达 $GITHUB_REF_NAME")
           if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
           gh release create "$GITHUB_REF_NAME" "build/$archive" "build/$archive.sha256" "${flags[@]}"
+
+      - name: Publish the update
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+          CHANNEL: ${{ steps.version.outputs.prerelease == 'true' && 'beta' || 'release' }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          CIDA_RELEASES_TOKEN=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=cida-releases" \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["value"])')
+          echo "::add-mask::$CIDA_RELEASES_TOKEN"
+          export CIDA_RELEASES_TOKEN
+          # The update notes are the user-facing commits since the version its users run: the
+          # previous release for a release, the previous tag of any kind for a candidate.
+          exclude=()
+          if [[ "$CHANNEL" == release ]]; then exclude=(--exclude '*-rc.*'); fi
+          previous=$(git describe --tags --abbrev=0 "${exclude[@]}" "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          git log --format=%s ${previous:+"$previous.."}"$GITHUB_REF_NAME" \
+            | grep -E '^(feat|fix)(\(.+\))?: ' >"$RUNNER_TEMP/update-notes.txt" || true
+          scripts/ci/publish-update.sh "build/Cida-$VERSION-$BUILD.zip" "$VERSION" "$BUILD" "$CHANNEL" \
+            "$RUNNER_TEMP/update-notes.txt"
 
       - name: Remove the signing material
         if: always()

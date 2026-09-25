@@ -13,6 +13,7 @@ Working rules for anyone changing Cida, human or agent. [`docs/development.md`](
 | `Resources` | `Cida-Info.plist` and the app icon (`AppIcon.icon`) |
 | `scripts` | Building, signing, notarizing, design rendering and the verification gates |
 | `docs` | Development notes, QA records and the README demo (`docs/images/demo.gif`) |
+| `infra/releases-publisher` | The Worker the release workflow uploads updates through |
 
 ## Design comes first
 
@@ -49,4 +50,4 @@ A pull request that changes the UI without screenshots is not ready for review.
 
 ## Release
 
-Pushing a `vX.Y.Z` tag on `main` builds, signs, notarizes and publishes a release through `.github/workflows/release.yml`. Run `scripts/e2e/run-release-gate.sh` on the commit before tagging it, because GitHub's runners cannot run the Tart journeys.
+Pushing a `vX.Y.Z` tag on `main` builds, signs, notarizes and publishes a release through `.github/workflows/release.yml`, and publishes it as a Sparkle update to `https://cida-releases.xuanwo.io` (`vX.Y.Z-rc.N` goes to the beta channel only). Run `scripts/e2e/run-release-gate.sh` on the commit before tagging it, because GitHub's runners cannot run the Tart journeys.
