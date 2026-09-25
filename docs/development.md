@@ -49,8 +49,10 @@ Tart suite, all unit and Release mutations, and the focused 120 Hz workloads. Re
 fresh-clone P0 burn-in rounds by default. Each invocation writes a single `gate-summary.json`;
 standalone scripts are diagnostic entry points, not a release verdict. After the harness contract
 check, nightly and release profiles query AppKit and Core Graphics for an awake, active display whose
-native maximum is at least 120 Hz. An unavailable physical frame clock is classified as
-infrastructure and stops the gate before builds, Tart clones, or mutation runs.
+native maximum is at least 120 Hz. When there is one, the physical 120 Hz workloads run and must
+pass. When there is none, the gate skips them, decides on everything else, and records
+`physical120HzSkippedReason` in `gate-summary.json`, so the release carries no physical frame-rate
+certification.
 
 Useful standalone diagnostics are:
 
@@ -76,7 +78,7 @@ Standalone design snapshots and native input probes use a fresh temporary `è¾žè¾
 
 The in-process integration suite and the VM XCUI suite both start a loopback OpenAI-compatible SSE server. XCUI drives the visible guest panel through Settings, the OpenAI endpoint, model and API Key editors, multiline growth and shrink of the source pane and the panel, submit with the source retained, stale marking, consecutive submissions, uneven streaming, stop and inline failure, hover-free copy, Escape and Option-Space, the empty-panel and Settings pixel baselines, the native accessibility audit, and the exact outbound request body. A separate Release executable gate routes a real mouse click through AppKit hit testing, performs an isolated focus handoff, sends real key-down events, and verifies the native editor and `AppModel` receive identical text. UI waits use an immediately sampled 20 ms polling primitive with timeout timelines, and harness self-tests prove that short-lived feedback cannot be skipped. Tart writes a machine-readable failure category before a failed run is interpreted as a product regression. No external credential or network service is used. `CIDA_UI_TEST_ONLY_TESTING` can select one XCUI identifier for diagnosis; omitting it always runs the complete regression suite.
 
-The strict performance gates require a detected 120 Hz-capable display, at least 118.8 measured native display-link callbacks per second, a P99 physical interval no greater than 12.5 ms, and zero main-actor callback latencies above the 12.5 ms budget. The focused gates collect 1,440 samples. Production stream pacing and the probe both use the panel's native Core Animation display link; the report labels it `view-bound-ca-display-link` and records native callback cadence separately from main-actor handling latency. A nonactivating fallback only keeps an unavailable display link from hanging the process; a 60 Hz or unavailable physical display still fails `displayRequirementSatisfied` and cannot produce a passing 120 Hz report. PR gates report structural proxy coverage without claiming an FPS result; nightly and release summaries cannot pass unless at least one physical report confirms a 120 Hz display and the view-bound clock.
+The strict performance gates require a detected 120 Hz-capable display, at least 118.8 measured native display-link callbacks per second, a P99 physical interval no greater than 12.5 ms, and zero main-actor callback latencies above the 12.5 ms budget. The focused gates collect 1,440 samples. Production stream pacing and the probe both use the panel's native Core Animation display link; the report labels it `view-bound-ca-display-link` and records native callback cadence separately from main-actor handling latency. A nonactivating fallback only keeps an unavailable display link from hanging the process; a 60 Hz or unavailable physical display still fails `displayRequirementSatisfied` and cannot produce a passing 120 Hz report. PR gates report structural proxy coverage without claiming an FPS result; nightly and release summaries on a host with a 120 Hz display cannot pass unless its physical reports confirm 120 Hz and the view-bound clock, and on a host without one they state that the certification was skipped.
 
 ## Releasing
 

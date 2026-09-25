@@ -96,7 +96,7 @@ class PerformanceGateContractTests(unittest.TestCase):
     def test_gate_requires_proxy_and_physical_120hz_for_non_pr_profiles(self):
         source = (PROJECT_ROOT / "scripts/e2e/run-gate.py").read_text(encoding="utf-8")
         self.assertIn('"performance-proxies"', source)
-        self.assertIn('physical_120hz_required = self.profile in ("nightly", "release")', source)
+        self.assertIn('self.profile in ("nightly", "release") and self.physical_120hz_available', source)
         self.assertIn('report["frameClock"] == "view-bound-ca-display-link"', source)
         self.assertIn('(report["displayMaximumFramesPerSecond"] or 0) >= 120', source)
 
@@ -124,6 +124,7 @@ class PerformanceGateContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             results = pathlib.Path(temporary_directory)
             gate = gate_module.GateRun("release", results)
+            gate.physical_120hz_available = True
             gate.artifact_digest = "app-tree"
             gate.artifact_manifest = {"sourceCommit": gate.source_commit}
             gate.stages = [
@@ -136,6 +137,34 @@ class PerformanceGateContractTests(unittest.TestCase):
         self.assertFalse(summary["passed"])
         self.assertTrue(summary["performanceCertification"]["physical120HzRequired"])
         self.assertFalse(summary["performanceCertification"]["physical120HzPassed"])
+
+    def test_release_without_a_120hz_display_passes_and_records_the_skip(self):
+        gate_module = load_gate_module()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            results = pathlib.Path(temporary_directory)
+            gate = gate_module.GateRun("release", results)
+            gate.physical_120hz_available = False
+            gate.artifact_digest = "app-tree"
+            gate.artifact_manifest = {"sourceCommit": gate.source_commit}
+            gate.stages = [
+                {"name": "performance-environment-preflight", "status": "skipped"},
+                {"name": "performance-proxies", "status": "passed"},
+                {"name": "release-artifact-final-verify", "status": "passed"},
+            ]
+
+            summary = gate.write_summary()
+
+        certification = summary["performanceCertification"]
+        self.assertTrue(summary["passed"])
+        self.assertFalse(certification["physical120HzRequired"])
+        self.assertIsNone(certification["physical120HzPassed"])
+        self.assertEqual(
+            certification["physical120HzSkippedReason"], "no-awake-active-120hz-display"
+        )
+
+    def test_physical_workloads_run_only_on_a_120hz_display(self):
+        source = (PROJECT_ROOT / "scripts/e2e/run-gate.py").read_text(encoding="utf-8")
+        self.assertIn("and gate.physical_120hz_available\n        and not gate.run_performance()", source)
 
 
 if __name__ == "__main__":

@@ -54,6 +54,10 @@ class GateRun:
         self.artifact_root = self.results_directory / "ReleaseArtifact"
         self.artifact_digest = None
         self.artifact_manifest = None
+        # Whether the host has an awake 120 Hz display for the physical frame-rate workloads.
+        # Nightly and release gates run them when it does and record why they were skipped when
+        # it does not; None until the display preflight has run.
+        self.physical_120hz_available = None
 
     @property
     def summary_path(self):
@@ -164,7 +168,7 @@ class GateRun:
             )
 
         required_stages_passed = bool(self.stages) and all(
-            stage["status"] == "passed" for stage in self.stages
+            stage["status"] in ("passed", "skipped") for stage in self.stages
         )
         final_verification_passed = any(
             stage["name"] == "release-artifact-final-verify"
@@ -179,7 +183,9 @@ class GateRun:
             stage["name"] == "performance-proxies" and stage["status"] == "passed"
             for stage in self.stages
         )
-        physical_120hz_required = self.profile in ("nightly", "release")
+        physical_120hz_required = (
+            self.profile in ("nightly", "release") and self.physical_120hz_available is not False
+        )
         physical_120hz_passed = bool(performance_reports) and all(
             report["passed"] is True
             and report["frameClock"] == "view-bound-ca-display-link"
@@ -215,6 +221,9 @@ class GateRun:
                 "physical120HzRequired": physical_120hz_required,
                 "physical120HzPassed": physical_120hz_passed
                 if physical_120hz_required
+                else None,
+                "physical120HzSkippedReason": "no-awake-active-120hz-display"
+                if self.physical_120hz_available is False
                 else None,
             },
             "passed": required_stages_passed
@@ -376,14 +385,21 @@ class GateRun:
             ],
         )
         report = read_json(report_path)
-        if report is not None:
-            self.stages[-1]["evidence"] = report
-            if not passed:
-                self.stages[-1]["failureClassification"] = {
-                    "category": report.get("failureCategory", "infrastructure"),
-                    "reason": report.get("reason", "display-preflight-failed"),
-                }
-            self.write_summary()
+        if report is None:
+            return passed
+        self.stages[-1]["evidence"] = report
+        self.physical_120hz_available = passed
+        if not passed and report.get("reason") == "no-awake-active-display-meets-frame-rate":
+            # Without a 120 Hz display the gate still decides on everything else; the summary
+            # says that no physical frame-rate certification was made.
+            self.stages[-1]["status"] = "skipped"
+            passed = True
+        elif not passed:
+            self.stages[-1]["failureClassification"] = {
+                "category": report.get("failureCategory", "infrastructure"),
+                "reason": report.get("reason", "display-preflight-failed"),
+            }
+        self.write_summary()
         return passed
 
     def run_performance(self):
@@ -492,7 +508,11 @@ def main():
                 print(gate.summary_path)
                 return 1
 
-    if gate.profile in ("nightly", "release") and not gate.run_performance():
+    if (
+        gate.profile in ("nightly", "release")
+        and gate.physical_120hz_available
+        and not gate.run_performance()
+    ):
         print(gate.summary_path)
         return 1
 

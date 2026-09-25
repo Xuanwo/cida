@@ -81,7 +81,7 @@ Use the unified profiles for gate decisions:
 | Profile | Required work |
 | --- | --- |
 | PR | full Swift suite, one exact Release artifact, P0 Tart journeys, unit mutation contracts |
-| Nightly | full Tart suite, all unit/Release mutations, focused 120 Hz gates |
+| Nightly | full Tart suite, all unit/Release mutations, focused 120 Hz gates when the host has a 120 Hz display |
 | Release | nightly correctness plus three fresh P0 burn-ins |
 
 These profiles require a clean, committed checkout:
