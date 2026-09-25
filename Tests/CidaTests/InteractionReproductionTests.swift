@@ -327,7 +327,7 @@ final class InteractionReproductionTests: XCTestCase {
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
     let collapsedFrame = window.frame
-    XCTAssertEqual(collapsedFrame.height, 744, accuracy: 4, "The board's 默认 is 744 pt tall")
+    XCTAssertEqual(collapsedFrame.height, 892, accuracy: 4, "The board's 默认 is 892 pt tall")
 
     model.editingPrompt = .improve
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))

@@ -465,6 +465,8 @@ body {
 }
 .field.placeholder { color: var(--text-tertiary); }
 .field.focused { border: 1.5px solid var(--accent); }
+.field.text { font-family: var(--font-ui); font-size: 12.5px; }
+.field .caret { display: inline-block; width: 1px; height: 14px; margin-left: 1px; background: var(--text-primary); vertical-align: -2px; }
 
 .readiness {
   display: flex;

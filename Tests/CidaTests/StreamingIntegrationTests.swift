@@ -44,9 +44,10 @@ final class StreamingIntegrationTests: XCTestCase {
     XCTAssertFalse(system.contains("{target_lang}"))
     XCTAssertTrue(system.contains(#""operation":"translate""#))
     XCTAssertTrue(
-      system.contains(#""source_language":"english""#),
-      "The source language is detected from the text")
-    XCTAssertTrue(system.contains(#""target_language":"chinese""#))
+      system.contains(#""language_behavior":"translate_between""#),
+      "The model decides the direction between the user's two languages")
+    XCTAssertTrue(system.contains(#""my_language":"简体中文""#))
+    XCTAssertTrue(system.contains(#""foreign_language":"English""#))
     XCTAssertEqual(messages.last?["content"]?.stringValue, largeInput)
   }
 

@@ -8,7 +8,7 @@ final class ModelServiceTests: XCTestCase {
     userMessage: "hello",
     parameters: ModelTaskParameters(
       request: ProcessingRequest(
-        text: "hello", mode: .translate, sourceLanguage: .english, targetLanguage: .chinese))
+        text: "hello", mode: .translate, myLanguage: "简体中文", foreignLanguage: "English"))
   )
 
   private func service(
@@ -122,7 +122,7 @@ final class ModelServiceTests: XCTestCase {
     XCTAssertThrowsError(
       try ModelServiceClient.prepare(
         ProcessingRequest(
-          text: "x", mode: .translate, sourceLanguage: .english, targetLanguage: .chinese),
+          text: "x", mode: .translate, myLanguage: "简体中文", foreignLanguage: "English"),
         settings: settings)
     ) { error in
       XCTAssertEqual(error as? ModelServiceError, .incompleteConfiguration(missing: ["api-key"]))
@@ -232,7 +232,7 @@ final class ModelServiceTests: XCTestCase {
     var result = ""
     for try await chunk in ModelServiceClient().stream(
       ProcessingRequest(
-        text: text, mode: .translate, sourceLanguage: .english, targetLanguage: .chinese),
+        text: text, mode: .translate, myLanguage: "简体中文", foreignLanguage: "English"),
       settings: settings)
     {
       result += chunk

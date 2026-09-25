@@ -20,6 +20,8 @@ enum ConfigurationField: String, CaseIterable, Sendable {
   case auth
   case headers
   case body
+  case myLanguage = "my-language"
+  case foreignLanguage = "foreign-language"
   case translationPrompt = "translation-prompt"
   case improvementPrompt = "improvement-prompt"
   case shortcut
@@ -88,6 +90,17 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         example: #"{"thinking": {"type": "disabled"}}"#,
         description:
           "合并进请求体的额外参数（如关闭推理、改 max_tokens）；对象逐层合并，值为 null 的键会从请求里去掉")
+    case .myLanguage:
+      Schema(
+        type: "text", values: nil, defaultValue: CidaSettings.defaultLanguages().my,
+        example: "粤语",
+        description:
+          "我的语言，与设置里的相同：其他语言都译成它；可写任何语言、方言、地区写法或文体，由模型理解")
+    case .foreignLanguage:
+      Schema(
+        type: "text", values: nil, defaultValue: CidaSettings.defaultLanguages().foreign,
+        example: "英式英语",
+        description: "常用外语，与设置里的相同：原文是我的语言时译成它；写法同 my-language")
     case .translationPrompt:
       Schema(
         type: "text", values: nil, defaultValue: CidaSettings.defaultTranslationPrompt,
@@ -161,6 +174,15 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         throw invalid(#"要是一个 JSON 对象，例如 {"thinking": {"type": "disabled"}}"#)
       }
       settings.modelService.body = object
+    case .myLanguage, .foreignLanguage:
+      guard !value.isEmpty, !value.contains("\n") else {
+        throw invalid("要是一行文字，例如 \(schema.example)；要恢复默认用 config unset \(rawValue)")
+      }
+      if self == .myLanguage {
+        settings.myLanguage = value
+      } else {
+        settings.foreignLanguage = value
+      }
     case .translationPrompt, .improvementPrompt:
       guard !value.isEmpty else {
         throw invalid("不能为空；要恢复默认用 config unset \(rawValue)")
@@ -200,6 +222,8 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .auth: configuration.settings.modelService.auth = nil
     case .headers: configuration.settings.modelService.headers = [:]
     case .body: configuration.settings.modelService.body = JSONObject()
+    case .myLanguage: configuration.settings.myLanguage = defaults.myLanguage
+    case .foreignLanguage: configuration.settings.foreignLanguage = defaults.foreignLanguage
     case .translationPrompt: configuration.settings.translationPrompt = defaults.translationPrompt
     case .improvementPrompt: configuration.settings.improvementPrompt = defaults.improvementPrompt
     case .shortcut: configuration.settings.shortcut = defaults.shortcut
@@ -276,6 +300,8 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       for name in service.headers.keys.sorted() { object[name] = .string(service.headers[name]!) }
       return .object(object)
     case .body: return .object(service.body)
+    case .myLanguage: return .string(settings.myLanguage)
+    case .foreignLanguage: return .string(settings.foreignLanguage)
     case .translationPrompt: return .string(settings.translationPrompt)
     case .improvementPrompt: return .string(settings.improvementPrompt)
     case .shortcut: return .string(settings.shortcut.configurationText)
@@ -306,7 +332,8 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         ? configuration.settings.translationPrompt : configuration.settings.improvementPrompt
       let line = prompt.replacingOccurrences(of: "\n", with: " ")
       return line.count > 60 ? String(line.prefix(60)) + "…" : line
-    case .format, .shortcut, .captureShortcut, .launchAtLogin, .automaticUpdates:
+    case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .launchAtLogin,
+      .automaticUpdates:
       let value = jsonValue(in: configuration, hasAPIKey: hasAPIKey)
       return value.stringValue ?? value.compactText
     }

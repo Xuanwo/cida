@@ -58,8 +58,8 @@ customElements.define("cida-note", CidaNote);
 customElements.define("cida-motion-note", CidaMotionNote);
 
 // The Settings window (spec/settings.md). Attributes name what a state
-// changes: config (see below), editing="improve", shortcut="custom|recording",
-// grants="all", launch="on", update="available".
+// changes: config (see below), language="editing", editing="improve",
+// shortcut="custom|recording", grants="all", launch="on", update="available".
 class CidaSettings extends HTMLElement {
   connectedCallback() {
     const is = (name, value) => this.getAttribute(name) === value;
@@ -69,6 +69,13 @@ class CidaSettings extends HTMLElement {
         <div class="labels"><b>${title}</b>${caption ? `<small>${caption}</small>` : ""}</div>
         <div class="controls ${align}">${controls}</div>
       </div>`;
+
+    // spec/settings.md §三: free text; language="editing" shows the second field focused.
+    const field = (value, extra = "") => `<span class="field text ${extra}">${value}</span>`;
+    const languages = `
+      ${row("我的语言", "其他语言都译成它", field("简体中文"))}
+      ${row("常用外语", "我的语言译成它",
+        is("language", "editing") ? field("英式英语<i class=\"caret\"></i>", "focused") : field("English"))}`;
 
     const prompt = (title, preview) => `
       <div class="row prompt">
@@ -142,6 +149,7 @@ class CidaSettings extends HTMLElement {
         <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">设置</div></div>
         <div class="settings">
           <div class="group"><h3>模型</h3>${modelGroup}</div>
+          <div class="group"><h3>语言</h3>${languages}</div>
           <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>
           <div class="group"><h3>唤起</h3>${shortcut}${capture}${selection}${launch}</div>
           <div class="group"><h3>更新</h3>${updates}</div>

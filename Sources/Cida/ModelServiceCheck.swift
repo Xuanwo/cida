@@ -21,7 +21,7 @@ enum ModelServiceCheck {
     var failure: ModelServiceError?
     do {
       let request = ProcessingRequest(
-        text: source, mode: .translate, sourceLanguage: .english, targetLanguage: .chinese)
+        text: source, mode: .translate, myLanguage: "简体中文", foreignLanguage: "English")
       let preparedRequest = try ModelServiceClient.prepare(
         request, settings: settings, timeout: timeout)
       prepared = preparedRequest

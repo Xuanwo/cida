@@ -36,6 +36,7 @@ compared natively:
 | 设置 · 默认 | `settings` | `settings` |
 | 设置 · 编辑改进提示词 · 自定义快捷键 · 已授权 · 开机启动 | `settings-custom` | `settings-custom` |
 | 设置 · 录制快捷键 | `settings-recording` | `settings-recording` |
+| 设置 · 常用外语输入中 | `settings-language-editing` | `settings-language-editing` |
 | 设置 · 有新版本可以安装 | `settings-update-available` | `settings-update-available` |
 | 配置 · 还没有模型服务 | `settings-config-unset` | `settings-config-unset` |
 | 配置 · 已复制提示词 | `settings-config-copied` | `settings-config-copied` |

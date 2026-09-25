@@ -113,6 +113,11 @@ private struct SettingsBody: View {
         ModelServiceGroup(model: model)
       }
       Hairline()
+      SettingsGroup(title: "语言") {
+        LanguageRow(model: model, role: .mine)
+        LanguageRow(model: model, role: .foreign)
+      }
+      Hairline()
       SettingsGroup(title: "提示词") {
         PromptRow(model: model, mode: .translate)
         PromptRow(model: model, mode: .improve)
@@ -149,6 +154,91 @@ private struct SettingsBody: View {
     } message: {
       Text(model.errorMessage ?? "")
     }
+  }
+}
+
+// MARK: - Languages
+
+/// One of the user's two languages (`Design/spec/settings.md` §三): free text the model reads, so
+/// a dialect, a regional variant or a register works as well as a language. An emptied field
+/// takes its default back when it loses focus.
+private struct LanguageRow: View {
+  enum Role {
+    case mine, foreign
+  }
+
+  @Bindable var model: AppModel
+  let role: Role
+  @FocusState private var isFocused: Bool
+
+  var body: some View {
+    SettingsRow(
+      title: role == .mine ? "我的语言" : "常用外语",
+      caption: role == .mine ? "其他语言都译成它" : "我的语言译成它"
+    ) {
+      SettingsTextField(
+        text: role == .mine ? $model.settings.myLanguage : $model.settings.foreignLanguage,
+        placeholder: role == .mine ? defaults.my : defaults.foreign,
+        accessibilityIdentifier: role == .mine
+          ? "settings-my-language-editor" : "settings-foreign-language-editor",
+        isFocused: $isFocused
+      )
+    }
+    .onChange(of: isFocused) {
+      guard !isFocused else { return }
+      restoreDefaultIfEmpty()
+    }
+    .onAppear {
+      #if DEBUG
+        if role == .foreign, model.focusesForeignLanguageForDesign { isFocused = true }
+      #endif
+    }
+  }
+
+  private var defaults: (my: String, foreign: String) {
+    CidaSettings.defaultLanguages()
+  }
+
+  private func restoreDefaultIfEmpty() {
+    switch role {
+    case .mine:
+      if model.settings.myLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        model.settings.myLanguage = defaults.my
+      }
+    case .foreign:
+      if model.settings.foreignLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        model.settings.foreignLanguage = defaults.foreign
+      }
+    }
+  }
+}
+
+/// A single-line field filling the control column: Inter 12.5 on `surface`, a 1.5 pt accent rule
+/// while focused.
+private struct SettingsTextField: View {
+  @Binding var text: String
+  let placeholder: String
+  let accessibilityIdentifier: String
+  var isFocused: FocusState<Bool>.Binding
+
+  var body: some View {
+    TextField(placeholder, text: $text)
+      .textFieldStyle(.plain)
+      .font(CidaDesign.ui(12.5))
+      .foregroundStyle(CidaDesign.textPrimary)
+      .focused(isFocused)
+      .padding(.horizontal, 10)
+      .frame(maxWidth: .infinity)
+      .frame(height: 30)
+      .background(CidaDesign.surface)
+      .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
+          .strokeBorder(
+            isFocused.wrappedValue ? CidaDesign.accent : CidaDesign.border,
+            lineWidth: isFocused.wrappedValue ? 1.5 : 1)
+      }
+      .accessibilityIdentifier(accessibilityIdentifier)
   }
 }
 
@@ -502,7 +592,7 @@ private struct ExpandedPromptRow: View {
 // MARK: - 唤起
 
 /// The key chip is the recorder: a click waits for the next combination,
-/// which is registered before it is kept (`Design/spec/settings.md` §四). The
+/// which is registered before it is kept (`Design/spec/settings.md` §五). The
 /// capture row also says whether the Screen Recording permission is there
 /// and asks for it.
 private struct GlobalShortcutRow: View {
@@ -632,7 +722,7 @@ private struct ShortcutChip: View {
 }
 
 /// The global shortcut brings in the frontmost application's selection only
-/// with the Accessibility permission (`Design/spec/settings.md` §四). There is no
+/// with the Accessibility permission (`Design/spec/settings.md` §五). There is no
 /// switch: granting turns it on, revoking in System Settings turns it off.
 private struct SelectionAccessRow: View {
   @Bindable var model: AppModel
@@ -701,7 +791,7 @@ private struct LaunchAtLoginRow: View {
   }
 }
 
-/// One row (`Design/spec/settings.md` §五): checking daily is a switch, checking now or
+/// One row (`Design/spec/settings.md` §六): checking daily is a switch, checking now or
 /// installing what a scheduled check found is the button beside it.
 private struct AutomaticUpdatesRow: View {
   let updates: UpdateState

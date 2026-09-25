@@ -38,8 +38,10 @@ enum Language: String, CaseIterable, Codable, Sendable {
 struct ProcessingRequest: Equatable, Sendable {
   let text: String
   let mode: ProcessingMode
-  let sourceLanguage: Language
-  let targetLanguage: Language
+  /// The user's two languages as they wrote them (`Design/spec/settings.md` §三); the model
+  /// decides which one a translation goes into.
+  let myLanguage: String
+  let foreignLanguage: String
 }
 
 /// The text of one result. The stream presenter appends to it on the main
@@ -96,9 +98,11 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
   let mode: ProcessingMode
   let source: String
   let sourceCharacterCount: Int
-  /// The language the result is written in; it selects the CJK or Latin
-  /// result typography.
-  let outputLanguage: Language
+  /// The script the result is written in; it selects the CJK or Latin result typography. A
+  /// translation starts from a guess and settles once its first characters arrive, since the
+  /// model decides the direction.
+  var outputLanguage: Language
+  @ObservationIgnored var outputLanguageSettled = false
   let storage: ResultTextStorage
   var phase: ResultPhase
   @ObservationIgnored var presentationRevision: Int
@@ -200,6 +204,10 @@ struct CidaSettings: Equatable, Sendable {
   var apiKey = ""
   var translationPrompt = defaultTranslationPrompt
   var improvementPrompt = defaultImprovementPrompt
+  /// What every other language is translated into; any wording, e.g. 粤语 or 英式英语.
+  var myLanguage = defaultLanguages().my
+  /// What text in `myLanguage` is translated into.
+  var foreignLanguage = defaultLanguages().foreign
   var launchAtLogin = false
   /// The combination that shows the panel from any application.
   var shortcut = GlobalShortcut.optionSpace
@@ -240,6 +248,29 @@ struct CidaSettings: Equatable, Sendable {
     mode == .translate ? defaultTranslationPrompt : defaultImprovementPrompt
   }
 
+  /// The two languages before the user writes any (`Design/spec/settings.md` §三): Cida speaks
+  /// Chinese, so its user's own language is Chinese whatever the system language is (many keep
+  /// macOS in English); 繁體中文 when the system prefers traditional Chinese.
+  static func defaultLanguages(
+    preferredLanguages: [String] = Locale.preferredLanguages
+  ) -> (my: String, foreign: String) {
+    let traditional = preferredLanguages.contains { identifier in
+      let locale = Locale(identifier: identifier)
+      guard locale.language.languageCode?.identifier == "zh" else { return false }
+      return locale.language.script?.identifier == "Hant"
+        || ["TW", "HK", "MO"].contains(locale.region?.identifier ?? "")
+    }
+    return (traditional ? "繁體中文" : "简体中文", "English")
+  }
+
+  /// The languages a request carries: an emptied field means its default.
+  var requestLanguages: (my: String, foreign: String) {
+    let defaults = Self.defaultLanguages()
+    let my = myLanguage.trimmingCharacters(in: .whitespacesAndNewlines)
+    let foreign = foreignLanguage.trimmingCharacters(in: .whitespacesAndNewlines)
+    return (my.isEmpty ? defaults.my : my, foreign.isEmpty ? defaults.foreign : foreign)
+  }
+
   private static func migratingLegacyPrompt(_ prompt: String) -> String {
     prompt
       .replacingOccurrences(of: "{text}", with: "the user-provided text")
@@ -267,6 +298,8 @@ extension CidaSettings: Codable {
     case modelService
     case translationPrompt
     case improvementPrompt
+    case myLanguage
+    case foreignLanguage
     case launchAtLogin
     case shortcut
     case captureShortcut
@@ -307,6 +340,10 @@ extension CidaSettings: Codable {
       translationPrompt = decodedTranslationPrompt
       improvementPrompt = decodedImprovementPrompt
     }
+    let defaults = Self.defaultLanguages()
+    myLanguage = try container.decodeIfPresent(String.self, forKey: .myLanguage) ?? defaults.my
+    foreignLanguage =
+      try container.decodeIfPresent(String.self, forKey: .foreignLanguage) ?? defaults.foreign
     launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
     shortcut =
       try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
@@ -319,6 +356,8 @@ extension CidaSettings: Codable {
     try container.encode(modelService, forKey: .modelService)
     try container.encode(translationPrompt, forKey: .translationPrompt)
     try container.encode(improvementPrompt, forKey: .improvementPrompt)
+    try container.encode(myLanguage, forKey: .myLanguage)
+    try container.encode(foreignLanguage, forKey: .foreignLanguage)
     try container.encode(launchAtLogin, forKey: .launchAtLogin)
     try container.encode(shortcut, forKey: .shortcut)
     try container.encode(captureShortcut, forKey: .captureShortcut)

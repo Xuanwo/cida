@@ -66,7 +66,7 @@ enum SettingsStore {
     }
   }
 
-  /// Writes what the application itself changes (prompts, shortcuts, launch at login) over the
+  /// Writes what the application itself changes (prompts, languages, shortcuts, launch at login) over the
   /// stored settings. The model service is left as stored: only the command line writes it, and
   /// an older copy in memory must not undo its change.
   static func saveApplicationSettings(
@@ -76,6 +76,8 @@ enum SettingsStore {
     var stored = loadWithoutAPIKey(namespace: namespace)
     stored.translationPrompt = settings.translationPrompt
     stored.improvementPrompt = settings.improvementPrompt
+    stored.myLanguage = settings.myLanguage
+    stored.foreignLanguage = settings.foreignLanguage
     stored.shortcut = settings.shortcut
     stored.captureShortcut = settings.captureShortcut
     stored.launchAtLogin = settings.launchAtLogin

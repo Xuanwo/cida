@@ -28,6 +28,24 @@ enum TextLanguageDetector {
     return nil
   }
 
+  /// The result typography `text` needs: CJK when it holds Han, kana or Hangul, Latin when it
+  /// holds other letters, nil before either shows up.
+  static func typography(of text: String) -> Language? {
+    let sample = text.prefix(sampleLimit).unicodeScalars
+    if sample.contains(where: { isCJKScalar($0) || isKanaOrHangulScalar($0) }) { return .chinese }
+    if sample.contains(where: CharacterSet.letters.contains) { return .english }
+    return nil
+  }
+
+  private static func isKanaOrHangulScalar(_ scalar: Unicode.Scalar) -> Bool {
+    switch scalar.value {
+    case 0x3040...0x30FF, 0x1100...0x11FF, 0x3130...0x318F, 0xAC00...0xD7AF:
+      return true
+    default:
+      return false
+    }
+  }
+
   private static func isCJKScalar(_ scalar: Unicode.Scalar) -> Bool {
     switch scalar.value {
     case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:

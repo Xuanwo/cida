@@ -184,8 +184,8 @@ def plan_for(submitted_text):
                 '"language_behavior":"preserve_source"',
             ],
             "forbiddenSystemFragments": [
-                '"source_language"',
-                '"target_language"',
+                '"my_language"',
+                '"foreign_language"',
             ],
         },
         "这句话不太清楚也有一点啰嗦。CIDA_E2E_IMPROVE_CHINESE": {
@@ -198,8 +198,8 @@ def plan_for(submitted_text):
                 '"language_behavior":"preserve_source"',
             ],
             "forbiddenSystemFragments": [
-                '"source_language"',
-                '"target_language"',
+                '"my_language"',
+                '"foreign_language"',
             ],
         },
     }

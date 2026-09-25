@@ -15,7 +15,7 @@
 
 ## How it works
 
-- **Select text and press <kbd>⌥</kbd> <kbd>Space</kbd>.** The panel appears with your selection and the translation starts streaming in. Chinese and English are detected and translated into each other.
+- **Select text and press <kbd>⌥</kbd> <kbd>Space</kbd>.** The panel appears with your selection and the translation starts streaming in. Text in your language goes into your usual foreign language and anything else comes into yours; they default to Simplified Chinese and English, and Settings takes any language, dialect or register, such as Cantonese or British English.
 - **Press <kbd>Tab</kbd>, then <kbd>Return</kbd>, to improve the writing instead.** The improved text stays in its own language.
 - **For text on the screen, press <kbd>⌥</kbd> <kbd>S</kbd>.** Frame what you want translated; Cida recognizes it on your Mac and translates it.
 

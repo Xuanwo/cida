@@ -31,6 +31,7 @@
 | `auth` | `bearer` / `x-api-key` / `api-key` / `none` | Key 放在哪个请求头；默认随 `format`（Anthropic 为 `x-api-key`，其余 `bearer`） |
 | `headers` | JSON 对象 | 额外请求头 |
 | `body` | JSON 对象 | 合并进请求体的额外参数（如关闭推理） |
+| `my-language` / `foreign-language` | 文本，如 `简体中文`、`English`、`粤语` | 与 Settings「语言」一组相同，任意写法（`spec/settings.md` §三） |
 | `translation-prompt` / `improvement-prompt` | 文本，可 `--file` / `--stdin` | 与设置里的提示词相同 |
 | `shortcut` / `capture-shortcut` | 如 `option+space` | 与设置里的快捷键相同 |
 | `launch-at-login` / `automatic-updates` | `true` / `false` | 与设置里的开关相同 |

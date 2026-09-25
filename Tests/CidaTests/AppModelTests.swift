@@ -28,22 +28,17 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.inputText, "Keep this text")
   }
 
-  func testImprovementDetectsTheSourceLanguageWithoutChangingTheModelPolicy() {
-    let model = AppModel(mode: .improve, inputText: "这句话需要改进。")
-
-    XCTAssertEqual(model.detectedSourceLanguage, .chinese)
-    model.inputText = "This sentence needs improvement."
-    XCTAssertEqual(model.detectedSourceLanguage, .english)
+  func testImprovementKeepsTheSourceLanguageWithoutChangingTheModelPolicy() {
+    let model = AppModel(mode: .improve, inputText: "This sentence needs improvement.")
 
     let request = ProcessingRequest(
       text: model.inputText,
       mode: .improve,
-      sourceLanguage: .chinese,
-      targetLanguage: .chinese
+      myLanguage: "简体中文", foreignLanguage: "English"
     )
     XCTAssertEqual(ModelTaskParameters(request: request).languageBehavior, .preserveSource)
-    XCTAssertNil(ModelTaskParameters(request: request).sourceLanguage)
-    XCTAssertNil(ModelTaskParameters(request: request).targetLanguage)
+    XCTAssertNil(ModelTaskParameters(request: request).myLanguage)
+    XCTAssertNil(ModelTaskParameters(request: request).foreignLanguage)
   }
 
   func testCopyResultRequiresATerminalResultWithText() {
@@ -68,11 +63,16 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.resultNote?.kind, .failed)
   }
 
-  func testTargetLanguageIsTheOtherHalfOfTheSupportedPair() {
-    XCTAssertEqual(AppModel.targetLanguage(for: .chinese), .english)
-    XCTAssertEqual(AppModel.targetLanguage(for: .english), .chinese)
-    let model = AppModel(inputText: "Cache invalidation is hard.")
-    XCTAssertEqual(model.detectedSourceLanguage, .english)
+  func testResultTypographyStartsFromTheLikelyDirection() {
+    func expected(_ text: String, _ mode: ProcessingMode = .translate, my: String = "简体中文", foreign: String = "English") -> Language {
+      AppModel.expectedTypography(
+        for: ProcessingRequest(text: text, mode: mode, myLanguage: my, foreignLanguage: foreign))
+    }
+    XCTAssertEqual(expected("缓存失效很难。"), .english, "My language goes to the foreign one")
+    XCTAssertEqual(expected("Cache invalidation is hard."), .chinese)
+    XCTAssertEqual(expected("Bonjour"), .chinese, "Any other language comes home")
+    XCTAssertEqual(expected("你好", my: "English", foreign: "日本語"), .english)
+    XCTAssertEqual(expected("这句话需要改进。", .improve), .chinese, "Improving keeps the script")
   }
 
   func testStagedVirtualDocumentKeepsItsPreparedUTF16Count() {
@@ -437,8 +437,7 @@ final class AppModelTests: XCTestCase {
     let request = ProcessingRequest(
       text: source,
       mode: .translate,
-      sourceLanguage: .chinese,
-      targetLanguage: .english
+      myLanguage: "简体中文", foreignLanguage: "English"
     )
     var settings = CidaSettings()
     settings.translationPrompt = "Policy keeps {text} and {target_lang} as ordinary text."
@@ -449,26 +448,29 @@ final class AppModelTests: XCTestCase {
     XCTAssertFalse(prompt.systemMessage.contains("SOURCE_ONLY_8472"))
     XCTAssertTrue(prompt.systemMessage.contains(settings.translationPrompt))
     XCTAssertEqual(prompt.parameters.operation, .translate)
-    XCTAssertEqual(prompt.parameters.languageBehavior, .translateToTarget)
-    XCTAssertEqual(prompt.parameters.sourceLanguage, .chinese)
-    XCTAssertEqual(prompt.parameters.targetLanguage, .english)
+    XCTAssertEqual(prompt.parameters.languageBehavior, .translateBetween)
+    XCTAssertEqual(prompt.parameters.myLanguage, "简体中文")
+    XCTAssertEqual(prompt.parameters.foreignLanguage, "English")
     XCTAssertTrue(prompt.systemMessage.contains(#""operation":"translate""#))
-    XCTAssertTrue(prompt.systemMessage.contains(#""target_language":"english""#))
+    XCTAssertTrue(prompt.systemMessage.contains(#""my_language":"简体中文""#))
+    XCTAssertTrue(prompt.systemMessage.contains(#""foreign_language":"English""#))
+    XCTAssertTrue(
+      prompt.systemMessage.contains("if the source is written in my_language, translate it into foreign_language"),
+      "The model decides the direction from the rule")
 
     let improvePrompt = try ModelPromptBuilder.build(
       request: ProcessingRequest(
         text: source,
         mode: .improve,
-        sourceLanguage: .english,
-        targetLanguage: .chinese
+        myLanguage: "简体中文", foreignLanguage: "English"
       ),
       settings: settings
     )
     XCTAssertEqual(improvePrompt.parameters.languageBehavior, .preserveSource)
-    XCTAssertNil(improvePrompt.parameters.sourceLanguage)
-    XCTAssertNil(improvePrompt.parameters.targetLanguage)
-    XCTAssertFalse(improvePrompt.systemMessage.contains(#""source_language""#))
-    XCTAssertFalse(improvePrompt.systemMessage.contains(#""target_language""#))
+    XCTAssertNil(improvePrompt.parameters.myLanguage)
+    XCTAssertNil(improvePrompt.parameters.foreignLanguage)
+    XCTAssertFalse(improvePrompt.systemMessage.contains(#""my_language""#))
+    XCTAssertFalse(improvePrompt.systemMessage.contains(#""foreign_language""#))
     XCTAssertTrue(
       improvePrompt.systemMessage.contains(#""language_behavior":"preserve_source""#)
     )

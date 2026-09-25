@@ -173,6 +173,17 @@ final class CommandLineInterfaceTests: XCTestCase {
     XCTAssertFalse(store.launchAtLogin)
   }
 
+  func testLanguagesTakeAnyWordingAndResetToChinese() async {
+    let store = InMemoryConfigurationStore()
+    await expect(0, ["config", "set", "my-language=粤语", "foreign-language=英式英语"], in: store)
+    XCTAssertEqual(store.settings.myLanguage, "粤语")
+    XCTAssertEqual(store.settings.foreignLanguage, "英式英语")
+    await expect(64, ["config", "set", "my-language="], in: store)
+    XCTAssertEqual(store.settings.myLanguage, "粤语", "An empty language is refused")
+    await expect(0, ["config", "unset", "my-language"], in: store)
+    XCTAssertEqual(store.settings.myLanguage, CidaSettings.defaultLanguages().my)
+  }
+
   func testSchemaListsEveryFieldInJSON() async throws {
     let store = InMemoryConfigurationStore()
     await expect(0, ["config", "schema", "--json"], in: store)

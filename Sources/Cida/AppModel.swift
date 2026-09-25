@@ -22,7 +22,10 @@ import SwiftUI
             let result =
               switch request.mode {
               case .translate:
-                translate(request.text, target: request.targetLanguage)
+                translate(
+                  request.text,
+                  target: TextLanguageDetector.typography(of: request.text) == .chinese
+                    ? .english : .chinese)
               case .improve:
                 improve(request.text)
               }
@@ -130,6 +133,10 @@ final class AppModel {
   @ObservationIgnored private var panelMessageHandler: PanelMessageHandler?
   /// ⏎ was pressed before a model service was configured (`Design/spec/lifecycle.md` §三).
   private(set) var showsConfigurationReminder = false
+  #if DEBUG
+    /// The settings-language-editing design state shows 常用外语 focused.
+    @ObservationIgnored var focusesForeignLanguageForDesign = false
+  #endif
 
   private let service: any TextProcessingService
   private let streamPresentationPolicy: StreamPresentationPolicy
@@ -284,16 +291,6 @@ final class AppModel {
     guard let handler = panelMessageHandler else { return }
     clearPanelMessage()
     handler.dismiss()
-  }
-
-  /// The source language of the current input, detected from the text; the
-  /// target is the other language of the supported pair.
-  var detectedSourceLanguage: Language {
-    TextLanguageDetector.detect(in: stagedInputDocument ?? inputText) ?? .chinese
-  }
-
-  static func targetLanguage(for source: Language) -> Language {
-    source == .chinese ? .english : .chinese
   }
 
   func setMode(_ newMode: ProcessingMode) {
@@ -474,13 +471,7 @@ final class AppModel {
     let requestText = currentInputDocument
     let requestCharacterCount = inputDocumentUTF16Count
     processingTask?.cancel()
-    let sourceLanguage = TextLanguageDetector.detect(in: requestText) ?? .chinese
-    let request = ProcessingRequest(
-      text: requestText,
-      mode: mode,
-      sourceLanguage: sourceLanguage,
-      targetLanguage: Self.targetLanguage(for: sourceLanguage)
-    )
+    let request = makeRequest(text: requestText)
     let record = beginGeneration(
       request: request,
       reportedSourceCharacterCount: requestCharacterCount
@@ -693,18 +684,29 @@ final class AppModel {
     reportedSourceCharacterCount: Int? = nil
   ) async {
     inputText = text
-    let sourceLanguage = TextLanguageDetector.detect(in: text) ?? .chinese
-    let request = ProcessingRequest(
-      text: text,
-      mode: mode,
-      sourceLanguage: sourceLanguage,
-      targetLanguage: Self.targetLanguage(for: sourceLanguage)
-    )
+    let request = makeRequest(text: text)
     let record = beginGeneration(
       request: request,
       reportedSourceCharacterCount: reportedSourceCharacterCount
     )
     await runGeneration(request: request, record: record)
+  }
+
+  private func makeRequest(text: String) -> ProcessingRequest {
+    let languages = settings.requestLanguages
+    return ProcessingRequest(
+      text: text, mode: mode, myLanguage: languages.my, foreignLanguage: languages.foreign)
+  }
+
+  /// The result typography before any text arrives. An improvement keeps the source's script. A
+  /// translation goes to the foreign language when the source looks like the user's own
+  /// language and to their own otherwise; the first characters of the result settle it.
+  static func expectedTypography(for request: ProcessingRequest) -> Language {
+    let source = TextLanguageDetector.typography(of: request.text) ?? .chinese
+    guard request.mode == .translate else { return source }
+    let mine = TextLanguageDetector.typography(of: request.myLanguage) ?? .chinese
+    let foreign = TextLanguageDetector.typography(of: request.foreignLanguage) ?? .english
+    return source == mine ? foreign : mine
   }
 
   private func beginGeneration(
@@ -715,8 +717,7 @@ final class AppModel {
       mode: request.mode,
       source: request.text,
       sourceCharacterCount: reportedSourceCharacterCount ?? request.text.utf16.count,
-      outputLanguage: request.mode == .translate
-        ? request.targetLanguage : request.sourceLanguage,
+      outputLanguage: Self.expectedTypography(for: request),
       phase: .streaming
     )
     generationState = .waiting(entryID: record.id)
@@ -779,6 +780,7 @@ final class AppModel {
   private func finish(_ record: ResultRecord, phase: ResultPhase) {
     guard result === record else { return }
     record.phase = phase
+    settleTypography(of: record)
     requestResultFollow(force: false, allowsThrottling: false)
   }
 
@@ -794,6 +796,7 @@ final class AppModel {
   private func publish(_ delta: String, to record: ResultRecord) {
     guard result === record else { return }
     record.appendPresentationDelta(delta)
+    settleTypography(of: record)
     if generationState == .waiting(entryID: record.id) {
       generationState = .revealing(entryID: record.id)
     }
@@ -803,6 +806,19 @@ final class AppModel {
       delta.count
     )
     requestResultFollow(force: false)
+  }
+
+  /// Once a few characters of the result exist, its own script decides the typography; a switch
+  /// this early costs one relayout of a line or two.
+  private func settleTypography(of record: ResultRecord) {
+    guard !record.outputLanguageSettled, record.resultUTF16Length >= 12 || record.phase != .streaming
+    else { return }
+    record.outputLanguageSettled = true
+    if let typography = TextLanguageDetector.typography(of: record.result),
+      typography != record.outputLanguage
+    {
+      record.outputLanguage = typography
+    }
   }
 
   /// Asks the result pane to keep the tail visible. Streaming updates are

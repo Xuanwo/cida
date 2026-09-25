@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 /// A key combination that works from any application: showing the panel or
-/// capturing text on screen (`Design/spec/settings.md` §四). It always carries ⌘,
+/// capturing text on screen (`Design/spec/settings.md` §五). It always carries ⌘,
 /// ⌥ or ⌃, so plain typing in another application can never trigger it.
 struct GlobalShortcut: Equatable, Hashable, Sendable {
   struct Modifiers: OptionSet, Hashable, Sendable {

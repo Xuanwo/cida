@@ -475,6 +475,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       if launchOptions.designState == .settingsUpdateAvailable {
         updater.state.availableVersion = "1.1.0"
       }
+      if launchOptions.designState == .settingsLanguageEditing {
+        model.settings.foreignLanguage = "英式英语"
+        model.focusesForeignLanguageForDesign = true
+      }
       switch launchOptions.designState {
       case .settingsConfigCopied:
         model.setModelServiceStateForDesign(copied: true)
@@ -678,6 +682,7 @@ private enum DesignState: String {
   case settingsCustom = "settings-custom"
   case settingsRecording = "settings-recording"
   case settingsUpdateAvailable = "settings-update-available"
+  case settingsLanguageEditing = "settings-language-editing"
   case settingsConfigUnset = "settings-config-unset"
   case settingsConfigCopied = "settings-config-copied"
   case settingsConfigReady = "settings-config-ready"
@@ -701,7 +706,7 @@ private enum DesignState: String {
 
   var isSettings: Bool {
     switch self {
-    case .settings, .settingsCustom, .settingsRecording, .settingsUpdateAvailable,
+    case .settings, .settingsCustom, .settingsRecording, .settingsLanguageEditing, .settingsUpdateAvailable,
       .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
       .settingsConfigChecking, .settingsConfigFailed:
       true
@@ -835,7 +840,7 @@ private struct LaunchOptions {
       case .long:
         return ResultRecord.designLong()
       case .empty, .streaming, .settings, .settingsCustom, .settingsRecording,
-        .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
+        .settingsUpdateAvailable, .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
         .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed,
         .lifecycleWelcome, .lifecycleWelcomeSubmitted, .lifecycleUpdateChecking,
         .lifecycleUpdateFound, .lifecycleUpdateDownloading, .lifecycleUpdateReady,
@@ -862,7 +867,7 @@ private struct LaunchOptions {
       case .lifecycleWelcomeSubmitted:
         "Consistency is the last refuge of the unimaginative."
       case .empty, .settings, .settingsCustom, .settingsRecording, .settingsUpdateAvailable,
-        .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
+        .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
         .settingsConfigChecking, .settingsConfigFailed, .lifecycleWelcome,
         .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
         .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,

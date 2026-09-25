@@ -109,6 +109,48 @@ final class LifecycleTests: XCTestCase {
       .stop)
   }
 
+  // MARK: Languages
+
+  func testChineseIsTheDefaultLanguageWhateverTheSystemSpeaks() {
+    XCTAssertEqual(CidaSettings.defaultLanguages(preferredLanguages: ["en-US", "en"]).my, "简体中文")
+    XCTAssertEqual(CidaSettings.defaultLanguages(preferredLanguages: ["zh-Hans-CN"]).my, "简体中文")
+    XCTAssertEqual(CidaSettings.defaultLanguages(preferredLanguages: ["en-US", "zh-Hant-TW"]).my, "繁體中文")
+    XCTAssertEqual(CidaSettings.defaultLanguages(preferredLanguages: ["zh-HK"]).my, "繁體中文")
+    XCTAssertEqual(CidaSettings.defaultLanguages(preferredLanguages: ["ja-JP"]).foreign, "English")
+  }
+
+  func testEmptiedLanguagesFallBackAndOlderSettingsGainDefaults() throws {
+    var settings = CidaSettings()
+    settings.myLanguage = "  "
+    settings.foreignLanguage = "英式英语"
+    XCTAssertEqual(settings.requestLanguages.my, CidaSettings.defaultLanguages().my)
+    XCTAssertEqual(settings.requestLanguages.foreign, "英式英语")
+
+    let older = try JSONDecoder().decode(CidaSettings.self, from: Data(#"{"launchAtLogin": true}"#.utf8))
+    XCTAssertEqual(older.myLanguage, CidaSettings.defaultLanguages().my)
+    XCTAssertEqual(older.foreignLanguage, "English")
+    let roundTrip = try JSONDecoder().decode(CidaSettings.self, from: JSONEncoder().encode(settings))
+    XCTAssertEqual(roundTrip.foreignLanguage, "英式英语")
+  }
+
+  func testResultTypographyFollowsTheScriptThatArrives() async throws {
+    XCTAssertEqual(TextLanguageDetector.typography(of: "こんにちは"), .chinese, "Kana is CJK")
+    XCTAssertEqual(TextLanguageDetector.typography(of: "안녕하세요"), .chinese, "Hangul is CJK")
+    XCTAssertEqual(TextLanguageDetector.typography(of: "Bonjour"), .english)
+    XCTAssertNil(TextLanguageDetector.typography(of: "123 !"))
+
+    // English source with 简体中文 as my language: the guess is Chinese, the reply is not.
+    let model = AppModel(inputText: "Hello there", service: ImmediateStreamingService())
+    XCTAssertTrue(model.submit())
+    let record = try XCTUnwrap(model.result)
+    XCTAssertEqual(record.outputLanguage, .chinese)
+    let deadline = Date().addingTimeInterval(5)
+    while record.phase == .streaming, Date() < deadline {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    XCTAssertEqual(record.outputLanguage, .english, "The reply's own script settles it")
+  }
+
   // MARK: Update steps
 
   func testUpdateMessagesSayWhatTheSpecSays() {
