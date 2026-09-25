@@ -404,61 +404,6 @@ final class AppModelTests: XCTestCase {
     XCTAssertLessThan(model.resultFollowRevision, model.streamPresentationUpdateCount)
   }
 
-  func testLegacySettingsDecodeWithTheOfficialOpenAIEndpoint() throws {
-    let data = Data(
-      #"{"provider":"OpenAI","apiKey":"","model":"gpt-5","translationPrompt":"translate","improvementPrompt":"improve","launchAtLogin":false}"#
-        .utf8
-    )
-
-    let settings = try JSONDecoder().decode(CidaSettings.self, from: data)
-
-    XCTAssertEqual(settings.provider, .openAI)
-    XCTAssertEqual(settings.customEndpoint, "")
-    XCTAssertEqual(settings.resolvedEndpoint?.absoluteString, CidaSettings.officialOpenAIEndpoint)
-  }
-
-  func testLegacyOpenAIWithAnotherEndpointBecomesACustomProvider() throws {
-    let data = Data(
-      #"{"provider":"OpenAI","apiKey":"","model":"local-model","openAIEndpoint":"http://127.0.0.1:8080/v1/chat/completions","translationPrompt":"translate","improvementPrompt":"improve","launchAtLogin":false}"#
-        .utf8
-    )
-
-    let settings = try JSONDecoder().decode(CidaSettings.self, from: data)
-
-    XCTAssertEqual(settings.provider, .custom)
-    XCTAssertEqual(settings.customEndpoint, "http://127.0.0.1:8080/v1/chat/completions")
-    XCTAssertTrue(settings.usesLocalEndpoint)
-    let encoded = try JSONEncoder().encode(settings)
-    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: encoded), settings)
-  }
-
-  func testReadinessIsDerivedWithoutANetworkRequest() {
-    var settings = CidaSettings()
-    XCTAssertEqual(settings.readiness, .missingAPIKey)
-    settings.apiKey = "sk-test"
-    XCTAssertEqual(settings.readiness, .ready)
-
-    settings.provider = .custom
-    settings.model = "local-model"
-    settings.customEndpoint = ""
-    XCTAssertEqual(settings.readiness, .invalidEndpoint)
-    settings.customEndpoint = "http://localhost:8080/v1/chat/completions"
-    settings.apiKey = ""
-    XCTAssertEqual(settings.readiness, .localEndpoint)
-    XCTAssertTrue(settings.readiness.isReady)
-    settings.customEndpoint = "https://example.com/v1/chat/completions"
-    XCTAssertEqual(settings.readiness, .missingAPIKey)
-    settings.model = " "
-    settings.apiKey = "sk-test"
-    XCTAssertEqual(settings.readiness, .missingModel)
-
-    for provider in ModelProvider.allCases where !provider.isCustom {
-      XCTAssertNotNil(provider.presetEndpoint, provider.rawValue)
-      XCTAssertFalse(provider.suggestedModels.isEmpty, provider.rawValue)
-      XCTAssertNotNil(provider.endpointCaption, provider.rawValue)
-    }
-  }
-
   func testLegacyPromptPlaceholdersMigrateToPlainPoliciesOnlyOnce() throws {
     let data = Data(
       #"{"provider":"DeepSeek","apiKey":"","model":"deepseek-chat","translationPrompt":"Translate {text} into {target_lang}.","improvementPrompt":"Improve {text} without changing {target_lang}.","launchAtLogin":false}"#
@@ -527,19 +472,6 @@ final class AppModelTests: XCTestCase {
     XCTAssertTrue(
       improvePrompt.systemMessage.contains(#""language_behavior":"preserve_source""#)
     )
-  }
-
-  func testSelectingProviderKeepsModelValid() {
-    let model = AppModel()
-
-    model.selectProvider(.openAI)
-
-    XCTAssertEqual(model.settings.provider, .openAI)
-    XCTAssertEqual(model.settings.model, "gpt-5")
-
-    model.selectProvider(.custom)
-    XCTAssertEqual(model.settings.provider, .custom)
-    XCTAssertEqual(model.settings.model, "", "A custom endpoint takes a typed model")
   }
 
   func testGlobalShortcutRequiresACommandOptionOrControlModifier() throws {
@@ -611,61 +543,44 @@ final class AppModelTests: XCTestCase {
     }
 
     var firstSettings = CidaSettings()
-    firstSettings.provider = .openAI
-    firstSettings.model = "isolated-model"
+    firstSettings.modelService.endpoint = "https://api.openai.com/v1/responses"
+    firstSettings.modelService.format = .responses
+    firstSettings.modelService.model = "isolated-model"
     SettingsStore.save(firstSettings, namespace: firstNamespace)
 
-    XCTAssertEqual(SettingsStore.load(namespace: firstNamespace).provider, .openAI)
-    XCTAssertEqual(SettingsStore.load(namespace: firstNamespace).model, "isolated-model")
-    XCTAssertEqual(SettingsStore.load(namespace: secondNamespace).provider, .deepSeek)
-    XCTAssertEqual(SettingsStore.load(namespace: secondNamespace).model, "deepseek-chat")
+    XCTAssertEqual(
+      SettingsStore.load(namespace: firstNamespace).modelService, firstSettings.modelService)
+    XCTAssertTrue(SettingsStore.load(namespace: secondNamespace).modelService.isUnset)
   }
 
-  func testSavingUnrelatedSettingsDoesNotClearAnUnavailableAPIKey() {
-    var clearCount = 0
-    var persistedSettings: CidaSettings?
-    let model = AppModel(
-      settings: CidaSettings(),
-      saveSettings: { persistedSettings = $0 },
-      clearPersistedAPIKey: { clearCount += 1 }
-    )
+  func testSavingSettingsFromTheAppKeepsTheStoredModelService() {
+    let namespace = "com.xuanwo.Cida.Automation.Unit.AppSave.\(UUID().uuidString)"
+    defer { SettingsStore.reset(namespace: namespace) }
+    var stored = CidaSettings()
+    stored.modelService.endpoint = "https://api.deepseek.com/chat/completions"
+    stored.modelService.model = "written-by-the-command-line"
+    SettingsStore.save(stored, namespace: namespace)
 
-    model.settings.model = "new-model"
-    model.persistSettings()
+    // An instance that loaded before the command line wrote, then the user edits a prompt.
+    var inMemory = CidaSettings()
+    inMemory.translationPrompt = "Edited in Settings."
+    SettingsStore.saveApplicationSettings(inMemory, namespace: namespace)
 
-    XCTAssertEqual(clearCount, 0)
-    XCTAssertEqual(persistedSettings?.model, "new-model")
-  }
-
-  func testExplicitlyClearingALoadedAPIKeyDeletesIt() {
-    var settings = CidaSettings()
-    settings.apiKey = "sk-existing-test-key"
-    var clearCount = 0
-    let model = AppModel(
-      settings: settings,
-      saveSettings: { _ in },
-      clearPersistedAPIKey: { clearCount += 1 }
-    )
-
-    model.settings.apiKey = ""
-    model.persistSettings()
-
-    XCTAssertEqual(clearCount, 1)
+    let reloaded = SettingsStore.load(namespace: namespace)
+    XCTAssertEqual(reloaded.modelService.model, "written-by-the-command-line")
+    XCTAssertEqual(reloaded.translationPrompt, "Edited in Settings.")
   }
 
   func testRecoveredAPIKeyIsRestoredWithoutReenteringIt() {
-    var clearCount = 0
-    let model = AppModel(
-      settings: CidaSettings(),
-      saveSettings: { _ in },
-      clearPersistedAPIKey: { clearCount += 1 }
-    )
+    var settings = CidaSettings.designPreview
+    settings.apiKey = ""
+    let model = AppModel(settings: settings, saveSettings: { _ in })
+    XCTAssertFalse(model.isModelServiceConfigured)
 
     model.restorePersistedAPIKey("sk-recovered-test-key")
-    model.persistSettings()
 
     XCTAssertEqual(model.settings.apiKey, "sk-recovered-test-key")
-    XCTAssertEqual(clearCount, 0)
+    XCTAssertTrue(model.isModelServiceConfigured)
   }
 
   func testFramePacingReportPassesForStable120HzSamples() {
@@ -964,7 +879,7 @@ private struct FailingStreamingService: TextProcessingService {
         // Let the presenter show what arrived before the backend fails.
         try? await Task.sleep(for: .milliseconds(150))
         continuation.finish(
-          throwing: TextProcessingError.apiError(statusCode: 500, message: message))
+          throwing: ModelServiceError.http(status: 500, providerMessage: message, body: message))
       }
       continuation.onTermination = { _ in task.cancel() }
     }

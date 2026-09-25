@@ -7,32 +7,6 @@ import XCTest
 
 @MainActor
 extension InteractionReproductionTests {
-  func testAPIKeyIsBackedByAnEditableSecureFieldWithoutViewReplacement() {
-    var apiKey = "sk-existing-key"
-    let binding = Binding(
-      get: { apiKey },
-      set: { apiKey = $0 }
-    )
-    let (_, hostingView) = makeHiddenWindow(
-      rootView: MaskedAPIKeyField(apiKey: binding)
-        .frame(width: 159, height: 27),
-      size: CGSize(width: 159, height: 27)
-    )
-
-    let editor = firstTextField(in: hostingView, identifier: "settings-api-key-editor")
-
-    XCTAssertNotNil(editor)
-    XCTAssertTrue(editor?.isEditable == true)
-    XCTAssertTrue(editor?.isSelectable == true)
-
-    editor?.stringValue = "sk-updated-key"
-    editor?.delegate?.controlTextDidChange?(
-      Notification(name: NSControl.textDidChangeNotification, object: editor)
-    )
-    RunLoop.current.run(until: Date().addingTimeInterval(0.02))
-    XCTAssertEqual(apiKey, "sk-updated-key")
-  }
-
   func testSettingsChangesAreForwardedToPersistence() async throws {
     var persistedSettings: CidaSettings?
     let model = AppModel(
@@ -44,12 +18,12 @@ extension InteractionReproductionTests {
       size: CGSize(width: 560, height: 660)
     )
 
-    model.settings.apiKey = "sk-updated-key"
+    model.settings.translationPrompt = "Updated translation policy."
     try await waitUntil(timeout: .seconds(2)) {
-      persistedSettings?.apiKey == "sk-updated-key"
+      persistedSettings?.translationPrompt == "Updated translation policy."
     }
 
-    XCTAssertEqual(persistedSettings?.apiKey, "sk-updated-key")
+    XCTAssertEqual(persistedSettings?.translationPrompt, "Updated translation policy.")
     withExtendedLifetime(hostingView) {}
   }
 
@@ -369,28 +343,5 @@ extension InteractionReproductionTests {
     XCTAssertEqual(model.result?.source, largeSelection)
     XCTAssertFalse(model.isResultStale)
     assertTestProcessIsNotFrontmost()
-  }
-
-  func testCustomEndpointFieldIsEditableWhenCustomIsSelected() throws {
-    var settings = CidaSettings.designPreview
-    settings.provider = .custom
-    settings.model = "local-model"
-    let model = AppModel(settings: settings)
-    let (_, hostingView) = makeHiddenWindow(
-      rootView: SettingsWindowView(model: model, updates: UpdateState()),
-      size: CGSize(width: 560, height: 800)
-    )
-
-    let endpoint = try XCTUnwrap(
-      firstTextField(in: hostingView, identifier: "settings-endpoint")
-    )
-    endpoint.stringValue = "http://127.0.0.1:8080/v1/chat/completions"
-    endpoint.delegate?.controlTextDidChange?(
-      Notification(name: NSControl.textDidChangeNotification, object: endpoint)
-    )
-    RunLoop.current.run(until: Date().addingTimeInterval(0.02))
-
-    XCTAssertEqual(model.settings.customEndpoint, endpoint.stringValue)
-    XCTAssertEqual(model.settings.readiness, .localEndpoint)
   }
 }

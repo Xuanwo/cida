@@ -9,19 +9,17 @@ import XCTest
 final class StreamingIntegrationTests: XCTestCase {
   func testLocalOpenAIEndpointStreamsLargeInputThroughTheFullModelFlow() async throws {
     let responseChunks = ["Local", " streaming", " response", " complete."]
-    let server = try LocalOpenAIStreamingServer(responseChunks: responseChunks)
+    let server = try LocalModelServiceServer(plan: .init(chunks: responseChunks, delay: 0.05))
     defer { server.stop() }
 
     let largeInput = String(repeating: "Large input paragraph. ", count: 6_000)
     var settings = CidaSettings()
-    settings.provider = .custom
-    settings.model = "local-model"
-    settings.apiKey = ""
-    settings.customEndpoint = server.endpoint.absoluteString
+    settings.modelService.endpoint = server.endpoint(for: .chatCompletions).absoluteString
+    settings.modelService.model = "local-model"
     let model = AppModel(
       inputText: largeInput,
       settings: settings,
-      service: OpenAICompatibleTextProcessingService()
+      service: ModelServiceClient()
     )
 
     let processing = Task { await model.process(text: largeInput) }
@@ -35,77 +33,70 @@ final class StreamingIntegrationTests: XCTestCase {
 
     let request = try server.recordedRequest()
     XCTAssertEqual(request.path, "/v1/chat/completions")
-    XCTAssertNil(request.authorization)
-    XCTAssertEqual(request.body.model, "local-model")
-    XCTAssertTrue(request.body.stream)
-    XCTAssertEqual(request.body.messages.map(\.role), ["system", "user"])
-    XCTAssertEqual(request.body.messages.count, 2)
-    XCTAssertFalse(request.body.messages[0].content.contains(largeInput))
-    XCTAssertFalse(request.body.messages[0].content.contains("{text}"))
-    XCTAssertFalse(request.body.messages[0].content.contains("{target_lang}"))
-    XCTAssertTrue(request.body.messages[0].content.contains(#""operation":"translate""#))
+    XCTAssertNil(request.headers["authorization"], "A local endpoint runs without a key")
+    XCTAssertEqual(request.body["model"], .string("local-model"))
+    XCTAssertEqual(request.body["stream"], .bool(true))
+    let messages = try XCTUnwrap(request.body["messages"]?.arrayValue)
+    XCTAssertEqual(messages.map { $0["role"]?.stringValue }, ["system", "user"])
+    let system = try XCTUnwrap(messages[0]["content"]?.stringValue)
+    XCTAssertFalse(system.contains(largeInput))
+    XCTAssertFalse(system.contains("{text}"))
+    XCTAssertFalse(system.contains("{target_lang}"))
+    XCTAssertTrue(system.contains(#""operation":"translate""#))
     XCTAssertTrue(
-      request.body.messages[0].content.contains(#""source_language":"english""#),
+      system.contains(#""source_language":"english""#),
       "The source language is detected from the text")
-    XCTAssertTrue(request.body.messages[0].content.contains(#""target_language":"chinese""#))
-    XCTAssertEqual(request.body.messages.last?.content, largeInput)
+    XCTAssertTrue(system.contains(#""target_language":"chinese""#))
+    XCTAssertEqual(messages.last?["content"]?.stringValue, largeInput)
   }
 
-  func testRemoteOpenAIEndpointStillRequiresAnAPIKey() async {
-    var settings = CidaSettings()
-    settings.provider = .openAI
+  func testRemoteEndpointStillRequiresAnAPIKey() async {
+    var settings = CidaSettings.designPreview
     settings.apiKey = ""
     let model = AppModel(
       inputText: "Draft",
       settings: settings,
-      service: OpenAICompatibleTextProcessingService()
+      service: ModelServiceClient()
     )
 
     await model.process(text: "Draft")
 
     XCTAssertEqual(
       model.result?.phase,
-      .failed(message: TextProcessingError.missingAPIKey.localizedDescription)
+      .failed(
+        message: ModelServiceError.incompleteConfiguration(missing: ["api-key"])
+          .localizedDescription)
     )
     XCTAssertEqual(model.resultNote?.kind, .failed)
   }
 
-  func testHiddenUIRunsSettingsToStreamingCompletionAgainstLocalMock() async throws {
+  /// The command line configures the service, the running model takes the change as it
+  /// would from the change notification, and the hidden panel streams from the new endpoint.
+  func testHiddenUIStreamsFromAServiceTheCommandLineConfigured() async throws {
     let responseChunks = ["Visible", " streamed", " result."]
-    let server = try LocalOpenAIStreamingServer(responseChunks: responseChunks)
+    let server = try LocalModelServiceServer(
+      plan: .init(format: .responses, chunks: responseChunks, delay: 0.05))
     defer { server.stop() }
 
-    var settings = CidaSettings()
-    settings.provider = .custom
-    settings.model = "typed-model"
-    settings.customEndpoint = "http://127.0.0.1:1/v1/chat/completions"
+    let store = InMemoryConfigurationStore()
     let model = AppModel(
-      settings: settings,
-      service: OpenAICompatibleTextProcessingService(),
+      settings: store.settings,
+      service: ModelServiceClient(),
       saveSettings: { _ in }
     )
-
-    let (settingsWindow, settingsHost) = makeHiddenHost(
-      SettingsWindowView(model: model, updates: UpdateState()),
-      size: CGSize(width: 560, height: 800)
+    XCTAssertFalse(model.isModelServiceConfigured)
+    let status = await CommandLineInterface.run(
+      [
+        "config", "set", "endpoint=\(server.endpoint(for: .responses).absoluteString)",
+        "format=responses", "model=mock-local-model",
+      ],
+      context: store.context()
     )
-    let endpointField = try XCTUnwrap(
-      allTextFields(in: settingsHost).first {
-        $0.stringValue == settings.customEndpoint
-      }
-    )
-    endpointField.stringValue = server.endpoint.absoluteString
-    endpointField.delegate?.controlTextDidChange?(
-      Notification(name: NSControl.textDidChangeNotification, object: endpointField)
-    )
-    let modelField = try XCTUnwrap(
-      allTextFields(in: settingsHost).first { $0.stringValue == "typed-model" }
-    )
-    modelField.stringValue = "mock-local-model"
-    modelField.delegate?.controlTextDidChange?(
-      Notification(name: NSControl.textDidChangeNotification, object: modelField)
-    )
-    try await Task.sleep(for: .milliseconds(30))
+    XCTAssertEqual(status, 0)
+    XCTAssertEqual(store.notificationCount, 1)
+    model.applyExternalSettings(store.settingsWithAPIKey, lastCheck: store.lastCheck)
+    XCTAssertTrue(model.isModelServiceConfigured)
+    XCTAssertTrue(model.isModelServiceRecentlyUpdated)
 
     let (mainWindow, mainHost) = makeHiddenHost(
       PanelView(model: model, heightBudget: .automation),
@@ -131,13 +122,15 @@ final class StreamingIntegrationTests: XCTestCase {
     try await waitUntil { model.result?.phase == .completed }
     XCTAssertEqual(model.result?.result, responseChunks.joined())
     XCTAssertEqual(model.result?.source, input)
-    XCTAssertEqual(try server.recordedRequest().body.model, "mock-local-model")
+    let request = try server.recordedRequest()
+    XCTAssertEqual(request.path, "/v1/responses")
+    XCTAssertEqual(request.body["model"], .string("mock-local-model"))
     XCTAssertFalse(NSApp.isActive)
     XCTAssertNotEqual(
       NSWorkspace.shared.frontmostApplication?.processIdentifier,
       ProcessInfo.processInfo.processIdentifier
     )
-    withExtendedLifetime((settingsWindow, settingsHost, mainWindow, mainHost)) {}
+    withExtendedLifetime((mainWindow, mainHost)) {}
   }
 
   private func waitUntil(
@@ -175,17 +168,6 @@ final class StreamingIntegrationTests: XCTestCase {
     hostingView.layoutSubtreeIfNeeded()
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     return (window, hostingView)
-  }
-
-  private func allTextFields(in view: NSView) -> [NSTextField] {
-    var fields: [NSTextField] = []
-    if let field = view as? NSTextField {
-      fields.append(field)
-    }
-    for child in view.subviews {
-      fields.append(contentsOf: allTextFields(in: child))
-    }
-    return fields
   }
 
   private func allScrollViews(in view: NSView) -> [NSScrollView] {
@@ -233,79 +215,5 @@ final class StreamingIntegrationTests: XCTestCase {
       }
     }
     return nil
-  }
-}
-
-@MainActor
-private final class LocalOpenAIStreamingServer {
-  struct RecordedRequest: Decodable {
-    struct Body: Decodable {
-      struct Message: Decodable {
-        let role: String
-        let content: String
-      }
-
-      let model: String
-      let messages: [Message]
-      let stream: Bool
-    }
-
-    let path: String
-    let authorization: String?
-    let body: Body
-  }
-
-  let endpoint: URL
-
-  private let process: Process
-  private let recordURL: URL
-
-  init(responseChunks: [String]) throws {
-    let fixtureURL = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .appendingPathComponent("Fixtures/openai_stream_mock.py")
-    recordURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("cida-openai-request-\(UUID().uuidString).json")
-
-    let output = Pipe()
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-    process.arguments = [
-      fixtureURL.path,
-      recordURL.path,
-      String(data: try JSONEncoder().encode(responseChunks), encoding: .utf8)!,
-    ]
-    process.standardOutput = output
-    process.standardError = output
-    try process.run()
-    self.process = process
-
-    let data = output.fileHandleForReading.availableData
-    guard
-      let line = String(data: data, encoding: .utf8)?
-        .split(separator: "\n", maxSplits: 1)
-        .first,
-      let port = Int(line)
-    else {
-      process.terminate()
-      throw MockServerError.failedToStart
-    }
-    endpoint = URL(string: "http://127.0.0.1:\(port)/v1/chat/completions")!
-  }
-
-  func recordedRequest() throws -> RecordedRequest {
-    let data = try Data(contentsOf: recordURL)
-    return try JSONDecoder().decode(RecordedRequest.self, from: data)
-  }
-
-  func stop() {
-    guard process.isRunning else { return }
-    process.terminate()
-    process.waitUntilExit()
-    try? FileManager.default.removeItem(at: recordURL)
-  }
-
-  private enum MockServerError: Error {
-    case failedToStart
   }
 }

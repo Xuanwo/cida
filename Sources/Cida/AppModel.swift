@@ -4,13 +4,6 @@ import Observation
 import ServiceManagement
 import SwiftUI
 
-protocol TextProcessingService: Sendable {
-  func stream(
-    _ request: ProcessingRequest,
-    settings: CidaSettings
-  ) -> AsyncThrowingStream<String, Error>
-}
-
 #if DEBUG
   struct PreviewTextProcessingService: TextProcessingService {
     func stream(
@@ -74,176 +67,6 @@ protocol TextProcessingService: Sendable {
     }
   }
 #endif
-
-struct OpenAICompatibleTextProcessingService: TextProcessingService {
-  func stream(
-    _ request: ProcessingRequest,
-    settings: CidaSettings
-  ) -> AsyncThrowingStream<String, Error> {
-    AsyncThrowingStream { continuation in
-      let task = Task.detached(priority: .utility) {
-        do {
-          let urlRequest = try makeRequest(for: request, settings: settings)
-          let (bytes, response) = try await URLSession.shared.bytes(for: urlRequest)
-          guard let response = response as? HTTPURLResponse else {
-            throw TextProcessingError.invalidResponse
-          }
-
-          guard (200..<300).contains(response.statusCode) else {
-            let data = try await bytes.collectData()
-            let apiError = try? JSONDecoder().decode(ChatCompletionErrorResponse.self, from: data)
-            throw TextProcessingError.apiError(
-              statusCode: response.statusCode,
-              message: apiError?.error.message
-            )
-          }
-
-          if response.value(forHTTPHeaderField: "Content-Type")?
-            .lowercased().contains("text/event-stream") == true
-          {
-            try await forwardServerSentEvents(bytes, to: continuation)
-          } else {
-            let data = try await bytes.collectData()
-            let completion = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-            guard let content = completion.choices.first?.message.content, !content.isEmpty else {
-              throw TextProcessingError.emptyResult
-            }
-            continuation.yield(content)
-          }
-          continuation.finish()
-        } catch {
-          continuation.finish(throwing: error)
-        }
-      }
-      continuation.onTermination = { _ in task.cancel() }
-    }
-  }
-
-  private func makeRequest(
-    for request: ProcessingRequest,
-    settings: CidaSettings
-  ) throws -> URLRequest {
-    guard let endpoint = settings.resolvedEndpoint else {
-      throw TextProcessingError.invalidEndpoint
-    }
-    guard !settings.apiKey.isEmpty || settings.usesLocalEndpoint else {
-      throw TextProcessingError.missingAPIKey
-    }
-
-    let prompt = try ModelPromptBuilder.build(request: request, settings: settings)
-    let body = ChatCompletionRequest(
-      model: settings.model,
-      messages: [
-        ChatMessage(role: "system", content: prompt.systemMessage),
-        ChatMessage(role: "user", content: prompt.userMessage),
-      ],
-      stream: true
-    )
-
-    var urlRequest = URLRequest(url: endpoint)
-    urlRequest.httpMethod = "POST"
-    urlRequest.timeoutInterval = 300
-    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-    if !settings.apiKey.isEmpty {
-      urlRequest.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
-    }
-    urlRequest.httpBody = try JSONEncoder().encode(body)
-    return urlRequest
-  }
-
-  private func forwardServerSentEvents(
-    _ bytes: URLSession.AsyncBytes,
-    to continuation: AsyncThrowingStream<String, Error>.Continuation
-  ) async throws {
-    for try await line in bytes.lines {
-      try Task.checkCancellation()
-      guard line.hasPrefix("data:") else { continue }
-      let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
-      guard payload != "[DONE]" else { return }
-      guard let data = payload.data(using: .utf8) else { continue }
-      let event = try JSONDecoder().decode(ChatCompletionStreamResponse.self, from: data)
-      if let content = event.choices.first?.delta.content, !content.isEmpty {
-        continuation.yield(content)
-      }
-    }
-  }
-}
-
-enum TextProcessingError: LocalizedError {
-  case missingAPIKey
-  case invalidEndpoint
-  case invalidRequest
-  case invalidResponse
-  case apiError(statusCode: Int, message: String?)
-  case emptyResult
-
-  var errorDescription: String? {
-    switch self {
-    case .missingAPIKey:
-      "请先在设置中填写 API Key。"
-    case .invalidEndpoint:
-      "OpenAI Endpoint 不是有效的 HTTP 或 HTTPS 地址。"
-    case .invalidRequest:
-      "无法构造模型请求。"
-    case .invalidResponse:
-      "模型服务返回了无效响应。"
-    case .apiError(let statusCode, let message):
-      message ?? "模型服务请求失败（HTTP \(statusCode)）。"
-    case .emptyResult:
-      "模型服务没有返回文本。"
-    }
-  }
-}
-
-private struct ChatCompletionRequest: Encodable {
-  let model: String
-  let messages: [ChatMessage]
-  let stream: Bool
-}
-
-private struct ChatMessage: Codable {
-  let role: String
-  let content: String
-}
-
-private struct ChatCompletionResponse: Decodable {
-  struct Choice: Decodable {
-    let message: ChatMessage
-  }
-
-  let choices: [Choice]
-}
-
-private struct ChatCompletionStreamResponse: Decodable {
-  struct Choice: Decodable {
-    struct Delta: Decodable {
-      let content: String?
-    }
-
-    let delta: Delta
-  }
-
-  let choices: [Choice]
-}
-
-private struct ChatCompletionErrorResponse: Decodable {
-  struct APIError: Decodable {
-    let message: String
-  }
-
-  let error: APIError
-}
-
-extension URLSession.AsyncBytes {
-  fileprivate func collectData() async throws -> Data {
-    var data = Data()
-    for try await byte in self {
-      data.append(byte)
-    }
-    return data
-  }
-}
 
 extension String {
   fileprivate func chunked(maxLength: Int) -> [String] {
@@ -311,15 +134,29 @@ final class AppModel {
       }
     }
   }
-  private let clearPersistedAPIKey: @MainActor () -> Void
   private let selectionAccess: SystemPermission
   private let captureAccess: SystemPermission
+  /// The latest check, from Settings or the command line; it applies only while its
+  /// fingerprint matches the configuration (`modelServiceStatus`).
+  private(set) var lastModelServiceCheck: ModelServiceCheckRecord?
+  private(set) var isCheckingModelService = false
+  /// Three seconds after the command line changed the model service or checked it.
+  private(set) var isModelServiceRecentlyUpdated = false
+  /// The onboarding card says the prompt was copied until a configuration arrives.
+  private(set) var hasCopiedConfigurationPrompt = false
+  /// ✓ 已复制 on the copy button, for `CidaMotion.copiedHoldMilliseconds`.
+  private(set) var isShowingConfigurationPromptCopied = false
+  private let checkService: @Sendable (CidaSettings) async -> ModelServiceCheckResult
+  private let recordCheck: @MainActor (ModelServiceCheckRecord) -> Void
+  /// Where copying writes; tests pass a private pasteboard so the user's clipboard survives.
+  private let pasteboard: NSPasteboard
+  @ObservationIgnored private var configurationPromptFeedbackTask: Task<Void, Never>?
+  @ObservationIgnored private var recentUpdateTask: Task<Void, Never>?
   /// The selection the global shortcut brought in last; the same selection
   /// again leaves the panel as it is.
   @ObservationIgnored private var lastImportedSelection: String?
   private var processingTask: Task<Void, Never>?
   private var settingsSaveTask: Task<Void, Never>?
-  private var lastPersistedAPIKey: String
   @ObservationIgnored private var stagedInputDocument: String?
   @ObservationIgnored private var stagedInputDocumentUTF16Count: Int?
   @ObservationIgnored private var stagedInputDocumentHasNonWhitespace: Bool?
@@ -335,20 +172,25 @@ final class AppModel {
     inputText: String = "",
     result: ResultRecord? = nil,
     settings: CidaSettings = CidaSettings(),
-    service: any TextProcessingService = OpenAICompatibleTextProcessingService(),
+    service: any TextProcessingService = ModelServiceClient(),
     streamPresentationPolicy: StreamPresentationPolicy = .production,
     saveSettings: @escaping @MainActor (CidaSettings) -> Void = { settings in
-      SettingsStore.save(settings)
-    },
-    clearPersistedAPIKey: @escaping @MainActor () -> Void = {
-      SettingsStore.clearAPIKey()
+      SettingsStore.saveApplicationSettings(settings)
     },
     applyGlobalShortcut: @escaping @MainActor (GlobalShortcut, GlobalShortcutAction) -> Bool = {
       _, _ in true
     },
     suspendGlobalShortcuts: @escaping @MainActor (Bool) -> Void = { _ in },
     selectionAccess: SystemPermission = .accessibility,
-    captureAccess: SystemPermission = .screenRecording
+    captureAccess: SystemPermission = .screenRecording,
+    lastModelServiceCheck: ModelServiceCheckRecord? = nil,
+    checkModelService: @escaping @Sendable (CidaSettings) async -> ModelServiceCheckResult = {
+      await ModelServiceCheck.run(settings: $0)
+    },
+    recordModelServiceCheck: @escaping @MainActor (ModelServiceCheckRecord) -> Void = {
+      SettingsStore.saveLastCheck($0)
+    },
+    pasteboard: NSPasteboard = .general
   ) {
     self.mode = mode
     self.inputText = inputText
@@ -357,18 +199,16 @@ final class AppModel {
     self.service = service
     self.streamPresentationPolicy = streamPresentationPolicy
     self.saveSettings = saveSettings
-    self.clearPersistedAPIKey = clearPersistedAPIKey
     self.applyGlobalShortcut = applyGlobalShortcut
     self.suspendGlobalShortcuts = suspendGlobalShortcuts
     self.selectionAccess = selectionAccess
     self.captureAccess = captureAccess
+    self.lastModelServiceCheck = lastModelServiceCheck
+    checkService = checkModelService
+    recordCheck = recordModelServiceCheck
+    self.pasteboard = pasteboard
     isSelectionAccessGranted = selectionAccess.isGranted()
     isCaptureAccessGranted = captureAccess.isGranted()
-    lastPersistedAPIKey = settings.apiKey
-  }
-
-  var modelStatus: String {
-    settings.model
   }
 
   /// The source language of the current input, detected from the text; the
@@ -582,7 +422,6 @@ final class AppModel {
   }
 
   private func copyToPasteboard(_ value: String) {
-    let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
     pasteboard.setString(value, forType: .string)
   }
@@ -597,50 +436,127 @@ final class AppModel {
 
   func persistSettings() {
     settingsSaveTask?.cancel()
-    persist(settings)
+    saveSettings(settings)
   }
 
   func scheduleSettingsPersistence() {
     settingsSaveTask?.cancel()
     let settings = settings
     let saveSettings = saveSettings
-    let clearPersistedAPIKey = clearPersistedAPIKey
-    let shouldClearAPIKey = settings.apiKey.isEmpty && !lastPersistedAPIKey.isEmpty
     settingsSaveTask = Task {
       do {
         try await Task.sleep(for: .milliseconds(250))
         try Task.checkCancellation()
-        if shouldClearAPIKey {
-          clearPersistedAPIKey()
-        }
         saveSettings(settings)
-        self.lastPersistedAPIKey = settings.apiKey
       } catch {
         return
       }
     }
   }
 
-  private func persist(_ settings: CidaSettings) {
-    if settings.apiKey.isEmpty, !lastPersistedAPIKey.isEmpty {
-      clearPersistedAPIKey()
-    }
-    saveSettings(settings)
-    lastPersistedAPIKey = settings.apiKey
-  }
-
-  /// Switching the provider starts from its first suggested model; a custom
-  /// endpoint has no suggestions, so its model is typed in.
-  func selectProvider(_ provider: ModelProvider) {
-    settings.provider = provider
-    settings.model = provider.suggestedModels.first ?? ""
-  }
-
   func restorePersistedAPIKey(_ apiKey: String) {
     guard settings.apiKey.isEmpty, !apiKey.isEmpty else { return }
     settings.apiKey = apiKey
-    lastPersistedAPIKey = apiKey
   }
+
+  // MARK: Model service (`Design/spec/configuration.md` §四)
+
+  /// Whether requests can be sent. Settings shows the onboarding card and the panel its
+  /// welcome until this is true.
+  var isModelServiceConfigured: Bool {
+    settings.isModelServiceComplete
+  }
+
+  /// The service row's status: a running check, then the latest check of this exact
+  /// configuration, and 已就绪 for a complete configuration nobody has checked yet.
+  var modelServiceStatus: ModelServiceStatus {
+    if isCheckingModelService { return .checking }
+    if let lastModelServiceCheck, !lastModelServiceCheck.passed,
+      lastModelServiceCheck.fingerprint == settings.modelServiceFingerprint
+    {
+      return .failed(lastModelServiceCheck.failureSummary ?? "检查失败")
+    }
+    return .ready
+  }
+
+  /// The prompt 复制配置提示词 copies, with this executable's path and the current service.
+  var configurationPrompt: String {
+    ConfigurationPrompt.text(settings: settings)
+  }
+
+  func copyConfigurationPrompt() {
+    copyToPasteboard(configurationPrompt)
+    hasCopiedConfigurationPrompt = true
+    isShowingConfigurationPromptCopied = true
+    configurationPromptFeedbackTask?.cancel()
+    configurationPromptFeedbackTask = Task { [weak self] in
+      try? await Task.sleep(for: .milliseconds(CidaMotion.copiedHoldMilliseconds))
+      guard !Task.isCancelled else { return }
+      self?.isShowingConfigurationPromptCopied = false
+    }
+  }
+
+  /// Runs the same request as `Cida check` and records the outcome where the command line
+  /// reads it.
+  func checkModelService() async {
+    guard !isCheckingModelService, isModelServiceConfigured else { return }
+    isCheckingModelService = true
+    let result = await checkService(settings)
+    recordCheck(result.record)
+    lastModelServiceCheck = result.record
+    isCheckingModelService = false
+  }
+
+  /// Takes what the command line wrote while Cida runs: the configuration, the key and the
+  /// latest check, plus the preferences Settings shows. The status says 刚刚更新 for three
+  /// seconds when the model service or its check changed.
+  func applyExternalSettings(
+    _ newSettings: CidaSettings, lastCheck: ModelServiceCheckRecord?
+  ) {
+    settingsSaveTask?.cancel()
+    let serviceChanged =
+      newSettings.modelService != settings.modelService || newSettings.apiKey != settings.apiKey
+      || lastCheck != lastModelServiceCheck
+    var everythingButShortcuts = newSettings
+    everythingButShortcuts.shortcut = settings.shortcut
+    everythingButShortcuts.captureShortcut = settings.captureShortcut
+    settings = everythingButShortcuts
+    // New combinations are registered like ones recorded in Settings.
+    for action in GlobalShortcutAction.allCases {
+      setShortcut(newSettings.shortcut(for: action), for: action)
+    }
+    lastModelServiceCheck = lastCheck
+    if settings != newSettings {
+      // A combination the system refused stays as it was, and so does the stored one.
+      saveSettings(settings)
+    }
+    if isModelServiceConfigured { hasCopiedConfigurationPrompt = false }
+    if serviceChanged { markModelServiceUpdated() }
+  }
+
+  private func markModelServiceUpdated() {
+    isModelServiceRecentlyUpdated = true
+    recentUpdateTask?.cancel()
+    recentUpdateTask = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(3))
+      guard !Task.isCancelled else { return }
+      self?.isModelServiceRecentlyUpdated = false
+    }
+  }
+
+  #if DEBUG
+    /// Freezes the model group in one of the board's states (`--design-state settings-config-*`).
+    func setModelServiceStateForDesign(
+      copied: Bool = false, recentlyUpdated: Bool = false, checking: Bool = false,
+      lastCheck: ModelServiceCheckRecord? = nil
+    ) {
+      hasCopiedConfigurationPrompt = copied
+      isShowingConfigurationPromptCopied = copied
+      isModelServiceRecentlyUpdated = recentlyUpdated
+      isCheckingModelService = checking
+      lastModelServiceCheck = lastCheck
+    }
+  #endif
 
   /// The combination is registered system-wide before it becomes the
   /// setting, so a combination the system, another application or the other
@@ -749,7 +665,7 @@ final class AppModel {
 
         try Task.checkCancellation()
         guard presenter.receivedContent else {
-          throw TextProcessingError.emptyResult
+          throw ModelServiceError.emptyResult
         }
         presenter.finishInput()
         try await presentationTask.value

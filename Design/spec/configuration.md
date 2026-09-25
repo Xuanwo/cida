@@ -16,9 +16,9 @@
   - `config show`：当前配置；API Key 只显示「已保存在钥匙串」或「未设置」，不输出任何片段。
   - `config set 字段=值 …`：一次写入多项，全部校验通过才生效，任何一项不合法都不改动；写入后正在运行的辞达立即改用新配置。
   - `config set api-key --stdin | --file 路径 | --env 名称`：敏感字段只从这三处读取，读到的值存进钥匙串；直接写在命令里的值被拒绝，免得留在 shell 历史和助手的对话里。`--env`、`--file` 只在执行时读一次，之后不再依赖它们（从访达打开的辞达看不到终端的环境变量）。
-  - `config unset 字段`、`config reset`：恢复默认。
+  - `config unset 字段`、`config reset`：恢复默认；`unset api-key` 与 `reset` 删除钥匙串里的 API Key。
   - `check`：用当前配置真的请求一次（让模型把 hello 译成中文），报告是否可用、耗时和回复。`check --verbose` 失败时列出实际请求的 URL、请求头、请求体、HTTP 状态与服务商返回的原文；API Key 在所有输出里（包括服务商回显的错误信息）都替换为 `••••`。
-- 退出码：成功 0；配置不合法 64；检查失败 69。
+- 退出码：成功 0；配置不合法 64；检查失败 69；钥匙串或开机启动拒绝写入 74。
 
 ## 三、字段
 
@@ -34,6 +34,8 @@
 | `translation-prompt` / `improvement-prompt` | 文本，可 `--file` / `--stdin` | 与设置里的提示词相同 |
 | `shortcut` / `capture-shortcut` | 如 `option+space` | 与设置里的快捷键相同 |
 | `launch-at-login` / `automatic-updates` | `true` / `false` | 与设置里的开关相同 |
+
+请求体里辞达自己带的参数：Anthropic Messages 的 `max_tokens` 为 8192；Responses 带 `"store": false`（辞达不留请求记录，也请服务不留）。`body` 逐层合并进请求体，值为 `null` 的键会被去掉，所以这些都可以改或去掉。
 
 原来的四个预设在升级时换算成对应的 `endpoint`、`format`、`model`，已配置的用户不受影响。
 

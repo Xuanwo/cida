@@ -62,8 +62,7 @@ final class TranslationJourneyPropertyTests: XCTestCase {
     let model = AppModel(
       service: service,
       streamPresentationPolicy: .fastTests,
-      saveSettings: { _ in },
-      clearPersistedAPIKey: {}
+      saveSettings: { _ in }
     )
 
     for (index, command) in commands.enumerated() {

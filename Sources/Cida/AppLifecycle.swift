@@ -3,7 +3,20 @@ import Carbon.HIToolbox
 import QuartzCore
 import SwiftUI
 
+/// One executable, two ways in: with a command (`Cida config …`, `Cida check`, `Cida --help`)
+/// it runs the command line and exits before NSApplication starts
+/// (`Design/spec/configuration.md` §二); otherwise it is the application.
 @main
+enum CidaEntryPoint {
+  static func main() {
+    let arguments = Array(CommandLine.arguments.dropFirst())
+    if CommandLineInterface.handles(arguments: arguments) {
+      CommandLineInterface.runAndExit(arguments: arguments)
+    }
+    CidaApplication.main()
+  }
+}
+
 struct CidaApplication: App {
   @NSApplicationDelegateAdaptor(CidaAppDelegate.self) private var appDelegate
 
@@ -40,10 +53,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       settings: launchOptions.initialSettings,
       service: launchOptions.textProcessingService,
       saveSettings: { settings in
-        SettingsStore.save(settings, namespace: settingsStorageNamespace)
-      },
-      clearPersistedAPIKey: {
-        SettingsStore.clearAPIKey(namespace: settingsStorageNamespace)
+        SettingsStore.saveApplicationSettings(settings, namespace: settingsStorageNamespace)
       },
       applyGlobalShortcut: { [weak self] shortcut, action in
         self?.applyGlobalShortcut(shortcut, for: action) ?? true
@@ -53,9 +63,15 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         self?.captureHotKey?.setSuspended(isSuspended)
       },
       selectionAccess: launchOptions.selectionAccess,
-      captureAccess: launchOptions.captureAccess
+      captureAccess: launchOptions.captureAccess,
+      lastModelServiceCheck: launchOptions.persistsSettings
+        ? SettingsStore.loadLastCheck(namespace: settingsStorageNamespace) : nil,
+      recordModelServiceCheck: { record in
+        SettingsStore.saveLastCheck(record, namespace: settingsStorageNamespace)
+      }
     )
   }()
+  private var configurationChangeObserver: NSObjectProtocol?
   private let selectedTextSource = AccessibilitySelectedTextSource()
   private let screenCaptureSource = SystemScreenCaptureSource()
 
@@ -99,6 +115,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       model.attachDisplayLink(to: contentView)
     }
     installPerformanceProbeIfNeeded()
+    if launchOptions.persistsSettings {
+      observeConfigurationChanges()
+    }
 
     if !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI {
       installStatusItem()
@@ -283,6 +302,30 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     NSApp.terminate(nil)
   }
 
+  /// The command line changed the settings or checked the service; Settings and the next
+  /// request follow at once (`Design/spec/configuration.md` §四).
+  private func observeConfigurationChanges() {
+    let namespace = launchOptions.settingsStorageNamespace
+    configurationChangeObserver = ConfigurationChangeNotification.observe(namespace: namespace) {
+      [weak self] in
+      guard let self else { return }
+      var settings = launchOptions.applyingEndpointOverride(
+        to: SettingsStore.load(namespace: namespace))
+      // A key this launch recovered interactively cannot be read again without asking.
+      if settings.apiKey.isEmpty, SettingsStore.hasAPIKey(namespace: namespace) {
+        settings.apiKey = model.settings.apiKey
+      }
+      model.applyExternalSettings(
+        settings, lastCheck: SettingsStore.loadLastCheck(namespace: namespace))
+      model.refreshLaunchAtLoginStatus()
+      let automaticUpdates = SettingsStore.automaticUpdatesEnabled(namespace: namespace)
+      if updater.state.automaticallyChecks != automaticUpdates {
+        updater.state.setAutomaticallyChecks(automaticUpdates)
+      }
+      lifecycleLog?.record("configuration-reloaded")
+    }
+  }
+
   /// The Keychain may ask the user to allow access; do it the first time the
   /// panel is shown, when someone is at the keyboard.
   private func recoverAPIKeyIfNeeded() {
@@ -418,6 +461,21 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       if launchOptions.designState == .settingsUpdateAvailable {
         updater.state.availableVersion = "1.1.0"
       }
+      switch launchOptions.designState {
+      case .settingsConfigCopied:
+        model.setModelServiceStateForDesign(copied: true)
+      case .settingsConfigUpdated:
+        model.setModelServiceStateForDesign(recentlyUpdated: true)
+      case .settingsConfigChecking:
+        model.setModelServiceStateForDesign(checking: true)
+      case .settingsConfigFailed:
+        model.setModelServiceStateForDesign(
+          lastCheck: ModelServiceCheckRecord(
+            passed: false, statusCode: 401, reason: "服务商拒绝了 API Key", checkedAt: Date(),
+            fingerprint: model.settings.modelServiceFingerprint))
+      default:
+        break
+      }
     #endif
     settingsWindowController = SettingsWindowFactory.makeWindowController(
       model: model, updates: updater.state)
@@ -516,15 +574,21 @@ private enum DesignState: String {
   case failed
   case long
   case settings
-  case settingsMissingKey = "settings-missing-key"
   case settingsCustom = "settings-custom"
   case settingsRecording = "settings-recording"
   case settingsUpdateAvailable = "settings-update-available"
+  case settingsConfigUnset = "settings-config-unset"
+  case settingsConfigCopied = "settings-config-copied"
+  case settingsConfigReady = "settings-config-ready"
+  case settingsConfigUpdated = "settings-config-updated"
+  case settingsConfigChecking = "settings-config-checking"
+  case settingsConfigFailed = "settings-config-failed"
 
   var isSettings: Bool {
     switch self {
-    case .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
-      .settingsUpdateAvailable:
+    case .settings, .settingsCustom, .settingsRecording, .settingsUpdateAvailable,
+      .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
+      .settingsConfigChecking, .settingsConfigFailed:
       true
     default: false
     }
@@ -578,25 +642,28 @@ private struct LaunchOptions {
       if usesDesignFixtures {
         settings = CidaSettings.designPreview
       }
-      if usesDesignFixtures, designState == .settingsMissingKey {
+      if usesDesignFixtures,
+        designState == .settingsConfigUnset || designState == .settingsConfigCopied
+      {
+        settings.modelService = ModelConfiguration()
         settings.apiKey = ""
       }
       if usesDesignFixtures, designState == .settingsCustom {
-        settings.provider = .custom
-        settings.model = "qwen3-32b"
-        settings.customEndpoint = "http://127.0.0.1:8080/v1/chat/completions"
-        settings.apiKey = ""
         settings.launchAtLogin = true
         settings.shortcut = GlobalShortcut(
           keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
       }
     #endif
-    if let automationOpenAIEndpoint {
-      settings.provider = .custom
-      settings.model = "cida-local-model"
-      settings.customEndpoint = automationOpenAIEndpoint
-      settings.apiKey = ""
-    }
+    return applyingEndpointOverride(to: settings)
+  }
+
+  /// UI automation points the instance at the loopback scenario server, which needs no key.
+  func applyingEndpointOverride(to settings: CidaSettings) -> CidaSettings {
+    guard let automationOpenAIEndpoint else { return settings }
+    var settings = settings
+    settings.modelService = ModelConfiguration(
+      endpoint: automationOpenAIEndpoint, format: .chatCompletions, model: "cida-local-model")
+    settings.apiKey = ""
     return settings
   }
 
@@ -606,7 +673,7 @@ private struct LaunchOptions {
         return PreviewTextProcessingService()
       }
     #endif
-    return OpenAICompatibleTextProcessingService()
+    return ModelServiceClient()
   }
 
   var selectionAccess: SystemPermission {
@@ -651,8 +718,9 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
-      case .empty, .streaming, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
-        .settingsUpdateAvailable:
+      case .empty, .streaming, .settings, .settingsCustom, .settingsRecording,
+        .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
+        .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed:
         return nil
       }
     #else
@@ -672,8 +740,9 @@ private struct LaunchOptions {
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:
         ResultRecord.designLongInput
-      case .empty, .settings, .settingsMissingKey, .settingsCustom, .settingsRecording,
-        .settingsUpdateAvailable:
+      case .empty, .settings, .settingsCustom, .settingsRecording, .settingsUpdateAvailable,
+        .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
+        .settingsConfigChecking, .settingsConfigFailed:
         ""
       }
     #else
