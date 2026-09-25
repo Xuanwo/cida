@@ -1,59 +1,62 @@
 <p align="center">
-  <img src="Design/rendered/states/brand-icon.png" width="128" alt="Cida: 辞 followed by the streaming caret">
+  <img src="Design/rendered/states/brand-icon.png" width="112" alt="辞达的图标：「辞」后跟一枚光标">
 </p>
 
-<h1 align="center">Cida · 辞达</h1>
+<h1 align="center">辞达</h1>
 
 <p align="center">
-  Translate and polish text anywhere on your Mac, one shortcut away.<br>
-  <a href="https://github.com/Xuanwo/cida/releases/latest">Download</a> · <a href="README.zh-Hans.md">简体中文</a>
+  用你选择的大模型，在 Mac 的任何地方翻译和润色文字。<br>
+  <a href="https://github.com/Xuanwo/cida/releases/latest">下载</a> · <a href="README.en.md">English</a>
 </p>
-
-![Cida translating a Chinese sentence into English](docs/images/translate.png)
-
-Cida lives in the menu bar. Press <kbd>⌥</kbd> <kbd>Space</kbd> in any app and a panel appears with the text you selected, already being translated; press <kbd>Tab</kbd> to improve the writing instead. The name comes from the *Analects*: 辞达而已矣, words need only get the meaning across.
-
-## Features
-
-- **Stays out of the way.** The panel takes your typing without switching apps, and <kbd>Esc</kbd> drops you back where you were. A request keeps streaming while the panel is hidden, and the caret in the menu bar breathes until it is done.
-- **Brings the selection in.** With the Accessibility permission, the text selected in the frontmost app becomes the source and is translated at once.
-- **Reads the screen.** <kbd>⌥</kbd> <kbd>S</kbd> freezes the screen; frame any text and Cida recognizes it on your Mac with Vision and translates it.
-- **Translates or improves.** Chinese and English are detected and translated into each other; improving keeps the text in its own language.
-- **Uses your model.** DeepSeek, OpenAI, Moonshot, 智谱 GLM, or any OpenAI-compatible endpoint, including a local server that needs no key.
-- **Keeps nothing.** The API key lives in Keychain. There is no history and no telemetry, and screenshots never leave your Mac.
-
-![Cida improving a Chinese sentence](docs/images/improve.png)
-
-The interface is in Simplified Chinese.
-
-## Install
-
-Cida needs macOS 15 or newer.
-
-1. Download `Cida-<version>.zip` from the [latest release](https://github.com/Xuanwo/cida/releases/latest). It is signed with a Developer ID and notarized by Apple.
-2. Unzip it and move **Cida.app** to Applications.
-3. Open it, press <kbd>⌘</kbd> <kbd>,</kbd>, pick a provider and paste your API key.
 
 <p align="center">
-  <img src="docs/images/settings.png" width="480" alt="Cida Settings">
+  <img src="docs/images/demo.gif" width="800" alt="选中一段英文按 ⌥Space 翻译成中文，按 Tab 润色，再用 ⌥S 框选屏幕上的文字翻译">
 </p>
 
-## Keys
+## 怎么用
 
-| Key | Action |
+- **选中文字，按 <kbd>⌥</kbd> <kbd>Space</kbd>。** 面板带着选中的文字出现，译文随即开始流出。中文和英文会自动互译。
+- **按 <kbd>Tab</kbd> 再按 <kbd>Return</kbd>，改成润色。** 润色后的文字保持原来的语言。
+- **屏幕上的文字，按 <kbd>⌥</kbd> <kbd>S</kbd>。** 框出要翻译的部分，辞达在本机识别后翻译。
+
+按 <kbd>Esc</kbd> 回到原来的应用。面板隐藏后请求会继续完成，下次唤出时结果还在。
+
+## 安装
+
+需要 macOS 15 或更新版本，以及一个大模型服务的 API Key。
+
+1. 从[最新版本](https://github.com/Xuanwo/cida/releases/latest)下载 zip。安装包经过 Developer ID 签名和 Apple 公证。
+2. 解压，把 **Cida.app** 拖进「应用程序」后打开。辞达只在菜单栏显示图标，不占用 Dock。
+3. 按 <kbd>⌘</kbd> <kbd>,</kbd> 打开设置，选择服务商并填入 API Key。
+
+内置 DeepSeek、OpenAI、Moonshot、智谱 GLM，也可以填任何兼容 OpenAI Chat Completions 的接口；在本机运行的模型（例如 `http://127.0.0.1:8080`）不需要 Key。辞达本身免费，模型调用按服务商的价格计费。
+
+两个权限都是可选的，在设置的「唤起」一栏点「去授权」即可开启：
+
+| 权限 | 开启后 | 不开启时 |
+| --- | --- | --- |
+| 辅助功能 | 按 <kbd>⌥</kbd> <kbd>Space</kbd> 时自动带入选中的文字 | 先 <kbd>⌘</kbd> <kbd>C</kbd>，再在面板里 <kbd>⌘</kbd> <kbd>V</kbd> |
+| 屏幕录制 | 用 <kbd>⌥</kbd> <kbd>S</kbd> 截图翻译 | 截图翻译不可用 |
+
+## 隐私
+
+- API Key 只存在 macOS 的钥匙串里。
+- 不保存历史记录，不收集任何数据，请求只发往你选择的服务商。
+- 截图在本机用 Apple 的 Vision 识别，图片不会离开你的 Mac。
+
+## 快捷键
+
+| 按键 | 作用 |
 | --- | --- |
-| <kbd>⌥</kbd> <kbd>Space</kbd> | Show or hide the panel, bringing in the selected text |
-| <kbd>⌥</kbd> <kbd>S</kbd> | Frame text on screen and translate it |
-| <kbd>Return</kbd> | Run the action (<kbd>⇧</kbd> <kbd>Return</kbd> for a new line) |
-| <kbd>Tab</kbd> | Switch between translate (翻译) and improve (改进) |
-| <kbd>⌘</kbd> <kbd>C</kbd> | Copy the selection, or the result when nothing is selected |
-| <kbd>⌘</kbd> <kbd>.</kbd> | Stop |
-| <kbd>Esc</kbd> | Hide |
-| <kbd>⌘</kbd> <kbd>,</kbd> | Settings |
+| <kbd>⌥</kbd> <kbd>Space</kbd> | 显示或隐藏面板 |
+| <kbd>⌥</kbd> <kbd>S</kbd> | 截图翻译 |
+| <kbd>Tab</kbd> | 在翻译和改进之间切换 |
+| <kbd>Return</kbd> | 执行（<kbd>⇧</kbd> <kbd>Return</kbd> 换行） |
+| <kbd>Esc</kbd> | 隐藏面板 |
 
-Both global shortcuts can be recorded again in Settings.
+两个全局快捷键都可以在设置里重新录制。
 
-## Build from source
+## 参与开发
 
 ```sh
 git clone https://github.com/Xuanwo/cida.git
@@ -61,8 +64,10 @@ cd cida
 swift run Cida
 ```
 
-Building needs Xcode 26 or newer. [`docs/development.md`](docs/development.md) covers signed builds, tests, releases and the architecture, and [`Design/`](Design/README.md) holds the design Cida is built from. Contributions follow [`AGENTS.md`](AGENTS.md).
+需要 Xcode 26 或更新版本。构建、测试和发版见 [`docs/development.md`](docs/development.md)，设计稿在 [`Design/`](Design/README.md)，提交改动前请阅读 [`AGENTS.md`](AGENTS.md)。
 
-## License
+## 许可证
 
-Cida is licensed under [Apache-2.0](LICENSE). It bundles Inter, Source Serif 4, Noto Serif SC and JetBrains Mono under the SIL Open Font License 1.1, and Lucide icons under the ISC License.
+[Apache-2.0](LICENSE)。
+
+名字取自《论语》「辞达而已矣」：言辞能把意思表达清楚就够了。

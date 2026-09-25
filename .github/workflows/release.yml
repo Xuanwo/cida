@@ -1,5 +1,5 @@
 # Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N for a prerelease) on a commit of main builds, signs,
-# notarizes and publishes Cida as a GitHub release. See "Releasing" in README.md for the
+# notarizes and publishes Cida as a GitHub release. See "Releasing" in docs/development.md for the
 # secrets it needs and the local gate that comes before the tag.
 name: Release
 

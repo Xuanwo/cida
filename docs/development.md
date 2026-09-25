@@ -27,7 +27,9 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 ## Screenshots
 
-`scripts/capture-design-states.sh` captures every panel and Settings state from an isolated, non-activating build into `Design/ImplementationCurrent` and compares each with its board. `swift scripts/render-readme-images.swift` then places the translate, improve and Settings captures on the backdrop used in the READMEs (`docs/images`).
+`scripts/capture-design-states.sh` captures every panel and Settings state from an isolated, non-activating build into `Design/ImplementationCurrent` and compares each with its board.
+
+The README's `docs/images/demo.gif` is a screen recording of the signed Release app driven by an XCUI journey in a Tart guest: a selection translated with ⌥Space, improved with Tab, and a line framed with ⌥S. The model's replies came from the loopback scenario server, and the desktop's widgets were hidden. That recording journey is not part of the regression suite; when the panel's look or the flow changes, record the demo again the same way.
 
 ## Verification
 
