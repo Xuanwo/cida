@@ -133,6 +133,28 @@ are recorded as diagnostics rather than misclassified as test activity.
   `TestResults/panel-mutations-20260923` and `TestResults/panel-mutations-20260923-fix`; all 8
   killed again on the Settings redesign commit 805366e (`TestResults/settings-mutations-20260923`).
 
+### Lifecycle run on released builds, 2026-09-25
+
+The whole path of `Design/spec/lifecycle.md` on the builds users get, in a networked clone of
+`cida-ui-golden` at 1512 × 982 pt. The guest screen was read and clicked through Tart's
+`--vnc-experimental` server (with `--no-graphics`, so nothing opens on the host), because
+`screencapture` and `osascript` started through tart-guest-agent are denied by TCC.
+
+- `v1.1.0-rc.3` (1.1.0, build 145) from R2, quarantined as a browser download: the DMG opened as
+  the paper window with 辞达 and 应用程序 on their marks; Gatekeeper named the app 辞达 and reported
+  it notarized. Finder counted the title bar in the window height and cut the background's bottom
+  off; `v1.1.0` makes the window 30 pt taller (checked on the released DMG).
+- The first launch found rc.4 at once and showed the update panel; 稍后 left 安装新版本 1.1.0… in
+  the menu bar, and the next open showed the welcome.
+- An assistant's configuration (`Cida config set api-key --stdin`, `config set endpoint=… model=…`)
+  removed the welcome from the open panel at once. No Keychain prompt appeared then, after the
+  update, or when the updated app and its command line read the key.
+- From the menu item: update found, download progress, 已准备好, 立即重启. `/Applications/Cida.app`
+  became build 146, notarized, relaunched into the menu bar without the panel, and opened to the
+  configured panel. rc.4 later received the `v1.1.0` release (build 147) with its notes.
+- The run found the notes unclear (no heading, developer wording) and 1.1.0 over 1.1.0 between
+  candidates; `v1.1.0` adds 更新内容, rewrites the notes and shows builds for equal versions.
+
 ### Tart XCUI run `shortcut-tart-20260924c`
 
 19 of 19 tests passed with the recordable global shortcut (artifact digest
