@@ -276,7 +276,7 @@ extension InteractionReproductionTests {
       try XCTUnwrap(revealAnimation.fromValue as? NSNumber).doubleValue,
       0,
       accuracy: 0.001,
-      "Pencil T2: glyphs fade in behind the caret from fully transparent"
+      "Streaming motion T2: glyphs fade in behind the caret from fully transparent"
     )
     XCTAssertEqual(resultView.glyphRevealCommittedLengthForTesting, 0)
     XCTAssertGreaterThan(resultView.streamingCaretFrame.minX, 0)
@@ -288,7 +288,7 @@ extension InteractionReproductionTests {
     XCTAssertEqual(resultView.glyphRevealCommittedLengthForTesting, 4)
   }
 
-  func testGlyphFadeMatchesThePencilOneHundredTwentyMillisecondEaseOut() {
+  func testGlyphFadeMatchesTheDesignOneHundredTwentyMillisecondEaseOut() {
     let initial = StreamGlyphFadeAnimation.style(elapsed: 0)
     let midpoint = StreamGlyphFadeAnimation.style(elapsed: 0.06)
     let complete = StreamGlyphFadeAnimation.style(elapsed: 0.12)
@@ -302,7 +302,7 @@ extension InteractionReproductionTests {
     XCTAssertEqual(complete.blurRadius, 0, accuracy: 0.001)
   }
 
-  func testEachPresentedGlyphRunGetsItsOwnPencilRevealAndCommitsInOrder() throws {
+  func testEachPresentedGlyphRunGetsItsOwnRevealAndCommitsInOrder() throws {
     let resultView = ResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 320, height: ResultTextContainer.minimumHeight)
     )

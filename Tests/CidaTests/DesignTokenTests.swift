@@ -5,6 +5,83 @@ import XCTest
 
 @MainActor
 final class DesignTokenTests: XCTestCase {
+  /// `Design/boards/tokens.css` is the design's token file; every value the
+  /// implementation mirrors must match it.
+  func testSwiftTokensMatchTheDesignTokenFile() throws {
+    let tokens = try Self.designTokens()
+    let colors: [(String, CidaColorToken)] = [
+      ("bg", CidaDesign.Palette.background), ("surface", CidaDesign.Palette.surface),
+      ("surface-dim", CidaDesign.Palette.surfaceDim),
+      ("surface-paper", CidaDesign.Palette.surfacePaper), ("border", CidaDesign.Palette.border),
+      ("text-primary", CidaDesign.Palette.textPrimary),
+      ("text-secondary", CidaDesign.Palette.textSecondary),
+      ("text-tertiary", CidaDesign.Palette.textTertiary), ("text-ink", CidaDesign.Palette.textInk),
+      ("text-control", CidaDesign.Palette.textControl), ("hint", CidaDesign.Palette.hint),
+      ("accent", CidaDesign.Palette.accent), ("accent-soft", CidaDesign.Palette.accentSoft),
+      ("accent-foreground", CidaDesign.Palette.accentForeground),
+      ("toggle-off", CidaDesign.Palette.toggleOff),
+    ]
+    for (name, token) in colors {
+      let value = try XCTUnwrap(tokens[name], name)
+      XCTAssertEqual(value, String(format: "#%06X", token.hex), name)
+    }
+
+    let numbers: [(String, Double)] = [
+      ("panel-width", CidaDesign.Panel.width), ("panel-top-ratio", CidaDesign.Panel.topRatio),
+      ("source-max-ratio", CidaDesign.Panel.sourceMaxRatio),
+      ("panel-max-ratio", CidaDesign.Panel.maxRatio),
+      ("control-bar-height", CidaDesign.Panel.controlBarHeight),
+      ("radius-window", CidaDesign.Radius.window), ("radius-panel", CidaDesign.Radius.panel),
+      ("radius-card", CidaDesign.Radius.card), ("radius-seg", CidaDesign.Radius.segment),
+      ("radius-chip", CidaDesign.Radius.chip), ("radius-seg-item", CidaDesign.Radius.segmentItem),
+      ("space-window-x", CidaDesign.Spacing.windowHorizontal),
+      ("space-entry-y", CidaDesign.Spacing.entryVertical),
+      ("space-pane-y", CidaDesign.Spacing.paneVertical),
+      ("space-result-y", CidaDesign.Spacing.resultVertical),
+      ("font-size-body", CidaDesign.Typography.bodySize),
+      ("font-size-result", CidaDesign.Typography.resultSize),
+      ("font-size-result-cjk", CidaDesign.Typography.resultSizeCJK),
+      ("motion-char-in-ms", Double(CidaMotion.characterInMilliseconds)),
+      ("motion-icon-in-ms", Double(CidaMotion.iconInMilliseconds)),
+      ("motion-icon-swap-ms", Double(CidaMotion.iconSwapMilliseconds)),
+      ("motion-height-ms", Double(CidaMotion.heightMilliseconds)),
+      ("motion-cursor-out-ms", Double(CidaMotion.cursorOutMilliseconds)),
+      ("motion-copied-hold-ms", Double(CidaMotion.copiedHoldMilliseconds)),
+      ("motion-breathe-ms", Double(CidaMotion.breatheMilliseconds)),
+      ("motion-catchup-ms", Double(CidaMotion.catchUpMilliseconds)),
+      ("motion-rate-min-cps", CidaMotion.minimumCharactersPerSecond),
+      ("motion-rate-max-cps", CidaMotion.maximumCharactersPerSecond),
+      ("motion-rate-alpha", CidaMotion.smoothingAlphaPer120HzFrame),
+      ("motion-blur-char-px", CidaMotion.characterBlurRadius),
+      ("motion-cursor-opacity-min", Double(CidaMotion.cursorMinimumOpacity)),
+      ("motion-cursor-w", CidaMotion.cursorWidth),
+      ("motion-cursor-h", CidaMotion.cursorHeight),
+    ]
+    for (name, expected) in numbers {
+      let raw = try XCTUnwrap(tokens[name], name).replacingOccurrences(of: "px", with: "")
+      let value = try XCTUnwrap(Double(raw), "\(name) = \(raw)")
+      XCTAssertEqual(value, expected, accuracy: 0.0001, name)
+    }
+  }
+
+  /// `--name: value;` declarations of the design token file.
+  private static func designTokens() throws -> [String: String] {
+    let url = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+      .appendingPathComponent("Design/boards/tokens.css")
+    let css = try String(contentsOf: url, encoding: .utf8)
+    var tokens: [String: String] = [:]
+    for line in css.split(separator: "\n") {
+      let trimmed = line.trimmingCharacters(in: .whitespaces)
+      guard trimmed.hasPrefix("--"), let colon = trimmed.firstIndex(of: ":") else { continue }
+      let name = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<colon])
+      let value = trimmed[trimmed.index(after: colon)...]
+        .trimmingCharacters(in: CharacterSet(charactersIn: " ;"))
+      tokens[name] = value
+    }
+    return tokens
+  }
+
   func testSemanticPaletteProducesExactAppKitColorsFromSharedTokens() throws {
     let expectations: [(CidaColorToken, UInt32, CGFloat)] = [
       (CidaDesign.Palette.background, 0xFAFAF8, 1),
@@ -32,9 +109,9 @@ final class DesignTokenTests: XCTestCase {
     }
   }
 
-  /// Pencil `Spec — 面板模型`: the panel's fixed width and screen ratios, the
+  /// `Design/spec/panel.md`: the panel's fixed width and screen ratios, the
   /// pane insets, and the result typography.
-  func testPanelAndResultTokensMatchThePencilVariables() {
+  func testPanelAndResultTokensMatchTheDesignTokens() {
     XCTAssertEqual(CidaDesign.Panel.width, 800)
     XCTAssertEqual(CidaDesign.Panel.topRatio, 0.2)
     XCTAssertEqual(CidaDesign.Panel.sourceMaxRatio, 0.3)
@@ -67,7 +144,7 @@ final class DesignTokenTests: XCTestCase {
     XCTAssertEqual(ResultTextStyle.lineHeight(for: .chinese), 31)
   }
 
-  func testMotionTokensMatchThePencilVariables() {
+  func testMotionTokensMatchTheDesignTokens() {
     XCTAssertEqual(CidaMotion.characterInMilliseconds, 120)
     XCTAssertEqual(CidaMotion.iconInMilliseconds, 120)
     XCTAssertEqual(CidaMotion.iconSwapMilliseconds, 150)

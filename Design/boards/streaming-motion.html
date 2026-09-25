@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>Motion — 流式输出</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+</head>
+<body>
+<!-- Rules: ../spec/streaming-motion.md. Each frame is a stable state; the
+     notes under it are the transition to the next one. -->
+<main class="board" data-board="streaming-motion">
+  <div class="board-title">流式输出 · 过渡关键帧(量值 = motion-* token;每帧 = 稳定状态,帧间 = 过渡)</div>
+
+  <div class="state-label">T0 — 提交瞬间 · 触发:⏎</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar></cida-bar>
+  </section>
+  <cida-motion-note>⏎ 发送:原文留在原文栏并保持可编辑;结果栏以 150ms(motion-height-ms)展开,面板同步向下生长;右侧槽位 150ms(motion-icon-swap-ms)淡入「停止 ⌘.」;动作选择降为 45%</cida-motion-note>
+  <div class="divider"></div>
+
+  <div class="state-label">T1 — 等待首个 token · 光标呼吸</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar processing action="stop"></cida-bar>
+    <div class="result"><div class="text"><span class="cursor"></span></div></div>
+  </section>
+  <cida-motion-note>结果栏仅 accent 光标(2×20,motion-cursor-w/h):呼吸 opacity 0.3(motion-cursor-opacity-min)↔ 1.0,周期 1200ms(motion-breathe-ms)ease-in-out(motion-ease-breathe);呼吸仅表示等待</cida-motion-note>
+  <div class="divider"></div>
+
+  <div class="state-label">T2 — 流式中 · 逐字上屏</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar processing action="stop"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves <span class="fading">read and write performance</span><span class="cursor"></span></div></div>
+  </section>
+  <cida-motion-note>逐字在光标后淡入:每字 120ms(motion-char-in-ms)ease-out(motion-ease-char-in),blur 2px(motion-blur-char-px)→ 0;光标随书写头前进,无呼吸;上屏粒度为字素簇</cida-motion-note>
+  <cida-motion-note>每换一行结果栏与面板高度 +26pt,150ms(motion-height-ms)ease-out(motion-ease-height),不逐 token 跳变;到面板上限(panel-max-ratio)后结果栏内部滚动并跟随尾部 — 用户上滚立即解除,滚回底部自动恢复</cida-motion-note>
+  <div class="divider"></div>
+
+  <div class="state-label">T3 — 完成</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar action="copy"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <cida-motion-note>光标 200ms(motion-cursor-out-ms)淡出;右侧槽位「停止」→「复制结果 ⌘C」交叉淡化 150ms(motion-icon-swap-ms);动作选择恢复</cida-motion-note>
+  <div class="divider"></div>
+
+  <div class="state-label">T4 — 中断 / 出错 · 降级</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar action="copy"></cida-bar>
+    <div class="result">
+      <div class="text">Our system adopts a brand-new storage engine that significantly improves read and write</div>
+      <cida-note kind="stopped">已停止 · ⏎ 重新生成</cida-note>
+    </div>
+  </section>
+  <cida-motion-note>中断 / 出错:已输出文字保留;光标直接淡出;结果栏末尾以 150ms(motion-height-ms)展开一行说明;已停止显示「复制结果」,出错时右侧槽位淡出</cida-motion-note>
+  <cida-motion-note>系统「减弱动态效果」开启时:去掉逐字淡入、呼吸与高度过渡,面板高度直接跳变;所有时长基于 120fps</cida-motion-note>
+</main>
+</body>
+</html>

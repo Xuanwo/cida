@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>States — 截图框选</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+</head>
+<body>
+<!-- Rules: ../spec/panel.md §一 截图翻译. -->
+<main class="board" data-board="capture">
+  <div class="board-title">States — 截图框选</div>
+  <p class="caption">截图翻译快捷键(默认 ⌥S)先冻结鼠标所在的整块屏幕,冻结画面上淡入一层纸雾(120ms,motion-icon-in-ms):亮屏为 surface-paper 72%,暗屏(冻结画面平均亮度低于一半)改为 text-ink 45%。屏幕上方 20%(与面板同高)一枚提示胶囊:「辞达」字标 + 「拖动框选要翻译的文字 · Esc 取消」;选区碰到胶囊时胶囊淡出。拖出的选区被托起成一张纸:冻结画面原样显示,圆角 radius-card 8,#00000012 描边,与面板同款双层阴影;暗屏上阴影不可见,改为 #FFFFFF24 描边;光标为十字。Esc、右键或只单击不拖动都取消。松开后裁出选区、本地识别文字,面板出现(面板交互 ⑩ / ⑪)。</p>
+  <div class="state-label">① 拖动前 · 亮屏</div>
+  <cida-frozen-screen state="capture-veiled"></cida-frozen-screen>
+  <div class="state-label">② 框选中 · 亮屏</div>
+  <cida-frozen-screen state="capture-lifted" lifted></cida-frozen-screen>
+  <div class="state-label">③ 框选中 · 暗屏</div>
+  <cida-frozen-screen state="capture-lifted-dark" lifted dark></cida-frozen-screen>
+</main>
+</body>
+</html>

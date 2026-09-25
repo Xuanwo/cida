@@ -33,7 +33,7 @@ final class InteractionReproductionTests: XCTestCase {
 
   // MARK: - Panel
 
-  /// Pencil `Spec — 面板模型` §一: a borderless floating panel that takes the
+  /// `Design/spec/panel.md` §一: a borderless floating panel that takes the
   /// keyboard without activating the app.
   func testPanelIsANonActivatingBorderlessFloatingKeyPanel() {
     let panel = CidaPanel(width: CidaDesign.Panel.width)
@@ -270,7 +270,7 @@ final class InteractionReproductionTests: XCTestCase {
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
     let collapsedFrame = window.frame
-    XCTAssertEqual(collapsedFrame.height, 726, accuracy: 4, "Pencil 默认 · DeepSeek is 733 pt tall")
+    XCTAssertEqual(collapsedFrame.height, 726, accuracy: 4, "The board's 默认 · DeepSeek is 729 pt tall")
 
     model.editingPrompt = .improve
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))

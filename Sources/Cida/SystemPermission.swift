@@ -3,7 +3,7 @@ import ApplicationServices
 import CoreGraphics
 
 /// A privacy permission a feature needs: whether Cida holds it, and the way
-/// to ask for it (Pencil `Spec — 设置` §四). The system does not notify a
+/// to ask for it (`Design/spec/settings.md` §四). The system does not notify a
 /// process when it is granted or revoked, so callers re-read `isGranted`.
 struct SystemPermission: Sendable {
   let isGranted: @MainActor @Sendable () -> Bool

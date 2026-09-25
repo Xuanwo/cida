@@ -7,7 +7,7 @@ protocol ResultHeightChangeHosting: AnyObject {
   func resultHeightWillChange(by delta: CGFloat, animated: Bool)
 }
 
-/// The Pencil result typography: Latin results are set in Source Serif 4 and
+/// The design's result typography: Latin results are set in Source Serif 4 and
 /// Chinese results in Noto Serif SC, each with its own size and leading
 /// (`font-result*`, `line-height-result*`).
 @MainActor
@@ -274,7 +274,7 @@ struct StreamGlyphFadeStyle: Equatable, Sendable {
   let blurRadius: CGFloat
 }
 
-/// Pencil `motion-char-in-ms`: each presented glyph run fades in from
+/// `motion-char-in-ms`: each presented glyph run fades in from
 /// transparent and unblurs from `motion-blur-char-px` over one ease-out.
 enum StreamGlyphFadeAnimation {
   static let duration = CidaMotion.characterInSeconds
@@ -565,7 +565,7 @@ final class ResultTextContainer: NSView {
       caretLayer.opacity = 1
       updateCaretPulse()
     } else {
-      // Pencil T3: the caret fades over motion-cursor-out-ms while the last
+      // Streaming motion T3: the caret fades over motion-cursor-out-ms while the last
       // revealed glyphs finish their own fade.
       scheduleFinalGlyphRevealCommit()
       caretLayer.removeAnimation(forKey: "waiting-pulse")
@@ -708,7 +708,7 @@ final class ResultTextContainer: NSView {
 
   func scheduleNaturalHeightPublication(heightDelta: CGFloat) {
     pendingNaturalHeightDelta += heightDelta
-    // Pencil `motion-height-ms`: a streaming result grows with the height
+    // `motion-height-ms`: a streaming result grows with the height
     // transition; width relayouts and completed results resize immediately.
     pendingNaturalHeightAnimated =
       pendingNaturalHeightAnimated

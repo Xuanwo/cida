@@ -4,7 +4,7 @@ import XCTest
 
 @testable import Cida
 
-/// The capture shortcut (Pencil `Spec — 面板模型` §一 截图翻译).
+/// The capture shortcut (`Design/spec/panel.md` §一 截图翻译).
 @MainActor
 final class CaptureTranslationTests: XCTestCase {
   // MARK: - Paragraphs from recognized lines

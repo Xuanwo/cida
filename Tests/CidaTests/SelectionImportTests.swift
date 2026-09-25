@@ -3,7 +3,7 @@ import XCTest
 
 @testable import Cida
 
-/// The global shortcut's selection import (Pencil `Spec — 面板模型` §一 带入选区).
+/// The global shortcut's selection import (`Design/spec/panel.md` §一 带入选区).
 @MainActor
 final class SelectionImportTests: XCTestCase {
   func testSelectionIsTrimmedAndBlankSelectionsAreNoSelection() {

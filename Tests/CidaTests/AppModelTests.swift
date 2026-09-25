@@ -13,7 +13,7 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.mode, .translate)
   }
 
-  func testEveryPencilLucideIconIsBundledForOfflineRendering() {
+  func testEveryDesignLucideIconIsBundledForOfflineRendering() {
     for name in LucideIconName.allCases {
       XCTAssertNotNil(LucideIconAsset.image(for: name), "Missing Lucide icon: \(name.rawValue)")
     }
@@ -263,7 +263,7 @@ final class AppModelTests: XCTestCase {
     XCTAssertTrue(buffer.isDrained)
   }
 
-  func testProductionStreamVelocityMatchesThePencilMotionContract() {
+  func testProductionStreamVelocityMatchesTheDesignMotionContract() {
     let policy = StreamPresentationPolicy.production
 
     XCTAssertEqual(policy.targetCharactersPerSecond(forPendingCount: 1), 30)
@@ -321,7 +321,7 @@ final class AppModelTests: XCTestCase {
     XCTAssertGreaterThan(publishedDeltas.joined().count, 200)
   }
 
-  func testPencilMotionTokensDriveTheProductionStreamPolicy() {
+  func testDesignMotionTokensDriveTheProductionStreamPolicy() {
     let policy = StreamPresentationPolicy.production
 
     XCTAssertEqual(policy.targetCatchUpDurationSeconds, 0.4)

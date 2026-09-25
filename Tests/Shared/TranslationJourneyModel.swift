@@ -36,7 +36,7 @@ extension TranslationJourneyCommand: CustomStringConvertible {
   }
 }
 
-/// The oracle for the single-result panel (Pencil `Spec — 面板模型`): one
+/// The oracle for the single-result panel (`Design/spec/panel.md`): one
 /// source, one action, at most one result, and the rules that tie them.
 struct TranslationJourneyModel: Equatable, Sendable {
   enum Action: String, Codable, Equatable, Sendable {

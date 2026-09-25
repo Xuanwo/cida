@@ -32,7 +32,7 @@ enum ComposerPresentationState: Equatable, Sendable {
 }
 
 /// What the right-hand slot of the control bar shows. One slot, one button,
-/// three phases (Pencil `Spec — 面板模型` §二).
+/// three phases (`Design/spec/panel.md` §二).
 enum BarActionPresentation: Equatable, Sendable {
   case none
   case stop

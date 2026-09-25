@@ -2,62 +2,53 @@
 
 ## Source of truth
 
-The current source is `Design/cida.pen`; its SHA-256 is pinned by
-`UITests/Resources/VisualBaselines/manifest.json` (`designDocumentSHA256`). The aligned Pencil
-nodes are:
+The design lives in `Design/` (see `Design/README.md`): one spec per topic under `Design/spec` and
+one HTML board per topic under `Design/boards`, drawn from the shared `tokens.css`,
+`components.css` and `components.js`.
 
-| State or contract | Node |
-| --- | --- |
-| Panel model rules | `j4dYmH` (`Spec — 面板模型`) |
-| Streaming motion rules | `NdsRA` (`Spec — 流式输出动效`) |
-| All panel states | `oeKVI` (`States — 面板交互`) |
-| Streaming keyframes T0–T4 | `hwlXF` (`Motion — 流式输出`) |
-| Settings rules | `mJ1h8` (`Spec — 设置`) |
-| All Settings states | `E86Rv` (`States — 设置`) |
-| Capture framing overlay | `ZFrn9` (`States — 截图框选`) |
-| Components | `mXBP1` Control Bar, `qZy7Z` Bar Action, `KCEUn` Result Note, `B1Kz01` Mode Seg, `POaFg` Send Button (unused by the panel), `YdbKP` Titlebar (Settings only), `pn8Ym` Motion Label |
-
-The panel states inside `oeKVI`, and the `--design-state` that renders each one natively:
-
-| Pencil state | Node | `--design-state` |
+| Contract | Rules | Board |
 | --- | --- | --- |
-| 空态 | `Vdzho` | `empty` |
-| 输入中 | `L4spv` | (typing, no fixture) |
-| 生成中 · 等待首字 / 流式 | `DfXTi` / `FMfFR` | `streaming` |
-| 完成 | `Y0C5VJ` | `translate` |
-| 已复制 | `fwPJ3` | (transient, 800 ms) |
-| 已修改 | `Ir399` | `stale` |
-| 已停止 | `RapER` | `stopped` |
-| 出错 | `mZG8z` | `failed` |
-| 改进 · 完成 | `kYllY` | `improve` |
-| 再次唤起 · 全选 | `N6v3qq` | (selection, no fixture) |
-| 唤起 · 带入选区 | `Hftz0` | (global shortcut, no fixture; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
-| 截图 · 未识别到文字 | `WlrCX` | (capture shortcut, no fixture; XCUI `testCaptureShortcutFramesTextOnAFrozenScreenAndTranslatesIt`) |
-| 最大高度 | `U2mUc` | `long` |
+| Panel shape, structure, actions, states, keys, selection import, capture | `spec/panel.md` | `boards/panel-states.html` |
+| Capture framing overlay | `spec/panel.md` §一 截图翻译 | `boards/capture.html` |
+| Streaming buffer and motion, keyframes T0–T4 | `spec/streaming-motion.md` | `boards/streaming-motion.html` |
+| Settings | `spec/settings.md` | `boards/settings-states.html` |
 
-The Settings states inside `E86Rv`, and the `--design-state` that renders each one natively:
+Each state carries a `data-state` name; the ones the app can render with `--design-state` are
+compared natively:
 
-| Pencil state | Node | `--design-state` |
+| Board state | `data-state` | `--design-state` |
 | --- | --- | --- |
-| 默认 · DeepSeek 已配置 | `yhtH2` | `settings` |
-| 服务商菜单展开 | `p5EOr` | (open menu, no fixture) |
-| 还差 API Key | `PA25F` | `settings-missing-key` |
-| 自定义端点 · 编辑改进提示词 · 自定义快捷键 · 截图与选中文字已授权 | `VKwj7` | `settings-custom` |
-| 录制快捷键 | `QSfT1` | `settings-recording` |
+| ① 空态 | `empty` | `empty` |
+| ② 输入中 | `typing` | (typing, no fixture) |
+| ③ 生成中 · 等待首字 / 流式 | `waiting` / `streaming` | `streaming` |
+| ④ 完成 | `translate` | `translate` |
+| ⑤ 已复制 | `copied` | (transient, 800 ms) |
+| ⑥ 已修改 | `stale` | `stale` |
+| ⑦ 已停止 / 出错 | `stopped` / `failed` | `stopped` / `failed` |
+| ⑧ 改进 · 完成 | `improve` | `improve` |
+| ⑨ 再次唤起 · 全选 | `reopened` | (selection, no fixture) |
+| ⑩ 带入选区 | `selection-imported` | (global shortcut; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
+| ⑪ 截图 · 未识别到文字 | `capture-unrecognized` | (capture shortcut; XCUI `testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt`) |
+| ⑫ 最大高度 | `long` | `long` |
+| 设置 · 默认 | `settings` | `settings` |
+| 设置 · 服务商菜单展开 | `settings-provider-menu` | (open menu, no fixture) |
+| 设置 · 还差 API Key | `settings-missing-key` | `settings-missing-key` |
+| 设置 · 自定义端点 · 编辑改进提示词 · 自定义快捷键 · 已授权 | `settings-custom` | `settings-custom` |
+| 设置 · 录制快捷键 | `settings-recording` | `settings-recording` |
+| 截图框选 · 拖动前 / 框选中 / 暗屏 | `capture-veiled` / `capture-lifted` / `capture-lifted-dark` | (overlay; XCUI attaches `capture-overlay-veiled`) |
 
-The Pencil document is the first source: each topic has one Spec note, and a rule change edits that
-note and its States or Motion board instead of adding a versioned copy. Exports of the boards and
-notes are retained under `Design/LatestReferenceExport`; per-state exports of the nodes above are
-under `Design/LatestReferenceExport/states`. `scripts/capture-design-states.sh` renders every state
-offscreen with an isolated, non-activating Debug build into `Design/ImplementationCurrent`, crops the
-Pencil export of the same node to the node's own pixels, and writes logical-size reference,
-implementation, and side-by-side comparison images to `Design/QACurrent`.
+`swift scripts/render-design.swift` renders every board off screen to `Design/rendered/boards` and
+every state to `Design/rendered/states` at 2x. `scripts/capture-design-states.sh` renders the boards,
+captures every `--design-state` offscreen with an isolated, non-activating Debug build into
+`Design/ImplementationCurrent`, and writes logical-size reference, implementation, and side-by-side
+comparison images to `Design/QACurrent`.
 
 ## Approved visual contracts
 
 `UITests/Resources/VisualBaselines/manifest.json` binds each executable baseline to the approved
-native image, the current Pencil export, and the complete `.pen` document by SHA-256. A changed
-image or design file cannot silently reuse an old approval.
+native image, the board's render of the same state, and the board file by SHA-256. A changed image
+or board cannot silently reuse an old approval; a change to the shared styles shows up as a changed
+render once the boards are rendered again.
 
 | Baseline | Logical size | Mask |
 | --- | ---: | --- |
@@ -73,14 +64,14 @@ inside a disposable headless Tart macOS session. Neither path activates the test
 
 ## Alignment result
 
-- The panel is a borderless, non-activating `NSPanel` 800 pt wide with the Pencil 14 pt radius,
+- The panel is a borderless, non-activating `NSPanel` 800 pt wide with the design's 14 pt radius,
   1 px hairline border, and shadow. Its height is exactly the content it shows: the source pane
   (18 pt insets around a 27 pt line that grows with the measured text), the 50 pt control bar, and,
   once a result exists, the result pane (22 pt insets around the result text and an optional note).
   The top edge stays at 20% of the visible screen; growth animates over `motion-height-ms`. The
   panel itself appears and hides at once, like Spotlight.
 - Height budget: the source editor is capped at 30% of the visible screen height minus its insets,
-  the panel at 70%; both panes scroll on their own past their caps with the system overlay scroll bar, which the static Pencil states do not draw. A
+  the panel at 70%; both panes scroll on their own past their caps with the system overlay scroll bar, which the static board states do not draw. A
   completed result opens at its top; a streaming result keeps its tail in view until the user
   scrolls away.
 - Typography: the source is Inter 16 / 26 pt lines; the result is Source Serif 4 17.5 / 29 pt
@@ -114,7 +105,7 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   guard, result typography per language, and ⌘C precedence.
 - The Tart XCUI suite drives the signed Release panel through the journeys listed in
   `UITests/README.md`; its latest run is recorded in `functional-qa.md`.
-- Failures retain approved/current/Pencil/diff images in the `.xcresult`; baseline recording is
+- Failures retain approved/current/design/diff images in the `.xcresult`; baseline recording is
   never automatic.
 
 ## Remaining certification boundary

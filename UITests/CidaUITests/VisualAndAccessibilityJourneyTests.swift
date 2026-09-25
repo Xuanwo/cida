@@ -3,8 +3,8 @@ import XCTest
 @MainActor
 final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
   /// The empty panel is the one main state every launch can reproduce
-  /// deterministically; it pins the Pencil `空态` pixels.
-  func testEmptyPanelMatchesTheApprovedPencilBaseline() throws {
+  /// deterministically; it pins the board's `empty` state pixels.
+  func testEmptyPanelMatchesTheApprovedDesignBaseline() throws {
     driver.launch()
     XCTAssertEqual(driver.panel.frame.width, 800, accuracy: 1)
     XCTAssertEqual(driver.panel.frame.height, 113, accuracy: 1)
@@ -12,7 +12,7 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     let manifest = try VisualBaselineManifest.load(from: e2eEnvironment.sourceRoot)
     XCTAssertEqual(manifest.namespace, "macos-26.4-xcode-26.5-retina-light-v2")
     let baseline = try manifest.baseline(named: "panel-empty")
-    try XCTContext.runActivity(named: "Pencil visual baseline: empty panel") { activity in
+    try XCTContext.runActivity(named: "Design visual baseline: empty panel") { activity in
       try PixelDiff.assertScreenshot(
         driver.panel.screenshot(),
         matches: baseline,
@@ -22,7 +22,7 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     }
   }
 
-  func testSettingsMatchesTheApprovedPencilBaseline() throws {
+  func testSettingsMatchesTheApprovedDesignBaseline() throws {
     driver.launch(endpointOverride: false)
     driver.openSettings()
     let settingsWindow = driver.settingsWindow
@@ -34,11 +34,11 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     driver.showPanel()
     driver.openSettings()
     XCTAssertEqual(settingsWindow.frame.width, 560, accuracy: 1)
-    XCTAssertEqual(settingsWindow.frame.height, 726, accuracy: 1, "Pencil 默认 · DeepSeek")
+    XCTAssertEqual(settingsWindow.frame.height, 726, accuracy: 1, "The board's 默认 · DeepSeek state")
 
     let manifest = try VisualBaselineManifest.load(from: e2eEnvironment.sourceRoot)
     let baseline = try manifest.baseline(named: "settings")
-    try XCTContext.runActivity(named: "Pencil visual baseline: settings") { activity in
+    try XCTContext.runActivity(named: "Design visual baseline: settings") { activity in
       try PixelDiff.assertScreenshot(
         settingsWindow.screenshot(),
         matches: baseline,

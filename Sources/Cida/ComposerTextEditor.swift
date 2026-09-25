@@ -153,7 +153,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     let scrollView = OverlayScrollView()
     scrollView.drawsBackground = false
     scrollView.borderType = .noBorder
-    // System overlay scroll bar (Pencil `Spec — 面板模型`): appears while
+    // System overlay scroll bar (`Design/spec/panel.md`): appears while
     // scrolling or hovering and never narrows the text column.
     scrollView.hasVerticalScroller = true
     scrollView.hasHorizontalScroller = false

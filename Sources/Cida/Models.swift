@@ -38,7 +38,7 @@ enum Language: String, CaseIterable, Codable, Sendable {
 /// A model service. Every preset is one OpenAI-compatible Chat Completions
 /// endpoint with its suggested models; `custom` points Cida at any compatible
 /// server, including a local one. Adding a provider is one more preset here
-/// (Pencil `Spec — 设置`).
+/// (`Design/spec/settings.md`).
 enum ModelProvider: String, CaseIterable, Codable, Sendable {
   case deepSeek = "DeepSeek"
   case openAI = "OpenAI"

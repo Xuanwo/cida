@@ -79,7 +79,7 @@ enum CidaDesign {
     static let component: CGFloat = 12
   }
 
-  /// Pencil `Spec — 面板模型`: the floating panel's fixed width and the
+  /// `Design/spec/panel.md`: the floating panel's fixed width and the
   /// screen-relative limits of its height.
   enum Panel {
     static let width: CGFloat = 800
@@ -91,7 +91,7 @@ enum CidaDesign {
     static let composerLineHeight: CGFloat = 26
   }
 
-  /// Pencil result typography (`font-size-result*` × `line-height-result*`,
+  /// The design's result typography (`font-size-result*` × `line-height-result*`,
   /// rounded to whole points).
   enum Typography {
     static let bodySize: CGFloat = 16
@@ -190,7 +190,7 @@ enum CidaMotion {
   static let cursorWidth: CGFloat = 2
   static let cursorHeight: CGFloat = 20
 
-  /// `motion-ease-char-in` and `motion-ease-height` are both the Pencil
+  /// `motion-ease-char-in` and `motion-ease-height` are both the design's
   /// ease-out curve. Core Animation and SwiftUI read the same
   /// control points, so a frame that SwiftUI animates and the content that
   /// AppKit animates inside it stay in step.

@@ -3,8 +3,8 @@ import CoreText
 import Foundation
 import Vision
 
-/// Recognizes the text in a captured part of the screen, on this Mac (Pencil
-/// `Spec — 面板模型` §一 截图翻译). Nothing is uploaded; only the text goes on
+/// Recognizes the text in a captured part of the screen, on this Mac
+/// (`Design/spec/panel.md` §一 截图翻译). Nothing is uploaded; only the text goes on
 /// to the model.
 enum TextRecognizer {
   /// The first recognition in a process loads the models (about 13 seconds

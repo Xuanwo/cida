@@ -27,7 +27,7 @@ struct CidaApplication: App {
 }
 
 /// Cida is a menu-bar application: no Dock icon, one floating panel shown by
-/// Option-Space, and a standard Settings window (Pencil `Spec — 面板模型`).
+/// Option-Space, and a standard Settings window (`Design/spec/panel.md`).
 @MainActor
 final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private let launchOptions = LaunchOptions(arguments: ProcessInfo.processInfo.arguments)
@@ -180,7 +180,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   /// The global shortcut hides a visible panel. Otherwise it first reads the
   /// frontmost application's selection, so a new one appears in the panel
-  /// already being translated (Pencil `Spec — 面板模型` §一 带入选区). The
+  /// already being translated (`Design/spec/panel.md` §一 带入选区). The
   /// menu bar item shows the panel without reading anything.
   private func handleGlobalShortcut() {
     guard let panelController, !isCapturing else { return }
@@ -203,7 +203,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  /// The capture shortcut (Pencil `Spec — 面板模型` §一 截图翻译): freezes
+  /// The capture shortcut (`Design/spec/panel.md` §一 截图翻译): freezes
   /// the screen under the pointer, lets the user frame some text, and shows
   /// the panel translating what was recognized. Without the Screen Recording
   /// permission it asks for it instead.

@@ -1,0 +1,108 @@
+/*
+ * Cida design tokens. The implementation mirrors every value in
+ * Sources/Cida/DesignSystem.swift (CidaDesign, CidaMotion);
+ * DesignTokenTests reads this file and fails when the two drift apart.
+ * Settings uses a few literal sizes (10.5 / 12 / 12.5 / 13.5) that are not
+ * tokens.
+ */
+
+@font-face {
+  font-family: "Inter";
+  src: url("../../Sources/Cida/Resources/Fonts/Inter%5Bopsz,wght%5D.ttf") format("truetype");
+  font-weight: 100 900;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("../../Sources/Cida/Resources/Fonts/SourceSerif4%5Bopsz,wght%5D.ttf") format("truetype");
+  font-weight: 200 900;
+}
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("../../Sources/Cida/Resources/Fonts/NotoSerifSC%5Bwght%5D.ttf") format("truetype");
+  font-weight: 200 900;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../../Sources/Cida/Resources/Fonts/JetBrainsMono%5Bwght%5D.ttf") format("truetype");
+  font-weight: 100 800;
+}
+
+:root {
+  /* Colors (light only) */
+  --bg: #FAFAF8;
+  --surface: #FFFFFF;
+  --surface-dim: #F4F4F1;
+  --surface-paper: #F7F6F1;
+  --border: #E8E8E3;
+  --text-primary: #1A1A18;
+  --text-secondary: #8A8A83;
+  --text-tertiary: #B5B5AE;
+  --text-ink: #161614;
+  --text-control: #4E4E49;
+  --hint: #C4C4BD;
+  --accent: #2E6B4F;
+  --accent-soft: #EAF2EE;
+  --accent-foreground: #FFFFFF;
+  --toggle-off: #DBDBD5;
+
+  /* Type */
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-result: "Source Serif 4", "Noto Serif SC", serif;
+  --font-result-cjk: "Noto Serif SC", "Source Serif 4", serif;
+  --font-brand: "Noto Serif SC", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-size-caption: 11px;
+  --font-size-label: 11.5px;
+  --font-size-secondary: 13px;
+  --font-size-body: 16px;
+  --font-size-result: 17.5px;
+  --font-size-result-cjk: 17px;
+  --line-height-body: 1.6;
+  --line-height-source: 1.55;
+  --line-height-result: 1.65;
+  --line-height-result-cjk: 1.85;
+
+  /* Radii */
+  --radius-window: 14px;
+  --radius-panel: 14px;
+  --radius-card: 8px;
+  --radius-seg: 7px;
+  --radius-chip: 6px;
+  --radius-seg-item: 5px;
+
+  /* Spacing */
+  --space-window-x: 28px;
+  --space-entry-y: 16px;
+  --space-pane-y: 18px;
+  --space-result-y: 22px;
+
+  /* Panel */
+  --panel-width: 800px;
+  --panel-top-ratio: 0.2;
+  --source-max-ratio: 0.3;
+  --panel-max-ratio: 0.7;
+  --control-bar-height: 50px;
+  --panel-shadow: 0 2px 6px #00000014, 0 28px 72px #1A1A1830;
+  --panel-edge: #00000012;
+
+  /* Motion (see spec/streaming-motion.md) */
+  --motion-char-in-ms: 120;
+  --motion-icon-in-ms: 120;
+  --motion-icon-swap-ms: 150;
+  --motion-height-ms: 150;
+  --motion-cursor-out-ms: 200;
+  --motion-copied-hold-ms: 800;
+  --motion-breathe-ms: 1200;
+  --motion-catchup-ms: 400;
+  --motion-rate-min-cps: 30;
+  --motion-rate-max-cps: 400;
+  --motion-rate-alpha: 0.15;
+  --motion-blur-char-px: 2;
+  --motion-cursor-opacity-min: 0.3;
+  --motion-cursor-w: 2;
+  --motion-cursor-h: 20;
+  --motion-ease-char-in: ease-out;
+  --motion-ease-height: ease-out;
+  --motion-ease-breathe: ease-in-out;
+}

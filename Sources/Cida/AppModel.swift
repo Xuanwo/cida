@@ -475,7 +475,7 @@ final class AppModel {
     return true
   }
 
-  /// The global shortcut's selection (Pencil `Spec — 面板模型` §一 带入选区).
+  /// The global shortcut's selection (`Design/spec/panel.md` §一 带入选区).
   /// A new selection replaces the source and is translated at once,
   /// superseding a running request. The selection brought in last time
   /// leaves everything as it is, so the source edited since survives
@@ -496,7 +496,7 @@ final class AppModel {
   }
 
   /// The text the capture shortcut recognized in the framed part of the
-  /// screen (Pencil `Spec — 面板模型` §一 截图翻译). Recognized text replaces
+  /// screen (`Design/spec/panel.md` §一 截图翻译). Recognized text replaces
   /// the source and is translated at once, superseding a running request.
   /// A capture without text clears the source and says so under an empty
   /// result, without a request.

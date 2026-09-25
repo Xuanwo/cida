@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The floating panel that is Cida's main interface (Pencil `Spec — 面板模型`
+/// The floating panel that is Cida's main interface (`Design/spec/panel.md`
 /// §一). It never activates the app, so the application the user came from
 /// keeps its focus and gets it back the moment the panel hides.
 @MainActor
@@ -200,7 +200,7 @@ final class PanelController {
     )
   }
 
-  /// Panel-level keys (Pencil `Spec — 面板模型` §五). Text editing keys stay
+  /// Panel-level keys (`Design/spec/panel.md` §五). Text editing keys stay
   /// with the editor; these only fire while the panel is key.
   private func installKeyMonitor() {
     keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in

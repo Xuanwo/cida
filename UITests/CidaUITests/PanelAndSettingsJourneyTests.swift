@@ -40,7 +40,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.showPanel()
   }
 
-  /// Pencil `Spec — 面板模型` §一 带入选区. The VM cannot grant the
+  /// `Design/spec/panel.md` §一 带入选区. The VM cannot grant the
   /// Accessibility permission, so the selection comes from the scenario
   /// server through the same shortcut path.
   func testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone() throws {
@@ -102,7 +102,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse((completed.value as? String)?.contains("SELECTION_GATED") ?? true)
   }
 
-  /// Pencil `Spec — 面板模型` §一 截图翻译. The VM cannot grant Screen
+  /// `Design/spec/panel.md` §一 截图翻译. The VM cannot grant Screen
   /// Recording, so the frozen screen is a fixture image; the overlay, the
   /// framing drag, Vision recognition, and the translation are the
   /// production path. Vision's first recognition loads its models, which

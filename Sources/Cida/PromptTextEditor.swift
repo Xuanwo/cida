@@ -58,7 +58,7 @@ struct PromptTextEditor: NSViewRepresentable {
 
   private func applyTypography(to textView: NSTextView) {
     // The prompt sheet: Inter 13 on 1.6 lines in ink, like text on paper
-    // (Pencil `Spec — 设置`).
+    // (`Design/spec/settings.md`).
     let paragraphStyle = NSMutableParagraphStyle()
     paragraphStyle.minimumLineHeight = 21
     paragraphStyle.maximumLineHeight = 21

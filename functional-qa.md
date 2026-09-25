@@ -8,7 +8,7 @@ and complete app-tree digest. Swift tests, Tart XCUI, mutation contracts, and pe
 consume that artifact or the same source commit, and the final gate verifies the app-tree digest
 again.
 
-The current core experience contract (Pencil `Spec — 面板模型`) includes:
+The current core experience contract (`Design/spec/panel.md`) includes:
 
 1. A menu-bar application whose main interface is one borderless, non-activating floating panel:
    the global shortcut (`Option-Space` unless another one was recorded in Settings) shows or hides it without taking focus from the application the user came from,

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The Settings window (Pencil `Spec — 设置`, `States — 设置`): three groups
+/// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): three groups
 /// that answer, in order, which model, how to translate or improve, and how
 /// to summon the panel. Everything saves itself; the window is as tall as
 /// its content.
@@ -461,7 +461,7 @@ private struct ExpandedPromptRow: View {
 // MARK: - 唤起
 
 /// The key chip is the recorder: a click waits for the next combination,
-/// which is registered before it is kept (Pencil `Spec — 设置` §四). The
+/// which is registered before it is kept (`Design/spec/settings.md` §四). The
 /// capture row also says whether the Screen Recording permission is there
 /// and asks for it.
 private struct GlobalShortcutRow: View {
@@ -591,7 +591,7 @@ private struct ShortcutChip: View {
 }
 
 /// The global shortcut brings in the frontmost application's selection only
-/// with the Accessibility permission (Pencil `Spec — 设置` §四). There is no
+/// with the Accessibility permission (`Design/spec/settings.md` §四). There is no
 /// switch: granting turns it on, revoking in System Settings turns it off.
 private struct SelectionAccessRow: View {
   @Bindable var model: AppModel

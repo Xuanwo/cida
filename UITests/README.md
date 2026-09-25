@@ -54,7 +54,7 @@ the result when nothing is selected, ⌘. stops. There is no send button and no 
 | `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, panel growth, result replacement, stop, inline failure, and recovery |
 | `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, hide, and show invariants |
 | `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, provider presets and the custom endpoint, readiness, prompt editing, recording the global shortcut, bringing in the frontmost selection, and framing text with the capture shortcut |
-| `VisualAndAccessibilityJourneyTests.swift` | approved empty-panel and Settings Pencil pixels and the native semantic accessibility audit |
+| `VisualAndAccessibilityJourneyTests.swift` | approved empty-panel and Settings design pixels and the native semantic accessibility audit |
 
 `Resources/Scenarios/pairwise-environment-v1.json` is a stable-seed pairwise environment matrix.
 `PairwiseManifestTests` mathematically verifies that every value pair remains covered. The manifest
@@ -63,14 +63,14 @@ is an inventory, not an executed Tart configuration matrix.
 ## Visual and accessibility gates
 
 `Resources/VisualBaselines/manifest.json` pins the baseline namespace, approved implementation
-image, Pencil reference, `Design/cida.pen`, their SHA-256 digests, masks, and pixel thresholds.
-A failure retains approved/current/Pencil/diff attachments in the `.xcresult`; changing a
+image, the board's render of the state, the board file, their SHA-256 digests, masks, and pixel thresholds.
+A failure retains approved/current/design/diff attachments in the `.xcresult`; changing a
 threshold or baseline is a reviewable source change. The approved images come from
 `scripts/capture-design-states.sh`, which renders the same states offscreen without activating
 anything on the host.
 
 The native accessibility gate covers element detection, hit regions, descriptions, actions, and
-parent/child relationships. Contrast is intentionally owned by the exact Pencil pixel contract so
+parent/child relationships. Contrast is intentionally owned by the exact design pixel contract so
 the audit cannot silently recolor an approved design. The empty XCTest Touch Bar proxy keeps its
 narrow recorded exception.
 

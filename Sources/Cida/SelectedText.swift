@@ -3,7 +3,7 @@ import ApplicationServices
 import os
 
 /// Where the global shortcut gets the text selected in the application the
-/// user summoned the panel from (Pencil `Spec — 面板模型` §一 带入选区).
+/// user summoned the panel from (`Design/spec/panel.md` §一 带入选区).
 protocol SelectedTextSource: Sendable {
   /// How long the shortcut waits for a selection before it shows the panel
   /// without one.

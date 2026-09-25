@@ -119,7 +119,7 @@ enum PixelDiff {
     )
     attach(
       designData,
-      name: "\(baseline.name) Pencil reference",
+      name: "\(baseline.name) design reference",
       to: activity
     )
     let currentAttachment = XCTAttachment(screenshot: screenshot)

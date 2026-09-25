@@ -2,7 +2,7 @@ import AppKit
 import QuartzCore
 
 /// The full-screen layer the capture shortcut puts over a frozen screen
-/// (Pencil `States — 截图框选`): the frozen image dimmed, the dragged region
+/// (`Design/boards/capture.html`): the frozen image dimmed, the dragged region
 /// at full brightness with a 1 pt white outline, a crosshair pointer.
 /// Escape, a right click, or a click without a drag cancels.
 @MainActor

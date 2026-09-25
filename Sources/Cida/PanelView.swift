@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The panel's content: source pane, control bar, result pane (Pencil
-/// `Spec — 面板模型` §二 and `States — 面板交互`). The view computes the height
+/// The panel's content: source pane, control bar, result pane (`Design/spec/panel.md`
+/// §二 and `Design/boards/panel-states.html`). The view computes the height
 /// it wants from the two panes and reports it, so the panel can grow from its
 /// top edge instead of the content adapting to a fixed window.
 struct PanelView: View {
@@ -262,7 +262,7 @@ struct ModeSegmentedControl: View {
 }
 
 /// One slot, one button, three phases: nothing while typing, 停止 while a
-/// request runs, 复制结果 once a result exists (Pencil `Spec — 面板模型` §二).
+/// request runs, 复制结果 once a result exists (`Design/spec/panel.md` §二).
 private struct BarActionButton: View {
   let model: AppModel
   let presentation: BarActionPresentation

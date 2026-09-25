@@ -3,7 +3,7 @@ import ImageIO
 import ScreenCaptureKit
 
 /// Where the capture shortcut gets the frozen screen it lets the user frame
-/// text on (Pencil `Spec — 面板模型` §一 截图翻译).
+/// text on (`Design/spec/panel.md` §一 截图翻译).
 protocol ScreenCaptureSource: Sendable {
   /// The whole of `screen` at its native pixel size, without the pointer.
   @MainActor func captureScreen(_ screen: NSScreen) async throws -> CGImage

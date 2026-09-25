@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>States — 面板交互</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+</head>
+<body>
+<!-- Rules: ../spec/panel.md. Each data-state is rendered on its own for the
+     implementation comparison (scripts/render-design.swift). -->
+<main class="board" data-board="panel-states">
+  <div class="board-title">面板交互 · 状态(动作 = 翻译 / 改进分段选择,Tab 切换,⏎ 执行;量值 = token)</div>
+
+  <p class="caption">① 唤起 · 空态 — 顶边固定在活动屏幕可见高度 20%(panel-top-ratio)处、水平居中;高度 = 输入一行 + 控制条;动作默认「翻译」;右侧槽位为空,⏎ 执行</p>
+  <section class="panel" data-state="empty">
+    <div class="source"><span class="placeholder">输入内容,回车翻译…</span></div>
+    <cida-bar></cida-bar>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">② 输入中 — Tab 在翻译 / 改进之间切换,⏎ 执行当前动作;源语言在后台自动检测,目标语言取 Settings 语言对的另一种,面板不显示方向;面板每换一行 +26pt,150ms(motion-height-ms)</p>
+  <section class="panel" data-state="typing">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar></cida-bar>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">③ 生成中 — 原文不动;结果栏展开,先只有呼吸光标;右侧槽位 150ms(motion-icon-swap-ms)淡入「停止 ⌘.」;动作选择降为 45% 不可切换;Escape 隐藏面板但生成继续</p>
+  <section class="panel" data-state="waiting">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar processing action="stop"></cida-bar>
+    <div class="result"><div class="text"><span class="cursor"></span></div></div>
+  </section>
+  <section class="panel" data-state="streaming">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar processing action="stop"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write <span class="fading">performance whi</span><span class="cursor"></span></div></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">④ 完成 — 光标 200ms(motion-cursor-out-ms)淡出;右侧槽位由「停止」交叉淡化为「复制结果 ⌘C」;焦点仍在原文:⏎ 重新生成,Tab 换动作后 ⏎ 用另一动作处理同一段原文</p>
+  <section class="panel" data-state="translate">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar action="copy"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑤ 已复制 — 点击复制结果或 ⌘C(原文与结果都无选区时;有选区时 ⌘C 复制选区,复制原文即在原文栏选中后 ⌘C):按钮变「✓ 已复制」800ms(motion-copied-hold-ms)后复原</p>
+  <section class="panel" data-state="copied">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar action="copied"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑥ 已修改 — 原文或动作与生成时不同:结果降为 text-secondary,结果栏末尾一行说明;复制仍可用;不自动重新请求</p>
+  <section class="panel" data-state="stale">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。</div>
+    <cida-bar action="copy"></cida-bar>
+    <div class="result">
+      <div class="text stale">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div>
+      <cida-note kind="stale">原文已修改 · ⏎ 重新生成</cida-note>
+    </div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑦ 已停止 / 出错 — 已输出文字保留;结果栏末尾一行说明代替 alert;⏎ 重试。已停止仍可复制结果,出错时右侧槽位为空</p>
+  <section class="panel" data-state="stopped">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar action="copy"></cida-bar>
+    <div class="result">
+      <div class="text">Our system adopts a brand-new storage engine that significantly improves read and write</div>
+      <cida-note kind="stopped">已停止 · ⏎ 重新生成</cida-note>
+    </div>
+  </section>
+  <section class="panel" data-state="failed">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar></cida-bar>
+    <div class="result"><cida-note kind="failed">请求失败:401 Unauthorized(deepseek-chat)。检查 API Key 后按 ⏎ 重试</cida-note></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑧ 改进 — Tab 切到「改进」后 ⏎;输出语言跟随原文;下次唤起动作回到默认「翻译」</p>
+  <section class="panel" data-state="improve">
+    <div class="source">这个功能通过复用已有的缓存结果,使得整体的处理流程在大多数的情况下都能够得到比较明显的加速。</div>
+    <cida-bar mode="improve" action="copy"></cida-bar>
+    <div class="result"><div class="text cjk">这个功能复用已有的缓存结果,使整体处理流程在大多数情况下都明显加速。</div></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑨ 再次唤起 — 面板带着上次的原文与结果原样出现,动作回到「翻译」,原文全选:直接输入或 ⌘V 即替换,方向键取消选择继续编辑</p>
+  <section class="panel" data-state="reopened">
+    <div class="source"><span class="selected">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</span></div>
+    <cida-bar action="copy"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑩ 带入选区 — 前台应用有新的选中文字时,Option-Space 用它替换原文(全选),动作回到「翻译」并立即生成;选区与上次带入的相同、没有选区、读不到或未授权辅助功能时,按 ⑨ 原样出现</p>
+  <section class="panel" data-state="selection-imported">
+    <div class="source"><span class="selected">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</span></div>
+    <cida-bar processing action="stop"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write <span class="fading">performance whi</span><span class="cursor"></span></div></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑪ 截图 · 未识别到文字 — 截图翻译快捷键框选的区域里没有文字:原文清空,结果栏只有一行说明「截图里没有识别到文字」(info 图标),不发请求;识别到文字时与 ⑩ 相同,原文是识别结果(全选)并立即翻译</p>
+  <section class="panel" data-state="capture-unrecognized">
+    <div class="source"><span class="placeholder">输入内容,回车翻译…</span></div>
+    <cida-bar></cida-bar>
+    <div class="result"><cida-note kind="unrecognized">截图里没有识别到文字</cida-note></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑫ 最大高度 — 面板上限 = 屏幕可见高度 70%(panel-max-ratio);原文栏上限 30%(source-max-ratio),超出后内部滚动;结果栏拿剩余,生成期间跟随尾部,用户上滚即解除</p>
+  <section class="panel" data-state="long" style="height: 720px">
+    <div class="source" style="height: 300px; overflow: hidden">在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。</div>
+    <cida-bar action="copy"></cida-bar>
+    <div class="result" style="flex: 1; overflow: hidden"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.</div></div>
+  </section>
+</main>
+</body>
+</html>
