@@ -26,7 +26,9 @@ if [[ -n "$swift_test_filter" ]]; then
 fi
 
 echo "Focused Tart diagnostics are not a release verdict; run a formal gate before delivery."
-CIDA_TART_DIAGNOSTIC_MODE=1 \
+# A diagnostic must not fail because Apple's timestamp service is down.
+CIDA_CODESIGN_TIMESTAMP=${CIDA_CODESIGN_TIMESTAMP:-none} \
+  CIDA_TART_DIAGNOSTIC_MODE=1 \
   CIDA_UI_TEST_ONLY_TESTING="$ui_test_selector" \
   CIDA_TART_RESULTS_DIR="$results_dir" \
   exec "$project_dir/scripts/test-ui-in-tart.sh"

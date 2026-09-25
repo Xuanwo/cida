@@ -273,6 +273,7 @@ class GateRun:
             str(self.artifact_root),
             "--require-clean-source",
             "--require-developer-id",
+            "--require-secure-timestamp",
         ]
         digest = run_output(command)
         manifest = read_json(self.artifact_root / "artifact-manifest.json")
@@ -284,12 +285,16 @@ class GateRun:
         self.artifact_manifest = manifest
 
     def build_artifact(self):
+        # A release verdict needs a timestamped Developer ID signature.
+        environment = os.environ.copy()
+        environment.pop("CIDA_CODESIGN_TIMESTAMP", None)
         if not self.run_stage(
             "release-artifact-build",
             [
                 str(PROJECT_ROOT / "scripts/e2e/build-release-artifact.sh"),
                 str(self.artifact_root),
             ],
+            environment,
         ):
             return False
         try:
@@ -498,6 +503,7 @@ def main():
             str(gate.artifact_root),
             "--require-clean-source",
             "--require-developer-id",
+            "--require-secure-timestamp",
         ],
     ):
         print(gate.summary_path)

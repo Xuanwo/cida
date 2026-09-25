@@ -60,7 +60,22 @@ if [[ -z "$signing_identity" ]]; then
   signature_mode=adhoc
 fi
 
-/usr/bin/codesign --force --deep --sign "$signing_identity" --options runtime "$app_path"
+# Developer ID signatures with the hardened runtime are timestamped by Apple's
+# service, which can be unreachable for minutes. Diagnostics may sign without
+# it (CIDA_CODESIGN_TIMESTAMP=none); gates always require the timestamp.
+signature_timestamp=${CIDA_CODESIGN_TIMESTAMP:-secure}
+timestamp_arguments=()
+case "$signature_timestamp" in
+  secure) ;;
+  none) timestamp_arguments=(--timestamp=none) ;;
+  *)
+    echo "CIDA_CODESIGN_TIMESTAMP must be secure or none" >&2
+    exit 64
+    ;;
+esac
+
+/usr/bin/codesign --force --deep --sign "$signing_identity" --options runtime \
+  "${timestamp_arguments[@]}" "$app_path"
 /usr/bin/codesign --verify --deep --strict "$app_path"
 /usr/bin/plutil -lint "$app_path/Contents/Info.plist" >/dev/null
 
@@ -104,6 +119,7 @@ swift_version=$(swift --version | /usr/bin/head -1)
 /usr/bin/plutil -insert sourceDirty -bool "$source_dirty" "$manifest_plist"
 /usr/bin/plutil -insert configuration -string "release" "$manifest_plist"
 /usr/bin/plutil -insert signatureMode -string "$signature_mode" "$manifest_plist"
+/usr/bin/plutil -insert signatureTimestamp -string "$signature_timestamp" "$manifest_plist"
 /usr/bin/plutil -insert codesignAuthority -string "${codesign_authority:-adhoc}" "$manifest_plist"
 /usr/bin/plutil -insert teamIdentifier -string "${team_identifier:-not-set}" "$manifest_plist"
 /usr/bin/plutil -insert macOSVersion -string "$(sw_vers -productVersion)" "$manifest_plist"

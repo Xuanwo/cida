@@ -1,8 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
-if (( $# < 1 || $# > 3 )); then
-  echo "Usage: $0 <artifact directory> [--require-clean-source] [--require-developer-id]" >&2
+if (( $# < 1 || $# > 4 )); then
+  echo "Usage: $0 <artifact directory> [--require-clean-source] [--require-developer-id] [--require-secure-timestamp]" >&2
   exit 64
 fi
 
@@ -11,10 +11,12 @@ artifact_root=${1:A}
 shift
 require_clean_source=false
 require_developer_id=false
+require_secure_timestamp=false
 for argument in "$@"; do
   case "$argument" in
     --require-clean-source) require_clean_source=true ;;
     --require-developer-id) require_developer_id=true ;;
+    --require-secure-timestamp) require_secure_timestamp=true ;;
     *)
       echo "Unknown argument: $argument" >&2
       exit 64
@@ -84,6 +86,16 @@ if [[ "$require_developer_id" == true ]]; then
   signature_mode=$(/usr/bin/plutil -extract signatureMode raw "$manifest_path")
   if [[ "$signature_mode" != developer-id ]]; then
     echo "Release artifact was not signed with Developer ID" >&2
+    exit 1
+  fi
+fi
+
+if [[ "$require_secure_timestamp" == true ]]; then
+  signature_timestamp=$(
+    /usr/bin/plutil -extract signatureTimestamp raw "$manifest_path" 2>/dev/null || echo secure
+  )
+  if [[ "$signature_timestamp" != secure ]]; then
+    echo "Release artifact signature carries no secure timestamp" >&2
     exit 1
   fi
 fi
