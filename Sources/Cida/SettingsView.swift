@@ -114,8 +114,7 @@ private struct SettingsBody: View {
       }
       Hairline()
       SettingsGroup(title: "语言") {
-        LanguageRow(model: model, role: .mine)
-        LanguageRow(model: model, role: .foreign)
+        LanguagesRow(model: model)
       }
       Hairline()
       SettingsGroup(title: "提示词") {
@@ -159,38 +158,49 @@ private struct SettingsBody: View {
 
 // MARK: - Languages
 
-/// One of the user's two languages (`Design/spec/settings.md` §三): free text the model reads, so
-/// a dialect, a regional variant or a register works as well as a language. An emptied field
-/// takes its default back when it loses focus.
-private struct LanguageRow: View {
-  enum Role {
+/// The user's two languages in one row (`Design/spec/settings.md` §三): mine on the left, the
+/// foreign one on the right. Both are free text the model reads, so a dialect, a regional variant
+/// or a register works as well as a language. An emptied field takes its default back when it
+/// loses focus. One row keeps the window whole on a 14-inch screen.
+private struct LanguagesRow: View {
+  @Bindable var model: AppModel
+  @FocusState private var focused: Side?
+
+  enum Side {
     case mine, foreign
   }
 
-  @Bindable var model: AppModel
-  let role: Role
-  @FocusState private var isFocused: Bool
-
   var body: some View {
-    SettingsRow(
-      title: role == .mine ? "我的语言" : "常用外语",
-      caption: role == .mine ? "其他语言都译成它" : "我的语言译成它"
-    ) {
-      SettingsTextField(
-        text: role == .mine ? $model.settings.myLanguage : $model.settings.foreignLanguage,
-        placeholder: role == .mine ? defaults.my : defaults.foreign,
-        accessibilityIdentifier: role == .mine
-          ? "settings-my-language-editor" : "settings-foreign-language-editor",
-        isFocused: $isFocused
-      )
+    SettingsRow(title: "互译", caption: "其他语言都译成左边") {
+      HStack(spacing: 10) {
+        SettingsTextField(
+          text: $model.settings.myLanguage,
+          placeholder: defaults.my,
+          accessibilityLabel: "我的语言",
+          accessibilityIdentifier: "settings-my-language-editor",
+          isFocused: focused == .mine
+        )
+        .focused($focused, equals: .mine)
+        Text("⇄")
+          .font(CidaDesign.ui(13))
+          .foregroundStyle(CidaDesign.textTertiary)
+          .accessibilityHidden(true)
+        SettingsTextField(
+          text: $model.settings.foreignLanguage,
+          placeholder: defaults.foreign,
+          accessibilityLabel: "常用外语",
+          accessibilityIdentifier: "settings-foreign-language-editor",
+          isFocused: focused == .foreign
+        )
+        .focused($focused, equals: .foreign)
+      }
     }
-    .onChange(of: isFocused) {
-      guard !isFocused else { return }
-      restoreDefaultIfEmpty()
+    .onChange(of: focused) { previous, _ in
+      if let previous { restoreDefaultIfEmpty(previous) }
     }
     .onAppear {
       #if DEBUG
-        if role == .foreign, model.focusesForeignLanguageForDesign { isFocused = true }
+        if model.focusesForeignLanguageForDesign { focused = .foreign }
       #endif
     }
   }
@@ -199,34 +209,33 @@ private struct LanguageRow: View {
     CidaSettings.defaultLanguages()
   }
 
-  private func restoreDefaultIfEmpty() {
-    switch role {
-    case .mine:
-      if model.settings.myLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        model.settings.myLanguage = defaults.my
-      }
-    case .foreign:
-      if model.settings.foreignLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        model.settings.foreignLanguage = defaults.foreign
-      }
+  private func restoreDefaultIfEmpty(_ side: Side) {
+    let isEmpty = { (text: String) in text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    switch side {
+    case .mine where isEmpty(model.settings.myLanguage):
+      model.settings.myLanguage = defaults.my
+    case .foreign where isEmpty(model.settings.foreignLanguage):
+      model.settings.foreignLanguage = defaults.foreign
+    default:
+      break
     }
   }
 }
 
-/// A single-line field filling the control column: Inter 12.5 on `surface`, a 1.5 pt accent rule
-/// while focused.
+/// A single-line field: Inter 12.5 on `surface`, a 1.5 pt accent rule while focused. The owner
+/// attaches the focus binding.
 private struct SettingsTextField: View {
   @Binding var text: String
   let placeholder: String
+  let accessibilityLabel: String
   let accessibilityIdentifier: String
-  var isFocused: FocusState<Bool>.Binding
+  let isFocused: Bool
 
   var body: some View {
     TextField(placeholder, text: $text)
       .textFieldStyle(.plain)
       .font(CidaDesign.ui(12.5))
       .foregroundStyle(CidaDesign.textPrimary)
-      .focused(isFocused)
       .padding(.horizontal, 10)
       .frame(maxWidth: .infinity)
       .frame(height: 30)
@@ -235,9 +244,9 @@ private struct SettingsTextField: View {
       .overlay {
         RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
           .strokeBorder(
-            isFocused.wrappedValue ? CidaDesign.accent : CidaDesign.border,
-            lineWidth: isFocused.wrappedValue ? 1.5 : 1)
+            isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: isFocused ? 1.5 : 1)
       }
+      .accessibilityLabel(accessibilityLabel)
       .accessibilityIdentifier(accessibilityIdentifier)
   }
 }

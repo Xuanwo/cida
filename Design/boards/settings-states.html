@@ -12,11 +12,11 @@
      --design-state values where one exists. -->
 <main class="board" data-board="settings-states">
   <div class="board-title">States — 设置</div>
-  <p class="caption">规则见 spec/settings.md。「模型」一组的各个状态在 configuration.html;这里的状态都是模型已就绪。五个状态:默认、常用外语输入中(两项可任意填写语言、方言或文体;原文是我的语言时译成常用外语,其他任何语言译成我的语言,由模型判断)、编辑改进提示词 + 自定义快捷键 + 截图与选中文字已授权 + 开机启动、录制快捷键、有新版本可以安装;除 settings-custom 外,「截图翻译」与「选中文字」都是未授权的「去授权」。窗口 560 宽,高度随内容,超过屏幕可见高度时在窗口内滚动;实现侧 --design-state 与状态名相同。</p>
+  <p class="caption">规则见 spec/settings.md。「模型」一组的各个状态在 configuration.html;这里的状态都是模型已就绪。五个状态:默认、常用外语输入中(左边我的语言、右边常用外语,可任意填写语言、方言或文体;原文是我的语言时译成常用外语,其他任何语言译成我的语言,由模型判断)、编辑改进提示词 + 自定义快捷键 + 截图与选中文字已授权 + 开机启动、录制快捷键、有新版本可以安装;除 settings-custom 外,「截图翻译」与「选中文字」都是未授权的「去授权」。窗口 560 宽,高度随内容,超过屏幕可见高度时在窗口内滚动;实现侧 --design-state 与状态名相同。</p>
   <div class="states-grid">
     <figure><div class="state-label">默认(settings)</div>
       <cida-settings state="settings"></cida-settings></figure>
-    <figure><div class="state-label">常用外语输入中(settings-language-editing)</div>
+    <figure><div class="state-label">常用外语(右边)输入中(settings-language-editing)</div>
       <cida-settings state="settings-language-editing" language="editing"></cida-settings></figure>
     <figure><div class="state-label">编辑改进提示词 · 自定义快捷键 · 截图与选中文字已授权 · 开机启动(settings-custom)</div>
       <cida-settings state="settings-custom" editing="improve" shortcut="custom" grants="all" launch="on"></cida-settings></figure>

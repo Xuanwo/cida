@@ -72,10 +72,9 @@ class CidaSettings extends HTMLElement {
 
     // spec/settings.md §三: free text; language="editing" shows the second field focused.
     const field = (value, extra = "") => `<span class="field text ${extra}">${value}</span>`;
-    const languages = `
-      ${row("我的语言", "其他语言都译成它", field("简体中文"))}
-      ${row("常用外语", "我的语言译成它",
-        is("language", "editing") ? field("英式英语<i class=\"caret\"></i>", "focused") : field("English"))}`;
+    const languages = row("互译", "其他语言都译成左边",
+      `${field("简体中文")}<span class="swap">⇄</span>${is("language", "editing")
+        ? field("英式英语<i class=\"caret\"></i>", "focused") : field("English")}`);
 
     const prompt = (title, preview) => `
       <div class="row prompt">
