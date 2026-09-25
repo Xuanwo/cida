@@ -30,11 +30,16 @@ print -rn -- "$CIDA_DEVELOPER_ID_P12" | /usr/bin/base64 --decode >"$p12"
 /usr/bin/security unlock-keychain -p "$keychain_password" "$keychain"
 /usr/bin/security import "$p12" -k "$keychain" -f pkcs12 \
   -P "$CIDA_DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign >/dev/null
-# The identity is valid only with its issuing CA; a fresh runner may not have it installed.
+# The identity is valid only with its issuing CA; a fresh runner may not have it installed. A
+# .p12 exported with its chain already carries the CA, which is fine.
 for authority in DeveloperIDCA DeveloperIDG2CA; do
   /usr/bin/curl --fail --silent --show-error --retry 3 \
     "https://www.apple.com/certificateauthority/$authority.cer" -o "$p12.$authority.cer"
-  /usr/bin/security import "$p12.$authority.cer" -k "$keychain" >/dev/null
+  if ! import_output=$(/usr/bin/security import "$p12.$authority.cer" -k "$keychain" 2>&1) \
+    && [[ "$import_output" != *"already exists"* ]]; then
+    echo "$import_output" >&2
+    exit 1
+  fi
   /bin/rm -f "$p12.$authority.cer"
 done
 # Let codesign use the private key without a UI prompt.
