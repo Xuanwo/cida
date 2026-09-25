@@ -1,110 +1,66 @@
-# Cida
+<p align="center">
+  <img src="Design/rendered/states/brand-icon.png" width="128" alt="Cida: 辞 followed by the streaming caret">
+</p>
 
-<img src="Design/rendered/states/brand-icon.png" width="128" alt="辞达: 辞 followed by the streaming caret">
+<h1 align="center">Cida · 辞达</h1>
 
-Cida is a native macOS writing assistant built with Swift 6.2, SwiftUI, and AppKit. It translates text or improves writing through streaming OpenAI-compatible Chat Completions APIs (DeepSeek, OpenAI, Moonshot, 智谱 GLM presets, or any custom endpoint). It lives in the menu bar and shows one floating panel on a global shortcut (`Option-Space` by default): the source you typed, the action, and the result.
+<p align="center">
+  Translate and polish text anywhere on your Mac, one shortcut away.<br>
+  <a href="https://github.com/Xuanwo/cida/releases/latest">Download</a> · <a href="README.zh-Hans.md">简体中文</a>
+</p>
 
-## Requirements
+![Cida translating a Chinese sentence into English](docs/images/translate.png)
 
-- macOS 15 or newer
-- Xcode 26 or a compatible Swift 6.2+ toolchain
+Cida lives in the menu bar. Press <kbd>⌥</kbd> <kbd>Space</kbd> in any app and a panel appears with the text you selected, already being translated; press <kbd>Tab</kbd> to improve the writing instead. The name comes from the *Analects*: 辞达而已矣, words need only get the meaning across.
 
-## Build and run
+## Features
+
+- **Stays out of the way.** The panel takes your typing without switching apps, and <kbd>Esc</kbd> drops you back where you were. A request keeps streaming while the panel is hidden, and the caret in the menu bar breathes until it is done.
+- **Brings the selection in.** With the Accessibility permission, the text selected in the frontmost app becomes the source and is translated at once.
+- **Reads the screen.** <kbd>⌥</kbd> <kbd>S</kbd> freezes the screen; frame any text and Cida recognizes it on your Mac with Vision and translates it.
+- **Translates or improves.** Chinese and English are detected and translated into each other; improving keeps the text in its own language.
+- **Uses your model.** DeepSeek, OpenAI, Moonshot, 智谱 GLM, or any OpenAI-compatible endpoint, including a local server that needs no key.
+- **Keeps nothing.** The API key lives in Keychain. There is no history and no telemetry, and screenshots never leave your Mac.
+
+The interface is in Simplified Chinese.
+
+## Install
+
+Cida needs macOS 15 or newer.
+
+1. Download `Cida-<version>.zip` from the [latest release](https://github.com/Xuanwo/cida/releases/latest). It is signed with a Developer ID and notarized by Apple.
+2. Unzip it and move **Cida.app** to Applications.
+3. Open it, press <kbd>⌘</kbd> <kbd>,</kbd>, pick a provider and paste your API key.
+
+<p align="center">
+  <img src="docs/images/settings.png" width="480" alt="Cida Settings">
+</p>
+
+## Keys
+
+| Key | Action |
+| --- | --- |
+| <kbd>⌥</kbd> <kbd>Space</kbd> | Show or hide the panel, bringing in the selected text |
+| <kbd>⌥</kbd> <kbd>S</kbd> | Frame text on screen and translate it |
+| <kbd>Return</kbd> | Run the action (<kbd>⇧</kbd> <kbd>Return</kbd> for a new line) |
+| <kbd>Tab</kbd> | Switch between translate (翻译) and improve (改进) |
+| <kbd>⌘</kbd> <kbd>C</kbd> | Copy the selection, or the result when nothing is selected |
+| <kbd>⌘</kbd> <kbd>.</kbd> | Stop |
+| <kbd>Esc</kbd> | Hide |
+| <kbd>⌘</kbd> <kbd>,</kbd> | Settings |
+
+Both global shortcuts can be recorded again in Settings.
+
+## Build from source
 
 ```sh
+git clone https://github.com/Xuanwo/cida.git
+cd cida
 swift run Cida
 ```
 
-Create a signed Release app bundle without launching it:
+Building needs Xcode 26 or newer. [`docs/development.md`](docs/development.md) covers signed builds, tests, releases and the architecture, and [`Design/`](Design/README.md) holds the design Cida is built from. Contributions follow [`AGENTS.md`](AGENTS.md).
 
-```sh
-scripts/build-app.sh release
-```
+## License
 
-To hand the app to another Mac, notarize it:
-
-```sh
-scripts/notarize-app.sh
-```
-
-It submits `build/Cida.app` to Apple's notary service, staples the ticket, checks that Gatekeeper accepts the app as notarized, and writes `build/Cida-<version>-<build>.zip`. It reads credentials from the notarytool keychain profile `cida-notary` (or `CIDA_NOTARY_PROFILE`), created once with `xcrun notarytool store-credentials cida-notary --apple-id <id> --team-id 3GMS63N4BQ` and an app-specific password.
-
-The production bundle is written to `build/Cida.app`. It uses a stable Developer ID signature so its Keychain identity survives rebuilds. Provider keys are stored only in Keychain; prompts, model IDs, the custom endpoint, and other non-secret preferences are stored in UserDefaults. Nothing else is persisted: the panel starts empty on every launch, and no record of past requests is written anywhere.
-
-The provider menu lists presets (DeepSeek, OpenAI, Moonshot, 智谱 GLM), each a fixed Chat Completions endpoint with suggested models, plus 自定义（OpenAI 兼容）, which exposes an editable endpoint and model ID. Loopback endpoints such as `http://127.0.0.1:8080/v1/chat/completions` and `http://localhost:8080/v1/chat/completions` may omit the API key. Non-local endpoints still require one. The model group ends in a readiness line derived locally from the provider, endpoint, model, and key.
-
-Prompts are stored as stable task policies rather than string templates. Each request sends the operation and language choices as a typed, trusted parameter envelope in the system message, while the complete source document appears exactly once in the user message. Legacy `{text}` and `{target_lang}` prompts migrate once; braces in current prompts remain literal text.
-
-## Interaction
-
-The design source is `Design/` (see `Design/README.md`): the rules in `Design/spec/panel.md` and the states in `Design/boards/panel-states.html`.
-
-- The global shortcut (`Option-Space` by default; record another one in Settings, where a combination the system or another app holds is refused): show or hide the panel from any application. Showing never activates Cida, so the application you came from keeps its focus and gets it back the moment the panel hides. Every appearance starts on 翻译 with the previous source fully selected, so typing or `Command-V` begins a new task.
-- Text selected in the application you came from: with the Accessibility permission (Settings › 唤起 › 选中文字 › 去授权), the global shortcut reads the focused control's selection before it shows the panel. A new selection replaces the source, fully selected, and is translated at once, replacing a request that is still running. The selection brought in last time leaves the panel as it was, so a source you edited since survives, and no request is repeated. No selection, a password field, Cida itself, an application that does not answer within 150 ms, or a missing permission all count as no selection. Cida never simulates `Command-C` or reads the pasteboard, so applications that do not expose their selection through Accessibility (some Electron and Chrome pages) still need `Command-C` and `Command-V`. The menu bar item shows the panel without reading a selection.
-- The capture shortcut (`Option-S` by default; recordable in Settings, and never the same combination as the panel's): freezes the screen under the pointer and fades a veil over it (the result pane's paper over a light screen, ink over a dark one) with a hint pill at the panel's height; drag a frame around some text and it lifts out of the veil as a sheet with the panel's shadow. Escape, a right click, or a click without a drag cancels. The framed part is recognized on this Mac with Vision (Simplified Chinese and English; the image never leaves the Mac), its lines are joined back into paragraphs, and the panel appears with that text as the source, fully selected, already being translated; a frame without text clears the source and says 截图里没有识别到文字. It needs the Screen Recording permission (Settings › 唤起 › 截图翻译 › 去授权); without it the shortcut only asks for the permission. macOS asks again every month whether Cida may keep recording the screen. The recognizer loads its models in the background after launch, so the first capture does not wait for them.
-- `Return`: run the selected action on the source. The source stays in the editor; the previous result is replaced immediately. `Shift-Return` or `Option-Return` inserts a newline.
-- `Tab`: switch between 翻译 and 改进. The source language is detected from the text; translation targets the other language of the Chinese/English pair, improvement keeps the source language.
-- `Escape`: hide the panel. Clicking outside hides it too. Hiding keeps the source and the result; a running request keeps streaming and is there when the panel comes back.
-- `Command-C`: copy the selection when there is one, otherwise copy the result. The control bar shows `复制结果` once a result exists and `停止` while a request runs (`Command-.` also stops).
-- `Command-,`: open Settings, a standard window with the usual close, minimize, and zoom controls. The menu-bar item offers the same entries and quit.
-
-The panel is 800 pt wide and exactly as tall as its content: the source pane grows with the text up to 30% of the screen, the panel up to 70%; beyond that each pane scrolls on its own. An edited source or a switched action dims the result and notes `原文已修改 · ⏎ 重新生成`; a stopped or failed request explains itself in the same place instead of an alert.
-
-## Verification
-
-Run a release decision from a clean, committed checkout with one of the unified gates:
-
-```sh
-scripts/e2e/run-pr-gate.sh
-scripts/e2e/run-nightly-gate.sh
-scripts/e2e/run-release-gate.sh
-```
-
-Every profile first validates every mutation anchor, runs the complete Swift suite, and reruns four
-named structural performance proxies before it builds and signs one Release app, binds its manifest
-to the current commit, and verifies the app-tree digest again after all consumers finish. The PR
-profile runs the P0 Release journeys in Tart and the unit mutation contracts. Nightly runs the full
-Tart suite, all unit and Release mutations, and the focused 120 Hz workloads. Release adds three
-fresh-clone P0 burn-in rounds by default. Each invocation writes a single `gate-summary.json`;
-standalone scripts are diagnostic entry points, not a release verdict. After the harness contract
-check, nightly and release profiles query AppKit and Core Graphics for an awake, active display whose
-native maximum is at least 120 Hz. An unavailable physical frame clock is classified as
-infrastructure and stops the gate before builds, Tart clones, or mutation runs.
-
-Useful standalone diagnostics are:
-
-```sh
-swift test -Xswiftc -warnings-as-errors
-scripts/test-ui-in-tart.sh
-scripts/e2e/run-focused-tart-diagnostic.sh \
-  CidaUITests/CoreTranslationJourneyTests/testNewSubmissionIsVisiblyEmptyUntilItsControlledFirstByte
-scripts/capture-design-states.sh
-scripts/test-release-input-interaction.sh
-scripts/benchmark-frame-pacing.sh
-scripts/benchmark-smooth-streaming.sh
-scripts/benchmark-million-character-paste.sh
-```
-
-The focused Tart diagnostic performs an incremental host compile, runs exactly one selected XCUI
-journey in a fresh no-graphics VM, and skips the duplicate guest Swift preflight. It is intentionally
-not a release verdict; every delivery still requires one of the unified gates above.
-
-The XCUI regression runs inside a fresh clone of the local `cida-ui-golden` macOS VM through [OpenAI Tart](https://github.com/openai/tart). Tart starts without graphics, audio, or host clipboard sharing; the guest network is disabled, the repository is mounted read-only, and only the selected result directory is writable from the VM. The exact signed artifact is copied into that writable share, verified against its source digest, consumed by the guest, and reverified on the host after the run. The ephemeral clone is deleted after every attempt, so the test never launches a host application or reads the production API key, UserDefaults, or Keychain. A 100 ms host monitor fails if either exact artifact copy is launched or takes focus on the host; frontmost-app, pasteboard, and production-Cida changes caused by concurrent user activity remain recorded diagnostics. See `UITests/README.md` for the golden-image contract and artifacts.
-
-Standalone design snapshots and native input probes use a fresh temporary `辞达测试.app` with a unique `com.xuanwo.Cida.Automation.*` bundle identifier. Release performance gates instead launch the exact manifest-bound `Cida.app` in an isolated automation data directory. The performance instance orders its panel behind existing windows, never activates the application or makes its panel key, and reports fail if activation or a key panel is observed.
-
-The in-process integration suite and the VM XCUI suite both start a loopback OpenAI-compatible SSE server. XCUI drives the visible guest panel through Settings, the OpenAI endpoint, model and API Key editors, multiline growth and shrink of the source pane and the panel, submit with the source retained, stale marking, consecutive submissions, uneven streaming, stop and inline failure, hover-free copy, Escape and Option-Space, the empty-panel and Settings pixel baselines, the native accessibility audit, and the exact outbound request body. A separate Release executable gate routes a real mouse click through AppKit hit testing, performs an isolated focus handoff, sends real key-down events, and verifies the native editor and `AppModel` receive identical text. UI waits use an immediately sampled 20 ms polling primitive with timeout timelines, and harness self-tests prove that short-lived feedback cannot be skipped. Tart writes a machine-readable failure category before a failed run is interpreted as a product regression. No external credential or network service is used. `CIDA_UI_TEST_ONLY_TESTING` can select one XCUI identifier for diagnosis; omitting it always runs the complete regression suite.
-
-The strict performance gates require a detected 120 Hz-capable display, at least 118.8 measured native display-link callbacks per second, a P99 physical interval no greater than 12.5 ms, and zero main-actor callback latencies above the 12.5 ms budget. The focused gates collect 1,440 samples. Production stream pacing and the probe both use the panel's native Core Animation display link; the report labels it `view-bound-ca-display-link` and records native callback cadence separately from main-actor handling latency. A nonactivating fallback only keeps an unavailable display link from hanging the process; a 60 Hz or unavailable physical display still fails `displayRequirementSatisfied` and cannot produce a passing 120 Hz report. PR gates report structural proxy coverage without claiming an FPS result; nightly and release summaries cannot pass unless at least one physical report confirms a 120 Hz display and the view-bound clock.
-
-## Architecture
-
-- SwiftUI owns the panel composition and observable application state. AppKit owns the non-activating floating panel, the global shortcut, the menu-bar item, native text controls, keyboard routing, result rendering, snapshots, and performance instrumentation. `PanelController` sizes the panel from the height its content reports and keeps the top edge fixed, so the panel only ever grows downward over the design's 150 ms height transition. `AppModel` holds one `ResultRecord`: the source and action it was made from, its streamed text, and its phase (streaming, completed, stopped, failed). Both frameworks derive colors and typography from one semantic `CidaDesign` token set: Inter for the source, Source Serif 4 and Noto Serif SC for the result, accent only on the selected action, the caret, and the copied feedback.
-- Model requests keep stable prompt policy, typed runtime parameters, and untrusted source content separate. Translation sends the detected source language and the other language of the supported pair as target; improvement sends `preserve_source` without either translation language, so every source passage stays in its original language. The same contract is used for OpenAI, compatible remote providers, and loopback mock endpoints without requiring provider-specific template syntax.
-- Streamed results use a lightweight TextKit 1 rendering view and materialize a native selection editor only when needed. The result storage publishes an append notification, so TextKit appends only the missing UTF-16 suffix without invalidating the SwiftUI tree. A view-bound `CADisplayLink` adaptive presenter smooths uneven network delivery at 30–400 grapheme clusters per second with a maximum of eight grapheme clusters per update.
-- Each streamed run is laid out on the display pulse that presents it and painted by a short-lived fragment view that fades in from transparent and unblurs from 2 pt over the design's 120 ms ease-out behind the inline caret; the renderer skips those glyphs until the fade completes and then paints them in place. The result pane grows with its text until the panel reaches its height budget, then scrolls and keeps the tail in view while streaming unless the user scrolled away; a completed result opens at its top.
-- The source and result panes are native `NSScrollView`s pinned to the system overlay scroll bar (`OverlayScrollView`): it appears while scrolling or hovering, fades out at rest, and never switches to the legacy track that a mouse or the "Always" preference would otherwise bring. The result scroll view spans the pane and insets its text, so both bars sit on the panel's right edge.
-- The source editor uses a full backing document with a virtualized TextKit viewport. Documents of at least 100,000 UTF-16 units materialize only the final 512 units; upward scrolling prepends earlier 1,024-unit pages on demand. The pane's height is measured from the laid-out text after every native edit, so deleting lines shrinks the pane and the panel immediately. The SwiftUI binding is never written back into the editor while an input method is composing, so pinyin candidates survive unrelated re-renders.
-- No idle display link or timer runs during normal use.
-
-See `functional-qa.md` for regression evidence and `design-qa.md` for the design comparison matrix.
+Cida is licensed under [Apache-2.0](LICENSE). It bundles Inter, Source Serif 4, Noto Serif SC and JetBrains Mono under the SIL Open Font License 1.1, and Lucide icons under the ISC License.

@@ -50,4 +50,4 @@ everything that never takes focus) and writes, at 2x:
 Debug build, and writes logical-size reference, implementation and side-by-side comparison images to
 `QACurrent`. The approved empty-panel and Settings baselines, and the board files they come from,
 are pinned by SHA-256 in `UITests/Resources/VisualBaselines/manifest.json` (see
-[`../design-qa.md`](../design-qa.md)).
+[`../docs/design-qa.md`](../docs/design-qa.md)).
