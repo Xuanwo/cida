@@ -301,11 +301,13 @@ body {
   font-size: 22px;
   color: var(--text-ink);
 }
+/* Finder draws both icons at 128pt centred on (150, 210) and (450, 210), labels 6pt below; the
+   arrow runs between the two icons' edges, 24pt clear of each, on their centre line. */
 .dmg-background .arrow {
   position: absolute;
-  top: 209px;
-  left: 236px;
-  width: 128px;
+  top: 210px;
+  left: 238px;
+  width: 124px;
   height: 1px;
   background: var(--text-tertiary);
 }
@@ -313,9 +315,9 @@ body {
   content: "";
   position: absolute;
   right: 0;
-  top: -4px;
-  width: 8px;
-  height: 8px;
+  top: -3.5px;
+  width: 7px;
+  height: 7px;
   border-top: 1px solid var(--text-tertiary);
   border-right: 1px solid var(--text-tertiary);
   transform: rotate(45deg);
@@ -330,19 +332,26 @@ body {
 }
 .dmg-icon {
   position: absolute;
-  top: 174px;
+  top: calc(28px + 146px);
   width: 128px;
   text-align: center;
   font-size: 12px;
+  line-height: 16px;
   color: var(--text-primary);
 }
 .dmg-icon.app { left: 86px; }
 .dmg-icon.folder { left: 386px; }
-.dmg-icon .app-icon, .dmg-icon .folder-icon { display: block; margin: 0 auto 6px; }
-.dmg-icon .folder-icon {
-  width: 104px;
-  height: 84px;
-  margin-top: 10px;
+/* macOS draws an app icon's artwork at about 80% of its box. */
+.dmg-icon .app-icon { display: block; margin: 12px 12px 18px; }
+/* A stand-in for the system's Applications folder icon, inside the same 128pt icon box. */
+.dmg-icon .folder-icon { position: relative; display: block; width: 128px; height: 128px; margin-bottom: 6px; }
+.dmg-icon .folder-icon::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 20px;
+  width: 112px;
+  height: 88px;
   border-radius: 10px;
   background: linear-gradient(#8cc9f2, #5aa9e4);
   box-shadow: inset 0 14px 0 -4px #a9d8f7;
@@ -479,6 +488,78 @@ body {
 }
 
 .link, .status { font-size: 12px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+
+/* spec/configuration.md §四 */
+.row .controls .stack.summary { gap: 3px; }
+.row .controls .stack.summary b { font-size: 13.5px; font-weight: 400; line-height: 20px; }
+.row .controls .push { margin-left: auto; }
+.dot-caption { display: inline-flex; align-items: center; gap: 6px; }
+.dot-caption i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.dot-caption.pending i { background: var(--text-tertiary); }
+.row-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: -2px 0 6px 144px;
+  font-size: var(--font-size-label);
+  line-height: 17px;
+  color: var(--text-secondary);
+}
+.row-note .icon { flex: none; width: 13px; height: 13px; margin-top: 2px; color: var(--text-tertiary); }
+.agent-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin: 10px 0 12px;
+  padding: 16px 18px;
+  border-radius: var(--radius-card);
+  background: var(--surface-paper);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.agent-card .labels { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.agent-card .labels b { font-size: 13.5px; font-weight: 500; line-height: 20px; }
+.agent-card .labels small { font-size: var(--font-size-label); line-height: 17px; color: var(--text-tertiary); }
+.button.with-icon { display: flex; align-items: center; gap: 6px; }
+.button.with-icon .icon { width: 12px; height: 12px; color: var(--text-secondary); }
+.button.copied { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+.button.copied .icon { color: var(--accent); }
+
+/* Command-line transcripts (spec/configuration.md §二) */
+.terminal {
+  width: 800px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #1E1E1C;
+  box-shadow: 0 0 0 1px var(--panel-edge), var(--panel-shadow);
+}
+.terminal .chrome { display: flex; gap: 8px; padding: 12px 14px 0; }
+.terminal .chrome i { width: 11px; height: 11px; border-radius: 50%; background: #3A3A37; }
+.terminal pre {
+  margin: 0;
+  padding: 14px 20px 18px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #B8B8B0;
+  white-space: pre-wrap;
+}
+.terminal .cmd { color: #EDEDE8; }
+.terminal .cmd::before { content: "$ "; color: #6E6E68; }
+.terminal .ok { color: #7FC8A0; }
+.terminal .bad { color: #E8927C; }
+.terminal .dim { color: #6E6E68; }
+.prompt-sheet {
+  width: 800px;
+  box-sizing: border-box;
+  padding: 22px 28px;
+  border-radius: var(--radius-card);
+  background: var(--surface-paper);
+  box-shadow: 0 0 0 1px var(--border);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-ink);
+  white-space: pre-wrap;
+}
 
 .chip {
   padding: 4px 9px;

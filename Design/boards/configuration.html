@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>States — 配置</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+</head>
+<body>
+<!-- Rules: ../spec/configuration.md. -->
+<main class="board" data-board="configuration">
+  <div class="board-title">配置 · 设置里不再逐项填写，AI 助手用辞达的命令行配好并检查</div>
+
+  <p class="caption">① 设置 · 还没有模型服务 — 模型组只有一张纸：说明与「复制配置提示词」；复制后按钮 800ms 为「✓ 已复制」，说明换成下一步，直到配置出现</p>
+  <div class="states-grid">
+    <figure><div class="state-label">还没有模型服务（settings-config-unset）</div>
+      <cida-settings state="settings-config-unset" config="unset"></cida-settings></figure>
+    <figure><div class="state-label">已复制提示词（settings-config-copied）</div>
+      <cida-settings state="settings-config-copied" config="unset-copied"></cida-settings></figure>
+  </div>
+  <div class="divider"></div>
+
+  <p class="caption">② 设置 · 已配置 — 纸收起；「模型服务」标签下是状态，控件列是模型名与「域名 · 格式」，右侧「检查」；下一行「调整配置」复制同一段提示词。助手改完配置时窗口实时刷新，状态带「刚刚更新」3 秒</p>
+  <div class="states-grid">
+    <figure><div class="state-label">已就绪（settings-config-ready）</div>
+      <cida-settings state="settings-config-ready" config="ready"></cida-settings></figure>
+    <figure><div class="state-label">助手刚改完（settings-config-updated）</div>
+      <cida-settings state="settings-config-updated" config="updated"></cida-settings></figure>
+  </div>
+  <div class="divider"></div>
+
+  <p class="caption">③ 设置 · 检查 — 「检查」与命令行 check 相同；进行中按钮为「检查中…」；失败时行下一句写原因和补救：交给 AI 助手修</p>
+  <div class="states-grid">
+    <figure><div class="state-label">检查中（settings-config-checking）</div>
+      <cida-settings state="settings-config-checking" config="checking"></cida-settings></figure>
+    <figure><div class="state-label">检查失败（settings-config-failed）</div>
+      <cida-settings state="settings-config-failed" config="failed"></cida-settings></figure>
+  </div>
+  <div class="divider"></div>
+
+  <p class="caption">④ 复制出的配置提示词 — 带上命令行的绝对路径与当前配置；要求助手先问、查文档、Key 只走 stdin / 文件 / 环境变量、check 通过才算完；不能运行命令的助手给出命令让用户粘贴</p>
+  <div class="prompt-sheet" data-state="configuration-prompt">帮我配置辞达（macOS 上的翻译与改写应用）使用的模型服务。
+
+辞达的命令行：/Applications/Cida.app/Contents/MacOS/Cida
+当前配置：还没配置
+
+请这样做:
+1. 问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。
+2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。
+3. 用 `Cida config set 字段=值 …` 一次写入。
+4. API Key 不要让我发给你，也不要打印或写进文件：请我先复制 Key，再运行 `pbpaste | Cida config set api-key --stdin`；Key 已经在环境变量或文件里时，用 `--env` 或 `--file`。
+5. 运行 `Cida check`;失败时用 `Cida check --verbose` 找原因、修改配置，直到通过。
+6. 最后用 `Cida config show` 告诉我配置结果。
+
+如果你不能运行命令，就把每一步的命令写给我，我粘贴到「终端」里运行，再把输出贴给你。</div>
+  <div class="divider"></div>
+
+  <p class="caption">⑤ 助手的一次配置 — 写入多项一次生效；Key 从剪贴板经 stdin 进钥匙串，对话里没有明文；check 通过才结束，正在运行的辞达立即改用新配置</p>
+  <div class="terminal" data-state="configuration-agent-session"><div class="chrome"><i></i><i></i><i></i></div><pre><span class="cmd">Cida config set endpoint=https://api.deepseek.com/chat/completions format=chat-completions model=deepseek-chat</span>
+已更新 3 项：endpoint、format、model
+
+<span class="cmd">pbpaste | Cida config set api-key --stdin</span>
+已把 API Key 存进钥匙串
+
+<span class="cmd">Cida check</span>
+<span class="ok">✓ 可用</span> · deepseek-chat · 0.8 秒 · 回复「你好」
+
+<span class="cmd">Cida config show</span>
+endpoint   https://api.deepseek.com/chat/completions
+format     chat-completions
+model      deepseek-chat
+api-key    已保存在钥匙串
+auth       bearer <span class="dim">（随 format）</span></pre></div>
+  <div class="divider"></div>
+
+  <p class="caption">⑥ 助手自己闭环 — 明文 Key 被拒并告诉它该怎么做；check 失败时 --verbose 给出实际请求与服务商原文，Key 一律替换为 ••••</p>
+  <div class="terminal" data-state="configuration-agent-errors"><div class="chrome"><i></i><i></i><i></i></div><pre><span class="cmd">Cida config set api-key=sk-1234…</span>
+<span class="bad">✗ api-key 不接受写在命令里的值</span>，改用 --stdin、--file 或 --env，例如:
+  pbpaste | Cida config set api-key --stdin
+
+<span class="cmd">Cida check --verbose</span>
+<span class="bad">✗ 检查失败</span> · HTTP 400
+POST https://api.moonshot.cn/v1/chat/completions
+Authorization: Bearer ••••
+{"model": "kimi-k2", "stream": true, "messages": [ … ]}
+服务商返回：{"error": {"message": "Not found the model kimi-k2 or Permission denied", "type": "resource_not_found_error"}}
+
+<span class="cmd">Cida config set model=kimi-k2-0905-preview</span>
+已更新 1 项：model
+
+<span class="cmd">Cida check</span>
+<span class="ok">✓ 可用</span> · kimi-k2-0905-preview · 1.2 秒 · 回复「你好」</pre></div>
+  <div class="divider"></div>
+
+</main>
+</body>
+</html>

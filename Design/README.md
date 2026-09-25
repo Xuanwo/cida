@@ -9,9 +9,11 @@ a versioned copy.
 | --- | --- | --- |
 | Panel: shape, structure, actions, states, keys, selection import, capture | [`spec/panel.md`](spec/panel.md) | [`boards/panel-states.html`](boards/panel-states.html), [`boards/capture.html`](boards/capture.html) |
 | Streaming: buffering rate, phase motion, constraints | [`spec/streaming-motion.md`](spec/streaming-motion.md) | [`boards/streaming-motion.html`](boards/streaming-motion.html) |
-| Settings: window, providers, readiness, prompts, shortcuts, permissions | [`spec/settings.md`](spec/settings.md) | [`boards/settings-states.html`](boards/settings-states.html) |
+| Settings: window, model status, prompts, shortcuts, permissions | [`spec/settings.md`](spec/settings.md) | [`boards/settings-states.html`](boards/settings-states.html) |
 | Brand: mark, app icon, menu bar image, wordmark | [`spec/brand.md`](spec/brand.md) | [`boards/brand.html`](boards/brand.html) |
 | Updates: checks, channels, update reminders, menu bar menu | [`spec/updates.md`](spec/updates.md) | [`boards/updates.html`](boards/updates.html) |
+| Lifecycle: DMG, first run, launch behaviour, the update panel, uninstall | [`spec/lifecycle.md`](spec/lifecycle.md) | [`boards/lifecycle.html`](boards/lifecycle.html) |
+| Configuration: the command line, model fields, the agent prompt, Settings' model group | [`spec/configuration.md`](spec/configuration.md) | [`boards/configuration.html`](boards/configuration.html) |
 
 ## Boards
 

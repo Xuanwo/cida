@@ -13,51 +13,26 @@
 <main class="board" data-board="lifecycle">
   <div class="board-title">生命周期 · 从下载到升级都用主面板说话(分段 = 可选做法,⇥ 切换,⏎ 执行,⎋ = 最后一项)</div>
 
-  <p class="caption">① 安装包 — DMG 打开是一个纸底 Finder 窗口:把辞达拖到「应用程序」。背景图(dmg-background)由这一状态渲染,Finder 在其上画两个图标</p>
-  <div class="dmg-window">
+  <p class="caption">① 安装包 — DMG 打开是一个纸底 Finder 窗口：把辞达拖到「应用程序」。背景图(dmg-background)由这一状态渲染，Finder 在其上画两个图标</p>
+  <div class="dmg-window" data-state="dmg-window">
     <div class="dmg-titlebar"><i></i><i></i><i></i><span>辞达</span></div>
     <div class="dmg-background" data-state="dmg-background">
       <div class="headline">把辞达拖进「应用程序」</div>
       <div class="arrow"></div>
       <div class="footnote">之后从启动台或聚焦搜索打开 · 辞达住在菜单栏</div>
     </div>
-    <div class="dmg-icon app"><span class="app-icon" style="--size: 128px"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>辞达</div>
+    <div class="dmg-icon app"><span class="app-icon" style="--size: 104px"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>辞达</div>
     <div class="dmg-icon folder"><span class="folder-icon"></span>应用程序</div>
   </div>
   <div class="divider"></div>
 
-  <p class="caption">② 移到「应用程序」 — 由用户打开且不在「应用程序」里时先出现;来源写磁盘映像、「下载」或所在文件夹;⏎ 移动后从新位置重新打开;「暂不」只对这一次打开有效</p>
-  <section class="panel" data-state="lifecycle-move">
-    <div class="source statement">辞达正从磁盘映像运行</div>
-    <cida-bar options="移到「应用程序」|暂不"></cida-bar>
-    <div class="result"><div class="text cjk">放进「应用程序」后,辞达才能自己更新、开机启动。移好后会重新打开,原来的这份会被移除。</div></div>
-  </section>
-  <section class="panel" data-state="lifecycle-move-replace">
-    <div class="source statement">辞达正从「下载」运行</div>
-    <cida-bar options="替换并打开|暂不"></cida-bar>
-    <div class="result"><div class="text cjk">「应用程序」里已有辞达 1.0.0,它会移到废纸篓,换成这一份。</div></div>
-  </section>
-  <section class="panel" data-state="lifecycle-moving">
-    <div class="source statement">辞达正从磁盘映像运行</div>
-    <cida-bar options="移到「应用程序」|暂不" processing action="status" status="正在移动…"></cida-bar>
-    <div class="result"><div class="text cjk">放进「应用程序」后,辞达才能自己更新、开机启动。移好后会重新打开,原来的这份会被移除。<span class="cursor"></span></div></div>
-  </section>
-  <section class="panel" data-state="lifecycle-move-failed">
-    <div class="source statement">辞达正从「下载」运行</div>
-    <cida-bar options="移到「应用程序」|暂不"></cida-bar>
-    <div class="result">
-      <div class="text cjk">放进「应用程序」后,辞达才能自己更新、开机启动。移好后会重新打开,原来的这份会被移除。</div>
-      <cida-note kind="failed">移动失败:「应用程序」没有写入权限 · ⏎ 重试</cida-note>
-    </div>
-  </section>
-  <div class="divider"></div>
 
-  <p class="caption">③ 第一次使用 — 模型还没就绪时,空态的结果栏是欢迎;右侧「打开设置 ⌘,」;原文照常可输入,⏎ 不发请求而提示还差 API Key;就绪后回到平常的空态</p>
+  <p class="caption">② 第一次使用 — 还没有模型服务时，空态的结果栏是欢迎;右侧「打开设置 ⌘,」;原文照常可输入,⏎ 不发请求而提示还没配置模型服务;就绪后回到平常的空态</p>
   <section class="panel" data-state="lifecycle-welcome">
-    <div class="source"><span class="placeholder">输入内容,回车翻译…</span></div>
+    <div class="source"><span class="placeholder">输入内容，回车翻译…</span></div>
     <cida-bar action="settings"></cida-bar>
     <div class="result">
-      <div class="text cjk">辞达帮你在任何应用里翻译和改进文字。先选一个模型服务、填入 API Key,就可以开始。</div>
+      <div class="text cjk">辞达需要一个模型服务。打开设置，复制配置提示词交给你的 AI 助手，它会帮你配好。</div>
       <div class="aside">⌥Space 随时唤起 · ⌥S 截图翻译 · 辞达住在菜单栏</div>
     </div>
   </section>
@@ -65,13 +40,13 @@
     <div class="source">Consistency is the last refuge of the unimaginative.</div>
     <cida-bar action="settings"></cida-bar>
     <div class="result">
-      <div class="text cjk">辞达帮你在任何应用里翻译和改进文字。先选一个模型服务、填入 API Key,就可以开始。</div>
-      <cida-note kind="failed">还差 API Key · ⌘, 打开设置</cida-note>
+      <div class="text cjk">辞达需要一个模型服务。打开设置，复制配置提示词交给你的 AI 助手，它会帮你配好。</div>
+      <cida-note kind="failed">还没配置模型服务 · ⌘, 打开设置</cida-note>
     </div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">④ 发现新版本 — 用户检查、点菜单或设置里的「安装…」,或启动时发现;结果栏是这个版本手写的中文更新说明(docs/releases/&lt;版本&gt;.md),超出上限时内部滚动</p>
+  <p class="caption">③ 发现新版本 — 用户检查、点菜单或设置里的「安装…」，或启动时发现;结果栏是这个版本手写的中文更新说明(docs/releases/&lt;版本&gt;.md),超出上限时内部滚动</p>
   <section class="panel" data-state="lifecycle-update-checking">
     <div class="source statement">正在检查更新…</div>
     <cida-bar options="安装并重启|稍后|跳过这个版本" processing action="stop"></cida-bar>
@@ -81,24 +56,24 @@
     <div class="source statement">辞达 1.1.0 可以安装<span class="muted"> · 当前 1.0.0</span></div>
     <cida-bar options="安装并重启|稍后|跳过这个版本"></cida-bar>
     <div class="result"><div class="text cjk notes">
-      <p>辞达会自己检查并安装新版本,更新说明就写在这里。</p>
-      <p>第一次打开时带你把辞达放进「应用程序」。</p>
-      <p>还没填 API Key 时,面板会告诉你从哪里开始。</p>
+      <p>辞达会自己检查并安装新版本，更新说明就写在这里。</p>
+      <p>开机启动时不再弹出面板。</p>
+      <p>还没填 API Key 时，面板会告诉你从哪里开始。</p>
     </div></div>
   </section>
   <section class="panel" data-state="lifecycle-update-downloading">
     <div class="source statement">正在下载辞达 1.1.0 · 38%</div>
     <cida-bar options="安装并重启|稍后|跳过这个版本" processing action="stop"></cida-bar>
     <div class="result"><div class="text cjk notes">
-      <p>辞达会自己检查并安装新版本,更新说明就写在这里。</p>
-      <p>第一次打开时带你把辞达放进「应用程序」。</p>
-      <p>还没填 API Key 时,面板会告诉你从哪里开始。<span class="cursor"></span></p>
+      <p>辞达会自己检查并安装新版本，更新说明就写在这里。</p>
+      <p>开机启动时不再弹出面板。</p>
+      <p>还没填 API Key 时，面板会告诉你从哪里开始。<span class="cursor"></span></p>
     </div></div>
   </section>
   <section class="panel" data-state="lifecycle-update-ready">
     <div class="source statement">辞达 1.1.0 已准备好</div>
     <cida-bar options="立即重启|退出时安装"></cida-bar>
-    <div class="result"><div class="text cjk">重启只需几秒,正在进行的翻译会停止。选「退出时安装」,下次退出辞达时换成新版本。</div></div>
+    <div class="result"><div class="text cjk">重启只需几秒，正在进行的翻译会停止。选「退出时安装」，下次退出辞达时换成新版本。</div></div>
   </section>
   <section class="panel" data-state="lifecycle-update-current">
     <div class="source statement">辞达 1.1.0 已是最新版本</div>
@@ -109,9 +84,19 @@
     <cida-bar options="安装并重启|稍后|跳过这个版本"></cida-bar>
     <div class="result">
       <div class="text cjk notes">
-        <p>辞达会自己检查并安装新版本,更新说明就写在这里。</p>
+        <p>辞达会自己检查并安装新版本，更新说明就写在这里。</p>
       </div>
-      <cida-note kind="failed">下载失败:网络连接已中断 · ⏎ 重试</cida-note>
+      <cida-note kind="failed">下载失败：网络连接已中断 · ⏎ 重试</cida-note>
+    </div>
+  </section>
+  <section class="panel" data-state="lifecycle-update-read-only">
+    <div class="source statement">辞达 1.1.0 可以安装<span class="muted"> · 当前 1.0.0</span></div>
+    <cida-bar options="稍后"></cida-bar>
+    <div class="result">
+      <div class="text cjk notes">
+        <p>辞达会自己检查并安装新版本，更新说明就写在这里。</p>
+      </div>
+      <cida-note kind="failed">辞达正从磁盘映像运行，没法更新。把它拖进「应用程序」后再打开</cida-note>
     </div>
   </section>
 </main>

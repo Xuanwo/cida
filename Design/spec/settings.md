@@ -1,20 +1,16 @@
 # 设置
 
-2026-09-23 在 Proposal 上确认，取代 Settings 单板与 Settings Row 组件。状态见 [`boards/settings-states.html`](../boards/settings-states.html)。
+2026-09-23 在 Proposal 上确认，取代 Settings 单板与 Settings Row 组件；2026-09-25「模型」一组改为 AI 助手配置（`spec/configuration.md`）。状态见 [`boards/settings-states.html`](../boards/settings-states.html)。
 
 ## 一、窗口
 
-- 标准标题栏窗口（⌘, 或菜单栏「设置…」），宽 560 固定；高度随内容，不滚动；`bg` 底色，内容左右内缩 28（`space-window-x`）。
+- 标准标题栏窗口（⌘, 或菜单栏「设置…」），宽 560 固定；高度随内容，超过屏幕可见高度时停在可见高度、内容在窗口内滚动；`bg` 底色，内容左右内缩 28（`space-window-x`）。
 - 四组，按用户的问题分组：模型（用什么模型）→ 提示词（怎么翻 / 怎么改）→ 唤起（怎么唤起）→ 更新（怎么保持最新）。组标题 12 semibold `text-control`；组间 1px `border` 分隔；行 = 标签列 120 + 24 间距 + 控件列铺满；标签 13.5 `text-primary`，说明 11.5 `text-tertiary`；行上下 padding 9。
 - 全部自动保存（250ms 合并），没有保存 / 取消按钮。
 
 ## 二、模型
 
-- 服务商是菜单，每一项是预设：预设 = 端点 + 建议模型 + 是否需要 Key；列表末尾固定「自定义（OpenAI 兼容）」。当前预设：DeepSeek、OpenAI、Moonshot、智谱 GLM。加服务商只加一行预设，界面不变。
-- 选预设时菜单下方一行说明写实际请求的域名（如 `api.deepseek.com · Chat Completions`），不显示端点输入；选自定义时出现「端点」行（`font-mono`，铺满，聚焦 1.5px accent 描边）。
-- 模型：预设 → 建议模型菜单，最后一项「其他…」把这一行换成输入框；自定义 → 输入框。切换服务商时模型回到该预设第一项。
-- API Key：遮罩输入框铺满（`font-mono`），说明「只存本机钥匙串」；自定义且端点为 localhost / 127.0.0.1 / ::1 时占位「本地端点可留空」。
-- 就绪行（组末尾，6pt 圆点 + 12 `text-secondary`，本地推导不联网）：已就绪（accent 点）/ 还差 API Key（`text-tertiary` 点）/ 本地端点 · 无需 API Key（accent 点）/ 端点无效（`text-tertiary` 点）。
+模型服务由 AI 助手通过辞达的命令行配置，这一组只显示状态与「复制配置提示词」，见 `spec/configuration.md` §四。
 
 ## 三、提示词
 
@@ -33,7 +29,7 @@
 ## 五、更新
 
 - 一行「自动检查更新」：说明「每天检查一次」；右侧「检查更新」边框按钮（同「编辑」）+ 开关（默认开），间距 12。后台检查发现新版本时，说明变为「新版本 <版本> 可以安装」，按钮变为「安装…」。行为见 `spec/updates.md`。
-- 设置窗口不滚动，所以这一组只有一行；通道随安装包决定，没有「测试版」开关。
+- 这一组只有一行；通道随安装包决定，没有「测试版」开关。
 
 ## 六、强调色
 

@@ -12,16 +12,12 @@
      --design-state values where one exists. -->
 <main class="board" data-board="settings-states">
   <div class="board-title">States — 设置</div>
-  <p class="caption">规则见 spec/settings.md。六个状态:默认(DeepSeek 已配置)、服务商菜单展开、还差 API Key、自定义端点 + 编辑改进提示词 + 自定义快捷键 + 截图与选中文字已授权、录制快捷键、有新版本可以安装;除 settings-custom 外,「截图翻译」与「选中文字」都是未授权的「去授权」。窗口 560 宽,高度随内容;实现侧 --design-state 对应:settings / settings-missing-key / settings-custom / settings-recording / settings-update-available。</p>
+  <p class="caption">规则见 spec/settings.md。「模型」一组的各个状态在 configuration.html;这里的状态都是模型已就绪。四个状态:默认、编辑改进提示词 + 自定义快捷键 + 截图与选中文字已授权 + 开机启动、录制快捷键、有新版本可以安装;除 settings-custom 外,「截图翻译」与「选中文字」都是未授权的「去授权」。窗口 560 宽,高度随内容,超过屏幕可见高度时在窗口内滚动;实现侧 --design-state 与状态名相同。</p>
   <div class="states-grid">
-    <figure><div class="state-label">默认 · DeepSeek 已配置(settings)</div>
+    <figure><div class="state-label">默认(settings)</div>
       <cida-settings state="settings"></cida-settings></figure>
-    <figure><div class="state-label">服务商菜单展开</div>
-      <cida-settings state="settings-provider-menu" menu="open"></cida-settings></figure>
-    <figure><div class="state-label">还差 API Key(settings-missing-key)</div>
-      <cida-settings state="settings-missing-key" key="missing"></cida-settings></figure>
-    <figure><div class="state-label">自定义(OpenAI 兼容)· 本地端点 · 编辑改进提示词 · 自定义快捷键 · 截图与选中文字已授权(settings-custom)</div>
-      <cida-settings state="settings-custom" provider="custom" editing="improve" shortcut="custom" grants="all" launch="on"></cida-settings></figure>
+    <figure><div class="state-label">编辑改进提示词 · 自定义快捷键 · 截图与选中文字已授权 · 开机启动(settings-custom)</div>
+      <cida-settings state="settings-custom" editing="improve" shortcut="custom" grants="all" launch="on"></cida-settings></figure>
     <figure><div class="state-label">录制快捷键(settings-recording)</div>
       <cida-settings state="settings-recording" shortcut="recording"></cida-settings></figure>
     <figure><div class="state-label">有新版本可以安装(settings-update-available)</div>

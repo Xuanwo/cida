@@ -58,34 +58,17 @@ customElements.define("cida-note", CidaNote);
 customElements.define("cida-motion-note", CidaMotionNote);
 
 // The Settings window (spec/settings.md). Attributes name what a state
-// changes: provider="custom", key="missing", editing="improve",
-// shortcut="custom|recording", grants="all", launch="on", menu="open".
+// changes: config (see below), editing="improve", shortcut="custom|recording",
+// grants="all", launch="on", update="available".
 class CidaSettings extends HTMLElement {
   connectedCallback() {
     const is = (name, value) => this.getAttribute(name) === value;
-    const custom = is("provider", "custom");
     const granted = is("grants", "all");
     const row = (title, caption, controls, align = "") => `
       <div class="row">
         <div class="labels"><b>${title}</b>${caption ? `<small>${caption}</small>` : ""}</div>
         <div class="controls ${align}">${controls}</div>
       </div>`;
-    const menu = (value) => `<span class="menu">${value}<i class="icon icon-chevron-down"></i></span>`;
-    const field = (value, extra = "") => `<span class="field ${extra}">${value}</span>`;
-
-    const provider = row("服务商", "", custom
-      ? menu("自定义（OpenAI 兼容）")
-      : `<div class="stack">${menu("DeepSeek")}<small>api.deepseek.com · Chat Completions</small></div>`);
-    const endpoint = row("端点", "OpenAI 格式的接口", field("http://127.0.0.1:8080/v1/chat/completions", "focused"));
-    const key = row("API Key", "只存本机钥匙串", custom
-      ? field("本地端点可留空", "placeholder")
-      : is("key", "missing") ? field("粘贴 API Key", "placeholder") : field("sk-••••••••••••••••3f2a"));
-    const model = row("模型", "", custom ? field("qwen3-32b") : menu("deepseek-chat"));
-    const readiness = custom
-      ? `<div class="readiness"><i></i>本地端点 · 无需 API Key</div>`
-      : is("key", "missing")
-        ? `<div class="readiness pending"><i></i>还差 API Key</div>`
-        : `<div class="readiness"><i></i>已就绪</div>`;
 
     const prompt = (title, preview) => `
       <div class="row prompt">
@@ -116,24 +99,54 @@ class CidaSettings extends HTMLElement {
       ? row("自动检查更新", "新版本 1.1.0 可以安装", `<span class="button">安装…</span><span class="toggle on"></span>`, "end spaced")
       : row("自动检查更新", "每天检查一次", `<span class="button">检查更新</span><span class="toggle on"></span>`, "end spaced");
 
-    const popover = is("menu", "open")
-      ? `<div class="popover" style="left: 172px; top: 107px">
-           <span class="current">DeepSeek<i class="icon icon-check"></i></span>
-           <span>OpenAI</span><span>Moonshot</span><span>智谱 GLM</span><span>自定义（OpenAI 兼容）</span>
-         </div>`
+    // The agent-configured model group (spec/configuration.md §四):
+    // config="unset|unset-copied|ready|updated|checking|failed".
+    const config = this.getAttribute("config") ?? "ready";
+    const copyIcon = `<i class="icon icon-copy"></i>`;
+    const statusCaption = {
+      ready: `<span class="dot-caption"><i></i>已就绪</span>`,
+      updated: `<span class="dot-caption"><i></i>已就绪 · 刚刚更新</span>`,
+      checking: `<span class="dot-caption pending"><i></i>正在检查…</span>`,
+      failed: `<span class="dot-caption pending"><i></i>检查失败</span>`,
+    }[config];
+    const serviceRow = `
+      <div class="row">
+        <div class="labels"><b>模型服务</b><small>${statusCaption}</small></div>
+        <div class="controls">
+          <div class="stack summary"><b>deepseek-chat</b><small>api.deepseek.com · Chat Completions</small></div>
+          <span class="button push">${config === "checking" ? "检查中…" : "检查"}</span>
+        </div>
+      </div>`;
+    const failure = config === "failed"
+      ? `<div class="row-note"><i class="icon icon-circle-alert"></i><span>401 · 服务商拒绝了 API Key。复制配置提示词，让 AI 助手修好。</span></div>`
       : "";
+    const adjustRow = row("调整配置", "交给 AI 助手", `<span class="button with-icon">${copyIcon}复制配置提示词</span>`, "end");
+    const onboarding = (copied) => `
+      <div class="agent-card">
+        <div class="labels">
+          <b>还没有模型服务</b>
+          <small>${copied
+            ? "已复制。粘贴给你的 AI 助手，配好后这里会自动更新。"
+            : "复制配置提示词，交给 Claude Code、Codex 等 AI 助手。它会问你用哪家服务，配好后自己检查。"}</small>
+        </div>
+        ${copied
+          ? `<span class="button copied with-icon"><i class="icon icon-check"></i>已复制</span>`
+          : `<span class="button with-icon">${copyIcon}复制配置提示词</span>`}
+      </div>`;
+    const modelGroup = config.startsWith("unset")
+        ? onboarding(config === "unset-copied")
+        : `${serviceRow}${failure}${adjustRow}`;
 
     this.outerHTML = `
       <section class="window" style="position: relative" data-state="${this.getAttribute("state")}">
         <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">设置</div></div>
         <div class="settings">
-          <div class="group"><h3>模型</h3>${provider}${custom ? endpoint + model + key : key + model}${readiness}</div>
+          <div class="group"><h3>模型</h3>${modelGroup}</div>
           <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>
           <div class="group"><h3>唤起</h3>${shortcut}${capture}${selection}${launch}</div>
           <div class="group"><h3>更新</h3>${updates}</div>
           <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>
         </div>
-        ${popover}
       </section>`;
   }
 }
