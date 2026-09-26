@@ -67,7 +67,7 @@ render once the boards are rendered again.
 | Baseline | Logical size | Mask |
 | --- | ---: | --- |
 | Panel, empty | 800 × 113 | none |
-| Settings, default | 560 × 744 | native title bar, 46 pt |
+| Settings, default | 560 × 886 | native title bar, 46 pt |
 
 The remaining states are retained as reviewable reference/current comparisons and are protected by
 deterministic geometry and interaction assertions (panel height budget, source cap, result

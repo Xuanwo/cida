@@ -33,7 +33,7 @@
 | `body` | JSON 对象 | 合并进请求体的额外参数（如关闭推理） |
 | `my-language` / `foreign-language` | 文本，如 `简体中文`、`English`、`粤语` | 与 Settings「语言」一组相同，任意写法（`spec/settings.md` §三） |
 | `translation-prompt` / `improvement-prompt` | 文本，可 `--file` / `--stdin` | 与设置里的提示词相同 |
-| `shortcut` / `capture-shortcut` | 如 `option+space` | 与设置里的快捷键相同 |
+| `shortcut` / `capture-shortcut` / `layer-shortcut` | 如 `option+space` | 与设置里的快捷键相同；三个不能相同 |
 | `launch-at-login` / `automatic-updates` | `true` / `false` | 与设置里的开关相同 |
 
 请求体里辞达自己带的参数：Anthropic Messages 的 `max_tokens` 为 8192；Responses 带 `"store": false`（辞达不留请求记录，也请服务不留）。`body` 逐层合并进请求体，值为 `null` 的键会被去掉，所以这些都可以改或去掉。
