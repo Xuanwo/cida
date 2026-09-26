@@ -68,7 +68,10 @@ final class CidaWindow: NSWindow {
     NSAnimationContext.runAnimationGroup { context in
       context.duration = duration
       context.timingFunction = CidaMotion.easeOut
-      animator().setFrame(target, display: flag)
+      // Sent through NSWindow so the proxy receives it as a message. Called on a CidaWindow,
+      // Swift dispatches straight to this override with the proxy as `self`, and the proxy has
+      // no storage for this class's properties.
+      (animator() as NSWindow).setFrame(target, display: flag)
     } completionHandler: { [weak self] in
       MainActor.assumeIsolated {
         guard let self, self.heightMoveCount == move else { return }
