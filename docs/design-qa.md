@@ -143,7 +143,7 @@ and refuses overflowing translations. It does not reconstruct textured backgroun
 font families/weights. `docs/images/demo.gif` must be recorded again because its capture and
 translation sequence changes.
 
-Review evidence is in `Design/QACurrent/comparison-capture-*.png` (board versus native offscreen
+Review evidence is in `Design/QACurrent/comparison-capture-translated.png` (board versus native offscreen
 fixture) and `Design/QACurrent/capture-before-after.png` (original versus translated fixture).
 These are deterministic synthetic screenshots drawn with the production renderer, not a host
 screen capture and not evidence of a successful ScreenCaptureKit/Vision/network journey.
@@ -179,7 +179,7 @@ export dimensions/orientation/unchanged pixels, PNG pasteboard and file output, 
 handoff, and window ownership. `PanelAndSettingsJourneyTests` includes the mode switch,
 persistence, capture, copy, save-sheet cancellation and close journey. Its test bundle compiles;
 execution is pending the missing Tart image, which the user confirmed is unavailable.
-Offscreen screenshots are under `Design/QACurrent`, including `comparison-settings-image-window.png`
+Offscreen screenshots are under `Design/QACurrent`, including `settings-mode-before-after.png`
 and `comparison-capture-image-window.png`. These are review evidence, not approved Tart baselines.
 The existing visual baseline manifest is intentionally not re-approved without the guest run.
 The capture sequence in `docs/images/demo.gif` needs re-recording.
@@ -189,3 +189,11 @@ correcting the initial window size, and `swift build -Xswiftc -warnings-as-error
 The complete offscreen capture script and updated capture board render completed successfully.
 `Design/QACurrent/settings-mode-before-after.png` retains the previous and current Settings states.
 The locally ad-hoc-signed Development app was refreshed with its existing bundle identity.
+
+
+Only four representative review images are committed for this feature: Settings before/after,
+source/translation, overlay board/native, and image-window board/native. The complete capture
+script was run during verification; its remaining generated outputs are omitted from this PR
+to avoid duplicating reference, implementation and comparison images for every Settings state.
+Regenerate those outputs with the commands above when needed. Existing approved baselines are
+not updated by this evidence-only cleanup.
