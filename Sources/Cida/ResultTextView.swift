@@ -4,7 +4,7 @@ import QuartzCore
 
 @MainActor
 protocol ResultHeightChangeHosting: AnyObject {
-  func resultHeightWillChange(by delta: CGFloat, animated: Bool)
+  func resultHeightDidChange(by delta: CGFloat)
 }
 
 /// The design's result typography: Latin results are set in Source Serif 4 and
@@ -227,6 +227,19 @@ final class ResultTextCoordinator: NSObject {
     }
   }
 
+  /// The height is needed now (SwiftUI sizes the pane, or a new record is about
+  /// to be shown): a document the container has not laid out as a whole at this
+  /// width, such as a new record, a different face or a new container, is laid
+  /// out at once. Streamed appends keep their coalesced layout.
+  func layoutForSizing(_ container: ResultTextContainer, width: CGFloat) {
+    guard width > ResultTextContainer.horizontalInset * 2 else { return }
+    if abs(container.frame.width - width) > 0.5 {
+      container.setFrameSize(NSSize(width: width, height: container.frame.height))
+    }
+    guard container.needsFullTextLayout else { return }
+    layoutNow(of: container, publishesHeight: false)
+  }
+
   /// Bypasses the coalescing interval, e.g. when a streamed line wraps and the
   /// result must grow on this pulse rather than up to 100 ms later.
   func layoutNow(of container: ResultTextContainer, publishesHeight: Bool = true) {
@@ -245,6 +258,9 @@ final class ResultTextCoordinator: NSObject {
 
     let elapsed = ProcessInfo.processInfo.systemUptime - lastLayoutUptime
     guard lastLayoutUptime == 0 || elapsed >= Self.minimumLayoutInterval else {
+      // Within the coalescing interval: lay out once it has passed, even if no
+      // further append or view update arrives to ask again.
+      scheduleLayout(of: container)
       return
     }
     performPendingLayout()
@@ -350,14 +366,15 @@ final class ResultTextContainer: NSView {
   private var revealFragments: [GlyphRevealFragmentView] = []
   private var revealCompletionWorkItem: DispatchWorkItem?
   private var isStreaming = false
-  private var needsFullTextLayout = true
+  /// The whole document needs laying out: a replaced text or a new width.
+  private(set) var needsFullTextLayout = true
   private var pendingTextLayoutRange: NSRange?
   private var intrinsicSizeInvalidationIsScheduled = false
   private var pendingNaturalHeightDelta: CGFloat = 0
-  private var pendingNaturalHeightAnimated = false
   private var naturalHeightPublicationGeneration = 0
   private var streamingTextViewHeightCapacity: CGFloat = 0
   private var selectionIsActive = false
+  private var isDimmed = false
   private var resultAccessibilityIdentifier: String?
 
   private(set) var fullReplacementCount = 0
@@ -543,7 +560,6 @@ final class ResultTextContainer: NSView {
     naturalHeightPublicationGeneration &+= 1
     intrinsicSizeInvalidationIsScheduled = false
     pendingNaturalHeightDelta = 0
-    pendingNaturalHeightAnimated = false
     isStreaming = false
     needsFullTextLayout = true
     pendingTextLayoutRange = nil
@@ -728,12 +744,6 @@ final class ResultTextContainer: NSView {
 
   func scheduleNaturalHeightPublication(heightDelta: CGFloat) {
     pendingNaturalHeightDelta += heightDelta
-    // `motion-height-ms`: a streaming result grows with the height
-    // transition; width relayouts and completed results resize immediately.
-    pendingNaturalHeightAnimated =
-      pendingNaturalHeightAnimated
-      || (isStreaming && window != nil
-        && !CidaMotion.reducesMotion)
     guard !intrinsicSizeInvalidationIsScheduled else { return }
     intrinsicSizeInvalidationIsScheduled = true
     let generation = naturalHeightPublicationGeneration
@@ -742,18 +752,37 @@ final class ResultTextContainer: NSView {
       guard self.naturalHeightPublicationGeneration == generation else { return }
       self.intrinsicSizeInvalidationIsScheduled = false
       let publishedHeightDelta = self.pendingNaturalHeightDelta
-      let animated = self.pendingNaturalHeightAnimated
       self.pendingNaturalHeightDelta = 0
-      self.pendingNaturalHeightAnimated = false
       var ancestor = self.superview
       while let current = ancestor {
         if let hostingView = current as? any ResultHeightChangeHosting {
-          hostingView.resultHeightWillChange(by: publishedHeightDelta, animated: animated)
+          hostingView.resultHeightDidChange(by: publishedHeightDelta)
           break
         }
         ancestor = current.superview
       }
       self.invalidateIntrinsicContentSize()
+    }
+  }
+
+  /// A stale result dims to 55%. The change fades with the note row the panel
+  /// reveals at the same time (`motion-height-ms`, `motion-ease-height`), except
+  /// when it comes with a new document.
+  func setDimmed(_ dimmed: Bool, animated: Bool) {
+    guard dimmed != isDimmed else { return }
+    isDimmed = dimmed
+    let alpha: CGFloat = dimmed ? 0.55 : 1
+    let duration =
+      animated ? CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: window) : 0
+    guard duration > 0 else {
+      layer?.removeAnimation(forKey: "opacity")
+      alphaValue = alpha
+      return
+    }
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = duration
+      context.timingFunction = CidaMotion.heightCurve.timingFunction
+      animator().alphaValue = alpha
     }
   }
 

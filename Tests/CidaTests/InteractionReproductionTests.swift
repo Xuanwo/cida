@@ -93,9 +93,13 @@ final class InteractionReproductionTests: XCTestCase {
     let controller = makeHiddenPanel(model: model)
     let panel = controller.panel
 
+    // At its cap the result pane shows whole lines, so the panel stops within one line of
+    // its budget.
+    let lineHeight = CidaDesign.Typography.resultLineHeight
+    let budget = controller.heightBudget.panelMaxHeight
     try await waitUntil(timeout: .seconds(2)) {
       controller.contentView?.layoutSubtreeIfNeeded()
-      return abs(panel.frame.height - controller.heightBudget.panelMaxHeight) <= 1
+      return panel.frame.height > budget - lineHeight
     }
     let contentView = try XCTUnwrap(controller.contentView)
     let resultScrollView = try XCTUnwrap(firstResultScrollView(in: contentView))
@@ -104,7 +108,10 @@ final class InteractionReproductionTests: XCTestCase {
       container.naturalTextHeight > resultScrollView.contentView.bounds.height
     }
 
-    XCTAssertEqual(panel.frame.height, controller.heightBudget.panelMaxHeight, accuracy: 1)
+    XCTAssertLessThanOrEqual(panel.frame.height, budget)
+    XCTAssertGreaterThan(panel.frame.height, budget - lineHeight)
+    let visibleLines = resultScrollView.contentView.bounds.height / lineHeight
+    XCTAssertEqual(visibleLines, visibleLines.rounded(), accuracy: 0.001, "No line is cut")
     XCTAssertGreaterThan(container.frame.height, resultScrollView.contentView.bounds.height)
     XCTAssertEqual(
       resultScrollView.contentView.bounds.minY, 0, accuracy: 0.5,
@@ -401,7 +408,12 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(
       sourceTopDrift, [],
       "The source pane stays pinned to the panel's top edge while the height animates (initial \(initialSourceTop))")
-    XCTAssertEqual(controller.panel.frame.height, PanelHeightBudget.automation.panelMaxHeight, accuracy: 0.5)
+    XCTAssertLessThanOrEqual(
+      controller.panel.frame.height, PanelHeightBudget.automation.panelMaxHeight)
+    XCTAssertGreaterThan(
+      controller.panel.frame.height,
+      PanelHeightBudget.automation.panelMaxHeight - CidaDesign.Typography.resultLineHeightCJK,
+      "At its cap the result pane shows whole lines")
     assertTestProcessIsNotFrontmost()
   }
 

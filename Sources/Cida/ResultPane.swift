@@ -4,6 +4,12 @@ import SwiftUI
 /// The result text inside a scroll view. The pane grows with the result until
 /// the panel reaches its height budget, then scrolls; while a stream runs it
 /// keeps the tail in view unless the user scrolled away.
+///
+/// The view's height is the laid-out text, up to `maxVisibleHeight`. A record or
+/// a width the text has not been laid out for yet is laid out when SwiftUI asks,
+/// so the pane shows a new record at its own height from its first frame; later
+/// growth while streaming stays coalesced and reaches SwiftUI through
+/// `ResultScrollView.resultHeightDidChange`.
 struct ResultTextView: NSViewRepresentable {
   let record: ResultRecord?
   let generationState: GenerationPresentationState
@@ -11,20 +17,16 @@ struct ResultTextView: NSViewRepresentable {
   let followRevision: Int
   /// The tallest the text area can get before the pane scrolls instead.
   let maxVisibleHeight: CGFloat
-  let onContentHeightChange: @MainActor (CGFloat, Bool) -> Void
 
   func makeCoordinator() -> ResultTextCoordinator {
     ResultTextCoordinator()
   }
 
   func makeNSView(context: Context) -> ResultScrollView {
-    let scrollView = ResultScrollView()
-    scrollView.onContentHeightChange = onContentHeightChange
-    return scrollView
+    ResultScrollView()
   }
 
   func updateNSView(_ scrollView: ResultScrollView, context: Context) {
-    scrollView.onContentHeightChange = onContentHeightChange
     scrollView.maxVisibleHeight = maxVisibleHeight
     let container = scrollView.container
     guard let record else {
@@ -38,6 +40,8 @@ struct ResultTextView: NSViewRepresentable {
       container.language = record.outputLanguage
       context.coordinator.detach(from: container)
     }
+    // A new record, or the same one set in another face: the document is replaced.
+    let replacesDocument = context.coordinator.entryID != record.id
     context.coordinator.observeStreamingUpdates(from: record.storage, in: container)
     context.coordinator.updateText(
       record.storage,
@@ -48,9 +52,23 @@ struct ResultTextView: NSViewRepresentable {
       in: container
     )
     container.setResultAccessibilityIdentifier("result-text")
-    container.alphaValue = isStale ? 0.55 : 1
+    container.setDimmed(isStale, animated: !replacesDocument)
+    if replacesDocument {
+      // The previous document must not be what the pane scrolls or shows.
+      context.coordinator.layoutForSizing(container, width: container.frame.width)
+      scrollView.documentDidReplace()
+    }
     context.coordinator.scheduleLayout(of: container)
     scrollView.setFollowsTail(isStreaming, forceRevision: followRevision)
+  }
+
+  func sizeThatFits(
+    _ proposal: ProposedViewSize, nsView scrollView: ResultScrollView, context: Context
+  ) -> CGSize? {
+    let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? scrollView.container.frame.width
+    context.coordinator.layoutForSizing(scrollView.container, width: width)
+    return CGSize(
+      width: width, height: min(scrollView.container.naturalTextHeight, maxVisibleHeight))
   }
 
   static func dismantleNSView(_ scrollView: ResultScrollView, coordinator: ResultTextCoordinator) {
@@ -61,7 +79,6 @@ struct ResultTextView: NSViewRepresentable {
 @MainActor
 final class ResultScrollView: OverlayScrollView, ResultHeightChangeHosting {
   let container = ResultTextContainer()
-  var onContentHeightChange: @MainActor (CGFloat, Bool) -> Void = { _, _ in }
   /// While the text is shorter than this the pane still grows, so following
   /// the tail would scroll up and then snap back once the pane catches up.
   var maxVisibleHeight: CGFloat = .greatestFiniteMagnitude
@@ -104,12 +121,24 @@ final class ResultScrollView: OverlayScrollView, ResultHeightChangeHosting {
     }
   }
 
-  func resultHeightWillChange(by delta: CGFloat, animated: Bool) {
+  /// The text's natural height changed: SwiftUI asks `ResultTextView` for the
+  /// new size.
+  func resultHeightDidChange(by delta: CGFloat) {
     resizeDocument()
-    onContentHeightChange(container.naturalTextHeight, animated)
+    invalidateIntrinsicContentSize()
     if isStreaming, followsTail, paneIsAtItsCap {
       scrollToTail()
     }
+  }
+
+  /// The document was replaced: it is read from its top, and it is sized now, so
+  /// a tail follow in the same update scrolls the new document rather than the
+  /// old one.
+  func documentDidReplace() {
+    resizeDocument()
+    contentView.scroll(to: .zero)
+    reflectScrolledClipView(contentView)
+    invalidateIntrinsicContentSize()
   }
 
   /// The visible area has stopped growing, so scrolling is the only way to

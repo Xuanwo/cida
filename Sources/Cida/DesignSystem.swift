@@ -275,10 +275,6 @@ enum CidaMotion {
     Curve.easeOut.timingFunction
   }
 
-  static func easeOutAnimation(duration: TimeInterval) -> Animation {
-    Curve.easeOut.animation(duration: duration)
-  }
-
   /// Tests that assert on motion pin this, so the host's Reduce Motion setting (on by default
   /// on CI runners) does not decide what they see.
   @MainActor static var reducesMotionOverride: Bool?
