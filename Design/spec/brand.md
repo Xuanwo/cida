@@ -19,7 +19,7 @@
 ## 三、菜单栏
 
 - 18×18pt 单色模板图，墨迹高 14，光标宽 1.5；由系统按菜单栏明暗着色，不带 accent。字形与光标是两层（`Sources/Cida/Resources/Brand/status-item-glyph.svg`、`status-item-caret.svg`），运行时叠成一张模板图。
-- 呼吸（2026-09-25 决定）：面板隐藏、请求仍在生成（等待首字或逐字显示）时，只有光标呼吸，与结果栏等待光标同一曲线：opacity 0.3（`motion-cursor-opacity-min`）↔ 1，周期 1.2s（`motion-breathe-ms`），ease-in-out。请求结束、被停止或失败，或面板重新出现，光标立即回到 1。面板可见时不呼吸，进度由面板自己显示。
+- 呼吸（2026-09-25 决定）：面板隐藏、请求仍在生成（等待首字或逐字显示）时，只有光标呼吸，与结果栏等待光标同一曲线：opacity 0.3（`motion-cursor-opacity-min`）↔ 1，周期 1.2s（`motion-breathe-ms`），ease-in-out。呼吸从 opacity 1 的相位开始；请求结束、被停止或失败，或面板重新出现，光标用 200ms（`motion-cursor-out-ms`，`motion-ease-cursor-out`）缓回 1。面板可见时不呼吸，进度由面板自己显示。
 - 呼吸期间按钮的辅助功能值为「正在生成」，平时为空。开启「减弱动态效果」时不动画，光标停在 0.3。
 - 资源缺失时退回文字「辞」。
 

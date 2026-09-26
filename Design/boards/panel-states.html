@@ -115,11 +115,11 @@
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑫ 最大高度 — 面板上限 = 屏幕可见高度 70%(panel-max-ratio);原文栏上限 30%(source-max-ratio),超出后内部滚动;结果栏拿剩余,生成期间跟随尾部,用户上滚即解除</p>
-  <section class="panel" data-state="long" style="height: 720px">
+  <p class="caption">⑫ 最大高度 — 面板上限 = 屏幕可见高度 70%(panel-max-ratio);原文栏上限 30%(source-max-ratio),超出后内部滚动;结果栏拿剩余,按整行取高(不切在字中间),生成期间跟随尾部,用户上滚即解除</p>
+  <section class="panel" data-state="long">
     <div class="source" style="height: 300px; overflow: hidden">在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。</div>
     <cida-bar action="copy"></cida-bar>
-    <div class="result" style="flex: 1; overflow: hidden"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.</div></div>
+    <div class="result"><div class="text" style="height: 290px; overflow: hidden">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.</div></div>
   </section>
 </main>
 </body>

@@ -260,8 +260,6 @@ body {
 
 /* ---- Lifecycle panels (spec/lifecycle.md) ------------------------------ */
 
-/* Short statement lines set their punctuation half-width, so 「：」 and 「、」 leave no hole. */
-.source.statement { font-feature-settings: "halt"; }
 .source.statement .muted { color: var(--text-tertiary); }
 /* 更新内容 belongs to the list below it. */
 .result .aside:first-child { margin-bottom: -4px; }
