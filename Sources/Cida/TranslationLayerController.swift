@@ -104,8 +104,10 @@ final class TranslationLayerController {
 
   private func step() {
     tickCount += 1
-    if tickCount % 5 == 1 { windows = LayerWindowInfo.onScreen() }
     if tickCount % 30 == 1 { discover() }
+    // Nothing to follow: no window list, no pointer.
+    guard !sessions.isEmpty || oneOff != nil else { return }
+    if tickCount % 5 == 1 { windows = LayerWindowInfo.onScreen() }
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     for session in allSessions {
       session.step(windows: windows, mouse: mouse)
