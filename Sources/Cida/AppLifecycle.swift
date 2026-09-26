@@ -576,10 +576,6 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   }
 }
 
-final class CidaWindow: NSWindow {
-  override var canBecomeKey: Bool { true }
-  override var canBecomeMain: Bool { true }
-}
 
 // MARK: - Updates in the panel
 
