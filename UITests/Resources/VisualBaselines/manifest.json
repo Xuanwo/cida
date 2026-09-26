@@ -4,7 +4,7 @@
     {
       "name": "panel-empty",
       "approvedImage": "Design/QACurrent/implementation-empty.png",
-      "approvedImageSHA256": "e258865d755e689983b702c6ffa5933c8244d3c5f1d78736c6dcaa761dc1a1cf",
+      "approvedImageSHA256": "46efe362b2ead74f951793c0e060fa7900ea2038e41f02c1a282dfa304474af0",
       "designReference": "Design/QACurrent/reference-empty.png",
       "designReferenceSHA256": "95d4f3d879d45b3854f1cbbd2770ca95e1bd78eed656e0da3da9b0a547b6336c",
       "designDocument": "Design/boards/panel-states.html",
