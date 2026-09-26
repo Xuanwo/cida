@@ -104,5 +104,6 @@
   --motion-cursor-h: 20;
   --motion-ease-char-in: ease-out;
   --motion-ease-height: ease-out;
+  --motion-ease-cursor-out: ease-out;
   --motion-ease-breathe: ease-in-out;
 }

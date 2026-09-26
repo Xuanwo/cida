@@ -327,6 +327,12 @@ final class ResultTextContainer: NSView {
   /// leading. Set it before `replaceText` for a new record.
   var language: Language = .english
 
+  /// One line of the result's typography: the height of an empty (waiting)
+  /// result, so the first glyph does not change it.
+  private var minimumTextHeight: CGFloat {
+    ResultTextStyle.lineHeight(for: language)
+  }
+
   private let renderingView: StreamingResultRenderingView
   private var selectionTextView: StreamingResultTextView?
   private var selectionTextStorage: NSTextStorage?
@@ -541,8 +547,8 @@ final class ResultTextContainer: NSView {
     isStreaming = false
     needsFullTextLayout = true
     pendingTextLayoutRange = nil
-    naturalTextHeight = Self.minimumHeight
-    contentTextHeight = Self.minimumHeight
+    naturalTextHeight = minimumTextHeight
+    contentTextHeight = minimumTextHeight
     streamingTextViewHeightCapacity = min(
       streamingTextViewHeightCapacity,
       Self.minimumStreamingTextViewCapacity
@@ -580,22 +586,18 @@ final class ResultTextContainer: NSView {
       deactivateSelection(clearMaterializedText: true)
     }
     if streaming {
-      caretLayer.opacity = 1
+      caretLayer.removeAnimation(forKey: Self.caretFadeKey)
+      setCaretOpacity(1)
       updateCaretPulse()
     } else {
       // Streaming motion T3: the caret fades over motion-cursor-out-ms while the last
       // revealed glyphs finish their own fade.
       scheduleFinalGlyphRevealCommit()
-      caretLayer.removeAnimation(forKey: "waiting-pulse")
-      if window == nil || CidaMotion.reducesMotion {
-        caretLayer.opacity = 0
-      } else {
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = caretLayer.presentation()?.opacity ?? caretLayer.opacity
-        fade.toValue = 0
-        fade.duration = CidaMotion.cursorOutSeconds
-        caretLayer.add(fade, forKey: "completion-fade")
-        caretLayer.opacity = 0
+      let shownOpacity = caretLayer.presentation()?.opacity ?? caretLayer.opacity
+      caretLayer.removeAnimation(forKey: Self.waitingPulseKey)
+      setCaretOpacity(0)
+      if window != nil, !CidaMotion.reducesMotion {
+        fadeCaret(from: shownOpacity, to: 0)
       }
     }
     updateStreamingCaretFrame()
@@ -622,7 +624,7 @@ final class ResultTextContainer: NSView {
     }
     let usedRect = renderingView.usageBounds
     contentTextHeight = max(
-      Self.minimumHeight,
+      minimumTextHeight,
       ceil(
         usedRect.height + StreamingResultRenderingView.verticalTextInset * 2
       )
@@ -758,21 +760,26 @@ final class ResultTextContainer: NSView {
   func updateStreamingCaretFrame() {
     guard isStreaming else { return }
     let length = textStorage?.length ?? 0
-    let origin: CGPoint
+    let lineTop: CGFloat
+    let lineEnd: CGFloat
     if length == 0 {
-      origin = CGPoint(x: 0, y: StreamingResultRenderingView.verticalTextInset + 3)
+      lineTop = 0
+      lineEnd = 0
     } else if let lastLineFrame = renderingView.lastTextLineFrame() {
-      origin = CGPoint(
-        x: lastLineFrame.maxX + 3,
-        y: lastLineFrame.minY + max(0, (lastLineFrame.height - CidaMotion.cursorHeight) / 2)
-      )
+      lineTop = lastLineFrame.minY
+      lineEnd = lastLineFrame.maxX
     } else {
       let usageBounds = renderingView.usageBounds
-      origin = CGPoint(
-        x: usageBounds.maxX + 3,
-        y: max(0, usageBounds.maxY - CidaMotion.cursorHeight)
-      )
+      lineTop = max(0, usageBounds.maxY - minimumTextHeight)
+      lineEnd = usageBounds.maxX
     }
+    // The same place in the line whether it holds glyphs yet or not, so the
+    // caret does not move vertically when the first glyph arrives.
+    let origin = CGPoint(
+      x: lineEnd + ResultTextStyle.caretGap,
+      y: StreamingResultRenderingView.verticalTextInset + lineTop
+        + ResultTextStyle.caretTop(for: language)
+    )
 
     CATransaction.begin()
     CATransaction.setDisableActions(true)
@@ -780,28 +787,62 @@ final class ResultTextContainer: NSView {
       origin: origin,
       size: CGSize(width: CidaMotion.cursorWidth, height: CidaMotion.cursorHeight)
     )
-    caretLayer.opacity = 1
     CATransaction.commit()
     updateCaretPulse()
   }
 
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    // A waiting caret made before the pane reached a window starts breathing now.
+    updateCaretPulse()
+  }
+
+  private static let waitingPulseKey = "waiting-pulse"
+  private static let caretFadeKey = "caret-fade"
+
+  private func setCaretOpacity(_ opacity: Float) {
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    caretLayer.opacity = opacity
+    CATransaction.commit()
+  }
+
+  /// `motion-cursor-out-ms` on `motion-ease-cursor-out`, from what the caret
+  /// shows now; the model opacity is already the target.
+  private func fadeCaret(from opacity: Float, to target: Float) {
+    let fade = CABasicAnimation(keyPath: "opacity")
+    fade.fromValue = opacity
+    fade.toValue = target
+    fade.duration = CidaMotion.cursorOutSeconds
+    fade.timingFunction = CidaMotion.cursorOutCurve.timingFunction
+    caretLayer.add(fade, forKey: Self.caretFadeKey)
+  }
+
+  /// The waiting caret breathes (`motion-breathe-ms`) from full opacity, where
+  /// it already is, down to `motion-cursor-opacity-min` and back. When the first
+  /// glyph arrives it eases back to full opacity instead of jumping there.
   private func updateCaretPulse() {
     guard isStreaming else { return }
     let shouldPulse =
       window != nil
       && (textStorage?.length ?? 0) == 0
       && !CidaMotion.reducesMotion
-    if shouldPulse, caretLayer.animation(forKey: "waiting-pulse") == nil {
+    let isPulsing = caretLayer.animation(forKey: Self.waitingPulseKey) != nil
+    if shouldPulse, !isPulsing {
       let pulse = CABasicAnimation(keyPath: "opacity")
-      pulse.fromValue = CidaMotion.cursorMinimumOpacity
-      pulse.toValue = 1
+      pulse.fromValue = 1
+      pulse.toValue = CidaMotion.cursorMinimumOpacity
       pulse.duration = CidaMotion.breatheHalfCycleSeconds
       pulse.autoreverses = true
       pulse.repeatCount = .infinity
-      pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-      caretLayer.add(pulse, forKey: "waiting-pulse")
-    } else if !shouldPulse {
-      caretLayer.removeAnimation(forKey: "waiting-pulse")
+      pulse.timingFunction = CidaMotion.breatheCurve.timingFunction
+      caretLayer.add(pulse, forKey: Self.waitingPulseKey)
+    } else if !shouldPulse, isPulsing {
+      let shownOpacity = caretLayer.presentation()?.opacity ?? caretLayer.opacity
+      caretLayer.removeAnimation(forKey: Self.waitingPulseKey)
+      if window != nil, !CidaMotion.reducesMotion {
+        fadeCaret(from: shownOpacity, to: 1)
+      }
     }
   }
 
@@ -935,7 +976,7 @@ final class ResultTextContainer: NSView {
       width: 0,
       height: StreamingResultRenderingView.verticalTextInset
     )
-    textView.minSize = NSSize(width: 0, height: Self.minimumHeight)
+    textView.minSize = NSSize(width: 0, height: minimumTextHeight)
     textView.maxSize = NSSize(
       width: CGFloat.greatestFiniteMagnitude,
       height: CGFloat.greatestFiniteMagnitude

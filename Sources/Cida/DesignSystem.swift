@@ -215,23 +215,68 @@ enum CidaMotion {
   static let cursorWidth: CGFloat = 2
   static let cursorHeight: CGFloat = 20
 
-  /// `motion-ease-char-in` and `motion-ease-height` are both the design's
-  /// ease-out curve. Core Animation and SwiftUI read the same
-  /// control points, so a frame that SwiftUI animates and the content that
-  /// AppKit animates inside it stay in step.
-  static let easeOutControlPoints: (x1: Float, y1: Float, x2: Float, y2: Float) = (0.33, 1, 0.68, 1)
+  /// The design's named curves, as the `motion-ease-*` tokens write them. Core
+  /// Animation and SwiftUI read the same control points, so a frame that
+  /// SwiftUI animates and the content that AppKit animates inside it stay in
+  /// step. The design's ease-out is (0.33, 1, 0.68, 1).
+  enum Curve: String, Sendable {
+    case easeOut = "ease-out"
+    case easeInOut = "ease-in-out"
+
+    var controlPoints: (x1: Float, y1: Float, x2: Float, y2: Float) {
+      switch self {
+      case .easeOut: (0.33, 1, 0.68, 1)
+      case .easeInOut: (0.42, 0, 0.58, 1)
+      }
+    }
+
+    var timingFunction: CAMediaTimingFunction {
+      let points = controlPoints
+      return CAMediaTimingFunction(controlPoints: points.x1, points.y1, points.x2, points.y2)
+    }
+
+    func animation(duration: TimeInterval) -> Animation {
+      let points = controlPoints
+      return .timingCurve(
+        Double(points.x1), Double(points.y1), Double(points.x2), Double(points.y2),
+        duration: duration
+      )
+    }
+
+    /// The curve's progress at `time` (0...1), for motion driven frame by frame.
+    func progress(at time: Double) -> Double {
+      let points = controlPoints
+      let (x1, y1, x2, y2) = (Double(points.x1), Double(points.y1), Double(points.x2), Double(points.y2))
+      let t = min(1, max(0, time))
+      func bezier(_ s: Double, _ p1: Double, _ p2: Double) -> Double {
+        3 * (1 - s) * (1 - s) * s * p1 + 3 * (1 - s) * s * s * p2 + s * s * s
+      }
+      var low = 0.0
+      var high = 1.0
+      for _ in 0..<32 {
+        let middle = (low + high) / 2
+        if bezier(middle, x1, x2) < t { low = middle } else { high = middle }
+      }
+      return bezier((low + high) / 2, y1, y2)
+    }
+  }
+
+  /// `motion-ease-char-in`
+  static let characterInCurve = Curve.easeOut
+  /// `motion-ease-height`
+  static let heightCurve = Curve.easeOut
+  /// `motion-ease-cursor-out`: the caret fading out when a stream ends, and
+  /// easing back to full opacity when it stops breathing.
+  static let cursorOutCurve = Curve.easeOut
+  /// `motion-ease-breathe`
+  static let breatheCurve = Curve.easeInOut
 
   static var easeOut: CAMediaTimingFunction {
-    let points = easeOutControlPoints
-    return CAMediaTimingFunction(controlPoints: points.x1, points.y1, points.x2, points.y2)
+    Curve.easeOut.timingFunction
   }
 
   static func easeOutAnimation(duration: TimeInterval) -> Animation {
-    let points = easeOutControlPoints
-    return .timingCurve(
-      Double(points.x1), Double(points.y1), Double(points.x2), Double(points.y2),
-      duration: duration
-    )
+    Curve.easeOut.animation(duration: duration)
   }
 
   /// Tests that assert on motion pin this, so the host's Reduce Motion setting (on by default

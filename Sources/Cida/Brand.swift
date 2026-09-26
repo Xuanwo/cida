@@ -31,44 +31,73 @@ final class StatusItemMark {
 
   /// Whether a request is running while the panel is hidden. The accessibility value says so
   /// too; with Reduce Motion the caret stays dim instead of breathing.
+  ///
+  /// The breath starts from the caret's resting full opacity, and when it stops the caret eases
+  /// back to full opacity over `motion-cursor-out-ms`, so neither end jumps.
   var isBreathing = false {
     didSet {
       guard isBreathing != oldValue else { return }
-      timer?.invalidate()
-      timer = nil
       button.setAccessibilityValue(isBreathing ? "正在生成" : nil)
-      guard isBreathing else {
-        button.image = image(caretOpacity: 1)
-        return
-      }
       if CidaMotion.reducesMotion {
-        button.image = image(caretOpacity: CGFloat(CidaMotion.cursorMinimumOpacity))
+        stopTimer()
+        shownOpacity = isBreathing ? CGFloat(CidaMotion.cursorMinimumOpacity) : 1
         return
       }
       let start = Date()
-      button.image = image(caretOpacity: Self.caretOpacity(after: 0))
-      let timer = Timer(timeInterval: 1 / Self.ticksPerSecond, repeats: true) { [weak self] _ in
-        MainActor.assumeIsolated {
-          guard let self else { return }
-          self.button.image = self.image(
-            caretOpacity: Self.caretOpacity(after: Date().timeIntervalSince(start)))
+      let settleFrom = shownOpacity
+      let breathes = isBreathing
+      runTimer { [weak self] in
+        guard let self else { return }
+        let elapsed = Date().timeIntervalSince(start)
+        if breathes {
+          self.shownOpacity = Self.caretOpacity(after: elapsed)
+        } else {
+          self.shownOpacity = Self.settlingOpacity(from: settleFrom, after: elapsed)
+          if elapsed >= CidaMotion.cursorOutSeconds { self.stopTimer() }
         }
       }
-      // Keep breathing while the status item's menu is open.
-      RunLoop.main.add(timer, forMode: .common)
-      self.timer = timer
     }
   }
 
-  /// The result pane's waiting pulse: from the minimum opacity to 1 over `motion-breathe-ms` / 2
-  /// and back, eased in and out.
+  /// The caret opacity on the button's image.
+  private var shownOpacity: CGFloat = 1 {
+    didSet { button.image = image(caretOpacity: shownOpacity) }
+  }
+
+  private func runTimer(_ tick: @escaping @MainActor () -> Void) {
+    stopTimer()
+    tick()
+    let timer = Timer(timeInterval: 1 / Self.ticksPerSecond, repeats: true) { _ in
+      MainActor.assumeIsolated { tick() }
+    }
+    // Keep breathing while the status item's menu is open.
+    RunLoop.main.add(timer, forMode: .common)
+    self.timer = timer
+  }
+
+  private func stopTimer() {
+    timer?.invalidate()
+    timer = nil
+  }
+
+  /// The result pane's waiting pulse: from 1, where the caret rests, down to the minimum opacity
+  /// over `motion-breathe-ms` / 2 and back, eased in and out.
   nonisolated static func caretOpacity(after elapsed: TimeInterval) -> CGFloat {
     let half = CidaMotion.breatheHalfCycleSeconds
     let phase = elapsed.truncatingRemainder(dividingBy: 2 * half)
     let progress = phase < half ? phase / half : (2 * half - phase) / half
     let eased = progress * progress * (3 - 2 * progress)
     let minimum = Double(CidaMotion.cursorMinimumOpacity)
-    return CGFloat(minimum + (1 - minimum) * eased)
+    return CGFloat(1 - (1 - minimum) * eased)
+  }
+
+  /// The caret easing back to full opacity from `opacity` once the breath stops
+  /// (`motion-cursor-out-ms`, `motion-ease-cursor-out`).
+  nonisolated static func settlingOpacity(from opacity: CGFloat, after elapsed: TimeInterval)
+    -> CGFloat
+  {
+    let progress = CidaMotion.cursorOutCurve.progress(at: elapsed / CidaMotion.cursorOutSeconds)
+    return opacity + (1 - opacity) * CGFloat(progress)
   }
 
   func image(caretOpacity: CGFloat) -> NSImage {
