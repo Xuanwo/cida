@@ -61,6 +61,9 @@ final class PanelController {
   private var keyMonitor: Any?
   private var resignObserver: NSObjectProtocol?
   private var contentHeight: CGFloat = 120
+  /// Identifies the latest height change, so an interrupted animation's
+  /// completion does not shrink the host under a newer one.
+  private var heightChangeGeneration = 0
   private(set) var heightBudget = PanelHeightBudget.automation
   private var topEdge: CGFloat?
   /// Production and E2E panels hide when they stop being key (the user left);
@@ -175,13 +178,20 @@ final class PanelController {
   }
 
   /// Called by the content whenever the height it wants changes. The panel
-  /// grows or shrinks from its top edge over `motion-height-ms`.
+  /// grows or shrinks from its top edge over `motion-height-ms`; a hidden panel
+  /// has nothing to animate and takes the height at once.
+  ///
+  /// The content is already laid out at its final height at the top of the
+  /// host, and the window's frame is the only thing that moves. The host is
+  /// never shorter than the window: it grows at once, and while the window
+  /// shrinks it keeps its height until the window has caught up, so what shows
+  /// below the content is the surface `PanelView` paints there (its bottom
+  /// pane's) instead of the empty container.
   func setContentHeight(_ height: CGFloat, animated: Bool) {
     let clamped = min(heightBudget.panelMaxHeight, max(1, ceil(height)))
     guard abs(clamped - contentHeight) > 0.5 else { return }
     contentHeight = clamped
-    hostingView.setFrameSize(NSSize(width: hostingView.frame.width, height: clamped))
-    hostingView.needsLayout = true
+    heightChangeGeneration &+= 1
     let top = topEdge ?? panel.frame.maxY
     let frame = NSRect(
       x: panel.frame.minX,
@@ -189,15 +199,40 @@ final class PanelController {
       width: panel.frame.width,
       height: clamped
     )
-    let duration = animated ? CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: panel) : 0
-    if duration > 0 {
-      NSAnimationContext.runAnimationGroup { context in
-        context.duration = duration
-        context.timingFunction = CidaMotion.easeOut
-        panel.animator().setFrame(frame, display: true)
-      }
-    } else {
+    let duration =
+      animated && panel.isVisible
+      ? CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: panel) : 0
+    if duration == 0 || clamped > hostingView.frame.height {
+      setHostHeight(clamped)
+    }
+    guard duration > 0 else {
       panel.setFrame(frame, display: true)
+      return
+    }
+    let generation = heightChangeGeneration
+    animateFrame(to: frame, duration: duration) { [weak self] in
+      guard let self, self.heightChangeGeneration == generation else { return }
+      self.setHostHeight(self.contentHeight)
+    }
+  }
+
+  private func setHostHeight(_ height: CGFloat) {
+    guard abs(hostingView.frame.height - height) > 0.5 else { return }
+    hostingView.setFrameSize(NSSize(width: hostingView.frame.width, height: height))
+    hostingView.needsLayout = true
+  }
+
+  private func animateFrame(
+    to frame: NSRect,
+    duration: TimeInterval,
+    completion: @escaping @MainActor () -> Void
+  ) {
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = duration
+      context.timingFunction = CidaMotion.heightCurve.timingFunction
+      panel.animator().setFrame(frame, display: true)
+    } completionHandler: {
+      MainActor.assumeIsolated { completion() }
     }
   }
 

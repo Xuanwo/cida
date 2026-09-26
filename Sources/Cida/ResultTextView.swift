@@ -4,14 +4,20 @@ import QuartzCore
 
 @MainActor
 protocol ResultHeightChangeHosting: AnyObject {
-  func resultHeightWillChange(by delta: CGFloat, animated: Bool)
+  func resultHeightDidChange(by delta: CGFloat)
 }
 
 /// The design's result typography: Latin results are set in Source Serif 4 and
 /// Chinese results in Noto Serif SC, each with its own size and leading
-/// (`font-result*`, `line-height-result*`).
+/// (`font-result*`, `line-height-result*`), and glyphs centred in the line as
+/// CSS centres them.
 @MainActor
 enum ResultTextStyle {
+  /// The board's caret sits `vertical-align: -4px`: its foot 4 pt below the
+  /// baseline, 2 pt (`margin-left`) after the text.
+  static let caretDescent: CGFloat = 4
+  static let caretGap: CGFloat = 2
+
   static func lineHeight(for language: Language) -> CGFloat {
     switch language {
     case .chinese: CidaDesign.Typography.resultLineHeightCJK
@@ -24,17 +30,29 @@ enum ResultTextStyle {
     let lineHeight = lineHeight(for: language)
     paragraphStyle.minimumLineHeight = lineHeight
     paragraphStyle.maximumLineHeight = lineHeight
+    let font = CidaDesign.appKitResult(for: language)
     return [
-      .font: CidaDesign.appKitResult(for: language),
+      .font: font,
       .foregroundColor: CidaDesign.Palette.textInk.appKit,
       .paragraphStyle: paragraphStyle.copy() as! NSParagraphStyle,
+      .baselineOffset: CidaDesign.halfLeading(of: font, lineHeight: lineHeight),
     ]
+  }
+
+  /// The caret's top inside a line of `language`'s typography: its foot is
+  /// `caretDescent` below the line's baseline, which sits where CSS puts it.
+  static func caretTop(for language: Language) -> CGFloat {
+    let font = CidaDesign.appKitResult(for: language)
+    let baseline = CidaDesign.halfLeading(of: font, lineHeight: lineHeight(for: language))
+      + font.ascender
+    return baseline + caretDescent - CidaMotion.cursorHeight
   }
 }
 
 @MainActor
 final class ResultTextCoordinator: NSObject {
-  private var entryID: UUID?
+  /// The record whose text the container holds.
+  private(set) var entryID: UUID?
   private var renderedPresentationRevision = 0
   private var pendingPresentationRevision = 0
   private var renderedUTF16Length = 0
@@ -209,6 +227,19 @@ final class ResultTextCoordinator: NSObject {
     }
   }
 
+  /// The height is needed now (SwiftUI sizes the pane, or a new record is about
+  /// to be shown): a document the container has not laid out as a whole at this
+  /// width, such as a new record, a different face or a new container, is laid
+  /// out at once. Streamed appends keep their coalesced layout.
+  func layoutForSizing(_ container: ResultTextContainer, width: CGFloat) {
+    guard width > ResultTextContainer.horizontalInset * 2 else { return }
+    if abs(container.frame.width - width) > 0.5 {
+      container.setFrameSize(NSSize(width: width, height: container.frame.height))
+    }
+    guard container.needsFullTextLayout else { return }
+    layoutNow(of: container, publishesHeight: false)
+  }
+
   /// Bypasses the coalescing interval, e.g. when a streamed line wraps and the
   /// result must grow on this pulse rather than up to 100 ms later.
   func layoutNow(of container: ResultTextContainer, publishesHeight: Bool = true) {
@@ -227,6 +258,9 @@ final class ResultTextCoordinator: NSObject {
 
     let elapsed = ProcessInfo.processInfo.systemUptime - lastLayoutUptime
     guard lastLayoutUptime == 0 || elapsed >= Self.minimumLayoutInterval else {
+      // Within the coalescing interval: lay out once it has passed, even if no
+      // further append or view update arrives to ask again.
+      scheduleLayout(of: container)
       return
     }
     performPendingLayout()
@@ -309,6 +343,12 @@ final class ResultTextContainer: NSView {
   /// leading. Set it before `replaceText` for a new record.
   var language: Language = .english
 
+  /// One line of the result's typography: the height of an empty (waiting)
+  /// result, so the first glyph does not change it.
+  private var minimumTextHeight: CGFloat {
+    ResultTextStyle.lineHeight(for: language)
+  }
+
   private let renderingView: StreamingResultRenderingView
   private var selectionTextView: StreamingResultTextView?
   private var selectionTextStorage: NSTextStorage?
@@ -326,14 +366,15 @@ final class ResultTextContainer: NSView {
   private var revealFragments: [GlyphRevealFragmentView] = []
   private var revealCompletionWorkItem: DispatchWorkItem?
   private var isStreaming = false
-  private var needsFullTextLayout = true
+  /// The whole document needs laying out: a replaced text or a new width.
+  private(set) var needsFullTextLayout = true
   private var pendingTextLayoutRange: NSRange?
   private var intrinsicSizeInvalidationIsScheduled = false
   private var pendingNaturalHeightDelta: CGFloat = 0
-  private var pendingNaturalHeightAnimated = false
   private var naturalHeightPublicationGeneration = 0
   private var streamingTextViewHeightCapacity: CGFloat = 0
   private var selectionIsActive = false
+  private var isDimmed = false
   private var resultAccessibilityIdentifier: String?
 
   private(set) var fullReplacementCount = 0
@@ -519,12 +560,11 @@ final class ResultTextContainer: NSView {
     naturalHeightPublicationGeneration &+= 1
     intrinsicSizeInvalidationIsScheduled = false
     pendingNaturalHeightDelta = 0
-    pendingNaturalHeightAnimated = false
     isStreaming = false
     needsFullTextLayout = true
     pendingTextLayoutRange = nil
-    naturalTextHeight = Self.minimumHeight
-    contentTextHeight = Self.minimumHeight
+    naturalTextHeight = minimumTextHeight
+    contentTextHeight = minimumTextHeight
     streamingTextViewHeightCapacity = min(
       streamingTextViewHeightCapacity,
       Self.minimumStreamingTextViewCapacity
@@ -562,22 +602,18 @@ final class ResultTextContainer: NSView {
       deactivateSelection(clearMaterializedText: true)
     }
     if streaming {
-      caretLayer.opacity = 1
+      caretLayer.removeAnimation(forKey: Self.caretFadeKey)
+      setCaretOpacity(1)
       updateCaretPulse()
     } else {
       // Streaming motion T3: the caret fades over motion-cursor-out-ms while the last
       // revealed glyphs finish their own fade.
       scheduleFinalGlyphRevealCommit()
-      caretLayer.removeAnimation(forKey: "waiting-pulse")
-      if window == nil || CidaMotion.reducesMotion {
-        caretLayer.opacity = 0
-      } else {
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = caretLayer.presentation()?.opacity ?? caretLayer.opacity
-        fade.toValue = 0
-        fade.duration = CidaMotion.cursorOutSeconds
-        caretLayer.add(fade, forKey: "completion-fade")
-        caretLayer.opacity = 0
+      let shownOpacity = caretLayer.presentation()?.opacity ?? caretLayer.opacity
+      caretLayer.removeAnimation(forKey: Self.waitingPulseKey)
+      setCaretOpacity(0)
+      if window != nil, !CidaMotion.reducesMotion {
+        fadeCaret(from: shownOpacity, to: 0)
       }
     }
     updateStreamingCaretFrame()
@@ -604,7 +640,7 @@ final class ResultTextContainer: NSView {
     }
     let usedRect = renderingView.usageBounds
     contentTextHeight = max(
-      Self.minimumHeight,
+      minimumTextHeight,
       ceil(
         usedRect.height + StreamingResultRenderingView.verticalTextInset * 2
       )
@@ -708,12 +744,6 @@ final class ResultTextContainer: NSView {
 
   func scheduleNaturalHeightPublication(heightDelta: CGFloat) {
     pendingNaturalHeightDelta += heightDelta
-    // `motion-height-ms`: a streaming result grows with the height
-    // transition; width relayouts and completed results resize immediately.
-    pendingNaturalHeightAnimated =
-      pendingNaturalHeightAnimated
-      || (isStreaming && window != nil
-        && !CidaMotion.reducesMotion)
     guard !intrinsicSizeInvalidationIsScheduled else { return }
     intrinsicSizeInvalidationIsScheduled = true
     let generation = naturalHeightPublicationGeneration
@@ -722,13 +752,11 @@ final class ResultTextContainer: NSView {
       guard self.naturalHeightPublicationGeneration == generation else { return }
       self.intrinsicSizeInvalidationIsScheduled = false
       let publishedHeightDelta = self.pendingNaturalHeightDelta
-      let animated = self.pendingNaturalHeightAnimated
       self.pendingNaturalHeightDelta = 0
-      self.pendingNaturalHeightAnimated = false
       var ancestor = self.superview
       while let current = ancestor {
         if let hostingView = current as? any ResultHeightChangeHosting {
-          hostingView.resultHeightWillChange(by: publishedHeightDelta, animated: animated)
+          hostingView.resultHeightDidChange(by: publishedHeightDelta)
           break
         }
         ancestor = current.superview
@@ -737,24 +765,50 @@ final class ResultTextContainer: NSView {
     }
   }
 
+  /// A stale result dims to 55%. The change fades with the note row the panel
+  /// reveals at the same time (`motion-height-ms`, `motion-ease-height`), except
+  /// when it comes with a new document.
+  func setDimmed(_ dimmed: Bool, animated: Bool) {
+    guard dimmed != isDimmed else { return }
+    isDimmed = dimmed
+    let alpha: CGFloat = dimmed ? 0.55 : 1
+    let duration =
+      animated ? CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: window) : 0
+    guard duration > 0 else {
+      layer?.removeAnimation(forKey: "opacity")
+      alphaValue = alpha
+      return
+    }
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = duration
+      context.timingFunction = CidaMotion.heightCurve.timingFunction
+      animator().alphaValue = alpha
+    }
+  }
+
   func updateStreamingCaretFrame() {
     guard isStreaming else { return }
     let length = textStorage?.length ?? 0
-    let origin: CGPoint
+    let lineTop: CGFloat
+    let lineEnd: CGFloat
     if length == 0 {
-      origin = CGPoint(x: 0, y: StreamingResultRenderingView.verticalTextInset + 3)
+      lineTop = 0
+      lineEnd = 0
     } else if let lastLineFrame = renderingView.lastTextLineFrame() {
-      origin = CGPoint(
-        x: lastLineFrame.maxX + 3,
-        y: lastLineFrame.minY + max(0, (lastLineFrame.height - CidaMotion.cursorHeight) / 2)
-      )
+      lineTop = lastLineFrame.minY
+      lineEnd = lastLineFrame.maxX
     } else {
       let usageBounds = renderingView.usageBounds
-      origin = CGPoint(
-        x: usageBounds.maxX + 3,
-        y: max(0, usageBounds.maxY - CidaMotion.cursorHeight)
-      )
+      lineTop = max(0, usageBounds.maxY - minimumTextHeight)
+      lineEnd = usageBounds.maxX
     }
+    // The same place in the line whether it holds glyphs yet or not, so the
+    // caret does not move vertically when the first glyph arrives.
+    let origin = CGPoint(
+      x: lineEnd + ResultTextStyle.caretGap,
+      y: StreamingResultRenderingView.verticalTextInset + lineTop
+        + ResultTextStyle.caretTop(for: language)
+    )
 
     CATransaction.begin()
     CATransaction.setDisableActions(true)
@@ -762,28 +816,62 @@ final class ResultTextContainer: NSView {
       origin: origin,
       size: CGSize(width: CidaMotion.cursorWidth, height: CidaMotion.cursorHeight)
     )
-    caretLayer.opacity = 1
     CATransaction.commit()
     updateCaretPulse()
   }
 
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    // A waiting caret made before the pane reached a window starts breathing now.
+    updateCaretPulse()
+  }
+
+  private static let waitingPulseKey = "waiting-pulse"
+  private static let caretFadeKey = "caret-fade"
+
+  private func setCaretOpacity(_ opacity: Float) {
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    caretLayer.opacity = opacity
+    CATransaction.commit()
+  }
+
+  /// `motion-cursor-out-ms` on `motion-ease-cursor-out`, from what the caret
+  /// shows now; the model opacity is already the target.
+  private func fadeCaret(from opacity: Float, to target: Float) {
+    let fade = CABasicAnimation(keyPath: "opacity")
+    fade.fromValue = opacity
+    fade.toValue = target
+    fade.duration = CidaMotion.cursorOutSeconds
+    fade.timingFunction = CidaMotion.cursorOutCurve.timingFunction
+    caretLayer.add(fade, forKey: Self.caretFadeKey)
+  }
+
+  /// The waiting caret breathes (`motion-breathe-ms`) from full opacity, where
+  /// it already is, down to `motion-cursor-opacity-min` and back. When the first
+  /// glyph arrives it eases back to full opacity instead of jumping there.
   private func updateCaretPulse() {
     guard isStreaming else { return }
     let shouldPulse =
       window != nil
       && (textStorage?.length ?? 0) == 0
       && !CidaMotion.reducesMotion
-    if shouldPulse, caretLayer.animation(forKey: "waiting-pulse") == nil {
+    let isPulsing = caretLayer.animation(forKey: Self.waitingPulseKey) != nil
+    if shouldPulse, !isPulsing {
       let pulse = CABasicAnimation(keyPath: "opacity")
-      pulse.fromValue = CidaMotion.cursorMinimumOpacity
-      pulse.toValue = 1
+      pulse.fromValue = 1
+      pulse.toValue = CidaMotion.cursorMinimumOpacity
       pulse.duration = CidaMotion.breatheHalfCycleSeconds
       pulse.autoreverses = true
       pulse.repeatCount = .infinity
-      pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-      caretLayer.add(pulse, forKey: "waiting-pulse")
-    } else if !shouldPulse {
-      caretLayer.removeAnimation(forKey: "waiting-pulse")
+      pulse.timingFunction = CidaMotion.breatheCurve.timingFunction
+      caretLayer.add(pulse, forKey: Self.waitingPulseKey)
+    } else if !shouldPulse, isPulsing {
+      let shownOpacity = caretLayer.presentation()?.opacity ?? caretLayer.opacity
+      caretLayer.removeAnimation(forKey: Self.waitingPulseKey)
+      if window != nil, !CidaMotion.reducesMotion {
+        fadeCaret(from: shownOpacity, to: 1)
+      }
     }
   }
 
@@ -917,7 +1005,7 @@ final class ResultTextContainer: NSView {
       width: 0,
       height: StreamingResultRenderingView.verticalTextInset
     )
-    textView.minSize = NSSize(width: 0, height: Self.minimumHeight)
+    textView.minSize = NSSize(width: 0, height: minimumTextHeight)
     textView.maxSize = NSSize(
       width: CGFloat.greatestFiniteMagnitude,
       height: CGFloat.greatestFiniteMagnitude

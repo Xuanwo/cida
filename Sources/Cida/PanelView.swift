@@ -2,22 +2,26 @@ import AppKit
 import SwiftUI
 
 /// The panel's content: source pane, control bar, result pane (`Design/spec/panel.md`
-/// §二 and `Design/boards/panel-states.html`). The view computes the height
-/// it wants from the two panes and reports it, so the panel can grow from its
-/// top edge instead of the content adapting to a fixed window. While Cida has
-/// something to say (`Design/spec/lifecycle.md`), the same three panes carry
-/// that message instead.
+/// §二 and `Design/boards/panel-states.html`). The panes take their own heights and
+/// the view reports the height they add up to, so the panel can grow from its top
+/// edge instead of the content adapting to a fixed window. While Cida has something
+/// to say (`Design/spec/lifecycle.md`), the same three panes carry that message
+/// instead.
+///
+/// The content always sits at the top at its final height; only the panel's frame
+/// animates. Whatever the panel shows below the content while its frame catches up
+/// is the bottom pane's own surface.
 struct PanelView: View {
   let model: AppModel
   let heightBudget: PanelHeightBudget
+  /// The height the panes add up to, and whether the panel should animate to it:
+  /// every change does except the first layout, which the panel appears with.
   var onContentHeightChange: @MainActor (CGFloat, Bool) -> Void = { _, _ in }
   var openSettings: @MainActor () -> Void = {}
   @State private var composerMetrics: ComposerTextMetrics
-  @State private var resultContentHeight: CGFloat = CidaDesign.Typography.resultLineHeight
-  @State private var resultHeightAnimated = false
+  @State private var hasReportedHeight = false
   @State private var copiedFeedbackTask: Task<Void, Never>?
   @State private var showsCopiedFeedback = false
-  @State private var welcomeHeight: CGFloat = 0
 
   init(
     model: AppModel,
@@ -33,16 +37,26 @@ struct PanelView: View {
   }
 
   var body: some View {
-    if let message = model.panelMessage {
-      PanelMessageView(
-        model: model,
-        message: message,
-        heightBudget: heightBudget,
-        onContentHeightChange: onContentHeightChange
-      )
-    } else {
-      translationPanes
+    VStack(spacing: 0) {
+      if let message = model.panelMessage {
+        PanelMessageView(model: model, message: message, heightBudget: heightBudget)
+      } else {
+        translationPanes
+      }
     }
+    .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
+      onContentHeightChange(height, hasReportedHeight)
+      hasReportedHeight = true
+    }
+    // Both bounds: a content taller than the host (before the panel has grown)
+    // stays at the top instead of being centred around it.
+    .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
+    .background(surfaceBelowContent)
+    .onChange(of: model.copyFeedbackRevision) { showCopiedFeedback() }
+    .onChange(of: model.result?.id) { showsCopiedFeedback = false }
+    // No identifier on this stack: SwiftUI would push it down onto the pane
+    // containers and hide their own `source-pane` / `control-bar` /
+    // `result-pane` identifiers from XCUI.
   }
 
   private var translationPanes: some View {
@@ -50,7 +64,8 @@ struct PanelView: View {
       SourcePane(
         model: model,
         metrics: $composerMetrics,
-        editorHeight: sourceEditorHeight
+        editorHeight: sourceEditorHeight,
+        editorMaxHeight: heightBudget.sourceEditorMaxHeight
       )
       ControlBar(
         model: model,
@@ -60,31 +75,29 @@ struct PanelView: View {
       )
       if showsWelcome {
         WelcomePane(model: model)
-          .onGeometryChange(for: CGFloat.self, of: \.size.height) { welcomeHeight = $0 }
       }
       if model.result != nil {
         ResultPane(
           model: model,
-          paneHeight: resultPaneHeight,
           maxTextHeight: resultTextMaxHeight,
-          showsText: showsResultText,
-          onContentHeightChange: { height, animated in
-            resultHeightAnimated = animated
-            resultContentHeight = height
-          }
+          showsText: showsResultText
         )
       }
     }
     .frame(width: CidaDesign.Panel.width)
     .background(CidaDesign.surface)
-    .onAppear { publishHeight(animated: false) }
-    .onChange(of: idealHeight) { publishHeight(animated: resultHeightAnimated) }
-    .onChange(of: model.panelMessage == nil) { publishHeight(animated: false) }
-    .onChange(of: model.copyFeedbackRevision) { showCopiedFeedback() }
-    .onChange(of: model.result?.id) { showsCopiedFeedback = false }
-    // No identifier on this stack: SwiftUI would push it down onto the pane
-    // containers and hide their own `source-pane` / `control-bar` /
-    // `result-pane` identifiers from XCUI.
+  }
+
+  /// The bottom pane's surface, which the panel shows below the content while
+  /// its frame shrinks to the content's height.
+  private var surfaceBelowContent: Color {
+    let endsOnPaper =
+      if let message = model.panelMessage {
+        message.hasPaper
+      } else {
+        model.result != nil || showsWelcome
+      }
+    return endsOnPaper ? CidaDesign.surfacePaper : CidaDesign.surface
   }
 
   // MARK: - Heights
@@ -115,12 +128,15 @@ struct PanelView: View {
     )
   }
 
-  /// The result text area at the pane's cap, with the note row's allowance.
+  /// The result text area at the pane's cap, with the note row's allowance, in
+  /// whole lines of the result's typography, so the pane never cuts a line
+  /// through its glyphs.
   private var resultTextMaxHeight: CGFloat {
     let noteAllowance: CGFloat = model.resultNote == nil ? 0 : ResultNoteRow.height + 10
-    return max(
-      CidaDesign.Typography.resultLineHeight,
-      resultPaneMaxHeight - CidaDesign.Spacing.resultVertical * 2 - noteAllowance)
+    let lineHeight = ResultTextStyle.lineHeight(for: model.result?.outputLanguage ?? .english)
+    let available =
+      resultPaneMaxHeight - CidaDesign.Spacing.resultVertical * 2 - noteAllowance
+    return max(1, floor(available / lineHeight)) * lineHeight
   }
 
   private var showsResultText: Bool {
@@ -128,27 +144,9 @@ struct PanelView: View {
     return result.phase == .streaming || result.resultUTF16Length > 0
   }
 
-  private var resultPaneHeight: CGFloat {
-    let noteHeight: CGFloat = model.resultNote == nil ? 0 : ResultNoteRow.height
-    let textHeight = showsResultText ? ceil(resultContentHeight) : 0
-    let spacing: CGFloat = showsResultText && model.resultNote != nil ? 10 : 0
-    let wanted = textHeight + spacing + noteHeight + CidaDesign.Spacing.resultVertical * 2
-    return min(resultPaneMaxHeight, wanted)
-  }
-
-  private var idealHeight: CGFloat {
-    sourcePaneHeight + CidaDesign.Panel.controlBarHeight
-      + (model.result == nil ? 0 : resultPaneHeight)
-      + (showsWelcome ? welcomeHeight : 0)
-  }
-
   /// No model service yet and nothing to show: the paper pane welcomes the user.
   private var showsWelcome: Bool {
     model.result == nil && model.needsModelConfiguration
-  }
-
-  private func publishHeight(animated: Bool) {
-    onContentHeightChange(idealHeight, animated)
   }
 
   // MARK: - Bar action
@@ -179,22 +177,28 @@ private struct SourcePane: View {
   @Bindable var model: AppModel
   @Binding var metrics: ComposerTextMetrics
   let editorHeight: CGFloat
+  let editorMaxHeight: CGFloat
 
   var body: some View {
     ZStack(alignment: .topLeading) {
       if !metrics.hasText {
+        // The typed text's line box: glyphs centred in one composer line, where the
+        // editor sets its first line.
         Text("输入内容，回车\(model.mode == .translate ? "翻译" : "改进")…")
           .font(CidaDesign.body(CidaDesign.Typography.bodySize))
           .foregroundStyle(CidaDesign.textTertiary)
+          .frame(height: CidaDesign.Panel.composerLineHeight)
           .padding(.leading, CidaDesign.Spacing.windowHorizontal)
-          .padding(.top, 3)
           .allowsHitTesting(false)
       }
 
+      // The editor takes its new height at once; the panel's frame is what
+      // animates (`Design/spec/panel.md` §二).
       ComposerTextEditor(
         text: $model.inputText,
         metrics: $metrics,
         horizontalInset: CidaDesign.Spacing.windowHorizontal,
+        maxVisibleHeight: editorMaxHeight,
         selectAllRevision: model.inputSelectAllRequestID,
         focusRevision: model.inputFocusRequestID,
         replacementRevision: model.inputReplacementRevision,
@@ -208,10 +212,6 @@ private struct SourcePane: View {
         }
       )
       .frame(height: editorHeight)
-      .animation(
-        CidaMotion.easeOutAnimation(duration: CidaMotion.heightSeconds),
-        value: editorHeight
-      )
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, CidaDesign.Spacing.paneVertical)
@@ -266,7 +266,7 @@ private struct TabHint: View {
     Text("⇥ 切换")
       .font(CidaDesign.mainUI(11))
       .foregroundStyle(CidaDesign.hint)
-      .opacity(isDimmed ? 0.45 : 1)
+      .modifier(DimmedWhileWorking(isDimmed: isDimmed))
       .accessibilityHidden(true)
   }
 }
@@ -303,11 +303,14 @@ struct PanelSegmentedControl: View {
         Button {
           onSelect(index)
         } label: {
+          // The board's item: a 14 pt line in 4/11 padding inside a 1 pt border that
+          // is transparent unless selected, so 5/12 from the text to the item's edge.
           Text(titles[index])
             .font(CidaDesign.mainUI(11.5, weight: isSelected ? .semibold : .medium))
             .foregroundStyle(isSelected ? CidaDesign.accent : CidaDesign.textSecondary)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 4)
+            .frame(height: 14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
             .background {
               if isSelected {
                 RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
@@ -327,10 +330,22 @@ struct PanelSegmentedControl: View {
     .padding(2)
     .background(CidaDesign.surfaceDim)
     .clipShape(.rect(cornerRadius: CidaDesign.Radius.segment, style: .continuous))
-    .opacity(isEnabled ? 1 : 0.45)
+    .modifier(DimmedWhileWorking(isDimmed: !isEnabled))
     .disabled(!isEnabled)
-    .animation(.easeOut(duration: CidaMotion.iconInSeconds), value: isEnabled)
     .accessibilityElement(children: .contain)
+  }
+}
+
+/// The action choice and its Tab hint dim to 45% while work runs. Only the opacity
+/// animates: an animation attached to the whole control would also carry any move
+/// of the control made in the same update.
+private struct DimmedWhileWorking: ViewModifier {
+  let isDimmed: Bool
+
+  func body(content: Content) -> some View {
+    content.animation(.easeOut(duration: CidaMotion.iconInSeconds)) {
+      $0.opacity(isDimmed ? 0.45 : 1)
+    }
   }
 }
 
@@ -372,7 +387,6 @@ private struct BarActionButton: View {
         }
       }
     }
-    .animation(.easeOut(duration: CidaMotion.iconSwapSeconds), value: presentation)
   }
 
   @ViewBuilder
@@ -412,18 +426,21 @@ private struct BarActionButton: View {
     .buttonStyle(HoverFadeButtonStyle())
     .accessibilityLabel(label)
     .accessibilityIdentifier(identifier)
-    .transition(.opacity)
+    // The pills cross-fade (`motion-icon-swap-ms`) and appear where the bar puts
+    // them: the animation belongs to the transition, not to the slot's layout.
+    .transition(.opacity.animation(.easeOut(duration: CidaMotion.iconSwapSeconds)))
   }
 }
 
 // MARK: - Result pane
 
+/// The paper pane: the result text at its own height up to `maxTextHeight`, then
+/// the note. The text view reports its height as it lays out, so the pane has its
+/// final height in the same pass as the record it shows.
 private struct ResultPane: View {
   let model: AppModel
-  let paneHeight: CGFloat
   let maxTextHeight: CGFloat
   let showsText: Bool
-  let onContentHeightChange: @MainActor (CGFloat, Bool) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -433,17 +450,9 @@ private struct ResultPane: View {
           generationState: model.generationState,
           isStale: model.isResultStale,
           followRevision: model.resultFollowRevision,
-          maxVisibleHeight: maxTextHeight,
-          onContentHeightChange: onContentHeightChange
+          maxVisibleHeight: maxTextHeight
         )
         .frame(maxWidth: .infinity)
-        .frame(
-          height: max(
-            CidaDesign.Typography.resultLineHeight,
-            paneHeight - CidaDesign.Spacing.resultVertical * 2
-              - (model.resultNote == nil ? 0 : ResultNoteRow.height + 10)
-          )
-        )
       }
       if let note = model.resultNote {
         ResultNoteRow(note: note)
@@ -452,7 +461,6 @@ private struct ResultPane: View {
     }
     .padding(.vertical, CidaDesign.Spacing.resultVertical)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .frame(height: paneHeight)
     .background(CidaDesign.surfacePaper)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("result-pane")
@@ -528,24 +536,19 @@ private struct WelcomePane: View {
   }
 
   private var shortcutsLine: String {
-    func compact(_ shortcut: GlobalShortcut) -> String {
-      (shortcut.modifiers.symbols + [shortcut.keyDisplayName]).joined()
-    }
-    return "\(compact(model.settings.shortcut)) 随时唤起 · \(compact(model.settings.captureShortcut)) 截图翻译 · 辞达住在菜单栏"
+    "\(model.settings.shortcut.displayText) 随时唤起 · \(model.settings.captureShortcut.displayText) 截图翻译 · 辞达住在菜单栏"
   }
 }
 
 // MARK: - Messages
 
 /// A message in the panel's own shape (`Design/spec/lifecycle.md` §一): the statement in the
-/// source pane, the choices in the control bar, the reason or the notes on paper. It reports the
-/// height it needs like the translation panes do; notes taller than the panel allows scroll.
+/// source pane, the choices in the control bar, the reason or the notes on paper. Notes taller
+/// than the panel allows scroll.
 private struct PanelMessageView: View {
   let model: AppModel
   let message: PanelMessage
   let heightBudget: PanelHeightBudget
-  let onContentHeightChange: @MainActor (CGFloat, Bool) -> Void
-  @State private var paperContentHeight: CGFloat = 0
 
   var body: some View {
     VStack(spacing: 0) {
@@ -557,9 +560,6 @@ private struct PanelMessageView: View {
     }
     .frame(width: CidaDesign.Panel.width)
     .background(CidaDesign.surface)
-    .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
-      onContentHeightChange(height, true)
-    }
   }
 
   private var statementHeight: CGFloat {
@@ -613,9 +613,27 @@ private struct PanelMessageView: View {
     )
   }
 
+  /// The paper at its own height when that fits the cap, a scroll view at the cap otherwise.
+  /// The choice is made against the cap itself, so it does not depend on how tall the panel
+  /// happens to be while its frame catches up, and nothing is measured and fed back.
   private var paper: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 10) {
+    CapProposal(height: paperMaxHeight) {
+      ViewThatFits(in: .vertical) {
+        paperContent
+        ScrollView { paperContent }
+          .scrollBounceBehavior(.basedOnSize)
+          .scrollIndicators(.automatic)
+          .frame(height: paperMaxHeight)
+      }
+    }
+    .background(CidaDesign.surfacePaper)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("message-paper")
+  }
+
+  private var paperContent: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: 6) {
         if let caption = message.bodyCaption {
           Text(caption)
             .font(CidaDesign.mainUI(11))
@@ -624,21 +642,15 @@ private struct PanelMessageView: View {
             .accessibilityIdentifier("message-body-caption")
         }
         paperBody
-        if let note = message.note {
-          ResultNoteRow(note: ResultNote(kind: .failed, text: note))
-        }
       }
-      .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
-      .padding(.vertical, CidaDesign.Spacing.resultVertical)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .onGeometryChange(for: CGFloat.self, of: \.size.height) { paperContentHeight = $0 }
+      if let note = message.note {
+        ResultNoteRow(note: ResultNote(kind: .failed, text: note))
+      }
     }
-    .scrollBounceBehavior(.basedOnSize)
-    .scrollIndicators(.automatic)
-    .frame(height: min(paperContentHeight, paperMaxHeight))
-    .background(CidaDesign.surfacePaper)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("message-paper")
+    .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+    .padding(.vertical, CidaDesign.Spacing.resultVertical)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   @ViewBuilder
@@ -653,6 +665,23 @@ private struct PanelMessageView: View {
     case .lines(let lines):
       PaperText(lines, bulleted: true, showsCaret: message.isWorking)
     }
+  }
+}
+
+/// Offers its content a fixed height to fit in, whatever height the parent offers, and takes the
+/// size the content picks.
+private struct CapProposal: Layout {
+  let height: CGFloat
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    subviews.first?.sizeThatFits(ProposedViewSize(width: proposal.width, height: height)) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+  ) {
+    subviews.first?.place(
+      at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: height))
   }
 }
 
@@ -732,11 +761,11 @@ private struct PaperText: View {
       .fixedSize(horizontal: false, vertical: true)
   }
 
-  private static let caretDescent: CGFloat = 4
+  private static let caretDescent = ResultTextStyle.caretDescent
 
-  /// The caret with 2 pt of room before it, as the board's `margin-left: 2px`.
+  /// The caret with room before it, as the board's `margin-left: 2px`.
   private static func caret(opacity: Double) -> NSImage {
-    let gap: CGFloat = 2
+    let gap = ResultTextStyle.caretGap
     let size = NSSize(width: gap + CidaMotion.cursorWidth, height: CidaMotion.cursorHeight)
     return NSImage(size: size, flipped: false) { rect in
       CidaDesign.Palette.accent.appKit.withAlphaComponent(opacity).setFill()

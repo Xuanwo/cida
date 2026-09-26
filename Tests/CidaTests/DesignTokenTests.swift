@@ -62,6 +62,16 @@ final class DesignTokenTests: XCTestCase {
       let value = try XCTUnwrap(Double(raw), "\(name) = \(raw)")
       XCTAssertEqual(value, expected, accuracy: 0.0001, name)
     }
+
+    let curves: [(String, CidaMotion.Curve)] = [
+      ("motion-ease-char-in", CidaMotion.characterInCurve),
+      ("motion-ease-height", CidaMotion.heightCurve),
+      ("motion-ease-cursor-out", CidaMotion.cursorOutCurve),
+      ("motion-ease-breathe", CidaMotion.breatheCurve),
+    ]
+    for (name, curve) in curves {
+      XCTAssertEqual(try XCTUnwrap(tokens[name], name), curve.rawValue, name)
+    }
   }
 
   /// The app icon's light appearance is ink on paper with the accent caret (spec/brand.md);

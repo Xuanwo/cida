@@ -122,12 +122,32 @@ struct ComposerTextMetrics: Equatable, Sendable {
   }
 }
 
+/// The source editor's clip view. While the text fits the pane's cap the pane grows to
+/// show every line, so the clip stays at the top: NSTextView would otherwise scroll a new
+/// line into view before the pane has grown, and the text would slide back down once it
+/// had. Past the cap the pane scrolls and keeps the insertion point visible as usual.
+@MainActor
+final class ComposerClipView: NSClipView {
+  var maxVisibleHeight: CGFloat = .greatestFiniteMagnitude
+
+  override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+    var bounds = super.constrainBoundsRect(proposedBounds)
+    if let documentView, documentView.frame.height <= maxVisibleHeight + 0.5 {
+      bounds.origin.y = 0
+    }
+    return bounds
+  }
+}
+
 struct ComposerTextEditor: NSViewRepresentable {
   @Binding var text: String
   @Binding var metrics: ComposerTextMetrics
   /// Distance from the editor's edges to the text column; the editor spans the
   /// window so its scroll bar stays at the window edge.
   let horizontalInset: CGFloat
+  /// The source pane's cap. Below it the pane grows to show every line, so the
+  /// text never scrolls.
+  var maxVisibleHeight: CGFloat = .greatestFiniteMagnitude
   /// Bumped when the whole text should be selected, e.g. when the panel is
   /// shown again with the previous source in it.
   var selectAllRevision = 0
@@ -151,6 +171,10 @@ struct ComposerTextEditor: NSViewRepresentable {
 
   func makeNSView(context: Context) -> NSScrollView {
     let scrollView = OverlayScrollView()
+    let clipView = ComposerClipView()
+    clipView.maxVisibleHeight = maxVisibleHeight
+    clipView.drawsBackground = false
+    scrollView.contentView = clipView
     scrollView.drawsBackground = false
     scrollView.borderType = .noBorder
     // System overlay scroll bar (`Design/spec/panel.md`): appears while
@@ -194,6 +218,7 @@ struct ComposerTextEditor: NSViewRepresentable {
 
   func updateNSView(_ scrollView: NSScrollView, context: Context) {
     guard let textView = scrollView.documentView as? ComposerNativeTextView else { return }
+    (scrollView.contentView as? ComposerClipView)?.maxVisibleHeight = maxVisibleHeight
     context.coordinator.text = $text
     context.coordinator.metrics = $metrics
     context.coordinator.onSubmit = onSubmit
@@ -250,15 +275,20 @@ struct ComposerTextEditor: NSViewRepresentable {
   }
 
   private func applyTypography(to textView: NSTextView) {
+    let lineHeight = CidaDesign.Panel.composerLineHeight
     let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.minimumLineHeight = 26
-    paragraphStyle.maximumLineHeight = 26
+    paragraphStyle.minimumLineHeight = lineHeight
+    paragraphStyle.maximumLineHeight = lineHeight
 
+    let font = CidaDesign.appKitBody(CidaDesign.Typography.bodySize)
     let attributes: [NSAttributedString.Key: Any] = [
-      .font: CidaDesign.appKitBody(16),
+      .font: font,
       .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
       .paragraphStyle: paragraphStyle,
     ]
+    // Glyphs centred in their line, as CSS sets them and as the placeholder sits.
+    (textView as? ComposerNativeTextView)?.glyphRaise = CidaDesign.halfLeading(
+      of: font, lineHeight: lineHeight)
 
     textView.defaultParagraphStyle = paragraphStyle
     textView.typingAttributes = attributes

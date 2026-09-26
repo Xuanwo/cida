@@ -284,11 +284,9 @@ extension InteractionReproductionTests {
 
 final class ResultHeightProbeView: NSView, ResultHeightChangeHosting {
   private(set) var publishedHeightDeltas: [CGFloat] = []
-  private(set) var publishedAnimatedFlags: [Bool] = []
 
-  func resultHeightWillChange(by delta: CGFloat, animated: Bool) {
+  func resultHeightDidChange(by delta: CGFloat) {
     publishedHeightDeltas.append(delta)
-    publishedAnimatedFlags.append(animated)
   }
 }
 

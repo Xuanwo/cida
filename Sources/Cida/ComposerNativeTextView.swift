@@ -27,6 +27,25 @@ final class ComposerNativeTextView: NSTextView {
   private var isApplyingMaterializedText = false
   private var isPageLoadScheduled = false
 
+  /// How far the text is drawn above its TextKit line boxes. TextKit puts all of
+  /// a fixed line height's extra leading above the glyphs, where CSS splits it
+  /// above and below (`CidaDesign.halfLeading`). TextKit 2 shrinks the line box
+  /// by a `baselineOffset` attribute instead of raising the glyphs in it, so the
+  /// whole text container is moved up; the line boxes keep their height, and
+  /// the top of the first one, which only holds leading, is clipped.
+  var glyphRaise: CGFloat = 0 {
+    didSet {
+      guard glyphRaise != oldValue else { return }
+      invalidateTextContainerOrigin()
+      needsDisplay = true
+    }
+  }
+
+  override var textContainerOrigin: NSPoint {
+    let origin = super.textContainerOrigin
+    return NSPoint(x: origin.x, y: origin.y - glyphRaise)
+  }
+
   var isVirtualizingLargeDocument: Bool {
     virtualDocument != nil
   }

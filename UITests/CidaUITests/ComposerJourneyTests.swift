@@ -46,13 +46,19 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     driver.paste(multiline)
     XCTAssertTrue(driver.waitForFrameHeight(atLeast: 150, in: driver.composer, timeout: 5))
     XCTAssertEqual(driver.textValue(in: driver.composer), multiline)
-    XCTAssertGreaterThan(driver.panel.frame.height, emptyHeight + 100, "The panel grows with the source")
+    // The panel's frame follows the source over motion-height-ms.
+    XCTAssertTrue(
+      driver.waitForFrameHeight(atLeast: emptyHeight + 100, in: driver.panel, timeout: 2),
+      "The panel grows with the source")
 
     driver.composer.typeKey("a", modifierFlags: .command)
     driver.composer.typeKey(.delete, modifierFlags: [])
     XCTAssertTrue(driver.waitForFrameHeight(atMost: 30, in: driver.composer, timeout: 5))
     XCTAssertEqual(driver.textValue(in: driver.composer), "")
-    XCTAssertEqual(driver.panel.frame.height, emptyHeight, accuracy: 2, "The panel shrinks back")
+    XCTAssertTrue(
+      driver.waitForFrameHeight(atMost: emptyHeight + 2, in: driver.panel, timeout: 2),
+      "The panel shrinks back")
+    XCTAssertEqual(driver.panel.frame.height, emptyHeight, accuracy: 2)
 
     driver.submit("CIDA_E2E_POOL_COMPOSER")
     XCTAssertTrue(

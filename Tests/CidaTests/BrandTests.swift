@@ -15,17 +15,26 @@ final class BrandTests: XCTestCase {
     XCTAssertGreaterThan(Self.caretAlpha(in: image), 0.95)
   }
 
+  /// The breath starts where the resting caret is, at full opacity, and when it stops the caret
+  /// eases back to full opacity over `motion-cursor-out-ms`: neither end jumps.
   func testTheCaretBreathesLikeTheResultPaneCaret() {
     let minimum = CGFloat(CidaMotion.cursorMinimumOpacity)
     let half = CidaMotion.breatheHalfCycleSeconds
-    XCTAssertEqual(StatusItemMark.caretOpacity(after: 0), minimum, accuracy: 0.001)
-    XCTAssertEqual(StatusItemMark.caretOpacity(after: half), 1, accuracy: 0.001)
-    XCTAssertEqual(StatusItemMark.caretOpacity(after: 2 * half), minimum, accuracy: 0.001)
+    XCTAssertEqual(StatusItemMark.caretOpacity(after: 0), 1, accuracy: 0.001)
+    XCTAssertEqual(StatusItemMark.caretOpacity(after: half), minimum, accuracy: 0.001)
+    XCTAssertEqual(StatusItemMark.caretOpacity(after: 2 * half), 1, accuracy: 0.001)
     XCTAssertEqual(
       StatusItemMark.caretOpacity(after: half / 2), (minimum + 1) / 2, accuracy: 0.001)
     XCTAssertEqual(
       StatusItemMark.caretOpacity(after: half * 0.3),
       StatusItemMark.caretOpacity(after: half * 1.7), accuracy: 0.001)
+
+    let out = CidaMotion.cursorOutSeconds
+    XCTAssertEqual(StatusItemMark.settlingOpacity(from: 0.4, after: 0), 0.4, accuracy: 0.001)
+    XCTAssertEqual(StatusItemMark.settlingOpacity(from: 0.4, after: out), 1, accuracy: 0.001)
+    let early = StatusItemMark.settlingOpacity(from: 0.4, after: out / 4)
+    XCTAssertGreaterThan(early, 0.4)
+    XCTAssertLessThan(early, 1)
   }
 
   func testOnlyTheCaretDimsAndTheButtonSaysARequestIsRunning() throws {
@@ -37,10 +46,15 @@ final class BrandTests: XCTestCase {
     XCTAssertEqual(
       Self.glyphInk(in: dim), Self.glyphInk(in: mark.image(caretOpacity: 1)), accuracy: 0.001)
 
+    CidaMotion.reducesMotionOverride = false
+    defer { CidaMotion.reducesMotionOverride = nil }
     mark.isBreathing = true
     XCTAssertEqual(button.accessibilityValue() as? String, "正在生成")
+    XCTAssertGreaterThan(
+      Self.caretAlpha(in: try XCTUnwrap(button.image)), 0.95, "The breath starts at full opacity")
     mark.isBreathing = false
     XCTAssertNil(button.accessibilityValue())
+    RunLoop.current.run(until: Date().addingTimeInterval(CidaMotion.cursorOutSeconds + 0.1))
     XCTAssertGreaterThan(Self.caretAlpha(in: try XCTUnwrap(button.image)), 0.95)
   }
 

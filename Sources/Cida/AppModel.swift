@@ -298,7 +298,10 @@ final class AppModel {
     mode = newMode
   }
 
+  /// Tab: the other action. While a request runs the action choice is dimmed and
+  /// cannot change (`Design/spec/panel.md` §三), so Tab does nothing.
   func toggleMode() {
+    guard !isProcessing else { return }
     setMode(mode == .translate ? .improve : .translate)
   }
 
