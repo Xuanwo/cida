@@ -26,6 +26,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
   case improvementPrompt = "improvement-prompt"
   case shortcut
   case captureShortcut = "capture-shortcut"
+  case capturePresentation = "capture-presentation"
   case launchAtLogin = "launch-at-login"
   case automaticUpdates = "automatic-updates"
 
@@ -122,6 +123,10 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionS.configurationText,
         example: "control+option+s",
         description: "截图翻译的快捷键，写法同 shortcut，两者不能相同")
+    case .capturePresentation:
+      Schema(
+        type: "enum", values: CapturePresentation.allCases.map(\.rawValue), defaultValue: "overlay",
+        example: "image-window", description: "截图结果展示方式：overlay 原屏幕覆盖，image-window 独立图片窗口，下次截图生效")
     case .launchAtLogin:
       Schema(
         type: "boolean", values: ["true", "false"], defaultValue: "false", example: "true",
@@ -197,6 +202,11 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         throw invalid("写成修饰键加一个键，至少带 control、option 或 command，例如 \(schema.example)")
       }
       settings.setShortcut(shortcut, for: self == .shortcut ? .showPanel : .captureText)
+    case .capturePresentation:
+      guard let presentation = CapturePresentation(rawValue: value) else {
+        throw invalid("只能是 overlay 或 image-window")
+      }
+      settings.capturePresentation = presentation
     case .launchAtLogin, .automaticUpdates:
       guard let enabled = ["true": true, "false": false][value] else {
         throw invalid("只能是 true 或 false")
@@ -228,6 +238,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .improvementPrompt: configuration.settings.improvementPrompt = defaults.improvementPrompt
     case .shortcut: configuration.settings.shortcut = defaults.shortcut
     case .captureShortcut: configuration.settings.captureShortcut = defaults.captureShortcut
+    case .capturePresentation: configuration.settings.capturePresentation = defaults.capturePresentation
     case .launchAtLogin:
       configuration.launchAtLogin = false
       configuration.settings.launchAtLogin = false
@@ -306,6 +317,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .improvementPrompt: return .string(settings.improvementPrompt)
     case .shortcut: return .string(settings.shortcut.configurationText)
     case .captureShortcut: return .string(settings.captureShortcut.configurationText)
+    case .capturePresentation: return .string(configuration.settings.capturePresentation.rawValue)
     case .launchAtLogin: return .bool(configuration.launchAtLogin)
     case .automaticUpdates: return .bool(configuration.automaticUpdates)
     }
@@ -332,7 +344,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         ? configuration.settings.translationPrompt : configuration.settings.improvementPrompt
       let line = prompt.replacingOccurrences(of: "\n", with: " ")
       return line.count > 60 ? String(line.prefix(60)) + "…" : line
-    case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .launchAtLogin,
+    case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .capturePresentation, .launchAtLogin,
       .automaticUpdates:
       let value = jsonValue(in: configuration, hasAPIKey: hasAPIKey)
       return value.stringValue ?? value.compactText

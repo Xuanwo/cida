@@ -151,27 +151,80 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     veiled.lifetime = .keepAlways
     add(veiled)
     driver.frameCapture(around: textFrame)
-    XCTAssertTrue(driver.panel.waitForExistence(timeout: 30), "The panel follows recognition")
-    XCTAssertFalse(driver.captureOverlay.exists)
+    let result = driver.element(identifier: "capture-translation-result")
+    XCTAssertTrue(result.waitForExistence(timeout: 3), "The frozen screen stays visible")
     XCTAssertTrue(
-      driver.waitForTextValue("CIDA CAPTURE SCENARIO", in: driver.composer, timeout: 5),
-      "The recognized text is the source")
-    XCTAssertTrue(driver.translateAction.isSelected)
-    XCTAssertTrue(
-      driver.result(containing: "CIDA_CAPTURE_SCENARIO_COMPLETE").waitForExistence(timeout: 8),
-      "and is translated without ⏎")
-    driver.waitForCompletion()
+      driver.waitForTextValue("截图译文", in: result, timeout: 30),
+      "Translation is painted in the captured region")
+    XCTAssertFalse(driver.panel.exists, "The text panel never opens")
+    let translated = XCTAttachment(screenshot: driver.captureOverlay.screenshot())
+    translated.name = "capture-translated-in-place"
+    translated.lifetime = .keepAlways
+    add(translated)
+    driver.app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(driver.captureOverlay.waitForNonExistence(timeout: 3))
+    XCTAssertFalse(driver.panel.exists)
 
-    driver.hidePanel()
     source.press("s", modifierFlags: .option)
     XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5))
     driver.frameCapture(around: blankFrame)
-    XCTAssertTrue(driver.panel.waitForExistence(timeout: 10))
+    let status = driver.element(identifier: "capture-translation-status")
     XCTAssertTrue(
-      driver.resultNote("unrecognized").waitForExistence(timeout: 3),
-      "A frame without text says so")
-    XCTAssertEqual(driver.textValue(in: driver.composer), "", "and clears the source")
-    XCTAssertFalse(driver.stopButton.exists, "Nothing was requested")
+      driver.waitForTextValue("截图里没有识别到文字 · Esc 退出", in: status, timeout: 15),
+      "A blank region stays on the frozen screen and makes no translation request")
+    XCTAssertFalse(driver.panel.exists)
+    driver.app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(driver.captureOverlay.waitForNonExistence(timeout: 3))
+  }
+
+  func testCaptureResultModePersistsAndOpensAnImageWindow() throws {
+    driver.launch()
+    driver.openSettings()
+    let mode = driver.element(identifier: "settings-capture-presentation")
+    XCTAssertTrue(mode.waitForExistence(timeout: 5))
+    let imageMode = driver.element(identifier: "capture-presentation-image-window")
+    XCTAssertTrue(imageMode.exists)
+    imageMode.click()
+    let settingsShot = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+    settingsShot.name = "settings-image-window-mode"
+    settingsShot.lifetime = .keepAlways
+    add(settingsShot)
+    // Query persistence through the artifact CLI rather than sleeping for the debounce.
+    let persisted = NSPredicate { _, _ in
+      guard let value = try? self.driver.runCommandLine(["config", "show", "--json"]) else { return false }
+      return value.output.contains("image-window")
+    }
+    XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: persisted, evaluatedWith: nil)], timeout: 5), .completed)
+    driver.app.terminate()
+    driver.launch()
+    driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    let frame = source.captureText.frame.insetBy(dx: -16, dy: -12)
+    source.press("s", modifierFlags: .option)
+    XCTAssertTrue(driver.captureOverlay.waitForExistence(timeout: 5))
+    driver.frameCapture(around: frame)
+    let result = driver.app.windows["capture-image-window"]
+    XCTAssertTrue(result.waitForExistence(timeout: 30))
+    XCTAssertFalse(driver.captureOverlay.exists)
+    XCTAssertFalse(driver.panel.exists)
+    XCTAssertTrue(driver.element(identifier: "capture-image-preview").exists)
+    result.buttons["capture-image-copy"].click()
+    XCTAssertTrue(driver.element(identifier: "capture-image-status").waitForExistence(timeout: 3))
+    let screenshot = XCTAttachment(screenshot: result.screenshot())
+    screenshot.name = "capture-independent-image-window"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    result.buttons["capture-image-save"].click()
+    XCTAssertTrue(result.sheets.firstMatch.waitForExistence(timeout: 3))
+    driver.app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(result.sheets.firstMatch.waitForNonExistence(timeout: 3))
+    driver.app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(result.waitForNonExistence(timeout: 3))
+    driver.showPanel()
+    driver.openSettings()
+    driver.element(identifier: "capture-presentation-overlay").click()
   }
 
   /// `Design/spec/configuration.md` §四: Settings starts with the onboarding card, copies the

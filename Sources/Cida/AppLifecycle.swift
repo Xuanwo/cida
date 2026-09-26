@@ -77,6 +77,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   private var panelController: PanelController?
   private var settingsWindowController: NSWindowController?
+  private var captureImageWindows: [UUID: CaptureImageWindowController] = [:]
   private var statusItem: NSStatusItem?
   private var statusItemMark: StatusItemMark?
   private var checkForUpdatesMenuItem: NSMenuItem?
@@ -92,8 +93,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var didAttemptInteractiveAPIKeyRecovery = false
   /// A shortcut press is reading the selection; further presses wait for it.
   private var isReadingSelection = false
-  /// The capture shortcut is freezing the screen, waiting for a frame, or
-  /// recognizing text; both shortcuts wait for it.
+  /// Both shortcuts wait until the frozen-screen translation is dismissed.
   private var isCapturing = false
   /// When the user opened Cida themselves; a scheduled check that finds an update soon after
   /// may bring the panel up (`Design/spec/lifecycle.md` §四).
@@ -238,9 +238,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   /// The capture shortcut (`Design/spec/panel.md` §一 截图翻译): freezes
-  /// the screen under the pointer, lets the user frame some text, and shows
-  /// the panel translating what was recognized. Without the Screen Recording
-  /// permission it asks for it instead.
+  /// the screen under the pointer and replaces framed text in that frozen image.
+  /// Without the Screen Recording permission it asks for it instead.
   @objc
   func handleCaptureShortcut() {
     guard !isCapturing, !isReadingSelection else { return }
@@ -268,16 +267,23 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       return
     }
     lifecycleLog?.record("capture-overlay-shown")
-    guard let region = await CaptureOverlay.selectRegion(of: frozenScreen, on: screen) else {
-      lifecycleLog?.record("capture-cancelled")
-      return
-    }
-    let text = (try? await TextRecognizer.recognizeText(in: region)) ?? nil
-    // The request may need the Keychain key, which the first show recovers.
     recoverAPIKeyIfNeeded()
-    model.importCapturedText(text)
-    lifecycleLog?.record(text == nil ? "capture-unrecognized" : "capture-imported")
-    showPanel()
+    model.cancelProcessing()
+    let session = CaptureTranslationSession(
+      image: frozenScreen, screen: screen, service: launchOptions.textProcessingService,
+      settings: model.settings,
+      onImageReady: { [weak self] document in
+        self?.showCaptureImage(document)
+      })
+    await session.run()
+    lifecycleLog?.record("capture-dismissed")
+  }
+
+  private func showCaptureImage(_ document: CaptureImageDocument) {
+    let controller = CaptureImageWindowController(document: document)
+    captureImageWindows[controller.id] = controller
+    controller.onClose = { [weak self] id in self?.captureImageWindows[id] = nil }
+    controller.present()
   }
 
   /// The first recognition in a process loads the models, which takes
@@ -676,6 +682,7 @@ private enum DesignState: String {
   case long
   case settings
   case settingsCustom = "settings-custom"
+  case settingsImageWindow = "settings-image-window"
   case settingsRecording = "settings-recording"
   case settingsUpdateAvailable = "settings-update-available"
   case settingsLanguageEditing = "settings-language-editing"
@@ -702,7 +709,7 @@ private enum DesignState: String {
 
   var isSettings: Bool {
     switch self {
-    case .settings, .settingsCustom, .settingsRecording, .settingsLanguageEditing, .settingsUpdateAvailable,
+    case .settings, .settingsCustom, .settingsImageWindow, .settingsRecording, .settingsLanguageEditing, .settingsUpdateAvailable,
       .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
       .settingsConfigChecking, .settingsConfigFailed:
       true
@@ -764,6 +771,9 @@ private struct LaunchOptions {
       {
         settings.modelService = ModelConfiguration()
         settings.apiKey = ""
+      }
+      if usesDesignFixtures, designState == .settingsImageWindow {
+        settings.capturePresentation = .imageWindow
       }
       if usesDesignFixtures, designState == .settingsCustom {
         settings.launchAtLogin = true
@@ -835,7 +845,7 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
-      case .empty, .streaming, .settings, .settingsCustom, .settingsRecording,
+      case .empty, .streaming, .settings, .settingsCustom, .settingsImageWindow, .settingsRecording,
         .settingsUpdateAvailable, .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
         .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed,
         .lifecycleWelcome, .lifecycleWelcomeSubmitted, .lifecycleUpdateChecking,
@@ -862,7 +872,7 @@ private struct LaunchOptions {
         ResultRecord.designLongInput
       case .lifecycleWelcomeSubmitted:
         "Consistency is the last refuge of the unimaginative."
-      case .empty, .settings, .settingsCustom, .settingsRecording, .settingsUpdateAvailable,
+      case .empty, .settings, .settingsCustom, .settingsImageWindow, .settingsRecording, .settingsUpdateAvailable,
         .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
         .settingsConfigChecking, .settingsConfigFailed, .lifecycleWelcome,
         .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,

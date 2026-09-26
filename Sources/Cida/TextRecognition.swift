@@ -21,7 +21,7 @@ enum TextRecognizer {
     return RecognizedTextLayout.text(from: lines)
   }
 
-  private static func recognizeLines(in image: CGImage) async throws -> [RecognizedLine] {
+  static func recognizeLines(in image: CGImage) async throws -> [RecognizedLine] {
     var request = RecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.recognitionLanguages = [

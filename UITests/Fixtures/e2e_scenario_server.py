@@ -205,10 +205,19 @@ def plan_for(submitted_text):
     }
     if submitted_text in plans:
         return plans[submitted_text]
-    if submitted_text == "CIDA CAPTURE SCENARIO":
-        # What Vision reads from the source application's line of text.
+    try:
+        blocks = json.loads(submitted_text)
+    except (ValueError, TypeError):
+        blocks = None
+    if isinstance(blocks, list) and blocks and all(
+        isinstance(block, dict) and block.get("text") == "CIDA CAPTURE SCENARIO"
+        for block in blocks
+    ):
         return {
-            "chunks": ["Captured text translated.\n", "CIDA_CAPTURE_SCENARIO_COMPLETE"],
+            "chunks": [json.dumps([
+                {"id": block["id"], "text": "截图译文"} for block in blocks
+            ], ensure_ascii=False)],
+            "requiredSystemFragments": ["Preserve every id exactly once"],
         }
     if submitted_text.startswith("CIDA_E2E_SELECTION_"):
         return {

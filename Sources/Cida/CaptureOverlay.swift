@@ -2,41 +2,6 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
-/// The full-screen layer the capture shortcut puts over a frozen screen
-/// (`Design/boards/capture.html`): a veil fades in over the frozen image, a
-/// hint pill names what to do, and the dragged frame is lifted out of the
-/// veil as a sheet of paper. Escape, a right click, or a click without a
-/// drag cancels.
-@MainActor
-enum CaptureOverlay {
-  /// Shows `image` over `screen` and returns the part of it the user framed,
-  /// or nil when they cancelled.
-  static func selectRegion(of image: CGImage, on screen: NSScreen) async -> CGImage? {
-    let panel = CaptureOverlayPanel(screen: screen)
-    let view = CaptureOverlayView(
-      frame: NSRect(origin: .zero, size: screen.frame.size), image: image,
-      veil: CaptureVeil(forScreen: image))
-    panel.contentView = view
-    defer { panel.orderOut(nil) }
-    return await withCheckedContinuation { continuation in
-      view.onFinish = { selection in
-        view.onFinish = nil
-        guard let selection else {
-          continuation.resume(returning: nil)
-          return
-        }
-        let pixelRect = CaptureGeometry.pixelRect(
-          for: selection, in: view.bounds.size,
-          imageSize: CGSize(width: image.width, height: image.height))
-        continuation.resume(returning: image.cropping(to: pixelRect))
-      }
-      panel.makeKeyAndOrderFront(nil)
-      panel.makeFirstResponder(view)
-      view.fadeInVeil()
-    }
-  }
-}
-
 /// Maps a selection in the overlay (points, origin bottom-left) onto the
 /// frozen image (pixels, origin top-left).
 enum CaptureGeometry {

@@ -107,14 +107,6 @@
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑪ 截图 · 未识别到文字 — 截图翻译快捷键框选的区域里没有文字:原文清空,结果栏只有一行说明「截图里没有识别到文字」(info 图标),不发请求;识别到文字时与 ⑩ 相同,原文是识别结果(全选)并立即翻译</p>
-  <section class="panel" data-state="capture-unrecognized">
-    <div class="source"><span class="placeholder">输入内容，回车翻译…</span></div>
-    <cida-bar></cida-bar>
-    <div class="result"><cida-note kind="unrecognized">截图里没有识别到文字</cida-note></div>
-  </section>
-  <div class="divider"></div>
-
   <p class="caption">⑫ 最大高度 — 面板上限 = 屏幕可见高度 70%(panel-max-ratio);原文栏上限 30%(source-max-ratio),超出后内部滚动;结果栏拿剩余,按整行取高(不切在字中间),生成期间跟随尾部,用户上滚即解除</p>
   <section class="panel" data-state="long">
     <div class="source" style="height: 300px; overflow: hidden">在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。</div>

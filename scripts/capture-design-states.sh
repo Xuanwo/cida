@@ -22,7 +22,7 @@ swift build --package-path "$project_dir"
 
 # Panel states: the capture is the panel at its content height, 800 pt wide.
 for state in empty translate improve stale stopped failed long \
-  settings settings-custom settings-recording settings-update-available settings-language-editing \
+  settings settings-image-window settings-custom settings-recording settings-update-available settings-language-editing \
   settings-config-unset settings-config-copied settings-config-ready settings-config-updated \
   settings-config-checking settings-config-failed \
   lifecycle-welcome lifecycle-welcome-submitted lifecycle-update-checking lifecycle-update-found \

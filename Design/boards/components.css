@@ -734,3 +734,19 @@ body {
 .status-menu .item b { font-weight: 400; color: var(--text-primary); }
 .status-menu .item kbd { font-family: var(--font-ui); color: var(--text-secondary); }
 .status-menu .separator { height: 1px; margin: 5px 9px; background: var(--border); }
+
+.capture-status {
+  position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+  width: 640px; padding: 8px; text-align: center; border-radius: var(--radius-card);
+  background: var(--surface); color: var(--text-control);
+  font: 500 12.5px/1.6 system-ui, sans-serif;
+}
+
+.capture-mode { display: flex; padding: 3px; gap: 3px; border-radius: var(--radius-seg); background: var(--surface-dim); font-size: 12px; }
+.capture-mode span { padding: 4px 9px; border-radius: var(--radius-seg-item); white-space: nowrap; }
+.capture-mode .selected { background: var(--surface); box-shadow: 0 1px 3px #00000014; }
+.capture-image-window { width: 896px; border: 1px solid var(--border); border-radius: var(--radius-window); overflow: hidden; background: var(--bg); }
+.capture-image-toolbar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+.capture-image-toolbar .push { margin-left: auto; }
+.capture-image-preview { padding: 24px; min-height: 240px; display: grid; place-items: center; }
+.capture-image-paper { padding: 26px; background: white; color: #000; width: 100%; height: 180px; font: 20px/1.2 system-ui; }

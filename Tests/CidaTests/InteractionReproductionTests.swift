@@ -334,7 +334,7 @@ final class InteractionReproductionTests: XCTestCase {
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
     let collapsedFrame = window.frame
-    XCTAssertEqual(collapsedFrame.height, 834, accuracy: 4, "The board's 默认 is 834 pt tall")
+    XCTAssertEqual(collapsedFrame.height, 886, accuracy: 4, "The board's 默认 includes the capture result mode row")
 
     // The window follows over motion-height-ms; wait for the move to end.
     model.editingPrompt = .improve

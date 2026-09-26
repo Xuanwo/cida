@@ -131,6 +131,7 @@ private struct SettingsBody: View {
       SettingsGroup(title: "唤起") {
         GlobalShortcutRow(model: model, action: .showPanel)
         GlobalShortcutRow(model: model, action: .captureText)
+        CapturePresentationRow(model: model)
         SelectionAccessRow(model: model)
         LaunchAtLoginRow(model: model)
       }
@@ -278,7 +279,7 @@ private struct SettingsGroup<Content: View>: View {
 }
 
 /// Label column (120 pt) beside a control column that fills the row.
-private struct SettingsRow<Control: View>: View {
+struct SettingsRow<Control: View>: View {
   let title: String
   var caption: String? = nil
   var verticalPadding: CGFloat = 9

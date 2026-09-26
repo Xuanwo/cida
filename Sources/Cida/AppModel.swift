@@ -410,24 +410,6 @@ final class AppModel {
     return true
   }
 
-  /// The text the capture shortcut recognized in the framed part of the
-  /// screen (`Design/spec/panel.md` §一 截图翻译). Recognized text replaces
-  /// the source and is translated at once, superseding a running request.
-  /// A capture without text clears the source and says so under an empty
-  /// result, without a request.
-  func importCapturedText(_ text: String?) {
-    guard let text else {
-      processingTask?.cancel()
-      generationState = .idle
-      replaceSource(with: "")
-      result = ResultRecord(
-        mode: .translate, source: "", outputLanguage: .english, phase: .unrecognized)
-      return
-    }
-    replaceSource(with: text)
-    startGeneration()
-  }
-
   /// The whole source becomes `text`, with the default action; the editor
   /// drops whatever it held.
   private func replaceSource(with text: String) {
