@@ -183,11 +183,13 @@ private struct SourcePane: View {
   var body: some View {
     ZStack(alignment: .topLeading) {
       if !metrics.hasText {
+        // The typed text's line box: glyphs centred in one composer line, where the
+        // editor sets its first line.
         Text("输入内容，回车\(model.mode == .translate ? "翻译" : "改进")…")
           .font(CidaDesign.body(CidaDesign.Typography.bodySize))
           .foregroundStyle(CidaDesign.textTertiary)
+          .frame(height: CidaDesign.Panel.composerLineHeight)
           .padding(.leading, CidaDesign.Spacing.windowHorizontal)
-          .padding(.top, 3)
           .allowsHitTesting(false)
       }
 
@@ -303,11 +305,14 @@ struct PanelSegmentedControl: View {
         Button {
           onSelect(index)
         } label: {
+          // The board's item: a 14 pt line in 4/11 padding inside a 1 pt border that
+          // is transparent unless selected, so 5/12 from the text to the item's edge.
           Text(titles[index])
             .font(CidaDesign.mainUI(11.5, weight: isSelected ? .semibold : .medium))
             .foregroundStyle(isSelected ? CidaDesign.accent : CidaDesign.textSecondary)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 4)
+            .frame(height: 14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
             .background {
               if isSelected {
                 RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
@@ -528,10 +533,7 @@ private struct WelcomePane: View {
   }
 
   private var shortcutsLine: String {
-    func compact(_ shortcut: GlobalShortcut) -> String {
-      (shortcut.modifiers.symbols + [shortcut.keyDisplayName]).joined()
-    }
-    return "\(compact(model.settings.shortcut)) 随时唤起 · \(compact(model.settings.captureShortcut)) 截图翻译 · 辞达住在菜单栏"
+    "\(model.settings.shortcut.displayText) 随时唤起 · \(model.settings.captureShortcut.displayText) 截图翻译 · 辞达住在菜单栏"
   }
 }
 
@@ -732,11 +734,11 @@ private struct PaperText: View {
       .fixedSize(horizontal: false, vertical: true)
   }
 
-  private static let caretDescent: CGFloat = 4
+  private static let caretDescent = ResultTextStyle.caretDescent
 
-  /// The caret with 2 pt of room before it, as the board's `margin-left: 2px`.
+  /// The caret with room before it, as the board's `margin-left: 2px`.
   private static func caret(opacity: Double) -> NSImage {
-    let gap: CGFloat = 2
+    let gap = ResultTextStyle.caretGap
     let size = NSSize(width: gap + CidaMotion.cursorWidth, height: CidaMotion.cursorHeight)
     return NSImage(size: size, flipped: false) { rect in
       CidaDesign.Palette.accent.appKit.withAlphaComponent(opacity).setFill()

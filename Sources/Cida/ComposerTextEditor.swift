@@ -250,15 +250,20 @@ struct ComposerTextEditor: NSViewRepresentable {
   }
 
   private func applyTypography(to textView: NSTextView) {
+    let lineHeight = CidaDesign.Panel.composerLineHeight
     let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.minimumLineHeight = 26
-    paragraphStyle.maximumLineHeight = 26
+    paragraphStyle.minimumLineHeight = lineHeight
+    paragraphStyle.maximumLineHeight = lineHeight
 
+    let font = CidaDesign.appKitBody(CidaDesign.Typography.bodySize)
     let attributes: [NSAttributedString.Key: Any] = [
-      .font: CidaDesign.appKitBody(16),
+      .font: font,
       .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
       .paragraphStyle: paragraphStyle,
     ]
+    // Glyphs centred in their line, as CSS sets them and as the placeholder sits.
+    (textView as? ComposerNativeTextView)?.glyphRaise = CidaDesign.halfLeading(
+      of: font, lineHeight: lineHeight)
 
     textView.defaultParagraphStyle = paragraphStyle
     textView.typingAttributes = attributes

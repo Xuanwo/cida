@@ -9,9 +9,15 @@ protocol ResultHeightChangeHosting: AnyObject {
 
 /// The design's result typography: Latin results are set in Source Serif 4 and
 /// Chinese results in Noto Serif SC, each with its own size and leading
-/// (`font-result*`, `line-height-result*`).
+/// (`font-result*`, `line-height-result*`), and glyphs centred in the line as
+/// CSS centres them.
 @MainActor
 enum ResultTextStyle {
+  /// The board's caret sits `vertical-align: -4px`: its foot 4 pt below the
+  /// baseline, 2 pt (`margin-left`) after the text.
+  static let caretDescent: CGFloat = 4
+  static let caretGap: CGFloat = 2
+
   static func lineHeight(for language: Language) -> CGFloat {
     switch language {
     case .chinese: CidaDesign.Typography.resultLineHeightCJK
@@ -24,17 +30,29 @@ enum ResultTextStyle {
     let lineHeight = lineHeight(for: language)
     paragraphStyle.minimumLineHeight = lineHeight
     paragraphStyle.maximumLineHeight = lineHeight
+    let font = CidaDesign.appKitResult(for: language)
     return [
-      .font: CidaDesign.appKitResult(for: language),
+      .font: font,
       .foregroundColor: CidaDesign.Palette.textInk.appKit,
       .paragraphStyle: paragraphStyle.copy() as! NSParagraphStyle,
+      .baselineOffset: CidaDesign.halfLeading(of: font, lineHeight: lineHeight),
     ]
+  }
+
+  /// The caret's top inside a line of `language`'s typography: its foot is
+  /// `caretDescent` below the line's baseline, which sits where CSS puts it.
+  static func caretTop(for language: Language) -> CGFloat {
+    let font = CidaDesign.appKitResult(for: language)
+    let baseline = CidaDesign.halfLeading(of: font, lineHeight: lineHeight(for: language))
+      + font.ascender
+    return baseline + caretDescent - CidaMotion.cursorHeight
   }
 }
 
 @MainActor
 final class ResultTextCoordinator: NSObject {
-  private var entryID: UUID?
+  /// The record whose text the container holds.
+  private(set) var entryID: UUID?
   private var renderedPresentationRevision = 0
   private var pendingPresentationRevision = 0
   private var renderedUTF16Length = 0
