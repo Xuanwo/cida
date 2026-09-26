@@ -11,29 +11,13 @@
 <!-- Rules: ../spec/panel.md §一 截图翻译. -->
 <main class="board" data-board="capture">
   <div class="board-title">States — 截图框选</div>
-  <p class="caption">截图翻译快捷键(默认 ⌥S)先冻结鼠标所在的整块屏幕,冻结画面上淡入一层纸雾(120ms,motion-icon-in-ms):亮屏为 surface-paper 72%,暗屏(冻结画面平均亮度低于一半)改为 text-ink 45%。屏幕上方 20%(与面板同高)一枚提示胶囊:「辞达」字标 + 「拖动框选要翻译的文字 · Esc 取消」;选区碰到胶囊时胶囊淡出。拖出的选区被托起成一张纸:冻结画面原样显示,圆角 radius-card 8,#00000012 描边,与面板同款双层阴影;暗屏上阴影不可见,改为 #FFFFFF24 描边;光标为十字。Esc、右键或只单击不拖动都取消。松开后保留冻结画面,撤去遮罩,识别与翻译进度在覆盖层展示。完成后译文替换原文字块,不打开面板;按住空格看原文,Esc 或右键退出。字号和颜色近似保留,复杂背景与原字体不保证恢复。</p>
+  <p class="caption">截图翻译快捷键(默认 ⌥S)先冻结鼠标所在的整块屏幕,冻结画面上淡入一层纸雾(120ms,motion-icon-in-ms):亮屏为 surface-paper 72%,暗屏(冻结画面平均亮度低于一半)改为 text-ink 45%。屏幕上方 20%(与面板同高)一枚提示胶囊:「辞达」字标 + 「拖动框选要翻译的文字 · Esc 取消」;选区碰到胶囊时胶囊淡出。拖出的选区被托起成一张纸:冻结画面原样显示,圆角 radius-card 8,#00000012 描边,与面板同款双层阴影;暗屏上阴影不可见,改为 #FFFFFF24 描边;光标为十字。Esc、右键或只单击不拖动都取消。松开后裁出选区、本地识别文字,面板出现(面板交互 ⑩ / ⑪)。</p>
   <div class="state-label">① 拖动前 · 亮屏</div>
   <cida-frozen-screen state="capture-veiled"></cida-frozen-screen>
   <div class="state-label">② 框选中 · 亮屏</div>
   <cida-frozen-screen state="capture-lifted" lifted></cida-frozen-screen>
   <div class="state-label">③ 框选中 · 暗屏</div>
   <cida-frozen-screen state="capture-lifted-dark" lifted dark></cida-frozen-screen>
-  <div class="state-label">④ 本地识别中 · 松手后保留画面</div>
-  <cida-frozen-screen state="capture-recognizing" phase="recognizing"></cida-frozen-screen>
-  <div class="state-label">⑤ 翻译中 · 原文保持可见</div>
-  <cida-frozen-screen state="capture-translating" phase="translating"></cida-frozen-screen>
-  <div class="state-label">⑥ 原位替换 · 按住空格查看原文</div>
-  <cida-frozen-screen state="capture-translated" phase="translated"></cida-frozen-screen>
-  <div class="state-label">⑦ 无文字</div>
-  <cida-frozen-screen state="capture-unrecognized" phase="unrecognized"></cida-frozen-screen>
-  <div class="state-label">⑧ 识别失败 · 与无文字区分</div>
-  <cida-frozen-screen state="capture-recognition-failed" phase="failed"></cida-frozen-screen>
-  <div class="state-label">⑨ 独立图片窗口 · 只显示框选区域</div>
-  <section class="capture-image-window" data-state="capture-image-window">
-    <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">截图翻译</div></div>
-    <div class="capture-image-toolbar"><div class="capture-mode"><span>原文</span><span class="selected">译文</span></div><span class="button push">复制译图</span><span class="button">保存译图…</span></div>
-    <div class="capture-image-preview"><div class="capture-image-paper">轻巧的翻译工具。框选屏幕区域，在保留布局的同时阅读译文。</div></div>
-  </section>
 </main>
 </body>
 </html>

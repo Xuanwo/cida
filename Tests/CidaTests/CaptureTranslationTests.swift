@@ -88,6 +88,43 @@ final class CaptureTranslationTests: XCTestCase {
     return context.makeImage()
   }
 
+  // MARK: - The panel after a capture
+
+  func testRecognizedTextReplacesTheSourceAndIsTranslatedAtOnce() async throws {
+    let model = AppModel(
+      mode: .improve, inputText: "Previous source",
+      service: DelayedStreamingService(chunks: ["译文"], delay: .milliseconds(20)))
+    let replacementRevision = model.inputReplacementRevision
+
+    model.importCapturedText("Recognized text")
+
+    XCTAssertEqual(model.inputText, "Recognized text")
+    XCTAssertEqual(model.inputReplacementRevision, replacementRevision + 1)
+    XCTAssertEqual(model.mode, .translate)
+    XCTAssertEqual(model.result?.source, "Recognized text")
+    try await waitUntil { model.result?.phase == .completed }
+  }
+
+  func testACaptureWithoutTextClearsTheSourceAndSupersedesARunningRequest() async throws {
+    let model = AppModel(service: DelayedStreamingService(chunks: ["Slow"], delay: .seconds(5)))
+    model.inputText = "Running source"
+    XCTAssertTrue(model.submit())
+    let running = try XCTUnwrap(model.result)
+
+    model.importCapturedText(nil)
+
+    XCTAssertEqual(model.inputText, "")
+    XCTAssertFalse(model.isProcessing, "The superseded request no longer holds the panel")
+    XCTAssertFalse(model.result === running)
+    XCTAssertEqual(model.result?.phase, .unrecognized)
+    XCTAssertEqual(model.resultNote?.kind, .unrecognized)
+    XCTAssertEqual(model.resultNote?.text, "截图里没有识别到文字")
+    XCTAssertFalse(model.canCopyResult)
+    try await Task.sleep(for: .milliseconds(150))
+    XCTAssertFalse(model.isProcessing)
+    XCTAssertEqual(model.result?.phase, .unrecognized)
+  }
+
   // MARK: - Shortcuts
 
   func testTheTwoGlobalShortcutsCannotShareACombination() {

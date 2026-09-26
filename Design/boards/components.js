@@ -97,8 +97,6 @@ class CidaSettings extends HTMLElement {
     const capture = granted
       ? row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end")
       : row("截图翻译", "需要屏幕录制权限", `<span class="button">去授权</span><span class="chip">⌥ S</span>`, "end");
-    const imageWindow = this.getAttribute("capture-result") === "image-window";
-    const captureResult = row("截图结果", "下次截图生效", `<div class="capture-mode"><span class="${imageWindow ? "" : "selected"}">原屏幕覆盖</span><span class="${imageWindow ? "selected" : ""}">独立图片窗口</span></div>`, "end");
     const selection = granted
       ? row("选中文字", "唤起时带入并翻译", `<span class="status">已开启</span>`, "end")
       : row("选中文字", "需要辅助功能权限", `<span class="button">去授权</span>`, "end");
@@ -152,7 +150,7 @@ class CidaSettings extends HTMLElement {
           <div class="group"><h3>模型</h3>${modelGroup}</div>
           <div class="group"><h3>语言</h3>${languages}</div>
           <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>
-          <div class="group"><h3>唤起</h3>${shortcut}${capture}${captureResult}${selection}${launch}</div>
+          <div class="group"><h3>唤起</h3>${shortcut}${capture}${selection}${launch}</div>
           <div class="group"><h3>更新</h3>${updates}</div>
           <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>
         </div>
@@ -167,19 +165,11 @@ customElements.define("cida-settings", CidaSettings);
 // paragraph and shows the frozen window through its own opening.
 class CidaFrozenScreen extends HTMLElement {
   connectedCallback() {
-    const phase = this.getAttribute("phase");
-    const statuses = {
-      recognizing: "正在识别文字…",
-      translating: "正在翻译…",
-      translated: "翻译完成 · 按住空格查看原文",
-      unrecognized: "截图里没有识别到文字",
-      failed: "文字识别失败，请重新框选。",
-    };
     const window = (style = "") => `
       <div class="frozen-window" style="${style}">
         <h2>Storage engine</h2>
         <p>The new storage engine keeps every write in an append-only log and compacts it in the background, so reads never wait for a merge.</p>
-        <p>${phase === "translated" ? "快照无需暂停写入。每个快照记录当时的日志位置，恢复时从该位置重放日志。" : "Snapshots are taken without pausing writers. Each one records the log position it saw, and recovery replays the log from there."}</p>
+        <p>Snapshots are taken without pausing writers. Each one records the log position it saw, and recovery replays the log from there.</p>
         <p>Benchmarks on a four-core machine show three times the read throughput of the previous engine while data stays consistent.</p>
       </div>`;
     const sheet = { left: 164, top: 364, width: 872, height: 74 };
@@ -191,9 +181,9 @@ class CidaFrozenScreen extends HTMLElement {
     this.outerHTML = `
       <section class="screen${this.hasAttribute("dark") ? " dark" : ""}" data-state="${this.getAttribute("state")}">
         ${window()}
-        ${phase ? "" : '<div class="veil"></div>'}
+        <div class="veil"></div>
         ${lifted}
-        ${phase ? `<div class="capture-status">${statuses[phase]} · Esc 退出</div>` : '<div class="capture-hint"><span class="wordmark">辞达</span><span>拖动框选要翻译的文字 · Esc 取消</span></div>'}
+        <div class="capture-hint"><span class="wordmark">辞达</span><span>拖动框选要翻译的文字 · Esc 取消</span></div>
       </section>`;
   }
 }

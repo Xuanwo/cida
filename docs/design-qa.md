@@ -31,7 +31,7 @@ compared natively:
 | ⑧ 改进 · 完成 | `improve` | `improve` |
 | ⑨ 再次唤起 · 全选 | `reopened` | (selection, no fixture) |
 | ⑩ 带入选区 | `selection-imported` | (global shortcut; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
-| 截图 · 识别 / 翻译 / 原位完成 / 无文字 / 识别失败 | `capture-recognizing` / `capture-translating` / `capture-translated` / `capture-unrecognized` / `capture-recognition-failed` | (offscreen `CaptureInlineTranslationTests`; guest XCUI `testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt`) |
+| ⑪ 截图 · 未识别到文字 | `capture-unrecognized` | (capture shortcut; XCUI `testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt`) |
 | ⑫ 最大高度 | `long` | `long` |
 | 设置 · 默认 | `settings` | `settings` |
 | 设置 · 编辑改进提示词 · 自定义快捷键 · 已授权 · 开机启动 | `settings-custom` | `settings-custom` |
@@ -132,67 +132,3 @@ Tart proves real macOS interaction and WindowServer composition, not physical 12
 Physical performance is accepted only when the nonactivating runner detects a real 120 Hz display
 and the exact manifest-bound app satisfies the frame budget. A 60 Hz run remains useful diagnostic
 evidence but cannot be labeled a 120 Hz pass.
-
-## In-place screenshot translation (2026-09-26)
-
-Screenshot translation now keeps the frozen screen visible and paints translated blocks back
-into their original positions. Escape or right click dismisses the overlay and cancels work;
-holding Space temporarily reveals the original. Only text and block IDs go to the model.
-The renderer estimates text size and colors, uses a system font, wraps and shrinks to fit,
-and refuses overflowing translations. It does not reconstruct textured backgrounds or original
-font families/weights. `docs/images/demo.gif` must be recorded again because its capture and
-translation sequence changes.
-
-Review evidence is in `Design/QACurrent/comparison-capture-translated.png` (board versus native offscreen
-fixture) and `Design/QACurrent/capture-before-after.png` (original versus translated fixture).
-These are deterministic synthetic screenshots drawn with the production renderer, not a host
-screen capture and not evidence of a successful ScreenCaptureKit/Vision/network journey.
-Generate the native fixtures with:
-
-```sh
-CIDA_CAPTURE_RENDER_DIR=/tmp/cida-inline-review swift test --filter CaptureInlineTranslationTests
-```
-
-The focused tests cover column separation, block-ID validation, source/policy separation,
-font fitting, light/dark color sampling, unchanged pixels outside the translated region, real
-Vision geometry on a synthetic image, late recognition after dismissal, and active request
-cancellation. The warnings-as-errors build and all 208 tests passed; the additional real-Vision
-case then passed with the complete 10-test inline-translation suite. The board render and standard
-`scripts/capture-design-states.sh` were also run. The guest journey now expects the translated
-overlay and attaches `capture-translated-in-place` instead of opening the text panel.
-
-The updated XCUI journeys were compiled but not executed. Offscreen fixtures verify static
-rendering and do not establish end-to-end interaction coverage.
-
-
-## Optional screenshot image window (2026-09-26)
-
-Settings → Screenshot result now selects the existing overlay or a separate image window.
-The default remains overlay; a change persists and applies to the next capture. The image
-window retains only the crop, supports original/translation comparison, and copies or saves
-the translated PNG at the crop's native pixel dimensions. Escape closes it. Multiple result
-windows can coexist. The renderer retains the style limitations documented above.
-
-The six `CaptureImageWindowTests` cover settings migration/persistence, CLI validation,
-export dimensions/orientation/unchanged pixels, PNG pasteboard and file output, capture-session
-handoff, and window ownership. `PanelAndSettingsJourneyTests` includes the mode switch,
-persistence, capture, copy, save-sheet cancellation and close journey. Its test bundle compiles;
-the journeys have not been executed.
-Offscreen screenshots are under `Design/QACurrent`, including `settings-mode-before-after.png`
-and `comparison-capture-image-window.png`. These are review evidence, not approved Tart baselines.
-The existing visual baseline manifest is unchanged.
-The capture sequence in `docs/images/demo.gif` needs re-recording.
-
-Validation: all 215 unit/in-process tests passed, the six image-window tests passed again after
-correcting the initial window size, and `swift build -Xswiftc -warnings-as-errors` passed.
-The complete offscreen capture script and updated capture board render completed successfully.
-`Design/QACurrent/settings-mode-before-after.png` retains the previous and current Settings states.
-The locally ad-hoc-signed Development app was refreshed with its existing bundle identity.
-
-
-Only four representative review images are committed for this feature: Settings before/after,
-source/translation, overlay board/native, and image-window board/native. The complete capture
-script was run during verification; its remaining generated outputs are omitted from this PR
-to avoid duplicating reference, implementation and comparison images for every Settings state.
-Regenerate those outputs with the commands above when needed. Existing approved baselines are
-not updated by this evidence-only cleanup.

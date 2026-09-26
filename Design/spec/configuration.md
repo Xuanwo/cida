@@ -76,5 +76,3 @@
 ## 六、第一次使用
 
 见 `spec/lifecycle.md` §三：还没有模型服务时，欢迎面板指向设置里的配置提示词。
-
-截图展示字段 `capture-presentation`：`overlay`（默认，原屏幕覆盖）或 `image-window`（独立图片窗口），与 Settings「截图结果」同步，下一次截图生效。

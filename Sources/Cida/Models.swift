@@ -42,8 +42,6 @@ struct ProcessingRequest: Equatable, Sendable {
   /// decides which one a translation goes into.
   let myLanguage: String
   let foreignLanguage: String
-  /// Screenshot translation preserves the IDs of a JSON array of text blocks.
-  var translatesCaptureBlocks = false
 }
 
 /// The text of one result. The stream presenter appends to it on the main
@@ -84,6 +82,8 @@ enum ResultPhase: Equatable, Sendable {
   case completed
   case stopped
   case failed(message: String)
+  /// A capture held no text, so nothing was requested.
+  case unrecognized
 
   var isTerminal: Bool {
     self != .streaming
@@ -170,6 +170,8 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
       ResultNote(kind: .stopped, text: "已停止 · ⏎ 重新生成")
     case .failed(let message):
       ResultNote(kind: .failed, text: "请求失败：\(message) 按 ⏎ 重试")
+    case .unrecognized:
+      ResultNote(kind: .unrecognized, text: "截图里没有识别到文字")
     }
   }
 }
@@ -179,6 +181,7 @@ struct ResultNote: Equatable, Sendable {
     case stale
     case stopped
     case failed
+    case unrecognized
   }
 
   let kind: Kind
@@ -210,7 +213,6 @@ struct CidaSettings: Equatable, Sendable {
   var shortcut = GlobalShortcut.optionSpace
   /// The combination that captures text on screen and translates it.
   var captureShortcut = GlobalShortcut.optionS
-  var capturePresentation = CapturePresentation.overlay
 
   /// Whether requests can be sent (`Design/spec/configuration.md`): a valid endpoint, a model,
   /// and a key unless the endpoint is on this Mac or `auth` is `none`.
@@ -301,7 +303,6 @@ extension CidaSettings: Codable {
     case launchAtLogin
     case shortcut
     case captureShortcut
-    case capturePresentation
     case promptContractVersion
     /// 1.0's provider preset, model and custom endpoint; read once to build `modelService`.
     case legacyProvider = "provider"
@@ -348,8 +349,6 @@ extension CidaSettings: Codable {
       try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
     captureShortcut =
       try container.decodeIfPresent(GlobalShortcut.self, forKey: .captureShortcut) ?? .optionS
-    capturePresentation =
-      try container.decodeIfPresent(CapturePresentation.self, forKey: .capturePresentation) ?? .overlay
   }
 
   func encode(to encoder: Encoder) throws {
@@ -362,7 +361,6 @@ extension CidaSettings: Codable {
     try container.encode(launchAtLogin, forKey: .launchAtLogin)
     try container.encode(shortcut, forKey: .shortcut)
     try container.encode(captureShortcut, forKey: .captureShortcut)
-    try container.encode(capturePresentation, forKey: .capturePresentation)
     try container.encode(Self.currentPromptContractVersion, forKey: .promptContractVersion)
   }
 }

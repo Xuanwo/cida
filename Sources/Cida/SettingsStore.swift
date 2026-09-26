@@ -80,7 +80,6 @@ enum SettingsStore {
     stored.foreignLanguage = settings.foreignLanguage
     stored.shortcut = settings.shortcut
     stored.captureShortcut = settings.captureShortcut
-    stored.capturePresentation = settings.capturePresentation
     stored.launchAtLogin = settings.launchAtLogin
     save(stored, namespace: namespace)
   }
