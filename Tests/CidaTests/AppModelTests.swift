@@ -28,6 +28,22 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.inputText, "Keep this text")
   }
 
+  /// `Design/spec/panel.md` §三: while a request runs the action choice is dimmed and cannot
+  /// change, so Tab does nothing until it ends.
+  func testTabIsIgnoredWhileARequestRuns() {
+    let model = AppModel(inputText: "Source")
+    let record = ResultRecord(mode: .translate, source: "Source", outputLanguage: .english)
+    model.setResultForTesting(record)
+    model.setGenerationStateForTesting(.waiting(entryID: record.id))
+
+    model.toggleMode()
+    XCTAssertEqual(model.mode, .translate)
+
+    model.setGenerationStateForTesting(.idle)
+    model.toggleMode()
+    XCTAssertEqual(model.mode, .improve)
+  }
+
   func testImprovementKeepsTheSourceLanguageWithoutChangingTheModelPolicy() {
     let model = AppModel(mode: .improve, inputText: "This sentence needs improvement.")
 
