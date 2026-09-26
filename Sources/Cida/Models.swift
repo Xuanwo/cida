@@ -42,6 +42,9 @@ struct ProcessingRequest: Equatable, Sendable {
   /// decides which one a translation goes into.
   let myLanguage: String
   let foreignLanguage: String
+  /// The translation layer's request (`Design/spec/translation-layer.md`): the text is a JSON
+  /// array of numbered paragraphs, each translated into `myLanguage` only.
+  var translatesLayerBlocks = false
 }
 
 /// The text of one result. The stream presenter appends to it on the main
@@ -213,6 +216,8 @@ struct CidaSettings: Equatable, Sendable {
   var shortcut = GlobalShortcut.optionSpace
   /// The combination that captures text on screen and translates it.
   var captureShortcut = GlobalShortcut.optionS
+  /// The combination that opens the translation layer's configuration.
+  var layerShortcut = GlobalShortcut.optionD
 
   /// Whether requests can be sent (`Design/spec/configuration.md`): a valid endpoint, a model,
   /// and a key unless the endpoint is on this Mac or `auth` is `none`.
@@ -230,6 +235,7 @@ struct CidaSettings: Equatable, Sendable {
     switch action {
     case .showPanel: shortcut
     case .captureText: captureShortcut
+    case .translationLayer: layerShortcut
     }
   }
 
@@ -237,6 +243,7 @@ struct CidaSettings: Equatable, Sendable {
     switch action {
     case .showPanel: shortcut = newShortcut
     case .captureText: captureShortcut = newShortcut
+    case .translationLayer: layerShortcut = newShortcut
     }
   }
 
@@ -303,6 +310,7 @@ extension CidaSettings: Codable {
     case launchAtLogin
     case shortcut
     case captureShortcut
+    case layerShortcut
     case promptContractVersion
     /// 1.0's provider preset, model and custom endpoint; read once to build `modelService`.
     case legacyProvider = "provider"
@@ -349,6 +357,8 @@ extension CidaSettings: Codable {
       try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
     captureShortcut =
       try container.decodeIfPresent(GlobalShortcut.self, forKey: .captureShortcut) ?? .optionS
+    layerShortcut =
+      try container.decodeIfPresent(GlobalShortcut.self, forKey: .layerShortcut) ?? .optionD
   }
 
   func encode(to encoder: Encoder) throws {
@@ -361,6 +371,7 @@ extension CidaSettings: Codable {
     try container.encode(launchAtLogin, forKey: .launchAtLogin)
     try container.encode(shortcut, forKey: .shortcut)
     try container.encode(captureShortcut, forKey: .captureShortcut)
+    try container.encode(layerShortcut, forKey: .layerShortcut)
     try container.encode(Self.currentPromptContractVersion, forKey: .promptContractVersion)
   }
 }

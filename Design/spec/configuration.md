@@ -31,16 +31,16 @@
 | `auth` | `bearer` / `x-api-key` / `api-key` / `none` | Key 放在哪个请求头；默认随 `format`（Anthropic 为 `x-api-key`，其余 `bearer`） |
 | `headers` | JSON 对象 | 额外请求头 |
 | `body` | JSON 对象 | 合并进请求体的额外参数（如关闭推理） |
-| `my-language` / `foreign-language` | 文本，如 `简体中文`、`English`、`粤语` | 与 Settings「语言」一组相同，任意写法（`spec/settings.md` §三） |
+| `my-language` / `foreign-language` | 文本，如 `简体中文`、`English`、`粤语` | 与设置「翻译」页的「语言」相同，任意写法（`spec/settings.md` §三） |
 | `translation-prompt` / `improvement-prompt` | 文本，可 `--file` / `--stdin` | 与设置里的提示词相同 |
-| `shortcut` / `capture-shortcut` | 如 `option+space` | 与设置里的快捷键相同 |
+| `shortcut` / `capture-shortcut` / `layer-shortcut` | 如 `option+space` | 与设置里的快捷键相同；三个不能相同 |
 | `launch-at-login` / `automatic-updates` | `true` / `false` | 与设置里的开关相同 |
 
 请求体里辞达自己带的参数：Anthropic Messages 的 `max_tokens` 为 8192；Responses 带 `"store": false`（辞达不留请求记录，也请服务不留）。`body` 逐层合并进请求体，值为 `null` 的键会被去掉，所以这些都可以改或去掉。
 
 原来的四个预设在升级时换算成对应的 `endpoint`、`format`、`model`，已配置的用户不受影响。
 
-## 四、设置里的「模型」
+## 四、设置里的「模型」页
 
 - 还没有模型服务：这一组只有一张纸（`surface-paper`，`radius-card`，1px `border`，padding 16/18）。标题「还没有模型服务」（13.5 medium），说明「复制配置提示词，交给 Claude Code、Codex 等 AI 助手。它会问你用哪家服务，配好后自己检查。」（11.5 `text-tertiary`），右侧带复制图标的「复制配置提示词」边框按钮。
 - 复制后：按钮 800ms 内为「✓ 已复制」（`accent-soft` 底，同面板的已复制，150ms `motion-icon-swap-ms` 交叉淡化进出），说明换成「已复制。粘贴给你的 AI 助手，配好后这里会自动更新。」，直到配置出现。
@@ -50,7 +50,7 @@
 - 检查失败：「模型服务」一行下、控件列起始处一行说明（提示图标 + 11.5 `text-secondary`）：「<状态码> · <原因>。复制配置提示词，让 AI 助手修好。」
 - 状态以最近一次检查为准：配置改动后还没检查过时为「已就绪」（配置完整即可）；设置里的「检查」与命令行 `check` 的结果都会记录，设置窗口开着时实时刷新。
 - 助手通过命令行改完配置时，窗口开着就实时刷新，状态说明带「 · 刚刚更新」3 秒。
-- 设置里不再有服务商菜单、端点、模型与 API Key 输入框。提示词、唤起、更新三组不变。
+- 设置里不再有服务商菜单、端点、模型与 API Key 输入框。其余标签不变。
 
 ## 五、配置提示词
 

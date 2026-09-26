@@ -10,6 +10,8 @@ enum LucideIconName: String, CaseIterable {
   case info
   case circleStop = "circle-stop"
   case circleAlert = "circle-alert"
+  case keyboard
+  case slidersHorizontal = "sliders-horizontal"
 }
 
 @MainActor

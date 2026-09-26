@@ -34,7 +34,8 @@ final class CidaAppDriver {
     app.descendants(matching: .any).matching(identifier: "cida-status-item").firstMatch
   }
   var resultText: XCUIElement { app.textViews["result-text"] }
-  var settingsWindow: XCUIElement { app.windows["设置"] }
+  /// Settings is titled after its tab, so it is found by its identifier.
+  var settingsWindow: XCUIElement { app.windows["settings-window"] }
   /// The capture shortcut's full-screen layer, a borderless panel like the
   /// main one.
   var captureOverlay: XCUIElement { app.dialogs["capture-overlay"] }
@@ -151,6 +152,20 @@ final class CidaAppDriver {
   func openSettings() {
     composer.typeKey(",", modifierFlags: .command)
     XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+  }
+
+  /// Shows one of Settings' tabs: `model`, `translation`, `shortcuts` or `general`.
+  func showSettingsTab(_ tab: String, title: String) {
+    let button = settingsWindow.buttons["settings-tab-\(tab)"]
+    XCTAssertTrue(button.waitForExistence(timeout: 3))
+    button.click()
+    XCTAssertTrue(waitForTitle(title, of: settingsWindow, timeout: 3), "The title names the tab")
+  }
+
+  func waitForTitle(_ title: String, of window: XCUIElement, timeout: TimeInterval) -> Bool {
+    let expectation = XCTNSPredicateExpectation(
+      predicate: NSPredicate(format: "title == %@", title), object: window)
+    return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
   }
 
   // MARK: - Source

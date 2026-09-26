@@ -41,6 +41,7 @@ The app is a menu-bar application whose main interface is a borderless floating 
 | result pane / text | `result-pane`, `result-text` |
 | result notes | `result-note-stale`, `result-note-stopped`, `result-note-failed`, `result-note-unrecognized` |
 | capture overlay / canvas | `capture-overlay`, `capture-overlay-canvas` |
+| translation layer configuration / hint / painted translations | `translation-layer-configuration`, `translation-layer-hint`, `translation-layer-content` |
 
 ⏎ submits, Tab switches the action, Escape hides, Option-Space shows, ⌘, opens Settings, ⌘C copies
 the result when nothing is selected, ⌘. stops. There is no send button and no title bar.
@@ -53,7 +54,7 @@ the result when nothing is selected, ⌘. stops. There is no send button and no 
 | `ComposerJourneyTests.swift` | responder-chain typing, panel growth and shrink with the source, submit keeps the source, stale marking, source-language-preserving improvement, and Command-C precedence |
 | `CoreTranslationJourneyTests.swift` | delayed first byte, uneven SSE, panel growth, result replacement, stop, inline failure, and recovery |
 | `TranslationStateMachineJourneyTests.swift` | shared model/UI consecutive-submit, completion, hide, and show invariants |
-| `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, the model service configured by the artifact's own command line while Settings is open (onboarding card, copied prompt, live status, 检查 and a failed check), prompt editing, recording the global shortcut, bringing in the frontmost selection, and framing text with the capture shortcut |
+| `PanelAndSettingsJourneyTests.swift` | Escape/Option-Space lifecycle, default action on show, select-all on show, the model service configured by the artifact's own command line while Settings is open (onboarding card, copied prompt, live status, 检查 and a failed check), prompt editing, recording the global shortcut, bringing in the frontmost selection, framing text with the capture shortcut, and the translation layer (one paragraph once, Escape, a pane kept with ⇧-click, scrolling, and the pane found again after a relaunch) against the UI test host's article |
 | `VisualAndAccessibilityJourneyTests.swift` | approved empty-panel and Settings design pixels and the native semantic accessibility audit |
 
 `Resources/Scenarios/pairwise-environment-v1.json` is a stable-seed pairwise environment matrix.
@@ -133,7 +134,9 @@ Accessibility API, and the capture shortcut freezes the guest's display with Scr
 recognizes the host's line of text with Vision. The Settings pixel baseline shows the state before
 any permission is granted, so it launches with `--automation-permissions denied`. The capture
 shortcut adds `capture-overlay-shown`, then `capture-imported`, `capture-unrecognized` or
-`capture-cancelled`, to the lifecycle log.
+`capture-cancelled`, to the lifecycle log. The translation layer records `layer-configuration-shown` and `-closed`, `layer-pane-found`,
+`layer-translated`, `layer-drawn` (with how many paragraphs are painted) and `layer-occluded` (with
+which windows cover the pane).
 
 Regenerate the project after adding or removing UI source files:
 

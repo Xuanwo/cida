@@ -129,6 +129,10 @@ body {
 .icon-circle-alert { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' x2='12' y1='8' y2='12'/><line x1='12' x2='12.01' y1='16' y2='16'/></svg>"); }
 .icon-chevron-down { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>"); }
 .icon-timer { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='10' x2='14' y1='2' y2='2'/><line x1='12' x2='15' y1='14' y2='11'/><circle cx='12' cy='14' r='8'/></svg>"); }
+.icon-sparkles { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z'/><path d='M20 2v4'/><path d='M22 4h-4'/><circle cx='4' cy='20' r='2'/></svg>"); }
+.icon-languages { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m5 8 6 6'/><path d='m4 14 6-6 2-3'/><path d='M2 5h12'/><path d='M7 2h1'/><path d='m22 22-5-10-5 10'/><path d='M14 18h6'/></svg>"); }
+.icon-keyboard { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M10 8h.01'/><path d='M12 12h.01'/><path d='M14 8h.01'/><path d='M16 12h.01'/><path d='M18 8h.01'/><path d='M6 8h.01'/><path d='M7 16h10'/><path d='M8 12h.01'/><rect width='20' height='16' x='2' y='4' rx='2'/></svg>"); }
+.icon-sliders-horizontal { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='21' x2='14' y1='4' y2='4'/><line x1='10' x2='3' y1='4' y2='4'/><line x1='21' x2='12' y1='12' y2='12'/><line x1='8' x2='3' y1='12' y2='12'/><line x1='21' x2='16' y1='20' y2='20'/><line x1='12' x2='3' y1='20' y2='20'/><line x1='14' x2='14' y1='2' y2='6'/><line x1='8' x2='8' y1='10' y2='14'/><line x1='16' x2='16' y1='18' y2='22'/></svg>"); }
 
 /* ---- Panel (spec/panel.md §二, §七) ----------------------------------- */
 
@@ -414,6 +418,32 @@ body {
   font-size: var(--font-size-secondary);
   font-weight: 600;
 }
+
+/* Four tabs under the title (spec/settings.md §一): 76 × 46 each, the chosen one on surface-dim. */
+.settings-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-tabs span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 76px;
+  height: 46px;
+  border-radius: var(--radius-card);
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  line-height: 14px;
+  color: var(--text-secondary);
+}
+.settings-tabs .icon { width: 18px; height: 18px; }
+.settings-tabs span.on { background: var(--surface-dim); color: var(--text-primary); }
+.settings-tabs span.on .icon { color: var(--accent); }
 
 .settings { padding: 6px var(--space-window-x) 24px; }
 .settings .group { padding-top: 20px; }
@@ -714,7 +744,7 @@ body {
 
 /* ---- Menu bar menu (spec/updates.md) ------------------------------------ */
 
-.status-menu-scene { position: relative; width: 320px; height: 210px; }
+.status-menu-scene { position: relative; width: 320px; height: 236px; }
 .status-menu-scene .menubar { width: 320px; }
 .status-menu {
   position: absolute;
@@ -734,3 +764,189 @@ body {
 .status-menu .item b { font-weight: 400; color: var(--text-primary); }
 .status-menu .item kbd { font-family: var(--font-ui); color: var(--text-secondary); }
 .status-menu .separator { height: 1px; margin: 5px 9px; background: var(--border); }
+
+/* ---- Translation layer (spec/translation-layer.md) ---------------------
+ * Mock windows of the apps a layer sits on. They are drawn loosely, only
+ * so the layer has something real-looking to cover; the layer's own parts
+ * are the .layer-* classes. */
+
+.screen.desk { background: linear-gradient(160deg, #D9DDD8, #C9CFCB); }
+.mock-window {
+  position: absolute;
+  left: 60px;
+  top: 64px;
+  display: flex;
+  flex-direction: column;
+  width: 1080px;
+  height: 646px;
+  overflow: hidden;
+  border: 1px solid #00000024;
+  border-radius: 12px;
+  background: #FFFFFF;
+  box-shadow: 0 20px 50px #0000002A;
+  font-family: var(--font-ui);
+}
+.mock-lights { display: flex; gap: 8px; }
+.mock-lights i { width: 12px; height: 12px; border-radius: 50%; background: #FF5F57; }
+.mock-lights i:nth-child(2) { background: #FEBC2E; }
+.mock-lights i:nth-child(3) { background: #28C840; }
+
+/* A chat app: rail, channel list, channel with messages and a composer. */
+.chat-top {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 14px;
+  background: #3A1E3E;
+}
+.chat-top .search {
+  width: 420px;
+  height: 24px;
+  margin: 0 auto;
+  border-radius: 6px;
+  background: #FFFFFF2B;
+  font-size: 12px;
+  line-height: 24px;
+  text-align: center;
+  color: #FFFFFFB3;
+}
+.chat-body { display: flex; flex: 1; min-height: 0; }
+.chat-rail { width: 64px; background: #3A1E3E; }
+.chat-rail i {
+  display: block;
+  width: 36px;
+  height: 36px;
+  margin: 12px auto 0;
+  border-radius: 9px;
+  background: #F2EDE3;
+}
+.chat-sidebar {
+  width: 236px;
+  padding: 16px 12px;
+  background: #4A2A4E;
+  font-size: 14px;
+  color: #FFFFFFB8;
+}
+.chat-sidebar b { display: block; margin: 0 8px 14px; font-size: 17px; color: #FFFFFF; }
+.chat-sidebar span { display: block; padding: 4px 8px; border-radius: 6px; }
+.chat-sidebar span.on { background: #FFFFFF26; font-weight: 600; color: #FFFFFF; }
+.chat-sidebar small { display: block; margin: 16px 8px 6px; font-size: 13px; }
+.chat-main { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.chat-header {
+  display: flex;
+  align-items: center;
+  height: 50px;
+  padding: 0 20px;
+  border-bottom: 1px solid #E8E8E8;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1D1C1D;
+}
+.chat-messages { position: relative; flex: 1; padding: 10px 0; overflow: hidden; }
+.chat-day {
+  margin: 4px 20px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #616061;
+}
+.chat-msg { position: relative; display: flex; gap: 10px; padding: 7px 20px; }
+.chat-msg .avatar { flex: none; width: 36px; height: 36px; border-radius: 7px; }
+.chat-msg .who { font-size: 15px; font-weight: 700; color: #1D1C1D; }
+.chat-msg .who time { margin-left: 6px; font-size: 12px; font-weight: 400; color: #616061; }
+.chat-msg .text { margin-top: 2px; font-size: 15px; line-height: 22px; color: #1D1C1D; }
+.chat-composer {
+  height: 84px;
+  margin: 0 20px 18px;
+  padding: 12px 14px;
+  border: 1px solid #BBBBBB;
+  border-radius: 8px;
+  font-size: 15px;
+  color: #8A8A8A;
+}
+
+/* A browser: tab strip, toolbar, a page with navigation, article and outline. */
+.browser-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  height: 40px;
+  padding: 0 14px;
+  background: #DDE1E6;
+}
+.browser-tabs .mock-lights { align-self: center; }
+.browser-tab {
+  width: 240px;
+  height: 32px;
+  padding: 8px 14px;
+  border-radius: 9px 9px 0 0;
+  background: #FFFFFF;
+  font-size: 12.5px;
+  color: #1F1F1F;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.browser-toolbar { display: flex; align-items: center; height: 40px; padding: 0 14px; border-bottom: 1px solid #E3E3E3; }
+.browser-toolbar .address {
+  flex: 1;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: #F1F3F4;
+  font-size: 13px;
+  line-height: 28px;
+  color: #3C4043;
+}
+.page { position: relative; display: flex; flex: 1; gap: 40px; padding: 36px 44px; min-height: 0; overflow: hidden; }
+.page-nav { width: 150px; flex: none; font-size: 14px; line-height: 30px; color: #5F6368; }
+.page-nav b { display: block; margin-bottom: 8px; font-size: 16px; color: #202124; }
+.page-article { flex: 1; min-width: 0; }
+.page-article h1 { margin: 0 0 8px; font-size: 30px; line-height: 38px; color: #202124; }
+.page-article .meta { margin-bottom: 20px; font-size: 13px; color: #5F6368; }
+.page-article p { margin: 0 0 16px; font-size: 16px; line-height: 27px; color: #3C4043; }
+.page-toc { width: 170px; flex: none; font-size: 13px; line-height: 26px; color: #5F6368; }
+.page-toc b { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.06em; color: #202124; }
+
+/* The layer's own parts. */
+.layer-hint { top: 14px; }
+/* Configuration: the veil covers every screen but the panes cut out of it; selected panes
+ * are lifted like the capture sheet, the pane under the pointer is a dashed preview. */
+.mock-window.scaled { transform: scale(0.6); transform-origin: top left; }
+.layer-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--surface-paper) 72%, transparent); }
+.layer-lifted { position: absolute; border: 1px solid var(--panel-edge); border-radius: var(--radius-card); box-shadow: var(--panel-shadow); }
+.layer-preview { position: absolute; border: 1.5px dashed var(--accent); border-radius: var(--radius-card); }
+.layer-paragraph { position: absolute; border: 1.5px dotted var(--accent); border-radius: 4px; background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+/* Without Screen Recording there is no background to sample: translations sit on paper. */
+.layer-card {
+  display: block;
+  margin: -3px -8px;
+  padding: 3px 8px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-chip);
+  background: var(--surface-paper);
+  color: var(--text-ink);
+}
+/* A block the pointer rests on: the translation has faded to show the original. */
+.layer-peek { margin: -2px -6px; padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.layer-status {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 2px 6px #00000014, 0 10px 24px #1A1A1822;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-control);
+  white-space: nowrap;
+}
+.pointer {
+  position: absolute;
+  width: 16px;
+  height: 22px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 22'><path d='M1 1v17l4.5-4.2 3 6.7 2.6-1.1-3-6.6H14z' fill='black' stroke='white' stroke-width='1.3' stroke-linejoin='round'/></svg>") no-repeat;
+}

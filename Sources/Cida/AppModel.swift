@@ -110,6 +110,8 @@ final class AppModel {
   var errorMessage: String?
   /// The prompt whose sheet is open in Settings; at most one at a time.
   var editingPrompt: ProcessingMode?
+  /// The Settings tab on screen; Settings reopens on it until Cida quits.
+  var settingsTab: SettingsTab = .model
   var inputFocusRequestID = 0
   /// Bumped when the whole source should be selected, e.g. when the panel is
   /// shown again with the previous text still in it.
@@ -598,8 +600,9 @@ final class AppModel {
       newSettings.modelService != settings.modelService || newSettings.apiKey != settings.apiKey
       || lastCheck != lastModelServiceCheck
     var everythingButShortcuts = newSettings
-    everythingButShortcuts.shortcut = settings.shortcut
-    everythingButShortcuts.captureShortcut = settings.captureShortcut
+    for action in GlobalShortcutAction.allCases {
+      everythingButShortcuts.setShortcut(settings.shortcut(for: action), for: action)
+    }
     settings = everythingButShortcuts
     // New combinations are registered like ones recorded in Settings.
     for action in GlobalShortcutAction.allCases {

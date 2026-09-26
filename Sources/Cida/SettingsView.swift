@@ -1,15 +1,42 @@
 import AppKit
 import SwiftUI
 
-/// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): five groups
-/// that answer, in order, which model, which languages, how to translate or improve, how to
-/// summon the panel, and how Cida stays current. Everything saves itself; the window is as tall as its content.
+/// The Settings tabs (`Design/spec/settings.md` §一), in the order a new user needs them:
+/// which model, what and how to translate, how to summon Cida and what it may read, and the
+/// app itself.
+enum SettingsTab: String, CaseIterable {
+  case model
+  case translation
+  case shortcuts
+  case general
+
+  var title: String {
+    switch self {
+    case .model: "模型"
+    case .translation: "翻译"
+    case .shortcuts: "快捷键"
+    case .general: "通用"
+    }
+  }
+
+  var icon: LucideIconName {
+    switch self {
+    case .model: .sparkles
+    case .translation: .languages
+    case .shortcuts: .keyboard
+    case .general: .slidersHorizontal
+    }
+  }
+}
+
+/// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): four
+/// tabs under the titlebar, each as tall as its content. Everything saves itself.
 struct SettingsWindowView: View {
   @Bindable var model: AppModel
   let updates: UpdateState
-  /// The tallest the window's content may be; below the titlebar the groups scroll past it.
+  /// The tallest the window's content may be; below the tabs the groups scroll past it.
   @State private var maxContentHeight: CGFloat
-  /// The groups' natural height, measured on every layout.
+  /// The tab's natural height, measured on every layout.
   @State private var bodyHeight: CGFloat?
 
   init(
@@ -24,7 +51,9 @@ struct SettingsWindowView: View {
   var body: some View {
     WindowSurface {
       VStack(spacing: 0) {
-        SettingsTitlebar()
+        SettingsTitlebar(title: model.settingsTab.title)
+        SettingsTabBar(selection: $model.settingsTab)
+        Hairline()
         ScrollView(.vertical) {
           SettingsBody(model: model, updates: updates)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bodyHeight = $0 }
@@ -32,7 +61,7 @@ struct SettingsWindowView: View {
         .scrollBounceBehavior(.basedOnSize)
         .frame(
           height: bodyHeight.map {
-            min($0, maxContentHeight - SettingsWindowFactory.titlebarHeight)
+            min($0, maxContentHeight - SettingsWindowFactory.chromeHeight)
           })
       }
     }
@@ -50,15 +79,19 @@ struct SettingsWindowView: View {
 }
 
 /// Builds the Settings window around a hosting controller whose preferred content size drives
-/// the window height, so expanding a prompt grows the window instead of scrolling it, up to the
-/// screen's visible height (minus the menu bar and the Dock); a smaller screen scrolls the groups
-/// instead. The window follows over `motion-height-ms` with its top edge fixed
-/// (`CidaWindow.animatesHeightChanges`, `Design/spec/settings.md` §一).
+/// the window height, so switching tabs or expanding a prompt resizes the window instead of
+/// scrolling it, up to the screen's visible height (minus the menu bar and the Dock); a smaller
+/// screen scrolls the tab instead. The window follows over `motion-height-ms` with its top edge
+/// fixed (`CidaWindow.animatesHeightChanges`, `Design/spec/settings.md` §一).
 @MainActor
 enum SettingsWindowFactory {
   static let width: CGFloat = 560
   /// The compact title bar the window's empty toolbar gives on macOS 26 (`CidaWindowFactory`).
   static let titlebarHeight: CGFloat = 40
+  /// The tabs under the title bar and the space below them, above the hairline.
+  static let tabBarHeight: CGFloat = 56
+  /// Everything above the tab's content: title bar, tabs and hairline.
+  static var chromeHeight: CGFloat { titlebarHeight + tabBarHeight + 1 }
 
   /// The visible height of the screen Settings opens on, where the Dock and the menu bar leave
   /// room for windows.
@@ -77,29 +110,46 @@ enum SettingsWindowFactory {
     // The titlebar is drawn by `SettingsTitlebar` inside the content; without
     // this SwiftUI would add the system titlebar's safe area to the height.
     hostingController.safeAreaRegions = []
-    // The first pass measures the groups; the second sizes the window from them.
+    // The first pass measures the tab; the second sizes the window from it.
     hostingController.view.layoutSubtreeIfNeeded()
     hostingController.view.layoutSubtreeIfNeeded()
     let initialHeight = hostingController.view.fittingSize.height
     let window = CidaWindowFactory.makeWindow(
       size: CGSize(width: width, height: initialHeight),
       minimumSize: CGSize(width: width, height: 200),
-      title: "设置"
+      title: model.settingsTab.title
     )
     window.styleMask.remove(.resizable)
     window.contentViewController = hostingController
+    // The title names the tab, so the window is found by this instead.
+    window.setAccessibilityIdentifier("settings-window")
     hostingController.view.setAccessibilityLabel("设置窗口内容")
     window.setContentSize(CGSize(width: width, height: initialHeight))
     window.center()
     window.animatesHeightChanges = true
+    followTabTitle(of: model, in: window)
     return NSWindowController(window: window)
+  }
+
+  /// Keeps the window's own title (the Window menu, VoiceOver, Mission Control) on the tab.
+  private static func followTabTitle(of model: AppModel, in window: NSWindow) {
+    withObservationTracking {
+      window.title = model.settingsTab.title
+    } onChange: { [weak window] in
+      Task { @MainActor in
+        guard let window else { return }
+        followTabTitle(of: model, in: window)
+      }
+    }
   }
 }
 
 private struct SettingsTitlebar: View {
+  let title: String
+
   var body: some View {
     ZStack {
-      Text("设置")
+      Text(title)
         .font(CidaDesign.ui(13, weight: .semibold))
         .foregroundStyle(CidaDesign.textPrimary)
         .accessibilityAddTraits(.isHeader)
@@ -109,36 +159,80 @@ private struct SettingsTitlebar: View {
   }
 }
 
+/// Four tabs centred under the title: a Lucide icon over its name. The chosen one sits on
+/// `surface-dim` with the icon in `accent`.
+private struct SettingsTabBar: View {
+  @Binding var selection: SettingsTab
+
+  var body: some View {
+    HStack(spacing: 4) {
+      ForEach(SettingsTab.allCases, id: \.self) { tab in
+        let isSelected = tab == selection
+        Button {
+          selection = tab
+        } label: {
+          VStack(spacing: 3) {
+            LucideIcon(tab.icon, size: 18)
+              .foregroundStyle(isSelected ? CidaDesign.accent : CidaDesign.textSecondary)
+            Text(tab.title)
+              .font(CidaDesign.ui(11.5, weight: .medium))
+              .foregroundStyle(isSelected ? CidaDesign.textPrimary : CidaDesign.textSecondary)
+          }
+          .frame(width: 76, height: 46)
+          .background(isSelected ? CidaDesign.surfaceDim : .clear)
+          .clipShape(.rect(cornerRadius: CidaDesign.Radius.card, style: .continuous))
+          .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityIdentifier("settings-tab-\(tab.rawValue)")
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .frame(height: SettingsWindowFactory.tabBarHeight, alignment: .top)
+  }
+}
+
 private struct SettingsBody: View {
   @Bindable var model: AppModel
   let updates: UpdateState
 
   var body: some View {
     VStack(spacing: 0) {
-      SettingsGroup(title: "模型", isFirst: true) {
-        ModelServiceGroup(model: model)
+      switch model.settingsTab {
+      case .model:
+        // One group a tab needs no heading: the title already names it.
+        SettingsGroup(isFirst: true) {
+          ModelServiceGroup(model: model)
+        }
+      case .translation:
+        SettingsGroup(title: "语言", isFirst: true) {
+          LanguagesRow(model: model)
+        }
+        Hairline()
+        SettingsGroup(title: "提示词") {
+          PromptRow(model: model, mode: .translate)
+          PromptRow(model: model, mode: .improve)
+        }
+      case .shortcuts:
+        SettingsGroup(title: "快捷键", isFirst: true) {
+          GlobalShortcutRow(model: model, action: .showPanel)
+          GlobalShortcutRow(model: model, action: .captureText)
+          GlobalShortcutRow(model: model, action: .translationLayer)
+        }
+        Hairline()
+        SettingsGroup(title: "权限") {
+          AccessibilityPermissionRow(model: model)
+          ScreenRecordingPermissionRow(model: model)
+        }
+      case .general:
+        SettingsGroup(isFirst: true) {
+          LaunchAtLoginRow(model: model)
+          AutomaticUpdatesRow(updates: updates)
+        }
+        AboutFooter()
       }
-      Hairline()
-      SettingsGroup(title: "语言") {
-        LanguagesRow(model: model)
-      }
-      Hairline()
-      SettingsGroup(title: "提示词") {
-        PromptRow(model: model, mode: .translate)
-        PromptRow(model: model, mode: .improve)
-      }
-      Hairline()
-      SettingsGroup(title: "唤起") {
-        GlobalShortcutRow(model: model, action: .showPanel)
-        GlobalShortcutRow(model: model, action: .captureText)
-        SelectionAccessRow(model: model)
-        LaunchAtLoginRow(model: model)
-      }
-      Hairline()
-      SettingsGroup(title: "更新") {
-        AutomaticUpdatesRow(updates: updates)
-      }
-      AboutFooter()
     }
     .padding(.top, 6)
     .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
@@ -259,17 +353,21 @@ private struct SettingsTextField: View {
 
 // MARK: - Layout pieces
 
+/// A group of rows; the first in a tab sits 12 pt under the tab bar, the next 20 pt under
+/// its hairline.
 private struct SettingsGroup<Content: View>: View {
-  let title: String
+  var title: String? = nil
   var isFirst = false
   @ViewBuilder let content: Content
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text(title)
-        .font(CidaDesign.ui(12, weight: .semibold))
-        .foregroundStyle(CidaDesign.textControl)
-        .frame(height: 17)
+      if let title {
+        Text(title)
+          .font(CidaDesign.ui(12, weight: .semibold))
+          .foregroundStyle(CidaDesign.textControl)
+          .frame(height: 17)
+      }
       content
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -606,12 +704,10 @@ private struct ExpandedPromptRow: View {
   }
 }
 
-// MARK: - 唤起
+// MARK: - 快捷键
 
 /// The key chip is the recorder: a click waits for the next combination,
-/// which is registered before it is kept (`Design/spec/settings.md` §五). The
-/// capture row also says whether the Screen Recording permission is there
-/// and asks for it.
+/// which is registered before it is kept (`Design/spec/settings.md` §四).
 private struct GlobalShortcutRow: View {
   @Bindable var model: AppModel
   let action: GlobalShortcutAction
@@ -632,12 +728,12 @@ private struct GlobalShortcutRow: View {
     model.settings.shortcut(for: action)
   }
 
-  private var needsCaptureAccess: Bool {
-    action == .captureText && !model.isCaptureAccessGranted
-  }
-
   private var title: String {
-    action == .showPanel ? "全局快捷键" : "截图翻译"
+    switch action {
+    case .showPanel: "显示辞达"
+    case .captureText: "截图翻译"
+    case .translationLayer: "翻译图层"
+    }
   }
 
   private var caption: String {
@@ -646,27 +742,31 @@ private struct GlobalShortcutRow: View {
     }
     if feedback == .rejected { return "这个组合已被占用，换一个" }
     switch action {
-    case .showPanel: return "在任何应用里显示辞达"
-    case .captureText: return needsCaptureAccess ? "需要屏幕录制权限" : "框选屏幕文字并翻译"
+    case .showPanel: return "在任何应用里唤起"
+    case .captureText: return "框选屏幕文字并翻译"
+    case .translationLayer: return "在原处翻译外文"
     }
   }
 
   private var identifierPrefix: String {
-    action == .showPanel ? "settings-shortcut" : "settings-capture-shortcut"
+    switch action {
+    case .showPanel: "settings-shortcut"
+    case .captureText: "settings-capture-shortcut"
+    case .translationLayer: "settings-layer-shortcut"
+    }
   }
 
   private var accessibilityName: String {
-    action == .showPanel ? "全局快捷键" : "截图翻译快捷键"
+    switch action {
+    case .showPanel: "显示辞达快捷键"
+    case .captureText: "截图翻译快捷键"
+    case .translationLayer: "翻译图层快捷键"
+    }
   }
 
   var body: some View {
     SettingsRow(title: title, caption: caption, alignment: .trailing) {
       HStack(spacing: 12) {
-        if needsCaptureAccess, !isRecording {
-          Button("去授权", action: model.requestCaptureAccess)
-            .buttonStyle(SettingsBorderedButtonStyle())
-            .accessibilityIdentifier("settings-capture-access-request")
-        }
         if shortcut != action.defaultShortcut, !isRecording {
           Button("恢复默认") {
             feedback = model.setShortcut(action.defaultShortcut, for: action) ? nil : .rejected
@@ -706,14 +806,6 @@ private struct GlobalShortcutRow: View {
         .accessibilityIdentifier(identifierPrefix)
       }
     }
-    .onAppear {
-      if action == .captureText { model.refreshCaptureAccess() }
-    }
-    .onReceive(
-      NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
-    ) { _ in
-      if action == .captureText { model.refreshCaptureAccess() }
-    }
   }
 }
 
@@ -738,29 +830,19 @@ private struct ShortcutChip: View {
   }
 }
 
-/// The global shortcut brings in the frontmost application's selection only
-/// with the Accessibility permission (`Design/spec/settings.md` §五). There is no
-/// switch: granting turns it on, revoking in System Settings turns it off.
-private struct SelectionAccessRow: View {
+// MARK: - 权限
+
+/// Accessibility lets Option-Space bring in the frontmost application's selection and lets the
+/// translation layer read other applications' text (`Design/spec/settings.md` §五). There is no
+/// switch: granting turns both on, revoking in System Settings turns them off.
+private struct AccessibilityPermissionRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    SettingsRow(
-      title: "选中文字",
-      caption: model.isSelectionAccessGranted ? "唤起时带入并翻译" : "需要辅助功能权限",
-      alignment: .trailing
-    ) {
-      if model.isSelectionAccessGranted {
-        Text("已开启")
-          .font(CidaDesign.ui(12, weight: .medium))
-          .foregroundStyle(CidaDesign.textSecondary)
-          .accessibilityIdentifier("settings-selection-access-granted")
-      } else {
-        Button("去授权", action: model.requestSelectionAccess)
-          .buttonStyle(SettingsBorderedButtonStyle())
-          .accessibilityIdentifier("settings-selection-access-request")
-      }
-    }
+    PermissionRow(
+      title: "辅助功能", caption: "选中文字与原处翻译", isGranted: model.isSelectionAccessGranted,
+      request: model.requestSelectionAccess, identifier: "settings-selection-access"
+    )
     // The system does not say when the permission changes for this process;
     // re-read it when the user comes back to the window and when the list of
     // allowed applications changes.
@@ -783,6 +865,52 @@ private struct SelectionAccessRow: View {
     }
   }
 }
+
+/// Screen Recording lets the capture shortcut freeze the screen and lets the translation
+/// layer match the page's colours and follow it while it scrolls.
+private struct ScreenRecordingPermissionRow: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    PermissionRow(
+      title: "屏幕录制", caption: "截图与图层跟随", isGranted: model.isCaptureAccessGranted,
+      request: model.requestCaptureAccess, identifier: "settings-capture-access"
+    )
+    .onAppear(perform: model.refreshCaptureAccess)
+    .onReceive(
+      NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
+    ) { _ in
+      model.refreshCaptureAccess()
+    }
+  }
+}
+
+/// 已开启 once granted, otherwise 去授权, which asks the system.
+private struct PermissionRow: View {
+  let title: String
+  let caption: String
+  let isGranted: Bool
+  let request: () -> Void
+  let identifier: String
+
+  var body: some View {
+    SettingsRow(title: title, caption: caption, alignment: .trailing) {
+      if isGranted {
+        Text("已开启")
+          .font(CidaDesign.ui(12, weight: .medium))
+          .foregroundStyle(CidaDesign.textSecondary)
+          .frame(height: 30)
+          .accessibilityIdentifier("\(identifier)-granted")
+      } else {
+        Button("去授权", action: request)
+          .buttonStyle(SettingsBorderedButtonStyle())
+          .accessibilityIdentifier("\(identifier)-request")
+      }
+    }
+  }
+}
+
+// MARK: - 通用
 
 private struct LaunchAtLoginRow: View {
   @Bindable var model: AppModel

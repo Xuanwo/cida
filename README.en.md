@@ -18,6 +18,7 @@
 - **Select text and press <kbd>⌥</kbd> <kbd>Space</kbd>.** The panel appears with your selection and the translation starts streaming in. Text in your language goes into your usual foreign language and anything else comes into yours; they default to Simplified Chinese and English, and Settings takes any language, dialect or register, such as Cantonese or British English.
 - **Press <kbd>Tab</kbd>, then <kbd>Return</kbd>, to improve the writing instead.** The improved text stays in its own language.
 - **For text on the screen, press <kbd>⌥</kbd> <kbd>S</kbd>.** Frame what you want translated; Cida recognizes it on your Mac and translates it.
+- **To read in place, press <kbd>⌥</kbd> <kbd>D</kbd>.** Click a paragraph and its translation covers the original; <kbd>⇧</kbd>-click an area, such as Slack's message list or an article, and its foreign text keeps showing as translations that follow scrolling. Rest the pointer on a translation to see the original; clicks and scrolling still reach the app.
 
 <kbd>Esc</kbd> takes you back to your app. A request keeps running while the panel is hidden, and the result is there when you bring it back.
 
@@ -33,18 +34,18 @@ You need macOS 15 or newer and a language model service.
 
 Your API key never passes through the assistant: it asks you to copy the key and run one command that stores it in the Keychain. Cida speaks OpenAI Chat Completions, Responses and Anthropic Messages; a model running on your Mac (such as `http://127.0.0.1:8080`) needs no key. Cida is free; your provider charges for the requests.
 
-Two permissions are optional. Turn them on with 去授权 in the 唤起 section of Settings:
+Two permissions are optional. Turn them on with 去授权 on the 快捷键 tab of Settings:
 
 | Permission | With it | Without it |
 | --- | --- | --- |
-| Accessibility | <kbd>⌥</kbd> <kbd>Space</kbd> brings in the selected text | Copy with <kbd>⌘</kbd> <kbd>C</kbd>, then paste into the panel |
-| Screen Recording | <kbd>⌥</kbd> <kbd>S</kbd> translates text on screen | Screenshot translation is unavailable |
+| Accessibility | <kbd>⌥</kbd> <kbd>Space</kbd> brings in the selected text; <kbd>⌥</kbd> <kbd>D</kbd> translates in place | Copy with <kbd>⌘</kbd> <kbd>C</kbd>, then paste into the panel; no in-place translation |
+| Screen Recording | <kbd>⌥</kbd> <kbd>S</kbd> translates text on screen; in-place translations take the original's colours and follow scrolling frame by frame | Screenshot translation is unavailable; in-place translations sit on paper and hide while scrolling |
 
 ## Privacy
 
 - The API key is stored only in the macOS Keychain.
 - There is no history and no telemetry; translation and improvement requests go only to the provider you chose.
-- Screenshots are recognized on your Mac with Apple's Vision and never leave it.
+- Screenshots are recognized on your Mac with Apple's Vision and never leave it. In-place translation reads only the text apps expose through Accessibility; frames are compared in memory and never saved or sent.
 
 ## Keys
 
@@ -52,11 +53,12 @@ Two permissions are optional. Turn them on with 去授权 in the 唤起 section 
 | --- | --- |
 | <kbd>⌥</kbd> <kbd>Space</kbd> | Show or hide the panel |
 | <kbd>⌥</kbd> <kbd>S</kbd> | Translate text on screen |
+| <kbd>⌥</kbd> <kbd>D</kbd> | Translate in place: click a paragraph once, <kbd>⇧</kbd>-click an area to keep it |
 | <kbd>Tab</kbd> | Switch between translate and improve |
 | <kbd>Return</kbd> | Run (<kbd>⇧</kbd> <kbd>Return</kbd> for a new line) |
 | <kbd>Esc</kbd> | Hide the panel |
 
-Both global shortcuts can be recorded again in Settings.
+All three global shortcuts can be recorded again in Settings.
 
 ## Command line
 
@@ -75,7 +77,7 @@ Every command takes `--json`. The API key is read only from `--stdin`, `--file` 
 
 ## Updates
 
-Cida checks `https://cida-releases.xuanwo.io/appcast.xml` once a day. When a new version is out, its panel shows the update notes and installs the update once you agree. The check sends no system information, and you can turn it off in the 更新 section of Settings.
+Cida checks `https://cida-releases.xuanwo.io/appcast.xml` once a day. When a new version is out, its panel shows the update notes and installs the update once you agree. The check sends no system information, and you can turn it off on the 通用 tab of Settings.
 
 ## Uninstall
 
