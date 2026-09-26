@@ -161,9 +161,8 @@ case then passed with the complete 10-test inline-translation suite. The board r
 `scripts/capture-design-states.sh` were also run. The guest journey now expects the translated
 overlay and attaches `capture-translated-in-place` instead of opening the text panel.
 
-Tart verification is pending: OpenAI Tart 2.38.0 is now installed, but host preflight
-stops because the required `cida-ui-golden` image is missing (exit 66). Before review/release, run the updated guest journey
-and attach its before/after screenshots. The offscreen fixtures do not replace that requirement.
+The updated XCUI journeys were compiled but not executed. Offscreen fixtures verify static
+rendering and do not establish end-to-end interaction coverage.
 
 
 ## Optional screenshot image window (2026-09-26)
@@ -178,10 +177,10 @@ The six `CaptureImageWindowTests` cover settings migration/persistence, CLI vali
 export dimensions/orientation/unchanged pixels, PNG pasteboard and file output, capture-session
 handoff, and window ownership. `PanelAndSettingsJourneyTests` includes the mode switch,
 persistence, capture, copy, save-sheet cancellation and close journey. Its test bundle compiles;
-execution is pending the missing Tart image, which the user confirmed is unavailable.
+the journeys have not been executed.
 Offscreen screenshots are under `Design/QACurrent`, including `settings-mode-before-after.png`
 and `comparison-capture-image-window.png`. These are review evidence, not approved Tart baselines.
-The existing visual baseline manifest is intentionally not re-approved without the guest run.
+The existing visual baseline manifest is unchanged.
 The capture sequence in `docs/images/demo.gif` needs re-recording.
 
 Validation: all 215 unit/in-process tests passed, the six image-window tests passed again after
