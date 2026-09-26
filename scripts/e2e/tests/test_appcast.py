@@ -75,6 +75,28 @@ class AppcastTests(unittest.TestCase):
         self.assertEqual([item.findtext(f"{SPARKLE}version") for item in items], ["150", "140"])
         self.assertIsNone(items[0].find(f"{SPARKLE}channel"))
 
+    def test_each_channel_keeps_its_two_newest_builds(self):
+        self.publish("1.0.0", "120")
+        self.publish("1.1.0", "128", channel="beta")
+        self.publish("1.1.0", "129", channel="beta")
+        self.publish("1.1.0", "140")
+        self.publish("1.1.1", "150")
+        items = self.publish("1.2.0", "160", channel="beta")
+
+        self.assertEqual(
+            [item.findtext(f"{SPARKLE}version") for item in items], ["160", "150", "140", "129"]
+        )
+
+    def test_candidates_never_push_the_releases_out(self):
+        self.publish("1.1.0", "140")
+        self.publish("1.1.1", "150")
+        for build in ("160", "161", "162"):
+            items = self.publish("1.2.0", build, channel="beta")
+
+        self.assertEqual(
+            [item.findtext(f"{SPARKLE}version") for item in items], ["162", "161", "150", "140"]
+        )
+
     def test_update_notes_are_plain_text_lines_marked_for_sparkle(self):
         items = self.publish("1.1.0", "140", notes="翻译 <选中> 的文字\n\n保留 & 恢复\n")
 

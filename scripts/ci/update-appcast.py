@@ -6,7 +6,8 @@ release candidate and then the release from one commit, or rerunning a job, leav
 Release candidates carry the beta channel; releases carry none. The update notes
 (release-notes.py) go into the item's <description> as plain text, one item per line, marked
 sparkle:format="plain-text" so Sparkle does not read them as HTML; Cida lays the lines out in
-its own panel.
+its own panel. Each channel keeps its two newest builds and older items leave the feed;
+publish-update.sh then deletes the files no item points at.
 
     update-appcast.py --appcast current.xml --output appcast.xml --version 1.1.0 --build 140 \
         --url https://.../Cida-1.1.0-140.zip --length 19000000 --signature <EdDSA> \
@@ -25,6 +26,8 @@ SPARKLE = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 ElementTree.register_namespace("sparkle", SPARKLE)
 
 MINIMUM_SYSTEM_VERSION = "15.0"
+# Two, so a version Cida found before the next one was published can still be downloaded.
+KEPT_PER_CHANNEL = 2
 FEED_TITLE = "辞达"
 FEED_LINK = "https://cida-releases.xuanwo.io/appcast.xml"
 
@@ -93,6 +96,18 @@ def make_item(arguments, notes):
     return item
 
 
+def drop_old_items(channel):
+    kept = {}
+    items = sorted(
+        channel.findall("item"), key=lambda item: int(item.findtext(sparkle("version"))), reverse=True
+    )
+    for item in items:
+        name = item.findtext(sparkle("channel"))
+        kept[name] = kept.get(name, 0) + 1
+        if kept[name] > KEPT_PER_CHANNEL:
+            channel.remove(item)
+
+
 def main(arguments):
     arguments = parse_arguments(arguments)
     tree, channel = load_channel(arguments.appcast)
@@ -104,6 +119,7 @@ def main(arguments):
         (index for index, child in enumerate(list(channel)) if child.tag == "item"), len(channel)
     )
     channel.insert(first_item, make_item(arguments, notes))
+    drop_old_items(channel)
     ElementTree.indent(tree, space="  ")
     arguments.output.write_bytes(
         ElementTree.tostring(tree.getroot(), encoding="utf-8", xml_declaration=True) + b"\n"
