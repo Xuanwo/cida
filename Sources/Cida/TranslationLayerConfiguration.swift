@@ -21,7 +21,11 @@ final class LayerConfiguration {
   private var paneCache: (pane: AccessibilityLayerNode, blocks: [LayerBlock], read: Date)?
   private var enabledTrees: Set<pid_t> = []
   private var lastChosen: LayerApplication?
+  /// The app in front when the configuration opened; it gets the front back on Esc.
+  private var previousApplication: NSRunningApplication?
   private var finish: CheckedContinuation<Void, Never>?
+  private var keyObservers: [NSObjectProtocol] = []
+  private var loggedPane: CGRect?
 
   init(controller: TranslationLayerController, screen: NSScreen) {
     self.controller = controller
@@ -47,22 +51,59 @@ final class LayerConfiguration {
       }
     }
     view.onFinish = { [weak self] commit in self?.close(commit: commit) }
+    view.onKey = { [weak self] code in self?.controller.log("layer-configuration-key-down code=\(code)") }
     view.veilIsInk = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     refreshLifted()
+    // Cida comes to the front while the veil is up. A non-activating panel only borrows the
+    // keyboard from the app in front, and an input method's event tap hands it back on the
+    // first ⇧ (measured with WeType, 2026-09-27); Esc and ⏎ then reach that app instead.
+    let frontmost = NSWorkspace.shared.frontmostApplication
+    if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+      previousApplication = frontmost
+    }
+    NSApp.activate()
     panel.makeKeyAndOrderFront(nil)
     panel.makeFirstResponder(view)
+    observeKeyWindow()
+    controller.log(
+      "layer-configuration-shown key=\(panel.isKeyWindow) active=\(NSApp.isActive) "
+        + "frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
     view.fadeIn()
     pointerMoved(to: view.convert(panel.mouseLocationOutsideOfEventStream, from: nil))
     await withCheckedContinuation { finish = $0 }
   }
 
-  private func close(commit: Bool) {
-    hoverTask?.cancel()
-    if commit {
-      controller.setSelections(working)
-      if let lastChosen { NSRunningApplication(processIdentifier: lastChosen.processIdentifier)?.activate() }
+  /// Whether the veil has the keyboard decides whether Esc and ⏎ reach it.
+  private func observeKeyWindow() {
+    let center = NotificationCenter.default
+    for (name, event) in [
+      (NSWindow.didBecomeKeyNotification, "layer-configuration-became-key"),
+      (NSWindow.didResignKeyNotification, "layer-configuration-resigned-key"),
+    ] {
+      keyObservers.append(
+        center.addObserver(forName: name, object: panel, queue: .main) { [weak self] _ in
+          MainActor.assumeIsolated {
+            self?.controller.log(
+              "\(event) frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+          }
+        })
     }
+  }
+
+  private func close(commit: Bool) {
+    controller.log("layer-configuration-closed commit=\(commit)")
+    keyObservers.forEach(NotificationCenter.default.removeObserver)
+    keyObservers = []
+    hoverTask?.cancel()
+    if commit { controller.setSelections(working) }
     panel.orderOut(nil)
+    // The front goes to the app last chosen, or back to the one the veil opened over.
+    let front = lastChosen.flatMap { NSRunningApplication(processIdentifier: $0.processIdentifier) }
+      ?? previousApplication
+    if let front {
+      NSApp.yieldActivation(to: front)
+      front.activate()
+    }
     finish?.resume()
     finish = nil
   }
@@ -147,12 +188,31 @@ final class LayerConfiguration {
           : "正在读取 \(hover.application.name)…")
       return
     }
-    let paragraph = resolved.blocks.first { $0.frame.contains(hover.point) }
+    if loggedPane != paneFrame {
+      loggedPane = paneFrame
+      controller.log(
+        "layer-hover app=\(hover.application.bundleIdentifier) pane=\(resolved.pane?.role ?? "-") "
+          + "\(Int(paneFrame.width))x\(Int(paneFrame.height)) blocks=\(resolved.blocks.count)")
+    }
+    let paragraph = Self.paragraph(at: hover.point, in: resolved.blocks)
     view.setPreview(pane: viewRect(paneFrame), paragraph: paragraph.map { viewRect($0.frame) })
     let scope = resolved.scope.label(applicationName: hover.application.name)
     let isChosen = chosenSelection(for: hover) != nil
     view.setHint(
       "\(scope) · 点击：翻译这一段 · ⇧ 点击：\(isChosen ? "不再翻译这个区域" : "一直翻译这个区域") · Esc 取消")
+  }
+
+  /// The paragraph on the pointer's line: the one under it, or the nearest beside it, so a
+  /// click anywhere along a line picks that line even where its text stops short.
+  nonisolated static func paragraph(at point: CGPoint, in blocks: [LayerBlock]) -> LayerBlock? {
+    if let under = blocks.first(where: { $0.frame.contains(point) }) { return under }
+    return blocks
+      .filter { $0.frame.minY - 2 <= point.y && point.y <= $0.frame.maxY + 2 }
+      .min { distance(from: point.x, to: $0.frame) < distance(from: point.x, to: $1.frame) }
+  }
+
+  nonisolated private static func distance(from x: CGFloat, to frame: CGRect) -> CGFloat {
+    x < frame.minX ? frame.minX - x : max(0, x - frame.maxX)
   }
 
   static let idleHint = "点击：翻译这一段 · ⇧ 点击：一直翻译这个区域 · Esc 取消"
@@ -173,11 +233,13 @@ final class LayerConfiguration {
   private func click(extends: Bool) {
     guard let hover, let resolved = hover.resolved, let pane = resolved.pane, let window = resolved.window
     else {
+      controller.log("layer-click outcome=no-pane")
       NSSound.beep()
       return
     }
     if extends {
       if let chosen = chosenSelection(for: hover) {
+        controller.log("layer-click outcome=stop")
         working.removeAll { $0.id == chosen.id }
         addedFrames[chosen.id] = nil
       } else {
@@ -185,6 +247,7 @@ final class LayerConfiguration {
           bundleIdentifier: hover.application.bundleIdentifier,
           applicationName: hover.application.name, scope: resolved.scope,
           locator: LayerPaneLocator(pane: pane, window: resolved.windowFrame))
+        controller.log("layer-click outcome=keep scope=\(resolved.scope.label(applicationName: hover.application.name))")
         working.append(selection)
         addedFrames[selection.id] = resolved.paneFrame
         bringForward(hover.application, window: window)
@@ -193,24 +256,31 @@ final class LayerConfiguration {
       apply(hover)
       return
     }
-    guard let paragraph = resolved.blocks.first(where: { $0.frame.contains(hover.point) }) else {
+    guard let paragraph = Self.paragraph(at: hover.point, in: resolved.blocks) else {
+      controller.log("layer-click outcome=no-paragraph blocks=\(resolved.blocks.count)")
       NSSound.beep()
       return
     }
+    controller.log("layer-click outcome=translate-once")
     controller.translateOnce(paragraph: paragraph, pane: pane, window: window, application: hover.application)
     lastChosen = hover.application
     close(commit: true)
   }
 
   /// A chosen pane's app comes to the front and its window above the others, so a pane
-  /// that was partly covered shows whole (§二). The configuration keeps the keyboard.
+  /// that was partly covered shows whole (§二). Cida then takes the front back, so the
+  /// configuration keeps the keyboard; the chosen app gets it when the configuration ends.
   private func bringForward(_ application: LayerApplication, window: AccessibilityLayerNode) {
     lastChosen = application
-    NSRunningApplication(processIdentifier: application.processIdentifier)?.activate()
+    if let running = NSRunningApplication(processIdentifier: application.processIdentifier) {
+      NSApp.yieldActivation(to: running)
+      running.activate()
+    }
     window.perform(kAXRaiseAction)
     Task { @MainActor [weak self] in
       try? await Task.sleep(for: .milliseconds(80))
-      guard let self else { return }
+      guard let self, finish != nil else { return }
+      NSApp.activate()
       panel.makeKeyAndOrderFront(nil)
       panel.makeFirstResponder(view)
     }
@@ -274,6 +344,7 @@ final class LayerConfigurationView: NSView {
   var onMove: ((CGPoint) -> Void)?
   var onClick: ((CGPoint, Bool) -> Void)?
   var onFinish: ((Bool) -> Void)?
+  var onKey: ((UInt16) -> Void)?
   var veilIsInk = false {
     didSet { veilLayer.fillColor = (veilIsInk ? CaptureVeil.ink : CaptureVeil.paper).color }
   }
@@ -435,6 +506,7 @@ final class LayerConfigurationView: NSView {
   override func rightMouseDown(with event: NSEvent) { onFinish?(false) }
 
   override func keyDown(with event: NSEvent) {
+    onKey?(event.keyCode)
     switch Int(event.keyCode) {
     case 53: onFinish?(false)
     case 36, 76: onFinish?(true)

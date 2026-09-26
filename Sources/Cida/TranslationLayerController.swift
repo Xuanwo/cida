@@ -1,5 +1,6 @@
 import AppKit
 import ScreenCaptureKit
+import os
 
 /// Runs the translation layer (`Design/spec/translation-layer.md`): finds the chosen panes in
 /// running applications, reads their paragraphs, translates what is not in the user's own
@@ -50,7 +51,10 @@ final class TranslationLayerController {
       NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
         // Escape dismisses a paragraph translated once; the key still reaches the app.
         guard event.keyCode == 53 else { return }
-        MainActor.assumeIsolated { self?.dismissOneOff() }
+        MainActor.assumeIsolated {
+          self?.log("layer-escape-elsewhere frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+          self?.dismissOneOff()
+        }
       } as Any)
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -185,7 +189,7 @@ final class TranslationLayerController {
       session.site = site
       sessions[key] = session
       session.read()
-      lifecycleLog?("layer-pane-found app=\(application.bundleIdentifier)")
+      log("layer-pane-found app=\(application.bundleIdentifier)")
     }
   }
 
@@ -194,7 +198,14 @@ final class TranslationLayerController {
   fileprivate var currentSettings: CidaSettings { settings() }
   fileprivate var translationService: any TextProcessingService { service }
   fileprivate var translations: LayerTranslationCache { cache }
-  fileprivate func log(_ event: String) { lifecycleLog?(event) }
+  private static let logger = Logger(subsystem: "com.xuanwo.Cida", category: "translation-layer")
+
+  /// Records a lifecycle event in the unified log and, under automation, the lifecycle log.
+  /// Events carry no text from any application.
+  func log(_ event: String) {
+    Self.logger.notice("\(event, privacy: .public)")
+    lifecycleLog?(event)
+  }
 }
 
 /// The site a window shows: the host of its web area, if it has one.
@@ -529,7 +540,7 @@ final class LayerPaneSession {
     let paper = LayerTextStyle.paper(darkAppearance: dark)
     let drawings: [LayerDrawing] = blocks.compactMap { block in
       guard let translation = owner.translations[block.maskedText] else { return nil }
-      let text = block.restoringLinks(in: translation)
+      let text = block.restoringVerbatim(in: translation)
       guard text != block.text else { return nil }
       return LayerDrawing(
         frame: block.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY),

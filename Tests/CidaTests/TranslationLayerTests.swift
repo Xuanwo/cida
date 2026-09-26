@@ -140,6 +140,81 @@ final class TranslationLayerTests: XCTestCase {
 
   // MARK: - Blocks
 
+  /// Slack's current client, measured on 2026-09-27: messages are rows of a list that is a
+  /// one-point screen-reader node, and an alert is one rich-text element whose lines are broken
+  /// by hand, with bold labels, code values and emoji wrapped in plain groups.
+  private func slackAlertPane() -> (pane: Node, alert: Node, label: Node) {
+    func code(_ value: String, _ frame: CGRect) -> Node {
+      Node("AXGroup", frame, classes: ["c-mrkdwn__code"], subrole: LayerRole.codeStyleGroup, children: [
+        .text(value, frame.insetBy(dx: 4, dy: 0))
+      ])
+    }
+    let label = Node.text("Service:", CGRect(x: 716, y: 279, width: 53, height: 19))
+    let alert = Node("AXGroup", CGRect(x: 716, y: 255, width: 1785, height: 110), classes: ["p-mrkdwn_element"], children: [
+      .text("service-pods-failing | ", CGRect(x: 716, y: 255, width: 396, height: 19)),
+      Node("AXGroup", CGRect(x: 1112, y: 255, width: 22, height: 22), classes: ["c-emoji"], children: [
+        Node(LayerRole.image, CGRect(x: 1112, y: 255, width: 22, height: 22))
+      ]),
+      .text(" Firing 1", CGRect(x: 1134, y: 255, width: 66, height: 19)),
+      label,
+      .text(" ", CGRect(x: 769, y: 279, width: 4, height: 19)),
+      code("SaaS", CGRect(x: 772, y: 279, width: 38, height: 21)),
+      .text("Urgency:", CGRect(x: 716, y: 301, width: 60, height: 19)),
+      .text(" ", CGRect(x: 776, y: 301, width: 4, height: 19)),
+      code("high", CGRect(x: 780, y: 301, width: 37, height: 21)),
+      .link("View the incident in PagerDuty", CGRect(x: 716, y: 345, width: 424, height: 19)),
+    ])
+    let bold = Node("AXGroup", CGRect(x: 716, y: 420, width: 1785, height: 21), children: [
+      .text("Please ", CGRect(x: 716, y: 420, width: 50, height: 21)),
+      Node("AXGroup", CGRect(x: 766, y: 420, width: 90, height: 21), subrole: "AXStrongStyleGroup", children: [
+        .text("do not restart", CGRect(x: 766, y: 420, width: 90, height: 21))
+      ]),
+      .text(" the pods yet.", CGRect(x: 856, y: 420, width: 100, height: 21)),
+    ])
+    func row(_ y: CGFloat, _ height: CGFloat, _ body: Node) -> Node {
+      Node("AXGroup", CGRect(x: 652, y: y, width: 1869, height: height), classes: ["c-virtual_list__item"], children: [
+        Node("AXGroup", CGRect(x: 652, y: y, width: 1869, height: height), classes: ["c-message_kit__hover"], subrole: "AXDocument", children: [
+          Node("AXGroup", CGRect(x: 669, y: y, width: 1832, height: height), classes: ["c-message_kit__actions"], children: [
+            Node("AXButton", CGRect(x: 716, y: y, width: 90, height: 20), children: [.text("LanceDuty", CGRect(x: 716, y: y, width: 90, height: 20))]),
+            body,
+          ])
+        ])
+      ])
+    }
+    let list = Node("AXList", CGRect(x: 652, y: 1339, width: 1, height: 1), classes: ["sr-only"], subrole: "AXContentList", children: [
+      row(230, 150, alert), row(400, 60, bold),
+    ])
+    let pane = Node("AXGroup", CGRect(x: 652, y: 149, width: 1869, height: 1191), classes: ["p-message_pane"], children: [list])
+    _ = Node(LayerRole.window, CGRect(x: 209, y: 30, width: 2316, height: 1410), children: [pane])
+    return (pane, alert, label)
+  }
+
+  func testTheWholeMessageListIsThePaneEvenFromInsideALongMessage() {
+    let slack = slackAlertPane()
+    // The alert alone is large and holds several paragraphs, but it is a row of the list.
+    XCTAssertTrue(LayerPaneRule.pane(from: slack.label) === slack.pane)
+    XCTAssertTrue(LayerPaneRule.pane(from: slack.alert) === slack.pane)
+  }
+
+  func testAClickAnywhereAlongALinePicksThatLine() {
+    let blocks = LayerBlockExtractor.blocks(in: slackAlertPane().pane)
+    // Right of "Service: SaaS", where the line's text stops, still picks it.
+    XCTAssertEqual(LayerConfiguration.paragraph(at: CGPoint(x: 1500, y: 289), in: blocks)?.maskedText, "Service: ⟦0⟧")
+    XCTAssertEqual(LayerConfiguration.paragraph(at: CGPoint(x: 720, y: 310), in: blocks)?.maskedText, "Urgency: ⟦0⟧")
+    XCTAssertNil(LayerConfiguration.paragraph(at: CGPoint(x: 900, y: 390), in: blocks), "Between lines, nothing")
+  }
+
+  func testLinesBrokenByHandAreSeparateBlocksWithCodeKeptAndStyledRunsJoined() {
+    let blocks = LayerBlockExtractor.blocks(in: slackAlertPane().pane)
+    // The emoji belongs to its line; a line that is only a link is not content.
+    XCTAssertEqual(
+      blocks.map(\.maskedText),
+      ["service-pods-failing |  Firing 1", "Service: ⟦0⟧", "Urgency: ⟦0⟧", "Please do not restart the pods yet."])
+    XCTAssertEqual(blocks[1].restoringVerbatim(in: "服务：⟦0⟧"), "服务：SaaS")
+    XCTAssertEqual(blocks[1].frame, CGRect(x: 716, y: 279, width: 94, height: 21), "Only its own line is covered")
+  }
+
+
   func testAMessageBodyIsOneBlockWithItsMentionKeptOutOfTheTranslation() throws {
     let slack = slackWindow()
     let blocks = LayerBlockExtractor.blocks(in: slack.scroller)
@@ -149,7 +224,7 @@ final class TranslationLayerTests: XCTestCase {
       ["Morning! The job finished overnight.", "Thanks to @maya for testing the compaction job before Friday."])
     let block = try XCTUnwrap(blocks.last)
     XCTAssertEqual(block.maskedText, "Thanks to ⟦0⟧ for testing the compaction job before Friday.")
-    XCTAssertEqual(block.restoringLinks(in: "感谢 ⟦0⟧ 在周五前测试压缩任务。"), "感谢 @maya 在周五前测试压缩任务。")
+    XCTAssertEqual(block.restoringVerbatim(in: "感谢 ⟦0⟧ 在周五前测试压缩任务。"), "感谢 @maya 在周五前测试压缩任务。")
     XCTAssertEqual(block.lineHeight, 22)
   }
 
