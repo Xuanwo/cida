@@ -34,7 +34,7 @@ You need macOS 15 or newer and a language model service.
 
 Your API key never passes through the assistant: it asks you to copy the key and run one command that stores it in the Keychain. Cida speaks OpenAI Chat Completions, Responses and Anthropic Messages; a model running on your Mac (such as `http://127.0.0.1:8080`) needs no key. Cida is free; your provider charges for the requests.
 
-Two permissions are optional. Turn them on with 去授权 in the 唤起 section of Settings:
+Two permissions are optional. Turn them on with 去授权 on the 快捷键 tab of Settings:
 
 | Permission | With it | Without it |
 | --- | --- | --- |
@@ -77,7 +77,7 @@ Every command takes `--json`. The API key is read only from `--stdin`, `--file` 
 
 ## Updates
 
-Cida checks `https://cida-releases.xuanwo.io/appcast.xml` once a day. When a new version is out, its panel shows the update notes and installs the update once you agree. The check sends no system information, and you can turn it off in the 更新 section of Settings.
+Cida checks `https://cida-releases.xuanwo.io/appcast.xml` once a day. When a new version is out, its panel shows the update notes and installs the update once you agree. The check sends no system information, and you can turn it off on the 通用 tab of Settings.
 
 ## Uninstall
 

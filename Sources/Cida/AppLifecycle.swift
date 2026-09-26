@@ -114,7 +114,11 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     let panelController = PanelController(
       model: model,
       hidesOnResignKey: !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI,
-      openSettings: { [weak self] in self?.showSettings() }
+      // Without a model service, Settings opens where it is configured.
+      openSettings: { [weak self] in
+        guard let self else { return }
+        openSettings(on: model.isModelServiceConfigured ? nil : .model)
+      }
     )
     self.panelController = panelController
     if let logURL = launchOptions.lifecycleLogURL {
@@ -358,6 +362,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   @objc
   func showSettings() {
+    openSettings(on: nil)
+  }
+
+  /// Opens Settings on `tab`, or on the tab it showed last.
+  func openSettings(on tab: SettingsTab?) {
+    if let tab { model.settingsTab = tab }
     ensureSettingsWindowController()
 
     guard let window = settingsWindowController?.window else { return }
@@ -531,7 +541,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private func ensureSettingsWindowController() {
     guard settingsWindowController == nil else { return }
     #if DEBUG
-      if launchOptions.designState == .settingsCustom {
+      if let tab = launchOptions.designState.settingsTab {
+        model.settingsTab = tab
+      }
+      if launchOptions.designState == .settingsPromptEditing {
         model.editingPrompt = .improve
       }
       if launchOptions.designState == .settingsRecording {
@@ -740,10 +753,14 @@ private enum DesignState: String {
   case failed
   case long
   case settings
-  case settingsCustom = "settings-custom"
-  case settingsRecording = "settings-recording"
-  case settingsUpdateAvailable = "settings-update-available"
+  case settingsTranslation = "settings-translation"
   case settingsLanguageEditing = "settings-language-editing"
+  case settingsPromptEditing = "settings-prompt-editing"
+  case settingsShortcuts = "settings-shortcuts"
+  case settingsShortcutsCustom = "settings-shortcuts-custom"
+  case settingsRecording = "settings-recording"
+  case settingsGeneral = "settings-general"
+  case settingsUpdateAvailable = "settings-update-available"
   case settingsConfigUnset = "settings-config-unset"
   case settingsConfigCopied = "settings-config-copied"
   case settingsConfigReady = "settings-config-ready"
@@ -765,13 +782,18 @@ private enum DesignState: String {
     self == .lifecycleWelcome || self == .lifecycleWelcomeSubmitted
   }
 
-  var isSettings: Bool {
+  var isSettings: Bool { settingsTab != nil }
+
+  /// The Settings tab the state shows, or nil for a panel state.
+  var settingsTab: SettingsTab? {
     switch self {
-    case .settings, .settingsCustom, .settingsRecording, .settingsLanguageEditing, .settingsUpdateAvailable,
-      .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
-      .settingsConfigChecking, .settingsConfigFailed:
-      true
-    default: false
+    case .settings, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
+      .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed:
+      .model
+    case .settingsTranslation, .settingsLanguageEditing, .settingsPromptEditing: .translation
+    case .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording: .shortcuts
+    case .settingsGeneral, .settingsUpdateAvailable: .general
+    default: nil
     }
   }
 }
@@ -830,8 +852,7 @@ private struct LaunchOptions {
         settings.modelService = ModelConfiguration()
         settings.apiKey = ""
       }
-      if usesDesignFixtures, designState == .settingsCustom {
-        settings.launchAtLogin = true
+      if usesDesignFixtures, designState == .settingsShortcutsCustom {
         settings.shortcut = GlobalShortcut(
           keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
       }
@@ -859,12 +880,12 @@ private struct LaunchOptions {
   }
 
   var selectionAccess: SystemPermission {
-    if usesDesignFixtures { return .fixed(granted: designState == .settingsCustom) }
+    if usesDesignFixtures { return .fixed(granted: designState == .settingsShortcutsCustom) }
     return automationDeniesPermissions ? .fixed(granted: false) : .accessibility
   }
 
   var captureAccess: SystemPermission {
-    if usesDesignFixtures { return .fixed(granted: designState == .settingsCustom) }
+    if usesDesignFixtures { return .fixed(granted: designState == .settingsShortcutsCustom) }
     return automationDeniesPermissions ? .fixed(granted: false) : .screenRecording
   }
 
@@ -900,12 +921,14 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
-      case .empty, .streaming, .settings, .settingsCustom, .settingsRecording,
-        .settingsUpdateAvailable, .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
-        .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed,
-        .lifecycleWelcome, .lifecycleWelcomeSubmitted, .lifecycleUpdateChecking,
-        .lifecycleUpdateFound, .lifecycleUpdateDownloading, .lifecycleUpdateReady,
-        .lifecycleUpdateCurrent, .lifecycleUpdateFailed, .lifecycleUpdateReadOnly:
+      case .empty, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
+        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording,
+        .settingsGeneral, .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied,
+        .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
+        .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted,
+        .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
+        .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
+        .lifecycleUpdateReadOnly:
         return nil
       }
     #else
@@ -927,12 +950,13 @@ private struct LaunchOptions {
         ResultRecord.designLongInput
       case .lifecycleWelcomeSubmitted:
         "Consistency is the last refuge of the unimaginative."
-      case .empty, .settings, .settingsCustom, .settingsRecording, .settingsUpdateAvailable,
-        .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
-        .settingsConfigChecking, .settingsConfigFailed, .lifecycleWelcome,
-        .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
-        .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
-        .lifecycleUpdateReadOnly:
+      case .empty, .settings, .settingsTranslation, .settingsLanguageEditing,
+        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording,
+        .settingsGeneral, .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied,
+        .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
+        .settingsConfigFailed, .lifecycleWelcome, .lifecycleUpdateChecking, .lifecycleUpdateFound,
+        .lifecycleUpdateDownloading, .lifecycleUpdateReady, .lifecycleUpdateCurrent,
+        .lifecycleUpdateFailed, .lifecycleUpdateReadOnly:
         ""
       }
     #else

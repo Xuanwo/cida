@@ -12,7 +12,7 @@
      parts are the veil, lifted panes, previews, hint pill, translations and status pill. -->
 <main class="board" data-board="translation-layer">
   <div class="board-title">States — 翻译图层</div>
-  <p class="caption">规则见 spec/translation-layer.md。按 ⌥D(或菜单栏「翻译图层」):整屏罩上纸雾,一直翻译的 pane 像截图选区一样托起;指针下的 pane 与其中这一段被预览。点击只翻这一段,⇧ 点击一直翻译这个 pane(网页里按网站记住,其他按应用记住)。文字只取自应用的辅助功能树。授予屏幕录制时译文底色取自原文、逐帧跟随滚动;没有时译文画在纸片上、滚动时隐藏,停下后回来。应用本身不改动。新增的设置只有「唤起」组里这个快捷键的一行。下面的应用窗口是示意。</p>
+  <p class="caption">规则见 spec/translation-layer.md。按 ⌥D(或菜单栏「翻译图层」):整屏罩上纸雾,一直翻译的 pane 像截图选区一样托起;指针下的 pane 与其中这一段被预览。点击只翻这一段,⇧ 点击一直翻译这个 pane(网页里按网站记住,其他按应用记住)。文字只取自应用的辅助功能树。授予屏幕录制时译文底色取自原文、逐帧跟随滚动;没有时译文画在纸片上、滚动时隐藏,停下后回来。应用本身不改动。新增的设置只有「快捷键」页里这个快捷键的一行。下面的应用窗口是示意。</p>
 
   <div class="state-label">① 配置 — 整屏纸雾,屏幕保持实时;一直翻译的 Slack 消息列表从纸雾里托起(同截图选区:圆角 8、面板阴影与描边),里面照常显示译文;指针下 Chrome 的正文是虚线预览,其中指针下的这一段再加细虚线框与 accent-soft 底;提示胶囊开头是适用范围 example.dev</div>
   <cida-layer-scene state="layer-configuring" layer="configuring"></cida-layer-scene>
@@ -34,12 +34,10 @@
 
   <div class="divider"></div>
 
-  <p class="caption">菜单栏菜单在「截图翻译」下方多一项「翻译图层 ⌥D」,与快捷键同一个动作。设置「唤起」组在「截图翻译」下方多一行快捷键,录制、恢复默认与占用提示同其他快捷键;三个快捷键不能相同。</p>
+  <p class="caption">菜单栏菜单在「截图翻译」下方多一项「翻译图层 ⌥D」,与快捷键同一个动作。设置「快捷键」页在「截图翻译」下方有它的一行(settings-states.html),录制、恢复默认与占用提示同其他快捷键;三个快捷键不能相同。</p>
   <div class="states-grid">
     <figure><div class="state-label">菜单栏菜单</div>
       <cida-status-menu state="layer-menu"></cida-status-menu></figure>
-    <figure><div class="state-label">设置 · 唤起组多一行</div>
-      <cida-settings state="settings-layer-shortcut" grants="all"></cida-settings></figure>
   </div>
 </main>
 </body>

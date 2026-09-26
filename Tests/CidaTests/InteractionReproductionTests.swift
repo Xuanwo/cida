@@ -208,6 +208,7 @@ final class InteractionReproductionTests: XCTestCase {
         applied.values.append(shortcut)
         return shortcut.keyCode != UInt16(kVK_ANSI_Q)
       })
+    model.settingsTab = .shortcuts
     let controller = SettingsWindowFactory.makeWindowController(model: model, updates: UpdateState())
     let window = try XCTUnwrap(controller.window)
     retainedTestWindows.append(window)
@@ -299,29 +300,31 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
-  /// A screen whose visible height is below the window's natural height (a 13-inch MacBook with
-  /// the Dock) scrolls the groups under the titlebar instead of running behind the Dock.
+  /// A screen whose visible height is below the tab's natural height scrolls the tab under the
+  /// tab bar instead of running behind the Dock.
   func testSettingsScrollsInsteadOfOutgrowingASmallScreen() throws {
     // Heights are measured in the bundled faces, whichever test ran first.
     FontRegistrar.registerBundledFonts()
     let model = AppModel(settings: .designPreview)
+    model.settingsTab = .shortcuts
     let controller = SettingsWindowFactory.makeWindowController(
-      model: model, updates: UpdateState(), maxContentHeight: 600)
+      model: model, updates: UpdateState(), maxContentHeight: 400)
     let window = try XCTUnwrap(controller.window)
     retainedTestWindows.append(window)
     window.alphaValue = 0
     window.orderBack(nil)
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
-    XCTAssertEqual(window.frame.height, 600, accuracy: 1)
+    XCTAssertEqual(window.frame.height, 400, accuracy: 1)
 
+    model.settingsTab = .translation
     model.editingPrompt = .improve
-    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
-    XCTAssertEqual(window.frame.height, 600, accuracy: 1, "An open prompt sheet scrolls too")
+    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    XCTAssertEqual(window.frame.height, 400, accuracy: 1, "An open prompt sheet scrolls too")
     assertTestProcessIsNotFrontmost()
   }
 
-  func testSettingsWindowHeightFollowsItsContentFromAFixedTopEdge() throws {
+  func testSettingsWindowHeightFollowsItsTabFromAFixedTopEdge() throws {
     // Heights are measured in the bundled faces, whichever test ran first.
     FontRegistrar.registerBundledFonts()
     let model = AppModel(settings: .designPreview)
@@ -333,16 +336,27 @@ final class InteractionReproductionTests: XCTestCase {
     window.orderBack(nil)
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
-    let collapsedFrame = window.frame
-    XCTAssertEqual(collapsedFrame.height, 886, accuracy: 4, "The board's 默认 is 889 pt tall")
+    let modelFrame = window.frame
+    XCTAssertEqual(modelFrame.height, 250, accuracy: 4, "The board's 模型 is 252 pt tall")
+    XCTAssertEqual(window.title, "模型")
 
-    // The window follows over motion-height-ms; wait for the move to end.
+    // The window follows over motion-height-ms; wait for each move to end.
+    model.settingsTab = .shortcuts
+    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    XCTAssertEqual(window.frame.height, 470, accuracy: 4, "The board's 快捷键 is 471 pt tall")
+    XCTAssertEqual(window.frame.maxY, modelFrame.maxY, accuracy: 0.5, "The top edge stays put")
+    XCTAssertEqual(window.title, "快捷键", "The title names the tab")
+
+    model.settingsTab = .translation
+    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    let collapsedFrame = window.frame
+    XCTAssertEqual(collapsedFrame.height, 364, accuracy: 4, "The board's 翻译 is 365 pt tall")
+
     model.editingPrompt = .improve
     RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-
     let expandedFrame = window.frame
     XCTAssertGreaterThan(expandedFrame.height, collapsedFrame.height + 80, "The prompt sheet grows the window")
-    XCTAssertEqual(expandedFrame.maxY, collapsedFrame.maxY, accuracy: 0.5, "The top edge stays put")
+    XCTAssertEqual(expandedFrame.maxY, modelFrame.maxY, accuracy: 0.5, "The top edge stays put")
 
     model.editingPrompt = nil
     RunLoop.current.run(until: Date().addingTimeInterval(0.4))

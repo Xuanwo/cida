@@ -57,7 +57,8 @@ customElements.define("cida-bar", CidaBar);
 customElements.define("cida-note", CidaNote);
 customElements.define("cida-motion-note", CidaMotionNote);
 
-// The Settings window (spec/settings.md). Attributes name what a state
+// The Settings window (spec/settings.md). tab="model|translation|shortcuts|general"
+// picks the tab (model by default); the other attributes name what a state
 // changes: config (see below), language="editing", editing="improve",
 // shortcut="custom|recording", grants="all", launch="on", update="available".
 class CidaSettings extends HTMLElement {
@@ -89,19 +90,17 @@ class CidaSettings extends HTMLElement {
          </div>`
       : prompt("改进", "You are a writing assistant. Improve the user-provided text…");
 
+    // spec/settings.md §四: three recordable shortcuts.
     const shortcut = is("shortcut", "recording")
-      ? row("全局快捷键", "Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
+      ? row("显示辞达", "Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
       : is("shortcut", "custom")
-        ? row("全局快捷键", "在任何应用里显示辞达", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
-        : row("全局快捷键", "在任何应用里显示辞达", `<span class="chip">⌥ Space</span>`, "end");
-    const capture = granted
-      ? row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end")
-      : row("截图翻译", "需要屏幕录制权限", `<span class="button">去授权</span><span class="chip">⌥ S</span>`, "end");
-    const selection = granted
-      ? row("选中文字", "唤起时带入并翻译", `<span class="status">已开启</span>`, "end")
-      : row("选中文字", "需要辅助功能权限", `<span class="button">去授权</span>`, "end");
-    // spec/translation-layer.md §二: the layer's shortcut, only on boards that show it.
-    const layerShortcut = row("翻译图层", "选择要持续翻译的区域", `<span class="chip">⌥ D</span>`, "end");
+        ? row("显示辞达", "在任何应用里唤起", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
+        : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ Space</span>`, "end");
+    const capture = row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end");
+    const layerShortcut = row("翻译图层", "在原处翻译外文", `<span class="chip">⌥ D</span>`, "end");
+    // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
+    const permission = (title, caption) => row(title, caption,
+      granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
     const launch = row("开机启动", "", `<span class="toggle${is("launch", "on") ? " on" : ""}"></span>`, "end");
     const updates = is("update", "available")
       ? row("自动检查更新", "新版本 1.1.0 可以安装", `<span class="button">安装…</span><span class="toggle on"></span>`, "end spaced")
@@ -145,17 +144,32 @@ class CidaSettings extends HTMLElement {
         ? onboarding(config === "unset-copied")
         : `${serviceRow}${failure}${adjustRow}`;
 
+    const tab = this.getAttribute("tab") ?? "model";
+    const tabs = [
+      ["model", "模型", "sparkles"], ["translation", "翻译", "languages"],
+      ["shortcuts", "快捷键", "keyboard"], ["general", "通用", "sliders-horizontal"],
+    ];
+    const tabBar = `<div class="settings-tabs">${tabs.map(([key, title, icon]) =>
+      `<span class="${key === tab ? "on" : ""}"><i class="icon icon-${icon}"></i>${title}</span>`).join("")}</div>`;
+    // A tab with one group has no heading: the title names it.
+    const content = {
+      model: `<div class="group">${modelGroup}</div>`,
+      translation: `
+        <div class="group"><h3>语言</h3>${languages}</div>
+        <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>`,
+      shortcuts: `
+        <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}</div>
+        <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图与图层跟随")}</div>`,
+      general: `
+        <div class="group">${launch}${updates}</div>
+        <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>`,
+    }[tab];
+
     this.outerHTML = `
       <section class="window" style="position: relative" data-state="${this.getAttribute("state")}">
-        <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">设置</div></div>
-        <div class="settings">
-          <div class="group"><h3>模型</h3>${modelGroup}</div>
-          <div class="group"><h3>语言</h3>${languages}</div>
-          <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>
-          <div class="group"><h3>唤起</h3>${shortcut}${capture}${layerShortcut}${selection}${launch}</div>
-          <div class="group"><h3>更新</h3>${updates}</div>
-          <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>
-        </div>
+        <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">${tabs.find(([key]) => key === tab)[1]}</div></div>
+        ${tabBar}
+        <div class="settings">${content}</div>
       </section>`;
   }
 }

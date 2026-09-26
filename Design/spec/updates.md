@@ -1,6 +1,6 @@
 # 更新
 
-2026-09-25 确认：用 Sparkle 2 自动更新，更新文件托管在 R2 bucket `cida-releases`，地址 `https://cida-releases.xuanwo.io`。状态见 [`boards/updates.html`](../boards/updates.html)（菜单）与 [`boards/settings-states.html`](../boards/settings-states.html)（设置「更新」一组）。
+2026-09-25 确认：用 Sparkle 2 自动更新，更新文件托管在 R2 bucket `cida-releases`，地址 `https://cida-releases.xuanwo.io`。状态见 [`boards/updates.html`](../boards/updates.html)（菜单）与 [`boards/settings-states.html`](../boards/settings-states.html)（设置「通用」页）。
 
 ## 一、检查与通道
 
@@ -13,7 +13,7 @@
 ## 二、发现新版本
 
 - 用户主动检查（菜单「检查更新…」或设置里的「检查更新」）：面板出现并显示检查、发现新版本、下载、安装的每一步，见 `spec/lifecycle.md` §五；不使用 Sparkle 自带的窗口。
-- 后台定时检查发现新版本：由用户打开辞达时直接显示「发现新版本」面板；其余时候不弹面板、不抢焦点，菜单里的「检查更新…」变为「安装新版本 <版本>…」，设置「更新」一行的说明变为「新版本 <版本> 可以安装」、按钮变为「安装…」。点其中任一处显示「发现新版本」面板。
+- 后台定时检查发现新版本：由用户打开辞达时直接显示「发现新版本」面板；其余时候不弹面板、不抢焦点，菜单里的「检查更新…」变为「安装新版本 <版本>…」，设置「通用」页「自动检查更新」一行的说明变为「新版本 <版本> 可以安装」、按钮变为「安装…」。点其中任一处显示「发现新版本」面板。
 - 下载、校验签名、替换应用与重新打开由 Sparkle 完成，界面由辞达的面板呈现；菜单项与设置在更新会话结束后恢复原样。
 
 ## 三、菜单栏菜单

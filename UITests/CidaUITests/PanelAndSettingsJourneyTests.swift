@@ -336,6 +336,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       "A changed configuration is 已就绪 until it is checked")
     XCTAssertFalse(driver.modelFailure.exists)
 
+    driver.showSettingsTab("translation", title: "翻译")
     XCTAssertFalse(driver.app.textViews["settings-prompt-editor-improve"].exists, "Prompts start collapsed")
     driver.app.buttons["settings-prompt-edit-improve"].click()
     let improveEditor = driver.app.textViews["settings-prompt-editor-improve"]
@@ -348,6 +349,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
     driver.showPanel()
     driver.openSettings()
+    XCTAssertTrue(
+      driver.waitForTitle("翻译", of: settingsWindow, timeout: 3), "Settings reopens on the last tab")
     XCTAssertEqual(
       driver.app.textViews["settings-prompt-editor-improve"].value as? String,
       customPrompt
@@ -368,32 +371,37 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
         timeout: 3
       )
     )
+    driver.showSettingsTab("general", title: "通用")
     let launchAtLogin = driver.element(identifier: "settings-launch-at-login-toggle")
-    XCTAssertTrue(launchAtLogin.exists)
+    XCTAssertTrue(launchAtLogin.waitForExistence(timeout: 3))
     XCTAssertEqual(launchAtLogin.elementType, .checkBox)
   }
 
   func testGlobalShortcutIsRecordedInSettingsAndSummonsThePanel() {
     driver.launch()
     driver.openSettings()
+    XCTAssertTrue(driver.waitForTitle("模型", of: driver.settingsWindow, timeout: 3), "Settings opens on 模型")
+    driver.showSettingsTab("shortcuts", title: "快捷键")
     let chip = driver.app.buttons["settings-shortcut"]
     XCTAssertTrue(chip.waitForExistence(timeout: 3))
-    XCTAssertEqual(chip.label, "全局快捷键 ⌥ Space")
+    XCTAssertEqual(chip.label, "显示辞达快捷键 ⌥ Space")
     XCTAssertFalse(
       driver.app.buttons["settings-shortcut-reset"].exists, "The default has nothing to restore")
-    XCTAssertTrue(
-      driver.element(identifier: "settings-selection-access-granted").exists,
-      "The guest granted Accessibility, and the selection row reads it")
     let captureChip = driver.app.buttons["settings-capture-shortcut"]
     XCTAssertEqual(captureChip.label, "截图翻译快捷键 ⌥ S")
-    XCTAssertFalse(
-      driver.app.buttons["settings-capture-access-request"].exists,
-      "The guest granted Screen Recording, so the capture row asks for nothing")
+    XCTAssertEqual(driver.app.buttons["settings-layer-shortcut"].label, "翻译图层快捷键 ⌥ D")
+    XCTAssertTrue(
+      driver.element(identifier: "settings-selection-access-granted").exists,
+      "The guest granted Accessibility, and the 权限 group reads it")
+    XCTAssertTrue(
+      driver.element(identifier: "settings-capture-access-granted").exists,
+      "The guest granted Screen Recording, and the 权限 group reads it")
+    XCTAssertFalse(driver.app.buttons["settings-capture-access-request"].exists)
 
     chip.click()
-    XCTAssertTrue(driver.waitForLabel("按下新的全局快捷键", in: chip, timeout: 3), "A click starts recording")
+    XCTAssertTrue(driver.waitForLabel("按下新的显示辞达快捷键", in: chip, timeout: 3), "A click starts recording")
     driver.app.typeKey("t", modifierFlags: [.control, .option])
-    XCTAssertTrue(driver.waitForLabel("全局快捷键 ⌃ ⌥ T", in: chip, timeout: 3), "The next combination is kept")
+    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌃ ⌥ T", in: chip, timeout: 3), "The next combination is kept")
     let reset = driver.app.buttons["settings-shortcut-reset"]
     XCTAssertTrue(reset.waitForExistence(timeout: 3))
 
@@ -410,7 +418,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.openSettings()
     XCTAssertTrue(reset.waitForExistence(timeout: 3))
     reset.click()
-    XCTAssertTrue(driver.waitForLabel("全局快捷键 ⌥ Space", in: chip, timeout: 3))
+    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌥ Space", in: chip, timeout: 3))
     XCTAssertTrue(reset.waitForNonExistence(timeout: 3), "The default has nothing to restore")
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))
