@@ -103,8 +103,8 @@ enum LayerMotionEstimator {
     let moving = shifts.filter { $0.key != 0 }
     guard let winner = moving.max(by: { $0.value < $1.value }) else {
       // A caret or a hover highlight changes one tile; a new channel changes most of them.
-      if changed >= 2 { return nil }
-      return shifts[0] != nil ? 0 : nil
+      // Tiles too plain to judge say nothing, which is not a change.
+      return changed >= 2 ? nil : 0
     }
     let movingTiles = moving.values.reduce(0, +)
     guard winner.value >= 2, Double(winner.value) >= Double(movingTiles) * 0.75 else { return nil }

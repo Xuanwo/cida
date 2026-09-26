@@ -35,7 +35,17 @@ final class LayerConfiguration {
   /// Shows the configuration and returns when it is finished or cancelled.
   func run() async {
     view.onMove = { [weak self] point in self?.pointerMoved(to: point) }
-    view.onClick = { [weak self] extends in self?.click(extends: extends) }
+    view.onClick = { [weak self] point, extends in
+      guard let self else { return }
+      // The pointer may not have been resolved yet where it was pressed.
+      Task { @MainActor in
+        let target = self.screenPoint(point)
+        if self.hover?.point != target {
+          self.apply(await self.resolveHover(at: target))
+        }
+        self.click(extends: extends)
+      }
+    }
     view.onFinish = { [weak self] commit in self?.close(commit: commit) }
     view.veilIsInk = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     refreshLifted()
@@ -262,7 +272,7 @@ final class LayerConfigurationPanel: NSPanel {
 /// hint pill.
 final class LayerConfigurationView: NSView {
   var onMove: ((CGPoint) -> Void)?
-  var onClick: ((Bool) -> Void)?
+  var onClick: ((CGPoint, Bool) -> Void)?
   var onFinish: ((Bool) -> Void)?
   var veilIsInk = false {
     didSet { veilLayer.fillColor = (veilIsInk ? CaptureVeil.ink : CaptureVeil.paper).color }
@@ -364,17 +374,20 @@ final class LayerConfigurationView: NSView {
     updateVeil()
   }
 
-  /// The veil covers the screen except the chosen panes and the pane under the pointer.
+  /// The veil covers the screen except the chosen panes and the pane under the pointer. The
+  /// holes are merged first: a pane both chosen and under the pointer would otherwise cancel
+  /// itself out under the even-odd rule.
   private func updateVeil() {
-    let path = CGMutablePath()
-    path.addRect(bounds)
+    var holes = CGMutablePath() as CGPath
     for hole in lifted + (previewPane.map { [$0] } ?? []) {
-      path.addRoundedRect(in: hole, cornerWidth: CidaDesign.Radius.card, cornerHeight: CidaDesign.Radius.card)
+      holes = holes.union(
+        CGPath(roundedRect: hole, cornerWidth: CidaDesign.Radius.card, cornerHeight: CidaDesign.Radius.card, transform: nil))
     }
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     veilLayer.frame = bounds
-    veilLayer.path = path
+    veilLayer.fillRule = .nonZero
+    veilLayer.path = CGPath(rect: bounds, transform: nil).subtracting(holes)
     CATransaction.commit()
   }
 
@@ -416,8 +429,7 @@ final class LayerConfigurationView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    onMove?(convert(event.locationInWindow, from: nil))
-    onClick?(event.modifierFlags.contains(.shift))
+    onClick?(convert(event.locationInWindow, from: nil), event.modifierFlags.contains(.shift))
   }
 
   override func rightMouseDown(with event: NSEvent) { onFinish?(false) }

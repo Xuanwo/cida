@@ -112,6 +112,17 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertTrue(LayerPaneRule.pane(from: deepText) === slack.scroller)
   }
 
+  func testANativeStackScrolledInAScrollAreaIsSeenThroughTheScrollArea() {
+    let texts = (0..<12).map { index in
+      Node.text("Paragraph \(index) of a long native article.", CGRect(x: 40, y: 100 + index * 60, width: 600, height: 44))
+    }
+    let stack = Node("AXGroup", CGRect(x: 40, y: 100, width: 600, height: 720), children: texts)
+    let scroll = Node("AXScrollArea", CGRect(x: 20, y: 80, width: 680, height: 300), children: [stack])
+    _ = Node(LayerRole.window, CGRect(x: 0, y: 0, width: 760, height: 460), children: [scroll])
+    XCTAssertTrue(LayerPaneRule.pane(from: texts[1]) === scroll)
+    XCTAssertEqual(LayerBlockExtractor.blocks(in: scroll, visible: scroll.frame).count, 5, "Rows inside the view only")
+  }
+
   func testAComposerOrAFieldIsNeverAPaneButALargeDocumentIs() {
     let slack = slackWindow()
     XCTAssertNil(LayerPaneRule.pane(from: slack.composer))
@@ -178,6 +189,20 @@ final class TranslationLayerTests: XCTestCase {
     let blocks = LayerBlockExtractor.blocks(in: document)
     XCTAssertEqual(blocks.map(\.text), ["Meeting notes.", "We moved the review to Thursday.", "Action items follow."])
     XCTAssertEqual(blocks.map(\.frame.minY), [0, 40, 60])
+  }
+
+  func testStackedNativeTextsAreSeparateParagraphsButWrappedPiecesAreOne() {
+    let stack = Node("AXGroup", CGRect(x: 0, y: 0, width: 600, height: 200), children: [
+      .text("First paragraph of the article.", CGRect(x: 0, y: 0, width: 600, height: 40)),
+      .text("Second paragraph follows below.", CGRect(x: 0, y: 56, width: 600, height: 40)),
+    ])
+    XCTAssertEqual(LayerBlockExtractor.blocks(in: stack).map(\.text), ["First paragraph of the article.", "Second paragraph follows below."])
+    // Web pieces of one wrapped paragraph share lines.
+    let wrapped = Node("AXGroup", CGRect(x: 0, y: 0, width: 600, height: 44), children: [
+      .text("A sentence that wraps onto ", CGRect(x: 0, y: 0, width: 600, height: 44)),
+      .text("a second line.", CGRect(x: 0, y: 22, width: 200, height: 22)),
+    ])
+    XCTAssertEqual(LayerBlockExtractor.blocks(in: wrapped).map(\.text), ["A sentence that wraps onto a second line."])
   }
 
   func testOnlyParagraphsInsideTheVisibleFrameAreRead() {
@@ -424,5 +449,36 @@ final class TranslationLayerTests: XCTestCase {
     }
     XCTAssertEqual(LayerMotionEstimator.shift(from: start, to: start), 0)
     XCTAssertNil(LayerMotionEstimator.shift(from: start, to: rows(frame(offset: 1_000, replaced: true))))
+  }
+
+  func testOnlyWindowsInFrontCoverAPaneAndWholeDisplayOverlaysDoNot() {
+    let own = ProcessInfo.processInfo.processIdentifier
+    let display = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    let windows = [
+      LayerWindowInfo(number: 1, ownerPID: 900, bounds: display, layer: 0),
+      LayerWindowInfo(number: 2, ownerPID: own, bounds: CGRect(x: 0, y: 0, width: 400, height: 300), layer: 3),
+      LayerWindowInfo(number: 3, ownerPID: 901, bounds: CGRect(x: 100, y: 100, width: 300, height: 200), layer: 0),
+      LayerWindowInfo(number: 4, ownerPID: 902, bounds: CGRect(x: 50, y: 50, width: 800, height: 600), layer: 0),
+      LayerWindowInfo(number: 5, ownerPID: 903, bounds: CGRect(x: 0, y: 500, width: 200, height: 200), layer: 0),
+    ]
+    XCTAssertEqual(
+      LayerWindowInfo.occluders(of: 4, in: windows, displays: [display]).map(\.number), [3],
+      "Only other apps' windows in front, not a full-display overlay or Cida itself")
+    XCTAssertEqual(
+      LayerWindowInfo.applicationWindow(at: CGPoint(x: 120, y: 120), in: windows, displays: [display])?.number, 3,
+      "The pointer is over the app window, not the overlay above everything")
+  }
+
+  func testALineIsOneCharacterBoxTallOrJudgedFromHowMuchTextFillsTheFrame() {
+    let wrapped = Node("AXGroup", CGRect(x: 0, y: 0, width: 600, height: 60), children: [
+      .text(String(repeating: "storage engine ", count: 8), CGRect(x: 0, y: 0, width: 600, height: 60))
+    ])
+    let estimated = try! XCTUnwrap(LayerBlockExtractor.blocks(in: wrapped).first).lineHeight
+    XCTAssertEqual(estimated, 25, accuracy: 6, "A two-line text is not one 60 pt line")
+
+    let measured = Node.text("CIDA LAYER PARAGRAPH 2. A long paragraph.", CGRect(x: 0, y: 0, width: 600, height: 44))
+    measured.characterBounds = { _ in CGRect(x: 0, y: 0, width: 9, height: 18) }
+    let pane = Node("AXGroup", CGRect(x: 0, y: 0, width: 600, height: 60), children: [measured, .link("x", .zero)])
+    XCTAssertEqual(LayerBlockExtractor.blocks(in: pane).first?.lineHeight, 18)
   }
 }

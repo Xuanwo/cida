@@ -253,10 +253,15 @@ final class LayerPaneSession {
   private var failure: LayerTranslationError?
   private var styles: [String: LayerTextStyle] = [:]
   private var peekCandidate: (index: Int, since: Date)?
+  /// The paragraph under the pointer when translations first appeared: the pointer is there
+  /// because the user just clicked it, so it waits until the pointer has left once.
+  private var peekSuppressed: Int?
+  private var hasShownTranslations = false
   private(set) var isFinished = false
   private var readsWithoutParagraph = 0
   /// Follows the content frame by frame while the screen can be read (§五).
   private var motion: LayerMotionStream?
+  private var lastCoveringCount = -1
 
   init(
     application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode,
@@ -303,6 +308,7 @@ final class LayerPaneSession {
     let stream = LayerMotionStream()
     stream.onMotion = { [weak self] offset in
       guard let self else { return }
+      if offset == nil { owner.log("layer-motion-lost") }
       lastMotion = Date()
       needsRead = true
       if let offset {
@@ -313,6 +319,7 @@ final class LayerPaneSession {
       }
     }
     motion = stream
+    owner.log("layer-motion-followed")
     let pane = paneFrame.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY)
     Task { await stream.start(windowNumber: windowNumber, pane: pane) }
   }
@@ -349,10 +356,15 @@ final class LayerPaneSession {
       return
     }
     isOnScreen = true
-    let covered = LayerWindowInfo.occluders(of: windowNumber, in: windows).map {
-      $0.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY)
-    }
+    let occluders = LayerWindowInfo.occluders(of: windowNumber, in: windows)
+    let covered = occluders.map { $0.bounds.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) }
     overlay.overlayView.setOcclusion(covered)
+    let coveringPane = occluders.filter { $0.bounds.intersects(paneFrame) }
+    if coveringPane.count != lastCoveringCount {
+      lastCoveringCount = coveringPane.count
+      owner.log(
+        "layer-occluded count=\(coveringPane.count) by=\(coveringPane.map { "\($0.ownerName) \(Int($0.bounds.width))x\(Int($0.bounds.height))" })")
+    }
     if !overlay.isVisible, !overlay.overlayView.drawings.isEmpty { overlay.orderFront(nil) }
     followMotion()
   }
@@ -530,6 +542,11 @@ final class LayerPaneSession {
       }
     }
     if isOnScreen, !drawings.isEmpty { overlay.orderFront(nil) }
+    owner.log(
+      "layer-drawn drawings=\(drawings.count) painted=\(overlay.overlayView.paintedCount) blocks=\(blocks.count) onScreen=\(isOnScreen)"
+        + " visible=\(overlay.isVisible) alpha=\(overlay.alphaValue) settled=\(settled)"
+        + " frame=\(Int(overlay.frame.minX)),\(Int(overlay.frame.minY)),\(Int(overlay.frame.width))x\(Int(overlay.frame.height))"
+        + " paper=\(drawings.first?.style.isPaper ?? true)")
     updateStatus()
   }
 
@@ -557,7 +574,13 @@ final class LayerPaneSession {
   /// (§四).
   private func updatePeek(mouse: CGPoint, settled: Bool) {
     let local = CGPoint(x: mouse.x - paneFrame.minX, y: mouse.y - paneFrame.minY)
-    guard settled, paneFrame.contains(mouse), let index = overlay.overlayView.index(at: local) else {
+    let hovered = paneFrame.contains(mouse) ? overlay.overlayView.index(at: local) : nil
+    if !hasShownTranslations, !overlay.overlayView.drawings.isEmpty {
+      hasShownTranslations = true
+      peekSuppressed = hovered
+    }
+    if hovered != peekSuppressed { peekSuppressed = nil }
+    guard settled, let index = hovered, index != peekSuppressed else {
       peekCandidate = nil
       overlay.overlayView.setPeek(nil, animated: true)
       return

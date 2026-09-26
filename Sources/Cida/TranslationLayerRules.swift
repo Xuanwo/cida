@@ -76,12 +76,28 @@ enum LayerPaneRule {
       steps += 1
       if node.role == LayerRole.window || node.role == LayerRole.application { break }
       if !LayerRole.small.contains(node.role), isLargeEnough(node.frame), holdsText(node) {
-        if node.role == LayerRole.textArea || holdsParagraphs(node, atLeast: 2) { return node }
+        if node.role == LayerRole.textArea || holdsParagraphs(node, atLeast: 2) { return viewport(of: node) }
         if firstLarge == nil { firstLarge = node }
       }
       cursor = node.parent
     }
-    return firstLarge
+    guard let firstLarge else { return nil }
+    return viewport(of: firstLarge)
+  }
+
+  /// Content taller than its scroll area is seen through the scroll area; that is the pane.
+  static func viewport<Node: LayerNode>(of node: Node) -> Node {
+    guard let frame = node.frame else { return node }
+    var cursor = node.parent
+    var steps = 0
+    while let ancestor = cursor, steps < 4 {
+      steps += 1
+      if ancestor.role == "AXScrollArea", let visible = ancestor.frame, !visible.contains(frame) {
+        return ancestor
+      }
+      cursor = ancestor.parent
+    }
+    return node
   }
 
   static func holdsParagraphs<Node: LayerNode>(_ node: Node, atLeast count: Int) -> Bool {
@@ -97,7 +113,7 @@ enum LayerPaneRule {
         children.contains(where: { $0.role == LayerRole.staticText }),
         (current.frame?.height ?? 0) >= 6
       {
-        found += 1
+        found += LayerBlockExtractor.isStack(children) ? children.count : 1
         if found >= count { return true }
         continue
       }
@@ -299,7 +315,14 @@ enum LayerBlockExtractor {
       if !children.isEmpty, children.allSatisfy({ LayerRole.inline.contains($0.role) }),
         children.contains(where: { $0.role == LayerRole.staticText })
       {
-        if let block = paragraph(node, children: children, visible: clip) { blocks.append((block, node)) }
+        if isStack(children) {
+          // Lines of text stacked in one native container are separate paragraphs.
+          for child in children where child.role == LayerRole.staticText {
+            if let block = paragraph(child, children: [child], visible: clip) { blocks.append((block, child)) }
+          }
+        } else if let block = paragraph(node, children: children, visible: clip) {
+          blocks.append((block, node))
+        }
         continue
       }
       // Lone text under a container that is not a paragraph (a label beside a control).
@@ -314,6 +337,16 @@ enum LayerBlockExtractor {
     return blocks
   }
 
+  /// Two or more texts, no links, one below the other without sharing a line: a native
+  /// stack of labels or paragraphs, not the pieces of one wrapped paragraph.
+  static func isStack<Node: LayerNode>(_ children: [Node]) -> Bool {
+    let texts = children.filter { $0.role == LayerRole.staticText }
+    guard texts.count >= 2, !children.contains(where: { $0.role == LayerRole.link }) else { return false }
+    let frames = texts.compactMap(\.frame).sorted { $0.minY < $1.minY }
+    guard frames.count == texts.count else { return false }
+    return zip(frames, frames.dropFirst()).allSatisfy { $1.minY >= $0.maxY - 1 }
+  }
+
   private static func paragraph<Node: LayerNode>(
     _ node: Node, children: [Node], visible: CGRect
   ) -> LayerBlock? {
@@ -325,12 +358,19 @@ enum LayerBlockExtractor {
     }
     var pieces: [LayerBlock.Piece] = []
     var lineHeight = CGFloat.greatestFiniteMagnitude
+    var measuredLine: CGFloat?
     for child in children {
       switch child.role {
       case LayerRole.staticText:
         if let text = child.textValue, !text.isEmpty {
           pieces.append(.init(text: text, isLink: false))
           if let height = child.frame?.height, height > 4 { lineHeight = min(lineHeight, height) }
+          // The first character's box is one line tall, however many lines the text wraps to.
+          if measuredLine == nil, let height = child.bounds(ofCharacters: NSRange(location: 0, length: 1))?.height,
+            height > 4
+          {
+            measuredLine = height
+          }
         }
       case LayerRole.link:
         let text = linkText(child)
@@ -348,7 +388,19 @@ enum LayerBlockExtractor {
     }
     return LayerBlock(
       pieces: pieces, frame: frame,
-      lineHeight: lineHeight == .greatestFiniteMagnitude ? min(frame.height, 20) : lineHeight)
+      lineHeight: measuredLine ?? estimatedLineHeight(
+        text: pieces.map(\.text).joined(), frame: frame, smallestPiece: lineHeight))
+  }
+
+  /// Without a character box, a line is judged from how much text fills the frame: at font
+  /// size f a line is about 1.3 f tall and holds width / (0.52 f) characters, so the frame
+  /// holds width × height / (0.68 f²). A piece shorter than two such lines is one line itself.
+  static func estimatedLineHeight(text: String, frame: CGRect, smallestPiece: CGFloat) -> CGFloat {
+    let characters = CGFloat(max(text.count, 1))
+    let fontSize = min(max((frame.width * frame.height / (0.68 * characters)).squareRoot(), 9), 28)
+    let estimate = fontSize * 1.3
+    if smallestPiece < estimate * 1.6 { return smallestPiece }
+    return estimate
   }
 
   private static func linkText<Node: LayerNode>(_ link: Node) -> String {

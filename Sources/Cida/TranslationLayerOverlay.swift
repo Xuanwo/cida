@@ -180,7 +180,16 @@ final class LayerOverlayView: NSView {
     CATransaction.commit()
   }
 
+  /// How many paragraphs are painted: a translation that does not fit leaves its original.
+  var paintedCount: Int { blockLayers.count }
+
   func show(_ drawings: [LayerDrawing], scale: CGFloat) {
+    // The tree is read again every second; unchanged paragraphs keep their layers and a
+    // paragraph showing its original keeps showing it.
+    if drawings == self.drawings {
+      setOffset(0)
+      return
+    }
     self.drawings = drawings
     peekedIndex = nil
     offset = 0

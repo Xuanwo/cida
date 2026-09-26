@@ -197,6 +197,7 @@ struct LayerWindowInfo: Equatable, Sendable {
   let ownerPID: pid_t
   let bounds: CGRect
   let layer: Int
+  var ownerName = ""
 
   static func onScreen() -> [LayerWindowInfo] {
     let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
@@ -213,26 +214,54 @@ struct LayerWindowInfo: Equatable, Sendable {
       guard alpha > 0 else { return nil }
       return LayerWindowInfo(
         number: number, ownerPID: pid, bounds: bounds,
-        layer: entry[kCGWindowLayer as String] as? Int ?? 0)
+        layer: entry[kCGWindowLayer as String] as? Int ?? 0,
+        ownerName: entry[kCGWindowOwnerName as String] as? String ?? "")
     }
   }
 
-  /// The application window under a point, skipping Cida's own windows and anything above
-  /// the normal window level (menu bar, Dock, notifications).
-  static func applicationWindow(at point: CGPoint, in windows: [LayerWindowInfo]) -> LayerWindowInfo? {
+  /// The application window under a point, skipping Cida's own windows, anything above the
+  /// normal window level (menu bar, Dock, notifications) and whole-display overlays.
+  static func applicationWindow(
+    at point: CGPoint, in windows: [LayerWindowInfo], displays: [CGRect] = displayFrames
+  ) -> LayerWindowInfo? {
     let ownPID = ProcessInfo.processInfo.processIdentifier
-    return windows.first { $0.ownerPID != ownPID && $0.layer == 0 && $0.bounds.contains(point) }
+    return windows.first {
+      $0.ownerPID != ownPID && $0.layer == 0 && $0.bounds.contains(point)
+        && !isDisplayOverlay($0, displays: displays)
+    }
   }
 
-  /// What covers `window` from the front: the bounds of the windows above it, Cida's excluded.
-  static func occluders(of window: CGWindowID, in windows: [LayerWindowInfo]) -> [CGRect] {
+  static func isDisplayOverlay(_ info: LayerWindowInfo, displays: [CGRect]) -> Bool {
+    displays.contains {
+      abs($0.minX - info.bounds.minX) < 1 && abs($0.minY - info.bounds.minY) < 1
+        && abs($0.width - info.bounds.width) < 1 && abs($0.height - info.bounds.height) < 1
+    }
+  }
+
+  /// What covers `window` from the front: the windows above it, Cida's excluded. A window
+  /// exactly the size of a whole display, menu bar included, is a transparent overlay (a
+  /// recording or automation shield): a real app in full screen has a Space of its own, and a
+  /// zoomed window leaves the menu bar.
+  static func occluders(
+    of window: CGWindowID, in windows: [LayerWindowInfo], displays: [CGRect] = displayFrames
+  ) -> [LayerWindowInfo] {
     let ownPID = ProcessInfo.processInfo.processIdentifier
-    var covering: [CGRect] = []
+    var covering: [LayerWindowInfo] = []
     for info in windows {
       if info.number == window { return covering }
-      if info.ownerPID != ownPID, info.layer >= 0, info.layer < 1_000 { covering.append(info.bounds) }
+      guard info.ownerPID != ownPID, info.layer >= 0, info.layer < 1_000 else { continue }
+      if !isDisplayOverlay(info, displays: displays) { covering.append(info) }
     }
     return covering
+  }
+
+  /// Every display's frame in top-left screen points.
+  static var displayFrames: [CGRect] {
+    NSScreen.screens.map { screen in
+      CGRect(
+        x: screen.frame.minX, y: LayerScreenGeometry.primaryHeight - screen.frame.maxY,
+        width: screen.frame.width, height: screen.frame.height)
+    }
   }
 }
 
