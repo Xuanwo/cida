@@ -10,7 +10,8 @@
 #
 # The notes file holds one line per item (scripts/ci/release-notes.py). The R2 key is an API
 # token limited to Object Read & Write on cida-releases. The zip goes up first and the feed
-# last, so the feed never points at a missing file.
+# last, so the feed never points at a missing file. After the feed, the release folders it no
+# longer lists are deleted; the feed keeps each channel's two newest builds.
 set -euo pipefail
 
 if [[ $# -lt 5 ]]; then
@@ -114,3 +115,26 @@ fi
 put "$work/appcast.xml" appcast.xml "application/xml; charset=utf-8" "public, max-age=300"
 
 echo "Published $version ($build, $channel): $public_host/$key"
+
+# Deletes every releases/<folder>/ the new feed does not point at. The folders come from the
+# feed each time, so a failed run is finished by the next publish and does not fail this one.
+prune_releases() {
+  local listed=() folders=() folder
+  listed=(${(f)"$(/usr/bin/sed -n "s|.*url=\"$public_host/releases/\([^/\"]*\)/.*|\1|p" \
+    "$work/appcast.xml")"})
+  # A feed that does not list what was just published was misread; delete nothing.
+  if (( ! ${listed[(Ie)$release_dir:t]} )); then
+    echo "The new feed does not list $release_dir" >&2
+    return 1
+  fi
+  folders=(${(f)"$(s3 s3 ls "s3://$bucket/releases/" | /usr/bin/awk '$1 == "PRE" { print $2 }')"}) \
+    || return 1
+  for folder in "${folders[@]%/}"; do
+    (( ${listed[(Ie)$folder]} )) && continue
+    s3 s3 rm --only-show-errors --recursive "s3://$bucket/releases/$folder/" || return 1
+    echo "Deleted releases/$folder"
+  done
+}
+if ! prune_releases; then
+  echo "::warning::Old releases were not deleted from $bucket; the next publish deletes them"
+fi
