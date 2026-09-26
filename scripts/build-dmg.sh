@@ -138,9 +138,9 @@ dmgbuild.core.build_dmg(
         "hide_extensions": [app_name],
         "icon": os.path.join(app, "Contents/Resources/AppIcon.icns"),
         "background": background,
-        # Finder takes this as the whole window: 400 pt of background plus a 30 pt title bar
-        # (measured on macOS 26; the tallest title bar Finder draws).
-        "window_rect": ((200, 120), (600, 430)),
+        # Finder takes this as the whole window: 400 pt of background plus its 33 pt title bar
+        # (32.5 pt measured on macOS 26).
+        "window_rect": ((200, 120), (600, 433)),
         "default_view": "icon-view",
         "show_toolbar": False,
         "show_sidebar": False,

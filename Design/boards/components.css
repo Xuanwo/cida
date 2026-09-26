@@ -230,6 +230,8 @@ body {
   color: var(--text-ink);
 }
 .result .text.cjk {
+  /* Adjacent CJK punctuation shares one em (「。」 then 「「」), as in the app. */
+  font-feature-settings: "chws";
   font-family: var(--font-result-cjk);
   font-size: var(--font-size-result-cjk);
   line-height: 31px;
@@ -258,7 +260,11 @@ body {
 
 /* ---- Lifecycle panels (spec/lifecycle.md) ------------------------------ */
 
+/* Short statement lines set their punctuation half-width, so 「：」 and 「、」 leave no hole. */
+.source.statement { font-feature-settings: "halt"; }
 .source.statement .muted { color: var(--text-tertiary); }
+/* 更新内容 belongs to the list below it. */
+.result .aside:first-child { margin-bottom: -4px; }
 .result .aside { font-size: var(--font-size-caption); line-height: 1.5; color: var(--text-tertiary); }
 /* A wrapped item hangs under its own text, not under the bullet. */
 .result .text.notes p { margin: 0; padding-left: 1em; text-indent: -1em; }
@@ -298,16 +304,19 @@ body {
   top: 56px;
   width: 100%;
   text-align: center;
+  /* Half-width 「」: the full-width brackets' blank halves pushed the line 7pt off centre. */
+  font-feature-settings: "halt";
   font-family: var(--font-result-cjk);
   font-size: 22px;
   color: var(--text-ink);
 }
-/* Finder draws both icons at 128pt centred on (150, 210) and (450, 210), labels 6pt below; the
-   arrow runs between the two icons' edges, 24pt clear of each, on their centre line. */
+/* Finder draws both icons at 128pt centred on (150, 210) and (450, 210), labels 6pt below. Their
+   artwork is not as wide as the box (the app's ends at x 204, the Applications folder's starts at
+   387.5), so the arrow is centred between the artwork, not the boxes, on their centre line. */
 .dmg-background .arrow {
   position: absolute;
   top: 210px;
-  left: 238px;
+  left: 234px;
   width: 124px;
   height: 1px;
   background: var(--text-tertiary);
@@ -384,7 +393,8 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  height: 43px;
+  /* macOS 26's compact title bar; the traffic lights and the title share its centre. */
+  height: 40px;
   padding: 0 16px;
 }
 .titlebar .lights { display: flex; gap: 8px; }
@@ -399,9 +409,10 @@ body {
 .titlebar .lights i:nth-child(3) { background: #28C840; }
 .titlebar .title {
   position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: var(--font-size-secondary);
   font-weight: 600;
 }

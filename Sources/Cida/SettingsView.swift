@@ -1,12 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): four groups
-/// that answer, in order, which model, how to translate or improve, how to summon the panel,
-/// and how Cida stays current. Everything saves itself; the window is as tall as its content.
+/// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): five groups
+/// that answer, in order, which model, which languages, how to translate or improve, how to
+/// summon the panel, and how Cida stays current. Everything saves itself; the window is as tall as its content.
 struct SettingsWindowView: View {
   @Bindable var model: AppModel
   let updates: UpdateState
+  /// Told the window height the content wants; the window follows over `motion-height-ms`.
+  var onHeightChange: @MainActor (CGFloat) -> Void = { _ in }
   /// The tallest the window's content may be; below the titlebar the groups scroll past it.
   @State private var maxContentHeight: CGFloat
   /// The groups' natural height, measured on every layout.
@@ -14,11 +16,21 @@ struct SettingsWindowView: View {
 
   init(
     model: AppModel, updates: UpdateState,
-    maxContentHeight: CGFloat = SettingsWindowFactory.screenContentHeight()
+    maxContentHeight: CGFloat = SettingsWindowFactory.screenContentHeight(),
+    onHeightChange: @escaping @MainActor (CGFloat) -> Void = { _ in }
   ) {
     self.model = model
     self.updates = updates
+    self.onHeightChange = onHeightChange
     _maxContentHeight = State(initialValue: maxContentHeight)
+  }
+
+  /// The titlebar plus the groups, up to the screen's room for the window.
+  private var windowHeight: CGFloat? {
+    bodyHeight.map {
+      SettingsWindowFactory.titlebarHeight
+        + min($0, maxContentHeight - SettingsWindowFactory.titlebarHeight)
+    }
   }
 
   var body: some View {
@@ -38,6 +50,12 @@ struct SettingsWindowView: View {
     }
     .frame(width: SettingsWindowFactory.width)
     .fixedSize(horizontal: false, vertical: true)
+    // While the window animates to a new height the content stays put at the top; the window
+    // reveals or covers its bottom.
+    .frame(maxHeight: .infinity, alignment: .top)
+    .onChange(of: windowHeight, initial: true) {
+      if let windowHeight { onHeightChange(windowHeight) }
+    }
     .onReceive(
       NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
     ) { _ in
@@ -46,14 +64,15 @@ struct SettingsWindowView: View {
   }
 }
 
-/// Builds the Settings window around a hosting controller whose preferred
-/// content size drives the window height, so expanding a prompt grows the
-/// window instead of scrolling it, up to the screen's visible height (minus the
-/// menu bar and the Dock); a smaller screen scrolls the groups instead.
+/// Builds the Settings window around its content, which reports the height it wants, so
+/// expanding a prompt grows the window instead of scrolling it, up to the screen's visible
+/// height (minus the menu bar and the Dock); a smaller screen scrolls the groups instead. The
+/// window follows over `motion-height-ms` with its top edge fixed (`Design/spec/settings.md` §一).
 @MainActor
 enum SettingsWindowFactory {
   static let width: CGFloat = 560
-  static let titlebarHeight: CGFloat = 46
+  /// The compact title bar the window's empty toolbar gives on macOS 26 (`CidaWindowFactory`).
+  static let titlebarHeight: CGFloat = 40
 
   /// The visible height of the screen Settings opens on, where the Dock and the menu bar leave
   /// room for windows.
@@ -65,28 +84,76 @@ enum SettingsWindowFactory {
     model: AppModel, updates: UpdateState,
     maxContentHeight: CGFloat = screenContentHeight()
   ) -> NSWindowController {
+    let sizer = SettingsWindowSizer()
     let hostingController = NSHostingController(
       rootView: SettingsWindowView(
-        model: model, updates: updates, maxContentHeight: maxContentHeight))
-    hostingController.sizingOptions = [.preferredContentSize]
+        model: model, updates: updates, maxContentHeight: maxContentHeight,
+        onHeightChange: { sizer.setContentHeight($0) }))
+    // The window's height is set by `SettingsWindowSizer`, not by the hosting controller, so it
+    // can animate with the top edge fixed.
+    hostingController.sizingOptions = []
     // The titlebar is drawn by `SettingsTitlebar` inside the content; without
     // this SwiftUI would add the system titlebar's safe area to the height.
     hostingController.safeAreaRegions = []
-    // The first pass measures the groups; the second sizes the window from them.
+    // The first pass measures the groups, which report the height the window starts at.
+    hostingController.view.frame.size = CGSize(width: width, height: 2_000)
     hostingController.view.layoutSubtreeIfNeeded()
     hostingController.view.layoutSubtreeIfNeeded()
-    let initialSize = hostingController.view.fittingSize
+    let initialHeight = sizer.requestedHeight ?? hostingController.view.fittingSize.height
     let window = CidaWindowFactory.makeWindow(
-      size: CGSize(width: width, height: initialSize.height),
+      size: CGSize(width: width, height: initialHeight),
       minimumSize: CGSize(width: width, height: 200),
       title: "设置"
     )
     window.styleMask.remove(.resizable)
     window.contentViewController = hostingController
     hostingController.view.setAccessibilityLabel("设置窗口内容")
-    window.setContentSize(CGSize(width: width, height: initialSize.height))
+    window.setContentSize(CGSize(width: width, height: initialHeight))
     window.center()
+    sizer.window = window
     return NSWindowController(window: window)
+  }
+}
+
+/// Moves the Settings window to the height its content asks for, growing or shrinking from a
+/// fixed top edge over `motion-height-ms` (at once under Reduce Motion).
+@MainActor
+final class SettingsWindowSizer {
+  weak var window: NSWindow?
+  /// The latest height the content asked for; the window starts at it.
+  private(set) var requestedHeight: CGFloat?
+  /// Counts moves, so a superseded move's fallback cannot pull the window back.
+  private var moveCount = 0
+
+  func setContentHeight(_ height: CGFloat) {
+    requestedHeight = height
+    guard let window else { return }
+    let target = window.frameRect(
+      forContentRect: NSRect(origin: .zero, size: CGSize(width: window.frame.width, height: height))
+    ).height
+    guard abs(target - window.frame.height) > 0.5 else { return }
+    let frame = NSRect(
+      x: window.frame.minX, y: window.frame.maxY - target, width: window.frame.width, height: target)
+    moveCount += 1
+    let move = moveCount
+    let duration = CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: window)
+    guard duration > 0, window.isVisible else {
+      window.setFrame(frame, display: true)
+      return
+    }
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = duration
+      context.timingFunction = CidaMotion.easeOut
+      window.animator().setFrame(frame, display: true)
+    }
+    // A window the system does not draw (hidden, or on a locked screen) never steps the animation
+    // or reports its end; a plain timer still lands it at the height its content asked for.
+    DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) { [weak self, weak window] in
+      MainActor.assumeIsolated {
+        guard let self, self.moveCount == move, let window, window.frame != frame else { return }
+        window.setFrame(frame, display: true)
+      }
+    }
   }
 }
 
@@ -508,6 +575,8 @@ private struct CopyConfigurationPromptButton: View {
       }
     }
     .buttonStyle(SettingsBorderedButtonStyle(isHighlighted: isCopied))
+    // The panel's 已复制 cross-fades over `motion-icon-swap-ms`; this one does too.
+    .animation(.easeOut(duration: CidaMotion.iconSwapSeconds), value: isCopied)
     .accessibilityLabel(isCopied ? "已复制" : "复制配置提示词")
     .accessibilityIdentifier("settings-copy-configuration-prompt")
   }
@@ -793,7 +862,7 @@ private struct LaunchAtLoginRow: View {
       .labelsHidden()
       .toggleStyle(.switch)
       .tint(CidaDesign.accent)
-      .controlSize(.mini)
+      .controlSize(.small)
       .accessibilityIdentifier("settings-launch-at-login-toggle")
     }
     .onAppear(perform: model.refreshLaunchAtLoginStatus)
@@ -825,7 +894,7 @@ private struct AutomaticUpdatesRow: View {
         .labelsHidden()
         .toggleStyle(.switch)
         .tint(CidaDesign.accent)
-        .controlSize(.mini)
+        .controlSize(.small)
         .accessibilityIdentifier("settings-automatic-updates-toggle")
       }
     }

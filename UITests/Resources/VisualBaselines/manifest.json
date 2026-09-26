@@ -6,9 +6,9 @@
       "approvedImage": "Design/QACurrent/implementation-empty.png",
       "approvedImageSHA256": "e258865d755e689983b702c6ffa5933c8244d3c5f1d78736c6dcaa761dc1a1cf",
       "designReference": "Design/QACurrent/reference-empty.png",
-      "designReferenceSHA256": "95d4f3d879d45b3854f1cbbd2770ca95e1bd78eed656e0da3da9b0a547b6336c",
+      "designReferenceSHA256": "5ba369d1fa5d0d907fcd63f0fa51661d27fddd479bc29432617719702ed11eb0",
       "designDocument": "Design/boards/panel-states.html",
-      "designDocumentSHA256": "cb3d904aa8db7df39f637189204965bfc293b6787b4fd7aef582be12666a6152",
+      "designDocumentSHA256": "0be2ca15ed9cb3f76ce0017d034521ef2d9a94f25ac2df0b47cc1b0ccf8b03f8",
       "logicalWidth": 800,
       "logicalHeight": 113,
       "blockSize": 8,
@@ -20,13 +20,13 @@
     {
       "name": "settings",
       "approvedImage": "Design/QACurrent/implementation-settings.png",
-      "approvedImageSHA256": "7a704f49a1fe81e3f6b95ccfe60bcc405dcc63e04af6ec8f5cfb74fa5e08b360",
+      "approvedImageSHA256": "5676ac4f9625313a98aa630c0b546df93891e5e23e90fec43cf6285cfff25a97",
       "designReference": "Design/QACurrent/reference-settings.png",
-      "designReferenceSHA256": "13379931294856cdbc26df5fdbe6ec873ce6e78695d85a9e510f619190aaec42",
+      "designReferenceSHA256": "dd7bb74d3cd7bad637b305de39091e2b6607f36abea3af62d52db0fe70502087",
       "designDocument": "Design/boards/settings-states.html",
       "designDocumentSHA256": "c2258497b05234732bf65f475f0ee111270a09aa3d00391191d8ea8fe12cad4d",
       "logicalWidth": 560,
-      "logicalHeight": 837,
+      "logicalHeight": 831,
       "blockSize": 8,
       "channelTolerance": 0.08,
       "maximumChangedBlockRatio": 0.12,
@@ -36,7 +36,7 @@
           "x": 0,
           "y": 0,
           "width": 560,
-          "height": 46
+          "height": 40
         }
       ]
     }

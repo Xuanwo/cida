@@ -327,17 +327,18 @@ final class InteractionReproductionTests: XCTestCase {
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
     let collapsedFrame = window.frame
-    XCTAssertEqual(collapsedFrame.height, 837, accuracy: 4, "The board's 默认 is 837 pt tall")
+    XCTAssertEqual(collapsedFrame.height, 834, accuracy: 4, "The board's 默认 is 834 pt tall")
 
+    // The window follows over motion-height-ms; wait for the move to end.
     model.editingPrompt = .improve
-    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
 
     let expandedFrame = window.frame
     XCTAssertGreaterThan(expandedFrame.height, collapsedFrame.height + 80, "The prompt sheet grows the window")
     XCTAssertEqual(expandedFrame.maxY, collapsedFrame.maxY, accuracy: 0.5, "The top edge stays put")
 
     model.editingPrompt = nil
-    RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
     XCTAssertEqual(window.frame.height, collapsedFrame.height, accuracy: 0.5)
     assertTestProcessIsNotFrontmost()
   }

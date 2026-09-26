@@ -199,7 +199,7 @@ class CidaStatusMenu extends HTMLElement {
       <section class="status-menu-scene" data-state="${this.getAttribute("state")}">
         <div class="menubar"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
         <div class="status-menu">
-          ${item("显示辞达", "⌥Space")}${item("截图翻译", "⌥S")}${item("设置…", "⌘,")}
+          ${item("显示辞达", "⌥ 空格键")}${item("截图翻译", "⌥ S")}${item("设置…", "⌘,")}
           ${available ? item("安装新版本 1.1.0…") : item("检查更新…")}
           <i class="separator"></i>
           ${item("退出辞达", "⌘Q")}

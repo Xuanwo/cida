@@ -23,6 +23,9 @@ enum CidaWindowFactory {
     window.titleVisibility = .hidden
     window.titlebarAppearsTransparent = true
     window.toolbarStyle = .unifiedCompact
+    // The style only applies with a toolbar: an empty one gives the 40 pt compact title bar the
+    // content's own title centres in, level with the traffic lights.
+    window.toolbar = NSToolbar(identifier: "cida.window")
     window.isOpaque = true
     window.backgroundColor = CidaDesign.Palette.background.appKit
     window.hasShadow = true
