@@ -61,6 +61,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       suspendGlobalShortcuts: { [weak self] isSuspended in
         self?.globalHotKey?.setSuspended(isSuspended)
         self?.captureHotKey?.setSuspended(isSuspended)
+        self?.layerHotKey?.setSuspended(isSuspended)
       },
       selectionAccess: launchOptions.selectionAccess,
       captureAccess: launchOptions.captureAccess,
@@ -83,8 +84,15 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private let updater = CidaUpdater()
   private var showPanelMenuItem: NSMenuItem?
   private var captureMenuItem: NSMenuItem?
+  private var layerMenuItem: NSMenuItem?
   private var globalHotKey: GlobalHotKey?
   private var captureHotKey: GlobalHotKey?
+  private var layerHotKey: GlobalHotKey?
+  /// The translation layer (`Design/spec/translation-layer.md`); nil in automation that shows
+  /// no interactive UI.
+  private var translationLayer: TranslationLayerController?
+  /// The layer's configuration is over the screen; the other shortcuts wait for it.
+  private var isConfiguringLayer = false
   private var performanceProbeView: FramePacingProbeNSView?
   private var millionCharacterPasteWorkload: MillionCharacterPasteWorkload?
   private var inputInteractionProbe: InputInteractionProbe?
@@ -130,6 +138,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       captureHotKey = GlobalHotKey(shortcut: model.settings.captureShortcut) { [weak self] in
         self?.handleCaptureShortcut()
       }
+      layerHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut) { [weak self] in
+        self?.handleLayerShortcut()
+      }
+      startTranslationLayer()
       warmUpTextRecognition()
     }
     // Only a user's own launch talks to the update feed; automation and E2E never do.
@@ -198,7 +210,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     _ shortcut: GlobalShortcut,
     for action: GlobalShortcutAction
   ) -> Bool {
-    let hotKey = action == .showPanel ? globalHotKey : captureHotKey
+    let hotKey =
+      switch action {
+      case .showPanel: globalHotKey
+      case .captureText: captureHotKey
+      case .translationLayer: layerHotKey
+      }
     if let hotKey, !hotKey.update(to: shortcut) {
       return false
     }
@@ -207,7 +224,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func updateMenuItem(for action: GlobalShortcutAction, shortcut: GlobalShortcut) {
-    let item = action == .showPanel ? showPanelMenuItem : captureMenuItem
+    let item =
+      switch action {
+      case .showPanel: showPanelMenuItem
+      case .captureText: captureMenuItem
+      case .translationLayer: layerMenuItem
+      }
     item?.keyEquivalent = shortcut.menuKeyEquivalent
     item?.keyEquivalentModifierMask = shortcut.menuModifierMask
   }
@@ -217,7 +239,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// already being translated (`Design/spec/panel.md` §一 带入选区). The
   /// menu bar item shows the panel without reading anything.
   private func handleGlobalShortcut() {
-    guard let panelController, !isCapturing else { return }
+    guard let panelController, !isCapturing, !isConfiguringLayer else { return }
     if panelController.isVisible {
       panelController.hide()
       return
@@ -243,7 +265,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// permission it asks for it instead.
   @objc
   func handleCaptureShortcut() {
-    guard !isCapturing, !isReadingSelection else { return }
+    guard !isCapturing, !isReadingSelection, !isConfiguringLayer else { return }
     panelController?.hide()
     model.refreshCaptureAccess()
     guard model.isCaptureAccessGranted else {
@@ -278,6 +300,43 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     model.importCapturedText(text)
     lifecycleLog?.record(text == nil ? "capture-unrecognized" : "capture-imported")
     showPanel()
+  }
+
+  private func startTranslationLayer() {
+    let controller = TranslationLayerController(
+      settings: { [weak self] in self?.model.settings ?? CidaSettings() },
+      service: launchOptions.textProcessingService,
+      namespace: launchOptions.settingsStorageNamespace,
+      persists: launchOptions.persistsSettings)
+    controller.lifecycleLog = { [weak self] event in self?.lifecycleLog?.record(event) }
+    controller.start()
+    translationLayer = controller
+  }
+
+  /// The layer shortcut (`Design/spec/translation-layer.md` §二): the configuration over the
+  /// screen under the pointer. Without the Accessibility permission it asks for it instead.
+  @objc
+  func handleLayerShortcut() {
+    guard let translationLayer, !isCapturing, !isReadingSelection, !isConfiguringLayer else { return }
+    panelController?.hide()
+    model.refreshSelectionAccess()
+    guard model.isSelectionAccessGranted else {
+      model.requestSelectionAccess()
+      return
+    }
+    let mouse = NSEvent.mouseLocation
+    guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main
+    else { return }
+    // The request may need the Keychain key, which the first show recovers.
+    recoverAPIKeyIfNeeded()
+    isConfiguringLayer = true
+    lifecycleLog?.record("layer-configuration-shown")
+    Task { @MainActor [weak self] in
+      LayerConfiguration.captureShortcutText = self?.model.settings.captureShortcut.displayText ?? "⌥ S"
+      await LayerConfiguration(controller: translationLayer, screen: screen).run()
+      self?.isConfiguringLayer = false
+      self?.lifecycleLog?.record("layer-configuration-closed")
+    }
   }
 
   /// The first recognition in a process loads the models, which takes
@@ -383,6 +442,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     menu.addItem(capture)
     captureMenuItem = capture
     updateMenuItem(for: .captureText, shortcut: model.settings.captureShortcut)
+    let layer = NSMenuItem(
+      title: "翻译图层", action: #selector(handleLayerShortcut), keyEquivalent: "")
+    layer.target = self
+    menu.addItem(layer)
+    layerMenuItem = layer
+    updateMenuItem(for: .translationLayer, shortcut: model.settings.layerShortcut)
     let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)

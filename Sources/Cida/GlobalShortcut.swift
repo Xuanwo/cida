@@ -62,6 +62,7 @@ struct GlobalShortcut: Equatable, Hashable, Sendable {
 
   static let optionSpace = GlobalShortcut(keyCode: UInt16(kVK_Space), modifiers: .option)
   static let optionS = GlobalShortcut(keyCode: UInt16(kVK_ANSI_S), modifiers: .option)
+  static let optionD = GlobalShortcut(keyCode: UInt16(kVK_ANSI_D), modifiers: .option)
 
   init(keyCode: UInt16, modifiers: Modifiers) {
     self.keyCode = keyCode
@@ -200,11 +201,14 @@ enum GlobalShortcutAction: CaseIterable, Sendable {
   case showPanel
   /// Freezes the screen, lets the user frame some text, and translates it.
   case captureText
+  /// Opens the translation layer's configuration over the screen.
+  case translationLayer
 
   var defaultShortcut: GlobalShortcut {
     switch self {
     case .showPanel: .optionSpace
     case .captureText: .optionS
+    case .translationLayer: .optionD
     }
   }
 }

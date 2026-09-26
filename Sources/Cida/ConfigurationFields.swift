@@ -26,6 +26,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
   case improvementPrompt = "improvement-prompt"
   case shortcut
   case captureShortcut = "capture-shortcut"
+  case layerShortcut = "layer-shortcut"
   case launchAtLogin = "launch-at-login"
   case automaticUpdates = "automatic-updates"
 
@@ -121,7 +122,12 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       Schema(
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionS.configurationText,
         example: "control+option+s",
-        description: "截图翻译的快捷键，写法同 shortcut，两者不能相同")
+        description: "截图翻译的快捷键，写法同 shortcut，三个快捷键不能相同")
+    case .layerShortcut:
+      Schema(
+        type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionD.configurationText,
+        example: "control+option+d",
+        description: "翻译图层的快捷键：选择要持续翻译的区域，写法同 shortcut，三个快捷键不能相同")
     case .launchAtLogin:
       Schema(
         type: "boolean", values: ["true", "false"], defaultValue: "false", example: "true",
@@ -192,11 +198,11 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       } else {
         settings.improvementPrompt = value
       }
-    case .shortcut, .captureShortcut:
+    case .shortcut, .captureShortcut, .layerShortcut:
       guard let shortcut = GlobalShortcut(configurationText: value) else {
         throw invalid("写成修饰键加一个键，至少带 control、option 或 command，例如 \(schema.example)")
       }
-      settings.setShortcut(shortcut, for: self == .shortcut ? .showPanel : .captureText)
+      settings.setShortcut(shortcut, for: shortcutAction!)
     case .launchAtLogin, .automaticUpdates:
       guard let enabled = ["true": true, "false": false][value] else {
         throw invalid("只能是 true 或 false")
@@ -228,6 +234,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .improvementPrompt: configuration.settings.improvementPrompt = defaults.improvementPrompt
     case .shortcut: configuration.settings.shortcut = defaults.shortcut
     case .captureShortcut: configuration.settings.captureShortcut = defaults.captureShortcut
+    case .layerShortcut: configuration.settings.layerShortcut = defaults.layerShortcut
     case .launchAtLogin:
       configuration.launchAtLogin = false
       configuration.settings.launchAtLogin = false
@@ -237,8 +244,24 @@ enum ConfigurationField: String, CaseIterable, Sendable {
 
   /// Rules that span fields; checked after every change in a command is applied.
   static func validate(_ configuration: EditableConfiguration) throws(InvalidValue) {
-    if configuration.settings.shortcut == configuration.settings.captureShortcut {
-      throw InvalidValue(field: "capture-shortcut", message: "capture-shortcut 不能与 shortcut 相同")
+    let settings = configuration.settings
+    let fields: [ConfigurationField] = [.shortcut, .captureShortcut, .layerShortcut]
+    for (index, field) in fields.enumerated() {
+      for earlier in fields[..<index]
+      where settings.shortcut(for: field.shortcutAction!) == settings.shortcut(for: earlier.shortcutAction!) {
+        throw InvalidValue(
+          field: field.rawValue, message: "\(field.rawValue) 不能与 \(earlier.rawValue) 相同")
+      }
+    }
+  }
+
+  /// The global shortcut a shortcut field sets.
+  private var shortcutAction: GlobalShortcutAction? {
+    switch self {
+    case .shortcut: .showPanel
+    case .captureShortcut: .captureText
+    case .layerShortcut: .translationLayer
+    default: nil
     }
   }
 
@@ -306,6 +329,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .improvementPrompt: return .string(settings.improvementPrompt)
     case .shortcut: return .string(settings.shortcut.configurationText)
     case .captureShortcut: return .string(settings.captureShortcut.configurationText)
+    case .layerShortcut: return .string(settings.layerShortcut.configurationText)
     case .launchAtLogin: return .bool(configuration.launchAtLogin)
     case .automaticUpdates: return .bool(configuration.automaticUpdates)
     }
@@ -332,8 +356,8 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         ? configuration.settings.translationPrompt : configuration.settings.improvementPrompt
       let line = prompt.replacingOccurrences(of: "\n", with: " ")
       return line.count > 60 ? String(line.prefix(60)) + "…" : line
-    case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .launchAtLogin,
-      .automaticUpdates:
+    case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .layerShortcut,
+      .launchAtLogin, .automaticUpdates:
       let value = jsonValue(in: configuration, hasAPIKey: hasAPIKey)
       return value.stringValue ?? value.compactText
     }

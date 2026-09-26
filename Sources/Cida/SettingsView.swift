@@ -131,6 +131,7 @@ private struct SettingsBody: View {
       SettingsGroup(title: "唤起") {
         GlobalShortcutRow(model: model, action: .showPanel)
         GlobalShortcutRow(model: model, action: .captureText)
+        GlobalShortcutRow(model: model, action: .translationLayer)
         SelectionAccessRow(model: model)
         LaunchAtLoginRow(model: model)
       }
@@ -637,7 +638,11 @@ private struct GlobalShortcutRow: View {
   }
 
   private var title: String {
-    action == .showPanel ? "全局快捷键" : "截图翻译"
+    switch action {
+    case .showPanel: "全局快捷键"
+    case .captureText: "截图翻译"
+    case .translationLayer: "翻译图层"
+    }
   }
 
   private var caption: String {
@@ -648,15 +653,24 @@ private struct GlobalShortcutRow: View {
     switch action {
     case .showPanel: return "在任何应用里显示辞达"
     case .captureText: return needsCaptureAccess ? "需要屏幕录制权限" : "框选屏幕文字并翻译"
+    case .translationLayer: return "选择要持续翻译的区域"
     }
   }
 
   private var identifierPrefix: String {
-    action == .showPanel ? "settings-shortcut" : "settings-capture-shortcut"
+    switch action {
+    case .showPanel: "settings-shortcut"
+    case .captureText: "settings-capture-shortcut"
+    case .translationLayer: "settings-layer-shortcut"
+    }
   }
 
   private var accessibilityName: String {
-    action == .showPanel ? "全局快捷键" : "截图翻译快捷键"
+    switch action {
+    case .showPanel: "全局快捷键"
+    case .captureText: "截图翻译快捷键"
+    case .translationLayer: "翻译图层快捷键"
+    }
   }
 
   var body: some View {

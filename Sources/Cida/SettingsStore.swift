@@ -80,6 +80,7 @@ enum SettingsStore {
     stored.foreignLanguage = settings.foreignLanguage
     stored.shortcut = settings.shortcut
     stored.captureShortcut = settings.captureShortcut
+    stored.layerShortcut = settings.layerShortcut
     stored.launchAtLogin = settings.launchAtLogin
     save(stored, namespace: namespace)
   }
@@ -136,6 +137,21 @@ enum SettingsStore {
     defaults.removeObject(forKey: lastCheckKey)
     KeychainStore.deleteAPIKey(service: namespace)
   }
+
+  /// The panes chosen for the translation layer (`Design/spec/translation-layer.md` §二).
+  /// They are not settings: nothing in Settings or the command line shows them.
+  static func loadLayerSelections(namespace: String = storageNamespace) -> [LayerSelection] {
+    userDefaults(for: namespace).data(forKey: layerSelectionsKey)
+      .flatMap { try? JSONDecoder().decode([LayerSelection].self, from: $0) } ?? []
+  }
+
+  static func saveLayerSelections(_ selections: [LayerSelection], namespace: String = storageNamespace) {
+    if let data = try? JSONEncoder().encode(selections) {
+      userDefaults(for: namespace).set(data, forKey: layerSelectionsKey)
+    }
+  }
+
+  private static let layerSelectionsKey = "cida.translation-layer.selections.v1"
 
   private static func userDefaults(for namespace: String) -> UserDefaults {
     if namespace == storageNamespace {

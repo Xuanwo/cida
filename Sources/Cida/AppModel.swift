@@ -598,8 +598,9 @@ final class AppModel {
       newSettings.modelService != settings.modelService || newSettings.apiKey != settings.apiKey
       || lastCheck != lastModelServiceCheck
     var everythingButShortcuts = newSettings
-    everythingButShortcuts.shortcut = settings.shortcut
-    everythingButShortcuts.captureShortcut = settings.captureShortcut
+    for action in GlobalShortcutAction.allCases {
+      everythingButShortcuts.setShortcut(settings.shortcut(for: action), for: action)
+    }
     settings = everythingButShortcuts
     // New combinations are registered like ones recorded in Settings.
     for action in GlobalShortcutAction.allCases {
