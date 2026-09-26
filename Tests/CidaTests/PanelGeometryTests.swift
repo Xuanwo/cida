@@ -193,8 +193,9 @@ final class PanelGeometryTests: XCTestCase {
     pump { false }
     let typedInk = try inkRows(in: hostingView)
 
-    XCTAssertEqual(typedInk.top, placeholderInk.top, accuracy: 0.6)
-    XCTAssertEqual(typedInk.bottom, placeholderInk.bottom, accuracy: 0.6)
+    // One point covers pixel rounding on a 1x display (CI runners); the defect was 3 pt.
+    XCTAssertEqual(typedInk.top, placeholderInk.top, accuracy: 1)
+    XCTAssertEqual(typedInk.bottom, placeholderInk.bottom, accuracy: 1)
   }
 
   /// The waiting caret and the caret after the first glyph sit at the same height in the line:
