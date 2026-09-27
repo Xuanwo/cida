@@ -41,7 +41,7 @@ The app is a menu-bar application whose main interface is a borderless floating 
 | result pane / text | `result-pane`, `result-text` |
 | result notes | `result-note-stale`, `result-note-stopped`, `result-note-failed`, `result-note-unrecognized` |
 | capture overlay / canvas | `capture-overlay`, `capture-overlay-canvas` |
-| translation layer painted translations / status and hint pill / whole-window outline | `translation-layer-content`, `translation-layer-status`, `translation-layer-outline` |
+| translation layer painted translations / hint pill / whole-window outline | `translation-layer-content`, `translation-layer-hint`, `translation-layer-outline` |
 
 ⏎ submits, Tab switches the action, Escape hides, Option-Space shows, ⌘, opens Settings, ⌘C copies
 the result when nothing is selected, ⌘. stops. There is no send button and no title bar.

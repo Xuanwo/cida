@@ -313,20 +313,20 @@ final class LayerOverlayView: NSView {
   }
 }
 
-/// The pill at a pane's lower right (§三): only while paragraphs wait, or after a failure,
-/// when a press retries. It is the only part of the layer that takes a click.
-final class LayerStatusPanel: NSPanel {
-  private let hosting: NSHostingView<LayerStatusPill>
-  var onRetry: (() -> Void)?
-  /// When the latest transient message appeared; an older one's fade leaves it alone.
-  fileprivate var lastFlash: Date?
+/// What the layer says, in Cida's hint pill where the panel and the capture hint appear: the
+/// screen under the pointer, the pill's top edge at the panel's (§五 提示胶囊). A failure stays
+/// until it is pressed, which retries; everything else fades on its own.
+final class LayerHintPanel: NSPanel {
+  private let hosting = NSHostingView(rootView: LayerHint(text: ""))
+  private var shownAt: Date?
+  private(set) var text: String?
 
   init() {
-    hosting = NSHostingView(rootView: LayerStatusPill(text: ""))
     super.init(
       contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
       defer: false)
-    level = .floating
+    // Above the translations it may talk about.
+    level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
     collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
     isOpaque = false
     backgroundColor = .clear
@@ -335,60 +335,83 @@ final class LayerStatusPanel: NSPanel {
     hidesOnDeactivate = false
     isReleasedWhenClosed = false
     contentView = hosting
-    setAccessibilityIdentifier("translation-layer-status")
+    setAccessibilityIdentifier("translation-layer-hint-panel")
+    setAccessibilityLabel("辞达提示")
+    // The pill is read as one element, like the translations, whether or not the panel is key.
+    hosting.setAccessibilityElement(true)
+    hosting.setAccessibilityRole(.staticText)
+    hosting.setAccessibilityIdentifier("translation-layer-hint")
   }
 
   override var canBecomeKey: Bool { false }
 
-  /// Places the pill inside `pane` (AppKit screen coordinates), 14 pt from its lower right.
-  func show(text: String, retryable: Bool, in pane: CGRect) {
-    hosting.rootView = LayerStatusPill(text: text, onPress: retryable ? { [weak self] in self?.onRetry?() } : nil)
+  /// Shows `text` for `seconds`, or until `hide` when nil; `onPress` makes the pill a button.
+  func show(_ text: String, for seconds: Double?, onPress: (() -> Void)? = nil) {
+    self.text = text
+    hosting.rootView = LayerHint(text: text, onPress: onPress)
+    let mouse = NSEvent.mouseLocation
+    let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
+    let frame = screen?.frame ?? .zero
     let size = hosting.fittingSize
+    let pillTop = frame.minY + frame.height * (1 - CidaDesign.Panel.topRatio)
     setFrame(
-      CGRect(x: pane.maxX - size.width - 14 + LayerStatusPill.shadowMargin,
-             y: pane.minY + 12 - LayerStatusPill.shadowMargin, width: size.width, height: size.height),
+      CGRect(
+        x: floor(frame.midX - size.width / 2), y: floor(pillTop + CidaHintPill.shadowMargin - size.height),
+        width: size.width, height: size.height),
       display: true)
-    ignoresMouseEvents = !retryable
-    setAccessibilityValue(text)
-    orderFront(nil)
+    ignoresMouseEvents = onPress == nil
+    hosting.setAccessibilityLabel(text)
+    hosting.setAccessibilityValue(text)
+    hosting.wantsLayer = true
+    hosting.layer?.removeAllAnimations()
+    hosting.layer?.opacity = 1
+    alphaValue = 1
+    orderFrontRegardless()
+    let shown = Date()
+    shownAt = shown
+    guard let seconds else { return }
+    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+      guard let self, shownAt == shown else { return }
+      hide()
+    }
+  }
+
+  func hide() {
+    let shown = shownAt
+    text = nil
+    // A layer fade: a window's own alpha animation does not always run in a Release build
+    // under automation, which left panels ordered in but transparent.
+    let duration = CidaMotion.resolvedDuration(0.3, in: self)
+    fade(hosting.layer, from: 1, to: 0, duration: duration)
+    DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+      guard let self, shownAt == shown else { return }
+      orderOut(nil)
+    }
   }
 }
 
-extension LayerStatusPanel {
-  /// Shows `text` for `seconds` at the lower right of `rect` (AppKit coordinates): turning a
-  /// window's translation on or off (§三).
-  func flash(text: String, in rect: CGRect, for seconds: Double) {
-    show(text: text, retryable: false, in: rect)
-    fadeOut(after: seconds)
-  }
+/// Fades `layer` and leaves it at `to`; with no duration (reduced motion) it lands at once.
+@MainActor
+private func fade(_ layer: CALayer?, from: Float, to: Float, duration: TimeInterval) {
+  guard let layer else { return }
+  layer.opacity = to
+  guard duration > 0 else { return }
+  let animation = CABasicAnimation(keyPath: "opacity")
+  animation.fromValue = from
+  animation.toValue = to
+  animation.duration = duration
+  animation.timingFunction = CidaMotion.Curve.easeOut.timingFunction
+  layer.add(animation, forKey: "fade")
+}
 
-  /// Shows `text` beside the pointer (AppKit coordinates) for 1.2 s: nothing to translate
-  /// there (§二).
-  func flash(text: String, near point: CGPoint) {
-    show(text: text, retryable: false, in: CGRect(x: point.x, y: point.y, width: 0, height: 0))
-    let size = frame.size
-    setFrameOrigin(
-      CGPoint(x: point.x + 14 - LayerStatusPill.shadowMargin, y: point.y - 22 - size.height + LayerStatusPill.shadowMargin))
-    fadeOut(after: 1.2)
-  }
+/// The hint pill, pressable when it offers a retry.
+struct LayerHint: View {
+  let text: String
+  var onPress: (() -> Void)?
 
-  private func fadeOut(after seconds: Double) {
-    alphaValue = 1
-    let shown = Date()
-    lastFlash = shown
-    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
-      guard let self, lastFlash == shown else { return }
-      NSAnimationContext.runAnimationGroup { context in
-        context.duration = CidaMotion.resolvedDuration(0.3, in: self)
-        self.animator().alphaValue = 0
-      } completionHandler: { [weak self] in
-        MainActor.assumeIsolated {
-          guard let self, self.lastFlash == shown else { return }
-          self.orderOut(nil)
-          self.alphaValue = 1
-        }
-      }
-    }
+  var body: some View {
+    CidaHintPill(text: text)
+      .onTapGesture { onPress?() }
   }
 }
 
@@ -432,46 +455,18 @@ final class LayerOutlinePanel: NSPanel {
     outline.path = CGPath(
       roundedRect: outline.frame.insetBy(dx: 0.75, dy: 0.75), cornerWidth: 12, cornerHeight: 12, transform: nil)
     CATransaction.commit()
-    alphaValue = 0
-    orderFront(nil)
-    NSAnimationContext.runAnimationGroup { context in
-      context.duration = CidaMotion.resolvedDuration(0.15, in: self)
-      self.animator().alphaValue = 1
-    } completionHandler: { [weak self] in
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-        guard let self else { return }
-        NSAnimationContext.runAnimationGroup { context in
-          context.duration = CidaMotion.resolvedDuration(0.3, in: self)
-          self.animator().alphaValue = 0
-        } completionHandler: { [weak self] in
-          MainActor.assumeIsolated { self?.orderOut(nil) }
-        }
-      }
+    alphaValue = 1
+    orderFrontRegardless()
+    // Layer fades, for the reason `LayerHintPanel.hide` gives.
+    let fadeIn = CidaMotion.resolvedDuration(0.15, in: self)
+    let fadeOut = CidaMotion.resolvedDuration(0.3, in: self)
+    outline.opacity = 0
+    fade(outline, from: 0, to: 1, duration: fadeIn)
+    DispatchQueue.main.asyncAfter(deadline: .now() + fadeIn + 0.6) { [weak self] in
+      guard let self else { return }
+      fade(outline, from: 1, to: 0, duration: fadeOut)
+      DispatchQueue.main.asyncAfter(deadline: .now() + fadeOut) { [weak self] in self?.orderOut(nil) }
     }
   }
 }
 
-struct LayerStatusPill: View {
-  static let shadowMargin: CGFloat = 16
-  let text: String
-  var onPress: (() -> Void)?
-
-  var body: some View {
-    HStack(spacing: 10) {
-      CidaWordmark()
-      Text(text)
-        .font(CidaDesign.ui(12, weight: .medium))
-        .foregroundStyle(CidaDesign.textControl)
-    }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 5)
-    .background(CidaDesign.surface, in: Capsule())
-    .overlay { Capsule().strokeBorder(Color.black.opacity(0x12 / 255), lineWidth: 1) }
-    .shadow(color: CidaDesign.textPrimary.opacity(0x14 / 255), radius: 3, y: 2)
-    .shadow(color: CidaDesign.textPrimary.opacity(0x22 / 255), radius: 12, y: 10)
-    .contentShape(Capsule())
-    .onTapGesture { onPress?() }
-    .padding(Self.shadowMargin)
-    .accessibilityElement(children: .combine)
-  }
-}

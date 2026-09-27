@@ -22,9 +22,11 @@ final class TranslationLayerController {
   private var monitors: [Any] = []
   private var discovering = false
   private var enabledTrees: Set<pid_t> = []
-  /// Turning a window on or off, and nothing to translate under the pointer.
-  private let pill = LayerStatusPanel()
-  private let outline = LayerOutlinePanel()
+  /// Everything the layer says (§五 提示胶囊).
+  private lazy var hints = LayerHintPanel()
+  /// The failure the hint pill shows, so it is said once and taken back when it clears.
+  private var shownFailure: LayerTranslationError?
+  private lazy var outline = LayerOutlinePanel()
   var lifecycleLog: ((String) -> Void)?
 
   init(
@@ -74,7 +76,7 @@ final class TranslationLayerController {
       let running = NSRunningApplication(processIdentifier: info.ownerPID),
       let application = LayerApplication(running)
     else {
-      hint("这里没有可以翻译的文字", at: point)
+      hint("这里没有可以翻译的文字")
       return
     }
     enableTree(of: application)
@@ -99,8 +101,7 @@ final class TranslationLayerController {
       hint(
         readsText
           ? "这里没有可以翻译的文字"
-          : "\(application.name) 里读不到文字，可以用截图翻译 \(settings().captureShortcut.displayText)",
-        at: point)
+          : "\(application.name) 里读不到文字，可以用截图翻译 \(settings().captureShortcut.displayText)")
       log("layer-paragraph-none app=\(application.bundleIdentifier)")
       return
     }
@@ -124,7 +125,7 @@ final class TranslationLayerController {
       let running = NSRunningApplication(processIdentifier: info.ownerPID),
       let application = LayerApplication(running)
     else {
-      hint("这里没有可以翻译的窗口", at: point)
+      hint("这里没有可以翻译的窗口")
       return
     }
     enableTree(of: application)
@@ -151,7 +152,7 @@ final class TranslationLayerController {
         session.close()
       }
       sessions.removeAll(where: \.isFinished)
-      pill.flash(text: "已停止翻译这个窗口", in: frame, for: 1.5)
+      hints.show("已停止翻译这个窗口", for: 1.5)
       log("layer-window-off app=\(application.bundleIdentifier)")
       return
     }
@@ -162,9 +163,8 @@ final class TranslationLayerController {
     saveWindowRules()
     outline.flash(around: frame)
     let stop = settings().layerShortcut.addingShift.displayText
-    pill.flash(
-      text: "翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止",
-      in: frame, for: 2)
+    hints.show("翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止", for: 2)
+    logHint()
     log("layer-window-on app=\(application.bundleIdentifier)")
     discover()
   }
@@ -173,8 +173,36 @@ final class TranslationLayerController {
     if persists { SettingsStore.saveLayerWindowRules(windowRules, namespace: namespace) }
   }
 
-  private func hint(_ text: String, at point: CGPoint) {
-    pill.flash(text: text, near: LayerScreenGeometry.appKitPoint(fromTopLeft: point))
+  private func hint(_ text: String) {
+    hints.show(text, for: 1.2)
+    logHint()
+  }
+
+  private func logHint() {
+    log(
+      "layer-hint visible=\(hints.isVisible) alpha=\(hints.alphaValue) frame=\(Int(hints.frame.minX)),\(Int(hints.frame.minY)),\(Int(hints.frame.width))x\(Int(hints.frame.height))"
+        + " screens=\(NSScreen.screens.map { "\(Int($0.frame.width))x\(Int($0.frame.height))" })")
+  }
+
+  /// A failed request is said once and stays until it is pressed, which retries every pane
+  /// that failed, or until a translation succeeds; without a model service it is said for a
+  /// moment (§二 失败).
+  private func updateFailureHint() {
+    let failure = sessions.lazy.compactMap(\.failure).first
+    guard failure != shownFailure else { return }
+    let previous = shownFailure
+    shownFailure = failure
+    switch failure {
+    case .notConfigured:
+      hints.show("还没有模型服务", for: 3)
+    case .some:
+      hints.show("翻译失败 · 点按重试", for: nil) { [weak self] in
+        guard let self else { return }
+        for session in sessions where session.failure != nil { session.retry() }
+      }
+    case nil:
+      if previous != nil, previous != .notConfigured, hints.text == "翻译失败 · 点按重试" { hints.hide() }
+    }
   }
 
   private func enableTree(of application: LayerApplication) {
@@ -204,6 +232,7 @@ final class TranslationLayerController {
       session.close()
     }
     sessions.removeAll(where: \.isFinished)
+    updateFailureHint()
   }
 
   /// When the windows of a newly active app have finished animating into place.
@@ -267,9 +296,13 @@ final class TranslationLayerController {
   }
 
   private func applyDiscovery(
-    _ found: [(application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode, site: String?)]
+    _ discovered: [(application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode, site: String?)]
   ) {
     discovering = false
+    // ⌥⇧D may have stopped a window while this search ran; only what is still on counts.
+    let found = discovered.filter { item in
+      windowRules.contains { $0.applies(to: item.application.bundleIdentifier, site: item.site) }
+    }
     for session in sessions where session.translatesAll
       && !found.contains(where: { $0.pane.isSameElement(as: session.pane) })
     {
@@ -309,7 +342,7 @@ final class TranslationLayerController {
   /// A paragraph ⌥D asked for is already in the user's own language.
   fileprivate func noteAlreadyMine(at frame: CGRect) {
     let language = settings().requestLanguages.my
-    hint("这一段已经是\(language)", at: CGPoint(x: frame.midX, y: frame.maxY))
+    hint("这一段已经是\(language)")
   }
 }
 
@@ -405,12 +438,9 @@ final class LayerPaneSession {
   /// Every paragraph of the last read, to find the one under the pointer without reading again.
   private var readBlocks: [LayerBlock] = []
   private var readNodes: [AccessibilityLayerNode] = []
-  /// The element each shown paragraph was read from, in the order of `blocks`.
-  private var shownNodes: [AccessibilityLayerNode] = []
   private unowned let owner: TranslationLayerController
 
   private let overlay = LayerOverlayPanel()
-  private let status = LayerStatusPanel()
   private(set) var paneFrame: CGRect = .zero
   private var windowNumber: CGWindowID?
   private(set) var isOnScreen = false
@@ -425,7 +455,7 @@ final class LayerPaneSession {
   private var needsRead = true
   private var lastRead = Date.distantPast
   private var translating: Task<Void, Never>?
-  private var failure: LayerTranslationError?
+  private(set) var failure: LayerTranslationError?
   private var styles: [String: LayerTextStyle] = [:]
   private var peekCandidate: (index: Int, since: Date)?
   /// The paragraph under the pointer when translations first appeared: the pointer is there
@@ -445,10 +475,12 @@ final class LayerPaneSession {
     self.window = window
     self.pane = pane
     self.owner = owner
-    status.onRetry = { [weak self] in
-      self?.failure = nil
-      self?.translatePending()
-    }
+  }
+
+  /// Tries the paragraphs whose request failed again (§二 失败).
+  func retry() {
+    failure = nil
+    translatePending()
   }
 
   func close() {
@@ -456,7 +488,6 @@ final class LayerPaneSession {
     motion?.stop()
     motion = nil
     overlay.orderOut(nil)
-    status.orderOut(nil)
     isFinished = true
   }
 
@@ -579,7 +610,6 @@ final class LayerPaneSession {
     guard let windowNumber, windows.contains(where: { $0.number == windowNumber }) else {
       isOnScreen = false
       overlay.orderOut(nil)
-      status.orderOut(nil)
       motion?.stop()
       motion = nil
       return
@@ -701,7 +731,6 @@ final class LayerPaneSession {
       owner.noteAlreadyMine(at: block.frame)
     }
     blocks = shown.map { newBlocks[$0] }
-    shownNodes = shown.map { nodes[$0] }
     if let windowFrame = window.frame {
       motion?.resetBaseline(pane: frame.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY))
     }
@@ -730,18 +759,11 @@ final class LayerPaneSession {
   }
 
   private func translatePending() {
-    guard translating == nil, failure == nil else {
-      updateStatus()
-      return
-    }
+    guard translating == nil, failure == nil else { return }
     let texts = Array(Set(pendingBlocks.map(\.maskedText)))
-    guard !texts.isEmpty else {
-      updateStatus()
-      return
-    }
+    guard !texts.isEmpty else { return }
     let settings = owner.currentSettings
     let service = owner.translationService
-    updateStatus()
     translating = Task { [weak self] in
       for batch in LayerTranslationRequest.batches(of: texts) {
         do {
@@ -763,7 +785,7 @@ final class LayerPaneSession {
       }
       guard let self else { return }
       translating = nil
-      updateStatus()
+      redraw()
       // Paragraphs that appeared while this batch was out.
       if failure == nil, !pendingBlocks.isEmpty { translatePending() }
     }
@@ -782,11 +804,8 @@ final class LayerPaneSession {
         text: text, lineHeight: block.lineHeight, style: styles[block.maskedText] ?? paper)
     }
     overlay.overlayView.show(drawings, scale: scale)
-    // Paragraphs ⌥D asked for breathe until their translation arrives (§二 等待).
-    let waiting = failure == nil
-      ? zip(blocks, shownNodes).filter { block, node in
-        owner.translations[block.maskedText] == nil && picked.contains { $0.matches(block, node: node) }
-      }.map(\.0) : []
+    // Every paragraph waiting for its translation breathes (§二 等待, §五 等待).
+    let waiting = failure == nil ? pendingBlocks : []
     overlay.overlayView.setPending(waiting.map { $0.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) })
     if isOnScreen, !waiting.isEmpty { overlay.orderFront(nil) }
     let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
@@ -802,26 +821,6 @@ final class LayerPaneSession {
         + " visible=\(overlay.isVisible) alpha=\(overlay.alphaValue) settled=\(settled)"
         + " frame=\(Int(overlay.frame.minX)),\(Int(overlay.frame.minY)),\(Int(overlay.frame.width))x\(Int(overlay.frame.height))"
         + " paper=\(drawings.first?.style.isPaper ?? true)")
-    updateStatus()
-  }
-
-  private func updateStatus() {
-    guard isOnScreen else {
-      status.orderOut(nil)
-      return
-    }
-    let pane = LayerScreenGeometry.appKitRect(fromTopLeft: paneFrame)
-    if let failure {
-      status.show(
-        text: failure == .notConfigured ? "还没有模型服务" : "翻译失败 · 点按重试",
-        retryable: failure != .notConfigured, in: pane)
-    } else if translating != nil, translatesAll {
-      // A paragraph ⌥D asked for says it is waiting by breathing (§二); the pill is for windows.
-      let count = Set(pendingBlocks.map(\.maskedText)).count
-      if count > 0 { status.show(text: "翻译中 · \(count) 条", retryable: false, in: pane) }
-    } else {
-      status.orderOut(nil)
-    }
   }
 
   // MARK: Showing the original

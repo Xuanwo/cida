@@ -236,11 +236,13 @@ customElements.define("cida-status-menu", CidaStatusMenu);
 //   once-two       ⌥D on another message: both translated, the rest original
 //   once-peek      the pointer rests on a translation: its original shows
 //   once-restore   ⌥D on a translated message: it turns back, the other stays
-//   once-none      ⌥D with no paragraph under the pointer: a hint by the pointer
-//   window-on      ⌥⇧D: the window is outlined and the status pill says how to stop
-//   translating    a new message waits while the rest is translated
+//   once-none      ⌥D with no paragraph under the pointer: the hint pill says so
+//   once-failed    the request failed: the paragraph stays original, the hint offers a retry
+//   window-on      ⌥⇧D: the window is outlined and the hint pill says how to stop
+//   translating    a new message breathes while it waits; the rest is translated
 //   window-one-original  ⌥D inside the window turns one message back
-//   window-off     ⌥⇧D again: translations fade, the pill says it stopped
+//   window-off     ⌥⇧D again: translations fade, the hint pill says it stopped
+// Every message sits in the hint pill where the panel and the capture hint appear.
 class CidaLayerScene extends HTMLElement {
   connectedCallback() {
     const app = this.getAttribute("app") ?? "chat";
@@ -252,7 +254,15 @@ class CidaLayerScene extends HTMLElement {
     scene.dataset.state = this.getAttribute("state");
     const body = app === "chat" ? this.chat(layer, wordmark, paper) : this.browser(layer, paper);
     const outlined = layer === "window-on" ? " data-outline" : "";
-    scene.innerHTML = `<div class="mock-window"${outlined}>${body}</div>`;
+    // What Cida says, at the panel's height (spec/translation-layer.md §五 提示胶囊).
+    const hint = {
+      "once-none": "这里没有可以翻译的文字",
+      "once-failed": "翻译失败 · 点按重试",
+      "window-on": "翻译整个窗口 · Slack · 再按 ⌥⇧D 停止",
+      "window-off": "已停止翻译这个窗口",
+    }[layer];
+    const pill = hint ? `<div class="capture-hint">${wordmark}<span>${hint}</span></div>` : "";
+    scene.innerHTML = `<div class="mock-window"${outlined}>${body}</div>${pill}`;
     this.replaceWith(scene);
     // Measure after the page and its fonts settle, and again whenever the page is resized
     // (the renderer resizes it to the board before taking snapshots).
@@ -266,7 +276,7 @@ class CidaLayerScene extends HTMLElement {
   // around the element marked data-outline.
   placeMarks(scene, wordmark) {
     const origin = scene.getBoundingClientRect();
-    scene.querySelectorAll(".layer-outline, .pointer.placed, .layer-tip").forEach((element) => element.remove());
+    scene.querySelectorAll(".layer-outline, .pointer.placed").forEach((element) => element.remove());
     const outlined = scene.querySelector("[data-outline]");
     if (outlined) {
       const r = outlined.getBoundingClientRect();
@@ -286,13 +296,6 @@ class CidaLayerScene extends HTMLElement {
     pointer.className = "pointer placed";
     Object.assign(pointer.style, { left: `${x}px`, top: `${y}px` });
     scene.appendChild(pointer);
-    if (target.dataset.pointer) {
-      const tip = document.createElement("div");
-      tip.className = "capture-hint layer-tip";
-      tip.innerHTML = `${wordmark}<span>${target.dataset.pointer}</span>`;
-      Object.assign(tip.style, { left: `${x + 18}px`, top: `${y + 24}px` });
-      scene.appendChild(tip);
-    }
   }
 
   chat(layer, wordmark, paper) {
@@ -321,7 +324,7 @@ class CidaLayerScene extends HTMLElement {
     }[layer] ?? [];
     const pending = { "once-pending": 2, translating: 4 }[layer];
     const peek = { "once-peek": 2 }[layer];
-    const pointed = { "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-peek": 2, "once-restore": 2, "window-one-original": 2 }[layer];
+    const pointed = { "once-failed": 2, "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-peek": 2, "once-restore": 2, "window-one-original": 2 }[layer];
     const card = (text) => (paper ? `<span class="layer-card">${text}</span>` : text);
     const rows = messages.map(([who, time, color, original, translation], index) => {
       let text = original;
@@ -332,12 +335,8 @@ class CidaLayerScene extends HTMLElement {
       return `<div class="chat-msg"><i class="avatar" style="background: ${color}"></i>
         <div><div class="who">${who}<time>${time}</time></div><div class="text"${pointer}>${text}</div></div></div>`;
     }).join("");
-    const empty = layer === "once-none" ? `<div class="chat-empty" data-pointer="这里没有可以翻译的文字"></div>` : "";
-    const status = {
-      translating: `<div class="layer-status">${wordmark}<span>翻译中 · 1 条</span></div>`,
-      "window-on": `<div class="layer-status">${wordmark}<span>翻译整个窗口 · Slack · 再按 ⌥⇧D 停止</span></div>`,
-      "window-off": `<div class="layer-status">${wordmark}<span>已停止翻译这个窗口</span></div>`,
-    }[layer] ?? "";
+    const empty = layer === "once-none" ? `<div class="chat-empty" data-pointer></div>` : "";
+    const status = "";
     const regions = "";
     return `
       <div class="chat-top"><div class="mock-lights"><i></i><i></i><i></i></div><div class="search">搜索 Storage Team</div></div>

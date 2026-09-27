@@ -236,7 +236,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
       "Only the paragraph pressed on turns back")
 
-    // ⌥⇧D: the whole window.
+    // ⌥⇧D: the whole window. (Its hint lasts 2 s, shorter than a synthesized key press takes
+    // to return here while the host's caret blinks; TranslationLayerTests places the pill.)
     press(on: 2, wholeWindow: true)
     XCTAssertNotNil(
       wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_1") && $0.contains("CIDA_LAYER_TRANSLATED_2") },
@@ -260,7 +261,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_") }, "The whole window comes back after a relaunch")
     source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
     source.press("d", modifierFlags: [.option, .shift])
-    XCTAssertNotNil(wait(timeout: 10) { $0.isEmpty }, "⌥⇧D again stops it")
+    XCTAssertNotNil(wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_") }, "⌥⇧D again stops it")
   }
 
   /// `Design/spec/configuration.md` §四: Settings starts with the onboarding card, copies the

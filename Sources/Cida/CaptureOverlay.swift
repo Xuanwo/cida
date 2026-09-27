@@ -356,26 +356,12 @@ extension CaptureGeometry {
   }
 }
 
-/// The pill at the panel's height: the wordmark, then what to do.
+/// The capture's words in the hint pill.
 struct CaptureHint: View {
-  /// Room around the pill for its shadow inside the hosting view.
-  static let shadowMargin: CGFloat = 40
+  static let shadowMargin = CidaHintPill.shadowMargin
 
   var body: some View {
-    HStack(spacing: 12) {
-      CidaWordmark()
-      Text("拖动框选要翻译的文字 · Esc 取消")
-        .font(CidaDesign.ui(12.5, weight: .medium))
-        .foregroundStyle(CidaDesign.textControl)
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 8)
-    .background(CidaDesign.surface, in: Capsule())
-    .overlay { Capsule().strokeBorder(Color.black.opacity(0x12 / 255), lineWidth: 1) }
-    .shadow(color: CidaDesign.textPrimary.opacity(0x14 / 255), radius: 3, y: 2)
-    .shadow(color: CidaDesign.textPrimary.opacity(0x30 / 255), radius: 36, y: 28)
-    .padding(Self.shadowMargin)
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("capture-overlay-hint")
+    CidaHintPill(text: "拖动框选要翻译的文字 · Esc 取消")
+      .accessibilityIdentifier("capture-overlay-hint")
   }
 }

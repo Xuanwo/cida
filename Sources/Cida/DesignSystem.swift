@@ -343,6 +343,33 @@ struct WindowSurface<Content: View>: View {
   }
 }
 
+/// Where Cida says something outside the panel: the wordmark, then one sentence, in a pill
+/// whose top edge sits where the panel's does (`Design/spec/panel.md` §一 截图翻译,
+/// `Design/spec/translation-layer.md` §五 提示胶囊).
+struct CidaHintPill: View {
+  /// Room around the pill for its shadow inside the hosting view.
+  static let shadowMargin: CGFloat = 40
+  let text: String
+
+  var body: some View {
+    HStack(spacing: 12) {
+      CidaWordmark()
+      Text(text)
+        .font(CidaDesign.ui(12.5, weight: .medium))
+        .foregroundStyle(CidaDesign.textControl)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 8)
+    .background(CidaDesign.surface, in: Capsule())
+    .overlay { Capsule().strokeBorder(Color.black.opacity(0x12 / 255), lineWidth: 1) }
+    .shadow(color: CidaDesign.textPrimary.opacity(0x14 / 255), radius: 3, y: 2)
+    .shadow(color: CidaDesign.textPrimary.opacity(0x30 / 255), radius: 36, y: 28)
+    .contentShape(Capsule())
+    .padding(Self.shadowMargin)
+    .accessibilityElement(children: .combine)
+  }
+}
+
 struct Hairline: View {
   var body: some View {
     CidaDesign.border.frame(height: 1)

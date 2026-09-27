@@ -915,8 +915,6 @@ body {
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
-/* A hint by the pointer when there is nothing under it to translate. */
-.layer-tip { top: auto; transform: none; }
 .chat-empty { height: 120px; margin: 0 20px; }
 /* ⌥⇧D: the window outlined for a moment when it starts. */
 .layer-outline { position: absolute; border: 1.5px solid var(--accent); border-radius: 15px; pointer-events: none; }

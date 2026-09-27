@@ -586,6 +586,22 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(LayerMotionEstimator.shift(from: rows(withThumb(at: 100)), to: rows(withThumb(at: 130))), 0)
   }
 
+  /// Cida says everything in one place (§五 提示胶囊): the screen under the pointer, centred,
+  /// the pill's top edge where the panel's is.
+  func testTheLayerSpeaksWhereThePanelAppears() throws {
+    let panel = LayerHintPanel()
+    defer { panel.orderOut(nil) }
+    panel.show("已停止翻译这个窗口", for: nil)
+    let mouse = NSEvent.mouseLocation
+    let screen = try XCTUnwrap(NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main).frame
+    let pill = panel.frame.insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
+    XCTAssertEqual(pill.midX, screen.midX, accuracy: 1)
+    XCTAssertEqual(pill.maxY, screen.minY + screen.height * (1 - CidaDesign.Panel.topRatio), accuracy: 1)
+    XCTAssertEqual(panel.text, "已停止翻译这个窗口")
+    panel.hide()
+    XCTAssertNil(panel.text)
+  }
+
   func testOnlyWindowsInFrontCoverAPaneAndWholeDisplayOverlaysDoNot() {
     let own = ProcessInfo.processInfo.processIdentifier
     let display = CGRect(x: 0, y: 0, width: 1512, height: 982)
