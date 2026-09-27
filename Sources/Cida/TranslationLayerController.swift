@@ -152,7 +152,7 @@ final class TranslationLayerController {
         session.close()
       }
       sessions.removeAll(where: \.isFinished)
-      hints.show("已停止翻译这个窗口", for: 1.5)
+      hints.show("已停止翻译这个窗口", for: LayerHintPanel.briefSeconds)
       log("layer-window-off app=\(application.bundleIdentifier)")
       return
     }
@@ -163,7 +163,7 @@ final class TranslationLayerController {
     saveWindowRules()
     outline.flash(around: frame)
     let stop = settings().layerShortcut.addingShift.displayText
-    hints.show("翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止", for: 2)
+    hints.show("翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止", for: LayerHintPanel.instructiveSeconds)
     logHint()
     log("layer-window-on app=\(application.bundleIdentifier)")
     discover()
@@ -174,7 +174,7 @@ final class TranslationLayerController {
   }
 
   private func hint(_ text: String) {
-    hints.show(text, for: 1.2)
+    hints.show(text, for: LayerHintPanel.briefSeconds)
     logHint()
   }
 
@@ -185,8 +185,9 @@ final class TranslationLayerController {
   }
 
   /// A failed request is said once and stays until it is pressed, which retries every pane
-  /// that failed, or until a translation succeeds; without a model service it is said for a
-  /// moment (§二 失败).
+  /// that failed, or until a translation succeeds. The shortcuts show the panel's welcome
+  /// without a model service, so that is said here only when the service is removed while a
+  /// window is translated whole (§二 失败).
   private func updateFailureHint() {
     let failure = sessions.lazy.compactMap(\.failure).first
     guard failure != shownFailure else { return }
@@ -194,7 +195,7 @@ final class TranslationLayerController {
     shownFailure = failure
     switch failure {
     case .notConfigured:
-      hints.show("还没有模型服务", for: 3)
+      hints.show("还没有模型服务", for: LayerHintPanel.briefSeconds)
     case .some:
       hints.show("翻译失败 · 点按重试", for: nil) { [weak self] in
         guard let self else { return }

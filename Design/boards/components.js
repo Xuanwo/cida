@@ -231,7 +231,7 @@ customElements.define("cida-status-menu", CidaStatusMenu);
 // <cida-layer-scene app="chat|browser" layer="…" paper>. paper draws translations on
 // paper cards, as without the Screen Recording permission. Chat layers, as a walk through:
 //   once-pointing  the pointer rests on a message; nothing yet
-//   once-pending   ⌥D: that message breathes on accent-soft while it is translated
+//   once-pending   ⌥D: that message breathes on accent while it is translated
 //   once-done      it reads in place, among the originals
 //   once-two       ⌥D on another message: both translated, the rest original
 //   once-peek      the pointer rests on a translation: its original shows
@@ -258,7 +258,7 @@ class CidaLayerScene extends HTMLElement {
     const hint = {
       "once-none": "这里没有可以翻译的文字",
       "once-failed": "翻译失败 · 点按重试",
-      "window-on": "翻译整个窗口 · Slack · 再按 ⌥⇧D 停止",
+      "window-on": "翻译整个窗口 · Slack · 再按 ⌥ ⇧ D 停止",
       "window-off": "已停止翻译这个窗口",
     }[layer];
     const pill = hint ? `<div class="capture-hint">${wordmark}<span>${hint}</span></div>` : "";
@@ -316,28 +316,25 @@ class CidaLayerScene extends HTMLElement {
         "Could it be the new prefetch default? Let's pair on it after standup.",
         "会不会是新的预取默认值导致的？站会后我们一起看看。"],
     ];
-    // Which messages read as translations, which one breathes, which shows its original.
+    // Which messages read as translations and which one breathes; the one peeked at shows its
+    // original, so it is simply not translated here.
     const all = [0, 1, 2, 3, 4];
     const translated = {
       "once-done": [2], "once-two": [2, 4], "once-peek": [4], "once-restore": [4],
       "window-on": all, translating: [0, 1, 2, 3], "window-one-original": [0, 1, 3, 4],
     }[layer] ?? [];
     const pending = { "once-pending": 2, translating: 4 }[layer];
-    const peek = { "once-peek": 2 }[layer];
     const pointed = { "once-failed": 2, "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-peek": 2, "once-restore": 2, "window-one-original": 2 }[layer];
     const card = (text) => (paper ? `<span class="layer-card">${text}</span>` : text);
     const rows = messages.map(([who, time, color, original, translation], index) => {
       let text = original;
       if (translated.includes(index)) text = card(translation);
       if (index === pending) text = `<span class="layer-pending">${original}</span>`;
-      if (index === peek) text = `<span class="layer-peek">${original}</span>`;
       const pointer = index === pointed ? " data-pointer" : "";
       return `<div class="chat-msg"><i class="avatar" style="background: ${color}"></i>
         <div><div class="who">${who}<time>${time}</time></div><div class="text"${pointer}>${text}</div></div></div>`;
     }).join("");
     const empty = layer === "once-none" ? `<div class="chat-empty" data-pointer></div>` : "";
-    const status = "";
-    const regions = "";
     return `
       <div class="chat-top"><div class="mock-lights"><i></i><i></i><i></i></div><div class="search">搜索 Storage Team</div></div>
       <div class="chat-body">
@@ -347,7 +344,7 @@ class CidaLayerScene extends HTMLElement {
           <small>私信</small><span>Maya Chen</span><span>Leo Park</span><span>Sam Rivera</span></div>
         <div class="chat-main">
           <div class="chat-header"># storage-eng</div>
-          <div class="chat-messages"><div class="chat-day">今天</div>${rows}${empty}${regions}${status}</div>
+          <div class="chat-messages"><div class="chat-day">今天</div>${rows}${empty}</div>
           <div class="chat-composer">发消息到 #storage-eng</div>
         </div>
       </div>`;
@@ -357,7 +354,6 @@ class CidaLayerScene extends HTMLElement {
     const translated = layer === "translated";
     const t = (original, translation) =>
       translated ? (paper ? `<span class="layer-card">${translation}</span>` : translation) : original;
-    const regions = "";
     return `
       <div class="browser-tabs"><div class="mock-lights"><i></i><i></i><i></i></div><div class="browser-tab">Why we rewrote the file format</div></div>
       <div class="browser-toolbar"><div class="address">example.dev/blog/file-format</div></div>
@@ -374,7 +370,6 @@ class CidaLayerScene extends HTMLElement {
             "在我们的基准测试中，随机读取最多快了 60 倍，全表扫描没有任何退步。")}</p>
         </div>
         <div class="page-toc"><b>ON THIS PAGE</b>Background<br>The new layout<br>Benchmarks<br>What's next</div>
-        ${regions}
       </div>`;
   }
 }

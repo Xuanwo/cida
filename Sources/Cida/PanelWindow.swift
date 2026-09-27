@@ -147,7 +147,7 @@ final class PanelController {
       heightBudget = PanelHeightBudget(visibleScreenHeight: screen.visibleFrame.height)
       applyRootView()
       let visible = screen.visibleFrame
-      topEdge = visible.maxY - floor(visible.height * CidaDesign.Panel.topRatio)
+      topEdge = CidaDesign.Panel.topEdge(in: visible)
       let origin = NSPoint(
         x: floor(visible.midX - panel.frame.width / 2),
         y: topEdge! - panel.frame.height

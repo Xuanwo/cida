@@ -781,7 +781,8 @@ body {
   height: 646px;
   overflow: hidden;
   border: 1px solid #00000024;
-  border-radius: 12px;
+  /* A titled window on macOS 26. */
+  border-radius: 16px;
   background: #FFFFFF;
   box-shadow: 0 20px 50px #0000002A;
   font-family: var(--font-ui);
@@ -907,17 +908,19 @@ body {
 .page-toc b { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.06em; color: #202124; }
 
 /* The layer's own parts. */
-/* ⌥D: the paragraph breathes on accent-soft while its translation is on the way. */
+/* ⌥D: the paragraph breathes on accent while its translation is on the way, in the shape
+   of the paper card that may replace it. */
 .layer-pending {
-  border-radius: 4px;
+  display: block;
+  margin: -3px -8px;
+  padding: 3px 8px;
+  border-radius: var(--radius-chip);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
 }
 .chat-empty { height: 120px; margin: 0 20px; }
-/* ⌥⇧D: the window outlined for a moment when it starts. */
-.layer-outline { position: absolute; border: 1.5px solid var(--accent); border-radius: 15px; pointer-events: none; }
+/* ⌥⇧D: the window outlined for a moment when it starts, 3px outside and concentric with
+   its 16px corners. */
+.layer-outline { position: absolute; border: 1.5px solid var(--accent); border-radius: 19px; pointer-events: none; }
 
 /* Without Screen Recording there is no background to sample: translations sit on paper. */
 .layer-card {
@@ -928,25 +931,6 @@ body {
   border-radius: var(--radius-chip);
   background: var(--surface-paper);
   color: var(--text-ink);
-}
-/* A block the pointer rests on: the translation has faded to show the original. */
-.layer-peek { margin: -2px -6px; padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
-.layer-status {
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 12px;
-  border: 1px solid var(--panel-edge);
-  border-radius: 999px;
-  background: var(--surface);
-  box-shadow: 0 2px 6px #00000014, 0 10px 24px #1A1A1822;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-control);
-  white-space: nowrap;
 }
 .pointer {
   position: absolute;

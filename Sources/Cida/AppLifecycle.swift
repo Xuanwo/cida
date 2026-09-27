@@ -332,7 +332,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   /// The layer shortcut (`Design/spec/translation-layer.md` §二, §三): the paragraph under
   /// the pointer turns into its translation and back; with ⇧, the whole window. Without the
-  /// Accessibility permission it asks for it instead.
+  /// Accessibility permission it asks for it instead, and without a model service it shows
+  /// the panel's welcome.
   private func handleLayerShortcut(wholeWindow: Bool) {
     guard let translationLayer, !isCapturing, !isReadingSelection else { return }
     model.refreshSelectionAccess()
@@ -342,6 +343,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
     // The request may need the Keychain key, which the first show recovers.
     recoverAPIKeyIfNeeded()
+    // The welcome says what to do, as it does for ⌥Space and ⌥S (`spec/lifecycle.md` §三).
+    guard !model.needsModelConfiguration else {
+      lifecycleLog?.record("layer-needs-configuration")
+      showPanel()
+      return
+    }
     let point = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     lifecycleLog?.record(wholeWindow ? "layer-window-shortcut" : "layer-paragraph-shortcut")
     if wholeWindow {

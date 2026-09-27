@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Carbon.HIToolbox
 import XCTest
 
@@ -478,6 +479,33 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertFalse(style.isPaper)
   }
 
+  /// A wide paragraph of thin black strokes on white: blending pixels while shrinking the
+  /// crop painted the translation grey on a page one shade darker than the app's, which
+  /// showed as a box around it.
+  func testThinBlackTextOnWhiteSamplesExactlyBlackOnWhite() throws {
+    let width = 2600, height = 80
+    let context = try XCTUnwrap(CGContext(
+      data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    for x in stride(from: 20, to: 2580, by: 9) {
+      context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+      context.fill(CGRect(x: x, y: 20, width: 2, height: 40))
+      // Antialiased edges on either side of each stroke.
+      context.setFillColor(CGColor(red: 0.6, green: 0.6, blue: 0.6, alpha: 1))
+      context.fill(CGRect(x: x - 1, y: 20, width: 1, height: 40))
+      context.setFillColor(CGColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1))
+      context.fill(CGRect(x: x + 2, y: 20, width: 1, height: 40))
+    }
+    let style = try XCTUnwrap(LayerColorSampler.style(
+      in: try XCTUnwrap(context.makeImage()), pixelRect: CGRect(x: 0, y: 0, width: width, height: height)))
+    let paper = try XCTUnwrap(style.background.usingColorSpace(.sRGB))
+    let ink = try XCTUnwrap(style.foreground.usingColorSpace(.sRGB))
+    XCTAssertEqual(paper.redComponent, 1, accuracy: 0.001)
+    XCTAssertEqual(ink.redComponent, 0, accuracy: 0.001)
+  }
+
   // MARK: - The third shortcut
 
   func testTheLayerShortcutDefaultsToOptionDAndNoTwoShortcutsShareACombination() {
@@ -586,20 +614,33 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(LayerMotionEstimator.shift(from: rows(withThumb(at: 100)), to: rows(withThumb(at: 130))), 0)
   }
 
-  /// Cida says everything in one place (§五 提示胶囊): the screen under the pointer, centred,
-  /// the pill's top edge where the panel's is.
-  func testTheLayerSpeaksWhereThePanelAppears() throws {
-    let panel = LayerHintPanel()
-    defer { panel.orderOut(nil) }
-    panel.show("已停止翻译这个窗口", for: nil)
-    let mouse = NSEvent.mouseLocation
-    let screen = try XCTUnwrap(NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main).frame
-    let pill = panel.frame.insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
-    XCTAssertEqual(pill.midX, screen.midX, accuracy: 1)
-    XCTAssertEqual(pill.maxY, screen.minY + screen.height * (1 - CidaDesign.Panel.topRatio), accuracy: 1)
-    XCTAssertEqual(panel.text, "已停止翻译这个窗口")
-    panel.hide()
-    XCTAssertNil(panel.text)
+  /// Cida says everything in one place (§五 提示胶囊): centred on the screen under the
+  /// pointer, the pill's top edge on the panel's, which leaves out the menu bar and the Dock.
+  func testTheLayerAndCaptureHintsSitOnThePanelsTopEdge() throws {
+    let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    // A 37 pt menu bar and a 70 pt Dock on the left.
+    let visible = CGRect(x: 70, y: 0, width: 1442, height: 945)
+    let panelTop = CidaDesign.Panel.topEdge(in: visible)
+    XCTAssertEqual(panelTop, 945 - 189)
+
+    let size = CGSize(width: 380, height: 112)
+    let layerPill = LayerHintPanel.frame(fitting: size, in: visible)
+      .insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
+    XCTAssertEqual(layerPill.maxY, panelTop, accuracy: 1)
+    XCTAssertEqual(layerPill.midX, visible.midX, accuracy: 1)
+
+    let image = try XCTUnwrap(
+      CGContext(
+        data: nil, width: 4, height: 4, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )?.makeImage())
+    let overlay = CaptureOverlayView(frame: CGRect(origin: .zero, size: screen.size), image: image, veil: .paper)
+    overlay.hintAnchor = CidaDesign.Panel.topCenter(in: visible)
+    overlay.layoutSubtreeIfNeeded()
+    let hosting = try XCTUnwrap(overlay.subviews.first { $0 is NSHostingView<CaptureHint> })
+    let capturePill = hosting.frame.insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
+    XCTAssertEqual(capturePill.maxY, panelTop, accuracy: 1)
+    XCTAssertEqual(capturePill.midX, visible.midX, accuracy: 1)
   }
 
   func testOnlyWindowsInFrontCoverAPaneAndWholeDisplayOverlaysDoNot() {

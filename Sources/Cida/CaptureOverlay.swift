@@ -16,6 +16,8 @@ enum CaptureOverlay {
     let view = CaptureOverlayView(
       frame: NSRect(origin: .zero, size: screen.frame.size), image: image,
       veil: CaptureVeil(forScreen: image))
+    let anchor = CidaDesign.Panel.topCenter(in: screen.visibleFrame)
+    view.hintAnchor = CGPoint(x: anchor.x - screen.frame.minX, y: anchor.y - screen.frame.minY)
     panel.contentView = view
     defer { panel.orderOut(nil) }
     return await withCheckedContinuation { continuation in
@@ -163,6 +165,11 @@ final class CaptureOverlayView: NSView {
   private let ambientShadowLayer = CALayer()
   private let sheetLayer = CALayer()
   private let hint: NSHostingView<CaptureHint>
+  /// The middle of the panel's top edge on this screen, in this view's coordinates; the
+  /// whole view counts as the screen's free area when it is not set.
+  var hintAnchor: CGPoint? {
+    didSet { needsLayout = true }
+  }
 
   init(frame: NSRect, image: CGImage, veil: CaptureVeil) {
     self.image = image
@@ -235,13 +242,13 @@ final class CaptureOverlayView: NSView {
 
   override func layout() {
     super.layout()
-    // Centred, with the pill's top edge where the panel's is
+    // On the panel's axis, with the pill's top edge where the panel's is
     // (`panel-top-ratio`); the hosting view also holds the shadow margin.
     let size = hint.fittingSize
-    let pillTop = bounds.height * (1 - CidaDesign.Panel.topRatio)
+    let anchor = hintAnchor ?? CidaDesign.Panel.topCenter(in: bounds)
     hint.frame = NSRect(
-      x: floor((bounds.width - size.width) / 2),
-      y: floor(pillTop + CaptureHint.shadowMargin - size.height),
+      x: floor(anchor.x - size.width / 2),
+      y: floor(anchor.y + CaptureHint.shadowMargin - size.height),
       width: size.width, height: size.height)
     updateLayers()
   }

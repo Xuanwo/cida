@@ -9,7 +9,7 @@
 </head>
 <body>
 <!-- Rules: ../spec/translation-layer.md. The app windows are mock-ups; Cida's own parts
-     are the translations, the breathing underlay, the hint, the area outline and status pill. -->
+     are the translations, the breathing underlay, the window outline and the hint pill. -->
 <main class="board" data-board="translation-layer">
   <div class="board-title">States — 原处翻译</div>
   <p class="caption">规则见 spec/translation-layer.md。译文出现在原文的位置上,前后的消息都还在原处,带着上下文读。两个一键动作:⌥D 把指针下这一段换成译文,再按换回;⌥⇧D 把整个窗口换成译文,新消息自动翻译,再按停止。没有纸雾,不用点击。文字只取自应用的辅助功能树,应用本身不改动。下面的应用窗口是示意。</p>
@@ -20,7 +20,7 @@
   <div class="state-label">① 读到卡住的一句 — 指针停在这条消息上;按下之前什么都不显示</div>
   <cida-layer-scene state="layer-once-pointing" app="chat" layer="once-pointing"></cida-layer-scene>
 
-  <div class="state-label">② 按 ⌥D · 翻译中 — 这一段立即垫一层 accent(圆角 4,外扩 3pt),不透明度在 16% 与 7% 之间呼吸(motion-breathe-ms);原文照常可读</div>
+  <div class="state-label">② 按 ⌥D · 翻译中 — 这一段立即垫一层 accent,形状同纸片(左右各宽 8pt、上下各高 3pt,radius-chip),不透明度在 16% 与 7% 之间呼吸(motion-breathe-ms);原文照常可读</div>
   <cida-layer-scene state="layer-once-pending" app="chat" layer="once-pending"></cida-layer-scene>
 
   <div class="state-label">③ 换上 — 约 1.5 秒后译文画在原文的位置上,交叉淡入(motion-height-ms),底色同时淡出。整段一次换上;前后的消息仍是原文,带着上下文读</div>
@@ -29,16 +29,16 @@
   <div class="state-label">④ 再指一段再按 — 那一段也换成译文,已换好的保持不变;几段译文与原文穿插着读,一起跟随滚动</div>
   <cida-layer-scene state="layer-once-two" app="chat" layer="once-two"></cida-layer-scene>
 
-  <div class="state-label">⑤ 看一眼原文 — 指针在译文上停 300ms,这一段淡出露出原文(accent-soft 底);移开即恢复。不必换回</div>
+  <div class="state-label">⑤ 看一眼原文 — 指针在译文上停 300ms,这一段译文淡出(motion-height-ms),露出原文本身;移开即恢复。不必换回</div>
   <cida-layer-scene state="layer-once-peek" app="chat" layer="once-peek"></cida-layer-scene>
 
   <div class="state-label">⑥ 换回 — 指着一段译文再按 ⌥D,它淡回原文;另一段仍是译文。这就是管理:同一个键,没有别的入口。原文变了、段落删除或切换频道后,译文自然不再显示</div>
   <cida-layer-scene state="layer-once-restore" app="chat" layer="once-restore"></cida-layer-scene>
 
-  <div class="state-label">⑦ 指针下没有段落 — 提示胶囊「这里没有可以翻译的文字」,1.2 秒后淡出;读不到文字的应用改为「<应用名> 里读不到文字,可以用截图翻译 ⌥S」。辞达要说的话都在这里说:和面板、截图框选的提示同一位置与样式,指针所在屏幕、上沿与面板对齐</div>
+  <div class="state-label">⑦ 指针下没有段落 — 提示胶囊「这里没有可以翻译的文字」1.5 秒(各句与时长见 spec §五 的表)。辞达要说的话都在这里说:和面板、截图框选的提示同一位置与样式,指针所在屏幕的可见区域里与面板同一中线、同一上沿;淡入淡出 motion-icon-in-ms</div>
   <cida-layer-scene state="layer-once-none" app="chat" layer="once-none"></cida-layer-scene>
 
-  <div class="state-label">⑦′ 翻译失败 — 底色停止呼吸淡出,这一段保持原文;提示胶囊「翻译失败 · 点按重试」停留到点按重试或下一次成功,是原处翻译里唯一接收点击的地方;还没有模型服务时为「还没有模型服务」</div>
+  <div class="state-label">⑦′ 翻译失败 — 底色停止呼吸淡出,这一段保持原文;提示胶囊「翻译失败 · 点按重试」停留到点按重试或下一次成功,是原处翻译里唯一接收点击的地方。还没有模型服务时 ⌥D 显示面板的欢迎,不在这里说</div>
   <cida-layer-scene state="layer-once-failed" app="chat" layer="once-failed"></cida-layer-scene>
 
   <div class="state-label">⑧ 未授予屏幕录制 — 取不到原文的底色,译文画在纸片上(surface-paper、text-ink、radius-chip、panel-edge 描边);滚动时淡出,停下 150ms 后回来</div>
@@ -47,7 +47,7 @@
   <div class="divider"></div>
   <p class="caption">流程二 · 这门语言读不懂,要连续读:⌥⇧D 整个窗口</p>
 
-  <div class="state-label">⑨ 按 ⌥⇧D · 开始 — 窗口外沿闪一圈 1.5px accent 实线轮廓(150ms 淡入、停 600ms、300ms 淡出);提示胶囊「翻译整个窗口 · Slack · 再按 ⌥⇧D 停止」2 秒;窗口里所有外文段落先呼吸、再换成译文,按应用(网页按网站)记住。频道栏是导航树、频道名只有一个词,都保持原文</div>
+  <div class="state-label">⑨ 按 ⌥⇧D · 开始 — 窗口外 3pt 闪一圈 1.5px accent 实线轮廓,圆角 19,与窗口 16pt 的圆角同心(motion-height-ms 淡入、停 600ms、300ms 淡出);提示胶囊「翻译整个窗口 · Slack · 再按 ⌥ ⇧ D 停止」2.5 秒;窗口里所有外文段落先呼吸、再换成译文,按应用(网页按网站)记住。频道栏是导航树、频道名只有一个词,都保持原文</div>
   <cida-layer-scene state="layer-window-on" app="chat" layer="window-on"></cida-layer-scene>
 
   <div class="state-label">⑩ 新消息 — 先显示原文并垫上同样呼吸的底色,译好后整块一次换上;没有进度胶囊,「正在翻译」就显示在那条消息本身上</div>
@@ -56,7 +56,7 @@
   <div class="state-label">⑪ 窗口里换回一段 — 指着一段译文按 ⌥D,只有这一段换回原文,窗口照常翻译;翻错或不该翻的段落也这样处理</div>
   <cida-layer-scene state="layer-window-one-original" app="chat" layer="window-one-original"></cida-layer-scene>
 
-  <div class="state-label">⑫ 再按 ⌥⇧D · 停止 — 译文全部淡出,提示胶囊「已停止翻译这个窗口」1.5 秒</div>
+  <div class="state-label">⑫ 再按 ⌥⇧D · 停止 — 译文全部淡出(motion-height-ms),提示胶囊「已停止翻译这个窗口」1.5 秒</div>
   <cida-layer-scene state="layer-window-off" app="chat" layer="window-off"></cida-layer-scene>
 
   <div class="state-label">⑬ 网页 · 未授予屏幕录制 — 整页正文换成译文;导航与目录是纯链接,保持原样;按网站记住</div>

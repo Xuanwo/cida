@@ -89,6 +89,17 @@ enum CidaDesign {
     static let controlBarHeight: CGFloat = 50
     static let compactEditorHeight: CGFloat = 27
     static let composerLineHeight: CGFloat = 26
+
+    /// Where the panel's top edge sits on a screen, in AppKit coordinates: `panel-top-ratio`
+    /// down the part of the screen the menu bar and Dock leave free. The hint pills share it.
+    static func topEdge(in visibleFrame: CGRect) -> CGFloat {
+      visibleFrame.maxY - floor(visibleFrame.height * topRatio)
+    }
+
+    /// The middle of the panel's top edge: centred on the screen's free area.
+    static func topCenter(in visibleFrame: CGRect) -> CGPoint {
+      CGPoint(x: visibleFrame.midX, y: topEdge(in: visibleFrame))
+    }
   }
 
   /// The design's result typography (`font-size-result*` × `line-height-result*`,

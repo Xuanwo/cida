@@ -78,23 +78,33 @@ enum LayerColorSampler {
           bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
           bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.noneSkipLast.rawValue)
       else { return false }
+      // Skips pixels instead of blending them: a blended thin stroke turns black ink grey
+      // and pulls a white page a shade darker, and either shows around the translation.
+      context.interpolationQuality = .none
       context.draw(crop, in: CGRect(x: 0, y: 0, width: width, height: height))
       return true
     }
     guard drawn else { return nil }
-    var bins: [Int: (count: Int, r: Double, g: Double, b: Double)] = [:]
+    // Near colours count together; each group paints with its most common exact colour.
+    var exact: [UInt32: Int] = [:]
     for index in stride(from: 0, to: bytes.count, by: 4) {
-      let r = Int(bytes[index]), g = Int(bytes[index + 1]), b = Int(bytes[index + 2])
-      let key = (r / 24) * 121 + (g / 24) * 11 + b / 24
-      let previous = bins[key] ?? (0, 0, 0, 0)
-      bins[key] = (previous.count + 1, previous.r + Double(r), previous.g + Double(g), previous.b + Double(b))
+      let rgb = UInt32(bytes[index]) << 16 | UInt32(bytes[index + 1]) << 8 | UInt32(bytes[index + 2])
+      exact[rgb, default: 0] += 1
     }
-    let colors = bins.values.map { bin in
+    var groups: [Int: (count: Int, top: UInt32, topCount: Int)] = [:]
+    for (rgb, count) in exact {
+      let key = Int(rgb >> 16 & 0xFF) / 24 * 121 + Int(rgb >> 8 & 0xFF) / 24 * 11 + Int(rgb & 0xFF) / 24
+      var group = groups[key] ?? (0, rgb, 0)
+      group.count += count
+      if count > group.topCount { (group.top, group.topCount) = (rgb, count) }
+      groups[key] = group
+    }
+    let colors = groups.values.map { group in
       (
-        count: bin.count,
+        count: group.count,
         color: NSColor(
-          srgbRed: bin.r / Double(bin.count) / 255, green: bin.g / Double(bin.count) / 255,
-          blue: bin.b / Double(bin.count) / 255, alpha: 1)
+          srgbRed: CGFloat(group.top >> 16 & 0xFF) / 255, green: CGFloat(group.top >> 8 & 0xFF) / 255,
+          blue: CGFloat(group.top & 0xFF) / 255, alpha: 1)
       )
     }.sorted { $0.count > $1.count }
     guard let background = colors.first?.color else { return nil }
@@ -186,7 +196,7 @@ final class LayerOverlayView: NSView {
   }
 
   /// The paragraphs waiting for their translation (§二 等待), in this view's coordinates:
-  /// accent at 16%, breathing down to 7% over `motion-breathe-ms`.
+  /// accent at 16%, breathing down to 7% over `motion-breathe-ms`, in the paper card's shape.
   func setPending(_ frames: [CGRect]) {
     guard frames != pendingFrames else { return }
     pendingFrames = frames
@@ -195,8 +205,8 @@ final class LayerOverlayView: NSView {
     pendingLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
     for frame in frames {
       let underlay = CALayer()
-      underlay.frame = frame.insetBy(dx: -3, dy: -3)
-      underlay.cornerRadius = 4
+      underlay.frame = Self.cardFrame(around: frame)
+      underlay.cornerRadius = CidaDesign.Radius.chip
       underlay.cornerCurve = .continuous
       underlay.backgroundColor = CidaDesign.Palette.accent.appKit.withAlphaComponent(0.16).cgColor
       if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
@@ -277,12 +287,16 @@ final class LayerOverlayView: NSView {
     return drawings.firstIndex { $0.frame.contains(shifted) }
   }
 
+  /// A paragraph's paper card, and the underlay it replaces: 8 pt wider on each side, 3 pt
+  /// taller (§五).
+  static func cardFrame(around paragraph: CGRect) -> CGRect {
+    paragraph.insetBy(dx: -8, dy: -3)
+  }
+
   private func makeLayer(for drawing: LayerDrawing, scale: CGFloat) -> CALayer? {
     // Paper stands a little proud of the original; sampled paint covers it exactly.
-    let frame =
-      drawing.style.isPaper
-      ? drawing.frame.insetBy(dx: -8, dy: -3) : drawing.frame.insetBy(dx: -1, dy: -1)
-    let textFrame = drawing.style.isPaper ? drawing.frame.insetBy(dx: 0, dy: 0) : drawing.frame
+    let frame = drawing.style.isPaper ? Self.cardFrame(around: drawing.frame) : drawing.frame.insetBy(dx: -1, dy: -1)
+    let textFrame = drawing.frame
     let maximum = LayerTextFitting.fontSize(forLineHeight: drawing.lineHeight)
     guard
       let font = LayerTextFitting.fittedFont(
@@ -345,28 +359,42 @@ final class LayerHintPanel: NSPanel {
 
   override var canBecomeKey: Bool { false }
 
+  /// How long a statement stays (§五 提示胶囊): long enough to read one short line.
+  static let briefSeconds = 1.5
+  /// A statement that also says what to press next.
+  static let instructiveSeconds = 2.5
+
+  /// Centred on the screen's free area, the pill's top edge on the panel's; `size` includes
+  /// the room left for the shadow.
+  static func frame(fitting size: CGSize, in visibleFrame: CGRect) -> CGRect {
+    let anchor = CidaDesign.Panel.topCenter(in: visibleFrame)
+    return CGRect(
+      x: floor(anchor.x - size.width / 2), y: floor(anchor.y + CidaHintPill.shadowMargin - size.height),
+      width: size.width, height: size.height)
+  }
+
   /// Shows `text` for `seconds`, or until `hide` when nil; `onPress` makes the pill a button.
   func show(_ text: String, for seconds: Double?, onPress: (() -> Void)? = nil) {
+    let wasShowing = isVisible && self.text != nil
     self.text = text
     hosting.rootView = LayerHint(text: text, onPress: onPress)
     let mouse = NSEvent.mouseLocation
     let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
-    let frame = screen?.frame ?? .zero
-    let size = hosting.fittingSize
-    let pillTop = frame.minY + frame.height * (1 - CidaDesign.Panel.topRatio)
-    setFrame(
-      CGRect(
-        x: floor(frame.midX - size.width / 2), y: floor(pillTop + CidaHintPill.shadowMargin - size.height),
-        width: size.width, height: size.height),
-      display: true)
+    setFrame(Self.frame(fitting: hosting.fittingSize, in: screen?.visibleFrame ?? .zero), display: true)
     ignoresMouseEvents = onPress == nil
     hosting.setAccessibilityLabel(text)
     hosting.setAccessibilityValue(text)
     hosting.wantsLayer = true
     hosting.layer?.removeAllAnimations()
-    hosting.layer?.opacity = 1
     alphaValue = 1
     orderFrontRegardless()
+    // In and out like the capture hint (`motion-icon-in-ms`); a new message replaces the
+    // one showing without a flicker.
+    if wasShowing {
+      hosting.layer?.opacity = 1
+    } else {
+      fade(hosting.layer, from: 0, to: 1, duration: CidaMotion.resolvedDuration(CidaMotion.iconInSeconds, in: self))
+    }
     let shown = Date()
     shownAt = shown
     guard let seconds else { return }
@@ -381,7 +409,7 @@ final class LayerHintPanel: NSPanel {
     text = nil
     // A layer fade: a window's own alpha animation does not always run in a Release build
     // under automation, which left panels ordered in but transparent.
-    let duration = CidaMotion.resolvedDuration(0.3, in: self)
+    let duration = CidaMotion.resolvedDuration(CidaMotion.iconInSeconds, in: self)
     fade(hosting.layer, from: 1, to: 0, duration: duration)
     DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
       guard let self, shownAt == shown else { return }
@@ -415,10 +443,18 @@ struct LayerHint: View {
   }
 }
 
-/// A window outlined for a moment when its translation turns on (§三): 1.5 pt accent, fading
-/// in over 150 ms, holding 600 ms, fading out over 300 ms.
+/// A window outlined for a moment when its translation turns on (§三): 1.5 pt accent 3 pt
+/// outside the window, concentric with a macOS 26 window's corners, fading in over
+/// `motion-height-ms`, holding 600 ms, fading out over 300 ms.
 final class LayerOutlinePanel: NSPanel {
-  private let outline = CAShapeLayer()
+  /// A titled window's corner radius on macOS 26, measured in the VM; windows with a toolbar
+  /// are a little rounder, which only widens the gap at their corners.
+  static let windowCornerRadius: CGFloat = 16
+  static let gap: CGFloat = 3
+  static let lineWidth: CGFloat = 1.5
+
+  /// A border fills the panel's edge, so its outer edge is the panel's.
+  private let outline = CALayer()
 
   init() {
     super.init(
@@ -437,9 +473,10 @@ final class LayerOutlinePanel: NSPanel {
     view.wantsLayer = true
     view.layer?.addSublayer(outline)
     contentView = view
-    outline.fillColor = nil
-    outline.strokeColor = CidaDesign.Palette.accent.appKit.cgColor
-    outline.lineWidth = 1.5
+    outline.borderColor = CidaDesign.Palette.accent.appKit.cgColor
+    outline.borderWidth = Self.lineWidth
+    outline.cornerRadius = Self.windowCornerRadius + Self.gap
+    outline.cornerCurve = .continuous
     setAccessibilityIdentifier("translation-layer-outline")
   }
 
@@ -447,18 +484,16 @@ final class LayerOutlinePanel: NSPanel {
 
   /// Outlines `rect` (AppKit coordinates) just outside its edge.
   func flash(around rect: CGRect) {
-    let frame = rect.insetBy(dx: -3, dy: -3)
+    let frame = rect.insetBy(dx: -Self.gap, dy: -Self.gap)
     setFrame(frame, display: false)
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     outline.frame = CGRect(origin: .zero, size: frame.size)
-    outline.path = CGPath(
-      roundedRect: outline.frame.insetBy(dx: 0.75, dy: 0.75), cornerWidth: 12, cornerHeight: 12, transform: nil)
     CATransaction.commit()
     alphaValue = 1
     orderFrontRegardless()
     // Layer fades, for the reason `LayerHintPanel.hide` gives.
-    let fadeIn = CidaMotion.resolvedDuration(0.15, in: self)
+    let fadeIn = CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: self)
     let fadeOut = CidaMotion.resolvedDuration(0.3, in: self)
     outline.opacity = 0
     fade(outline, from: 0, to: 1, duration: fadeIn)
@@ -469,4 +504,3 @@ final class LayerOutlinePanel: NSPanel {
     }
   }
 }
-
