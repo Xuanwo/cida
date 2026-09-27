@@ -643,6 +643,19 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(capturePill.midX, visible.midX, accuracy: 1)
   }
 
+  /// Stage Manager keeps a window in the window list while it shows it as a thumbnail in the
+  /// strip; its tree still reports the full frame, so its translations would float where the
+  /// window no longer is (2026-09-28, Slack behind Claude on the user's Mac).
+  func testAWindowShownElsewhereThanItsTreeSaysIsNotInPlace() {
+    let slack = CGRect(x: 209, y: 30, width: 2316, height: 1410)
+    let front = LayerWindowInfo(number: 1, ownerPID: 900, bounds: slack, layer: 0)
+    let inTheStrip = LayerWindowInfo(
+      number: 1, ownerPID: 900, bounds: CGRect(x: -323, y: 578, width: 189, height: 161), layer: 0)
+    XCTAssertTrue(LayerWindowInfo.isInPlace(front, windowFrame: slack))
+    XCTAssertTrue(LayerWindowInfo.isInPlace(front, windowFrame: slack.offsetBy(dx: 1, dy: -1)))
+    XCTAssertFalse(LayerWindowInfo.isInPlace(inTheStrip, windowFrame: slack))
+  }
+
   func testOnlyWindowsInFrontCoverAPaneAndWholeDisplayOverlaysDoNot() {
     let own = ProcessInfo.processInfo.processIdentifier
     let display = CGRect(x: 0, y: 0, width: 1512, height: 982)

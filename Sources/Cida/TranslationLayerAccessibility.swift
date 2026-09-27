@@ -255,6 +255,13 @@ struct LayerWindowInfo: Equatable, Sendable {
     return covering
   }
 
+  /// Whether the window server shows `info` where the app's accessibility tree says its
+  /// window is: not while Stage Manager shrinks it into the strip, or while it minimizes.
+  static func isInPlace(_ info: LayerWindowInfo, windowFrame: CGRect) -> Bool {
+    abs(info.bounds.minX - windowFrame.minX) < 2 && abs(info.bounds.minY - windowFrame.minY) < 2
+      && abs(info.bounds.width - windowFrame.width) < 2
+  }
+
   /// Every display's frame in top-left screen points.
   static var displayFrames: [CGRect] {
     NSScreen.screens.map { screen in

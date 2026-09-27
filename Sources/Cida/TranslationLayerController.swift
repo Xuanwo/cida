@@ -105,7 +105,7 @@ final class TranslationLayerController {
       log("layer-paragraph-none app=\(application.bundleIdentifier)")
       return
     }
-    let session = sessions.first { $0.pane.isSameElement(as: pane) } ?? {
+    let session = sessions.first { !$0.isFinished && $0.pane.isSameElement(as: pane) } ?? {
       let session = LayerPaneSession(application: application, window: window, pane: pane, owner: self)
       session.site = site
       sessions.append(session)
@@ -310,7 +310,7 @@ final class TranslationLayerController {
       session.translatesAll = false
     }
     for (application, window, pane, site) in found {
-      if let session = sessions.first(where: { $0.pane.isSameElement(as: pane) }) {
+      if let session = sessions.first(where: { !$0.isFinished && $0.pane.isSameElement(as: pane) }) {
         if !session.translatesAll {
           session.translatesAll = true
           session.read()
@@ -443,6 +443,8 @@ final class LayerPaneSession {
 
   private let overlay = LayerOverlayPanel()
   private(set) var paneFrame: CGRect = .zero
+  /// The window's frame as its accessibility tree reports it, read with the pane's.
+  private var windowFrame: CGRect?
   private var windowNumber: CGWindowID?
   private(set) var isOnScreen = false
   private var blocks: [LayerBlock] = []
@@ -484,6 +486,8 @@ final class LayerPaneSession {
     translatePending()
   }
 
+  /// Ends the session for good: reads and requests still on their way find it finished and
+  /// never show the overlay again, or it would float over every app with no one to hide it.
   func close() {
     translating?.cancel()
     motion?.stop()
@@ -601,14 +605,18 @@ final class LayerPaneSession {
   private func placeOverWindow(_ windows: [LayerWindowInfo]) {
     let ownerPID = application.processIdentifier
     if windowNumber == nil || !windows.contains(where: { $0.number == windowNumber }) {
-      let windowFrame = window.frame ?? .zero
+      let frame = window.frame ?? .zero
+      windowFrame = frame
       windowNumber = windows.first {
-        $0.ownerPID == ownerPID && abs($0.bounds.minX - windowFrame.minX) < 2
-          && abs($0.bounds.minY - windowFrame.minY) < 2
-          && abs($0.bounds.width - windowFrame.width) < 2
+        $0.ownerPID == ownerPID && LayerWindowInfo.isInPlace($0, windowFrame: frame)
       }?.number
     }
-    guard let windowNumber, windows.contains(where: { $0.number == windowNumber }) else {
+    // Stage Manager keeps a window in the list while it shows it as a thumbnail in the strip,
+    // and a window is also elsewhere while it minimizes or Mission Control shows it: its
+    // paragraphs are not where the tree says, so nothing is drawn.
+    guard let windowNumber, let info = windows.first(where: { $0.number == windowNumber }),
+      windowFrame.map({ LayerWindowInfo.isInPlace(info, windowFrame: $0) }) ?? true
+    else {
       isOnScreen = false
       overlay.orderOut(nil)
       motion?.stop()
@@ -636,14 +644,17 @@ final class LayerPaneSession {
     isProbing = true
     let anchors = anchors
     let pane = pane
+    let window = window
     Task.detached(priority: .userInitiated) {
       let frames = anchors.map(\.currentFrame)
       let paneFrame = pane.currentFrame
+      let windowFrame = window.currentFrame
       await MainActor.run { [weak self] in
-        guard let self else { return }
+        guard let self, !isFinished else { return }
         isProbing = false
+        self.windowFrame = windowFrame
         guard let paneFrame else {
-          isFinished = true
+          close()
           return
         }
         if paneFrame != self.paneFrame {
@@ -676,7 +687,7 @@ final class LayerPaneSession {
     let translatesAll = translatesAll
     Task.detached(priority: .userInitiated) {
       guard let frame = pane.currentFrame else {
-        await MainActor.run { [weak self] in self?.isFinished = true }
+        await MainActor.run { [weak self] in self?.close() }
         return
       }
       let located = LayerBlockExtractor.located(in: pane, visible: frame)
@@ -708,6 +719,7 @@ final class LayerPaneSession {
     image: CGImage?, windowFrame: CGRect?
   ) {
     isReading = false
+    guard !isFinished else { return }
     lastRead = Date()
     place(frame)
     readBlocks = newBlocks
@@ -778,13 +790,14 @@ final class LayerPaneSession {
         } catch is CancellationError {
           return
         } catch {
-          guard let self else { return }
+          // A cancelled request may fail with its transport's own error.
+          guard let self, !Task.isCancelled else { return }
           failure = error as? LayerTranslationError ?? .mismatchedReply
           owner.log("layer-translation-failed")
           break
         }
       }
-      guard let self else { return }
+      guard let self, !Task.isCancelled else { return }
       translating = nil
       redraw()
       // Paragraphs that appeared while this batch was out.
@@ -793,6 +806,7 @@ final class LayerPaneSession {
   }
 
   private func redraw() {
+    guard !isFinished else { return }
     let scale = overlay.backingScaleFactor
     let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     let paper = LayerTextStyle.paper(darkAppearance: dark)
