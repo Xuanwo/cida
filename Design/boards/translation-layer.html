@@ -17,6 +17,9 @@
   <div class="state-label">① 配置 — 整屏纸雾,屏幕保持实时;一直翻译的 Slack 消息列表从纸雾里托起(同截图选区:圆角 8、面板阴影与描边),里面照常显示译文;指针下 Chrome 的正文是虚线预览,其中指针下的这一段再加细虚线框与 accent-soft 底;提示胶囊开头是适用范围 example.dev</div>
   <cida-layer-scene state="layer-configuring" layer="configuring"></cida-layer-scene>
 
+  <div class="state-label">①′ 配置 · 已有一段在翻译 — 点一下翻译的那一段仍在显示时,它和一直翻译的 pane 一样从纸雾里托起;指针在它上面时提示为「点击：不再翻译这一段」,点击即取消并关闭配置。一直翻译的 pane 仍用 ⇧ 点击停止</div>
+  <cida-layer-scene state="layer-configuring-once" layer="configuring-once"></cida-layer-scene>
+
   <div class="state-label">② 只翻这一段 · Chrome · 未授予屏幕录制 — 点击后配置关闭,只有这一段的译文盖在原文上;它离开屏幕、文字变化或按 Esc 就消失,什么都不记住</div>
   <cida-layer-scene state="layer-once-browser-paper" app="browser" layer="once" paper></cida-layer-scene>
 

@@ -58,8 +58,13 @@ final class TranslationLayerController {
       } as Any)
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-    ) { [weak self] _ in
-      MainActor.assumeIsolated { self?.discover() }
+    ) { [weak self] notification in
+      let pid = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?
+        .processIdentifier
+      MainActor.assumeIsolated {
+        self?.frontApplicationChanged(to: pid)
+        self?.discover()
+      }
     }
   }
 
@@ -83,18 +88,27 @@ final class TranslationLayerController {
     }
   }
 
+  /// The paragraph translated once while its translation shows, and the pane it is in, so
+  /// the configuration can lift it and offer to take it away (§二).
+  var translatedOnce: (paragraph: CGRect, pane: CGRect)? {
+    guard let oneOff, !oneOff.isFinished, oneOff.isOnScreen, let frame = oneOff.shownParagraphFrame else {
+      return nil
+    }
+    return (frame, oneOff.paneFrame)
+  }
+
   // MARK: One paragraph, once
 
   /// Translates one paragraph in place until it leaves the screen, its text changes or the
   /// user presses Escape (the configuration's plain click).
   func translateOnce(
-    paragraph: LayerBlock, pane: AccessibilityLayerNode, window: AccessibilityLayerNode,
-    application: LayerApplication
+    paragraph: LayerBlock, element: AccessibilityLayerNode, pane: AccessibilityLayerNode,
+    window: AccessibilityLayerNode, application: LayerApplication
   ) {
     dismissOneOff()
     let session = LayerPaneSession(
       application: application, window: window, pane: pane, selectionID: nil,
-      paragraph: paragraph.text, owner: self)
+      paragraph: (paragraph, element), owner: self)
     oneOff = session
     session.read()
   }
@@ -111,7 +125,12 @@ final class TranslationLayerController {
     if tickCount % 30 == 1 { discover() }
     // Nothing to follow: no window list, no pointer.
     guard !sessions.isEmpty || oneOff != nil else { return }
-    if tickCount % 5 == 1 { windows = LayerWindowInfo.onScreen() }
+    if let settle = windowsSettleAt, Date() >= settle {
+      windowsSettleAt = nil
+      windows = LayerWindowInfo.onScreen()
+    } else if tickCount % 5 == 1 {
+      windows = LayerWindowInfo.onScreen()
+    }
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     for session in allSessions {
       session.step(windows: windows, mouse: mouse)
@@ -122,6 +141,20 @@ final class TranslationLayerController {
     }
   }
 
+  /// When the windows of a newly active app have finished animating into place.
+  private var windowsSettleAt: Date?
+
+  /// Another app came to the front: its windows grow over the panes while they animate in,
+  /// faster than the window list can follow. The translations of every other app are hidden
+  /// at once and come back where they are still visible once the windows settle.
+  private func frontApplicationChanged(to pid: pid_t?) {
+    let settle = Date().addingTimeInterval(0.3)
+    windowsSettleAt = settle
+    for session in allSessions where session.application.processIdentifier != pid {
+      session.hideUntilWindowsSettle(settle)
+    }
+  }
+
   private var allSessions: [LayerPaneSession] {
     Array(sessions.values) + (oneOff.map { [$0] } ?? [])
   }
@@ -129,7 +162,7 @@ final class TranslationLayerController {
   private func noteScroll() {
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     for session in allSessions where session.paneFrame.contains(mouse) {
-      session.noteMotion()
+      session.noteScroll()
     }
   }
 
@@ -244,8 +277,11 @@ final class LayerPaneSession {
   let window: AccessibilityLayerNode
   let pane: AccessibilityLayerNode
   let selectionID: UUID?
-  /// Set for a paragraph translated once: only this text is drawn.
+  /// Set for a paragraph translated once: only this text, read from this element, is drawn.
+  /// Another paragraph with the same text elsewhere (a repeated alert) stays untouched.
   let paragraph: String?
+  private let paragraphElement: AccessibilityLayerNode?
+  private var paragraphFrame: CGRect?
   var site: String?
   private unowned let owner: TranslationLayerController
 
@@ -258,6 +294,8 @@ final class LayerPaneSession {
   private var anchors: [AccessibilityLayerNode] = []
   private var anchorFrames: [CGRect?] = []
   private var lastMotion: Date?
+  private var lastScroll: Date?
+  private var windowsSettle: Date?
   private var isReading = false
   private var isProbing = false
   private var needsRead = true
@@ -278,13 +316,16 @@ final class LayerPaneSession {
 
   init(
     application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode,
-    selectionID: UUID?, paragraph: String?, owner: TranslationLayerController
+    selectionID: UUID?, paragraph: (block: LayerBlock, element: AccessibilityLayerNode)?,
+    owner: TranslationLayerController
   ) {
     self.application = application
     self.window = window
     self.pane = pane
     self.selectionID = selectionID
-    self.paragraph = paragraph
+    self.paragraph = paragraph?.block.text
+    paragraphElement = paragraph?.element
+    paragraphFrame = paragraph?.block.frame
     self.owner = owner
     status.onRetry = { [weak self] in
       self?.failure = nil
@@ -303,6 +344,25 @@ final class LayerPaneSession {
 
   /// The content moved. Followed frame by frame when the screen can be read; hidden until it
   /// settles otherwise (§五).
+  /// Where the paragraph translated once is, while its translation is drawn.
+  var shownParagraphFrame: CGRect? {
+    guard paragraph != nil, !overlay.overlayView.drawings.isEmpty else { return nil }
+    return blocks.first?.frame
+  }
+
+  /// Hidden while another app's windows move in front (see `frontApplicationChanged`).
+  func hideUntilWindowsSettle(_ date: Date) {
+    if windowsSettle == nil, overlay.alphaValue > 0 { owner.log("layer-hidden-for-app-switch") }
+    windowsSettle = date
+    overlay.alphaValue = 0
+  }
+
+  /// The user scrolled over the pane.
+  func noteScroll() {
+    lastScroll = Date()
+    noteMotion()
+  }
+
   func noteMotion() {
     lastMotion = Date()
     needsRead = true
@@ -319,17 +379,21 @@ final class LayerPaneSession {
       return
     }
     let stream = LayerMotionStream()
+    stream.onLost = { [weak self] reason in self?.owner.log("layer-motion-unexplained \(reason)") }
     stream.onMotion = { [weak self] offset in
       guard let self else { return }
-      if offset == nil { owner.log("layer-motion-lost") }
-      lastMotion = Date()
       needsRead = true
       if let offset {
+        lastMotion = Date()
         overlay.overlayView.setOffset(offset)
-      } else {
-        // Replaced or too fast to follow: hide until it settles.
+      } else if let lastScroll, Date().timeIntervalSince(lastScroll) < 0.5 {
+        // Scrolled too fast to follow: hidden until it settles.
+        owner.log("layer-motion-lost")
+        lastMotion = Date()
         overlay.alphaValue = 0
       }
+      // Otherwise pixels changed in place (a hover toolbar, an animation, a new message): the
+      // translations stay and the next read of the tree puts them where the text is.
     }
     motion = stream
     owner.log("layer-motion-followed")
@@ -339,6 +403,13 @@ final class LayerPaneSession {
 
   func step(windows: [LayerWindowInfo], mouse: CGPoint) {
     guard !isFinished else { return }
+    if let settle = windowsSettle {
+      guard Date() >= settle else { return }
+      windowsSettle = nil
+      placeOverWindow(windows)
+      redraw()
+      return
+    }
     placeOverWindow(windows)
     probeMotion()
     let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
@@ -460,7 +531,15 @@ final class LayerPaneSession {
     var blocks = newBlocks
     var nodes = nodes
     if let paragraph {
-      let keep = blocks.indices.filter { blocks[$0].text == paragraph }
+      // The element it was read from, and the same line in it: an element may hold several
+      // hand-broken lines.
+      let matches = blocks.indices.filter {
+        blocks[$0].text == paragraph && paragraphElement.map(nodes[$0].isSameElement) ?? true
+      }
+      let last = paragraphFrame ?? .zero
+      let keep = matches.min { abs(blocks[$0].frame.midY - last.midY) < abs(blocks[$1].frame.midY - last.midY) }
+        .map { [$0] } ?? []
+      if let index = keep.first { paragraphFrame = blocks[index].frame }
       blocks = keep.map { blocks[$0] }
       nodes = keep.map { nodes[$0] }
       readsWithoutParagraph = blocks.isEmpty ? readsWithoutParagraph + 1 : 0

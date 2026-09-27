@@ -18,11 +18,10 @@ final class LayerConfiguration {
   private var hover: LayerHover?
   private var hoverTask: Task<Void, Never>?
   private var pendingPoint: CGPoint?
-  private var paneCache: (pane: AccessibilityLayerNode, blocks: [LayerBlock], read: Date)?
+  private var paneCache: (pane: AccessibilityLayerNode, blocks: [LayerBlock], nodes: [AccessibilityLayerNode], read: Date)?
   private var enabledTrees: Set<pid_t> = []
   private var lastChosen: LayerApplication?
-  /// The app in front when the configuration opened; it gets the front back on Esc.
-  private var previousApplication: NSRunningApplication?
+  private var keyTap: LayerKeyTap?
   private var finish: CheckedContinuation<Void, Never>?
   private var keyObservers: [NSObjectProtocol] = []
   private var loggedPane: CGRect?
@@ -54,19 +53,23 @@ final class LayerConfiguration {
     view.onKey = { [weak self] code in self?.controller.log("layer-configuration-key-down code=\(code)") }
     view.veilIsInk = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     refreshLifted()
-    // Cida comes to the front while the veil is up. A non-activating panel only borrows the
-    // keyboard from the app in front, and an input method's event tap hands it back on the
-    // first ⇧ (measured with WeType, 2026-09-27); Esc and ⏎ then reach that app instead.
-    let frontmost = NSWorkspace.shared.frontmostApplication
-    if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-      previousApplication = frontmost
-    }
-    NSApp.activate()
     panel.makeKeyAndOrderFront(nil)
     panel.makeFirstResponder(view)
     observeKeyWindow()
+    // The veil only borrows the keyboard from the app in front, which can take it back at any
+    // moment: on 2026-09-27 Slack did within two seconds, and so did an input method's ⇧.
+    // Esc and ⏎ are therefore taken before any app sees them while the veil is up.
+    keyTap = LayerKeyTap { [weak self] code in
+      guard let self else { return false }
+      switch code {
+      case 53: close(commit: false)
+      case 36, 76: close(commit: true)
+      default: return false
+      }
+      return true
+    }
     controller.log(
-      "layer-configuration-shown key=\(panel.isKeyWindow) active=\(NSApp.isActive) "
+      "layer-configuration-shown key=\(panel.isKeyWindow) tap=\(keyTap != nil) "
         + "frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
     view.fadeIn()
     pointerMoved(to: view.convert(panel.mouseLocationOutsideOfEventStream, from: nil))
@@ -91,19 +94,18 @@ final class LayerConfiguration {
   }
 
   private func close(commit: Bool) {
+    guard finish != nil else { return }
     controller.log("layer-configuration-closed commit=\(commit)")
+    keyTap?.stop()
+    keyTap = nil
     keyObservers.forEach(NotificationCenter.default.removeObserver)
     keyObservers = []
     hoverTask?.cancel()
-    if commit { controller.setSelections(working) }
-    panel.orderOut(nil)
-    // The front goes to the app last chosen, or back to the one the veil opened over.
-    let front = lastChosen.flatMap { NSRunningApplication(processIdentifier: $0.processIdentifier) }
-      ?? previousApplication
-    if let front {
-      NSApp.yieldActivation(to: front)
-      front.activate()
+    if commit {
+      controller.setSelections(working)
+      if let lastChosen { NSRunningApplication(processIdentifier: lastChosen.processIdentifier)?.activate() }
     }
+    panel.orderOut(nil)
     finish?.resume()
     finish = nil
   }
@@ -154,22 +156,26 @@ final class LayerConfiguration {
         let window = hit.window ?? pane.window, let windowFrame = window.frame
       else {
         return LayerHover.Resolved(pane: nil, paneFrame: nil, window: nil, windowFrame: info.bounds,
-          blocks: [], scope: .application, readsText: LayerPaneRule.holdsText(hit.window ?? hit))
+          blocks: [], nodes: [], scope: .application, readsText: LayerPaneRule.holdsText(hit.window ?? hit))
       }
       var blocks: [LayerBlock]
+      var nodes: [AccessibilityLayerNode]
       if let cached, cached.pane.isSameElement(as: pane), Date().timeIntervalSince(cached.read) < 1 {
-        blocks = cached.blocks
+        (blocks, nodes) = (cached.blocks, cached.nodes)
       } else {
-        blocks = LayerBlockExtractor.blocks(in: pane, visible: paneFrame)
+        let located = LayerBlockExtractor.located(in: pane, visible: paneFrame)
+        (blocks, nodes) = (located.map(\.block), located.map(\.node))
       }
       return LayerHover.Resolved(
         pane: pane, paneFrame: paneFrame, window: window, windowFrame: windowFrame, blocks: blocks,
-        scope: LayerScope.of(pane), readsText: true)
+        nodes: nodes, scope: LayerScope.of(pane), readsText: true)
     }.value
     guard let result else {
       return LayerHover(application: application, point: point, resolved: nil)
     }
-    if let pane = result.pane { paneCache = (pane, result.blocks, cached?.pane.isSameElement(as: pane) == true ? cached!.read : Date()) }
+    if let pane = result.pane {
+      paneCache = (pane, result.blocks, result.nodes, cached?.pane.isSameElement(as: pane) == true ? cached!.read : Date())
+    }
     return LayerHover(application: application, point: point, resolved: result)
   }
 
@@ -178,6 +184,12 @@ final class LayerConfiguration {
     guard let hover else {
       view.setPreview(pane: nil, paragraph: nil)
       view.setHint(Self.idleHint)
+      return
+    }
+    if let once = onTranslatedOnce(hover.point) {
+      view.setPreview(pane: nil, paragraph: viewRect(once))
+      let scope = hover.resolved?.scope.label(applicationName: hover.application.name) ?? hover.application.name
+      view.setHint("\(scope) · 点击：不再翻译这一段 · Esc 取消")
       return
     }
     guard let resolved = hover.resolved, let paneFrame = resolved.paneFrame else {
@@ -205,10 +217,14 @@ final class LayerConfiguration {
   /// The paragraph on the pointer's line: the one under it, or the nearest beside it, so a
   /// click anywhere along a line picks that line even where its text stops short.
   nonisolated static func paragraph(at point: CGPoint, in blocks: [LayerBlock]) -> LayerBlock? {
-    if let under = blocks.first(where: { $0.frame.contains(point) }) { return under }
-    return blocks
-      .filter { $0.frame.minY - 2 <= point.y && point.y <= $0.frame.maxY + 2 }
-      .min { distance(from: point.x, to: $0.frame) < distance(from: point.x, to: $1.frame) }
+    paragraphIndex(at: point, in: blocks).map { blocks[$0] }
+  }
+
+  nonisolated static func paragraphIndex(at point: CGPoint, in blocks: [LayerBlock]) -> Int? {
+    if let under = blocks.firstIndex(where: { $0.frame.contains(point) }) { return under }
+    return blocks.indices
+      .filter { blocks[$0].frame.minY - 2 <= point.y && point.y <= blocks[$0].frame.maxY + 2 }
+      .min { distance(from: point.x, to: blocks[$0].frame) < distance(from: point.x, to: blocks[$1].frame) }
   }
 
   nonisolated private static func distance(from x: CGFloat, to frame: CGRect) -> CGFloat {
@@ -230,7 +246,23 @@ final class LayerConfiguration {
     }
   }
 
+  /// The paragraph translated once, when the pointer is on its line inside its pane.
+  private func onTranslatedOnce(_ point: CGPoint) -> CGRect? {
+    guard let once = controller.translatedOnce, once.pane.contains(point),
+      once.paragraph.minY - 2 <= point.y, point.y <= once.paragraph.maxY + 2
+    else {
+      return nil
+    }
+    return once.paragraph
+  }
+
   private func click(extends: Bool) {
+    if !extends, let hover, onTranslatedOnce(hover.point) != nil {
+      controller.log("layer-click outcome=dismiss-once")
+      controller.dismissOneOff()
+      close(commit: true)
+      return
+    }
     guard let hover, let resolved = hover.resolved, let pane = resolved.pane, let window = resolved.window
     else {
       controller.log("layer-click outcome=no-pane")
@@ -256,31 +288,31 @@ final class LayerConfiguration {
       apply(hover)
       return
     }
-    guard let paragraph = Self.paragraph(at: hover.point, in: resolved.blocks) else {
-      controller.log("layer-click outcome=no-paragraph blocks=\(resolved.blocks.count)")
+    guard let index = Self.paragraphIndex(at: hover.point, in: resolved.blocks) else {
+      let nearest = resolved.blocks.map { abs($0.frame.midY - hover.point.y) }.min() ?? -1
+      controller.log(
+        "layer-click outcome=no-paragraph blocks=\(resolved.blocks.count) "
+          + "point=\(Int(hover.point.x)),\(Int(hover.point.y)) nearest-row-dy=\(Int(nearest))")
       NSSound.beep()
       return
     }
     controller.log("layer-click outcome=translate-once")
-    controller.translateOnce(paragraph: paragraph, pane: pane, window: window, application: hover.application)
+    controller.translateOnce(
+      paragraph: resolved.blocks[index], element: resolved.nodes[index], pane: pane, window: window,
+      application: hover.application)
     lastChosen = hover.application
     close(commit: true)
   }
 
   /// A chosen pane's app comes to the front and its window above the others, so a pane
-  /// that was partly covered shows whole (§二). Cida then takes the front back, so the
-  /// configuration keeps the keyboard; the chosen app gets it when the configuration ends.
+  /// that was partly covered shows whole (§二).
   private func bringForward(_ application: LayerApplication, window: AccessibilityLayerNode) {
     lastChosen = application
-    if let running = NSRunningApplication(processIdentifier: application.processIdentifier) {
-      NSApp.yieldActivation(to: running)
-      running.activate()
-    }
+    NSRunningApplication(processIdentifier: application.processIdentifier)?.activate()
     window.perform(kAXRaiseAction)
     Task { @MainActor [weak self] in
       try? await Task.sleep(for: .milliseconds(80))
       guard let self, finish != nil else { return }
-      NSApp.activate()
       panel.makeKeyAndOrderFront(nil)
       panel.makeFirstResponder(view)
     }
@@ -289,12 +321,63 @@ final class LayerConfiguration {
   private func refreshLifted() {
     var frames: [CGRect] = []
     let known = controller.visibleSelectedPanes
+    // The paragraph translated once is lifted too, so it can be taken away here.
+    if let once = controller.translatedOnce {
+      frames.append(viewRect(once.paragraph.insetBy(dx: -4, dy: -2)))
+    }
     for selection in working {
       if let frame = addedFrames[selection.id] ?? known.first(where: { $0.selectionID == selection.id })?.frame {
         frames.append(viewRect(frame))
       }
     }
     view.setLifted(frames)
+  }
+}
+
+/// A keyboard event tap for the veil's own keys. Every key reaches the tap before any app; the
+/// handler says which ones it took. Needs the Accessibility permission the layer already has;
+/// nil without it, and the veil then relies on having the keyboard itself.
+@MainActor
+final class LayerKeyTap {
+  private var port: CFMachPort?
+  private var source: CFRunLoopSource?
+  private let handler: (Int64) -> Bool
+
+  init?(handler: @escaping (Int64) -> Bool) {
+    self.handler = handler
+    let callback: CGEventTapCallBack = { _, type, event, context in
+      guard let context else { return Unmanaged.passUnretained(event) }
+      let tap = Unmanaged<LayerKeyTap>.fromOpaque(context).takeUnretainedValue()
+      let code = event.getIntegerValueField(.keyboardEventKeycode)
+      // The source runs on the main run loop.
+      let taken = MainActor.assumeIsolated { () -> Bool in
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+          if let port = tap.port { CGEvent.tapEnable(tap: port, enable: true) }
+          return false
+        }
+        return type == .keyDown && tap.handler(code)
+      }
+      return taken ? nil : Unmanaged.passUnretained(event)
+    }
+    guard
+      let port = CGEvent.tapCreate(
+        tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+        eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue), callback: callback,
+        userInfo: Unmanaged.passUnretained(self).toOpaque())
+    else {
+      return nil
+    }
+    self.port = port
+    let source = CFMachPortCreateRunLoopSource(nil, port, 0)
+    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+    self.source = source
+  }
+
+  func stop() {
+    if let port { CGEvent.tapEnable(tap: port, enable: false) }
+    if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+    port = nil
+    source = nil
   }
 }
 
@@ -306,6 +389,8 @@ struct LayerHover {
     let window: AccessibilityLayerNode?
     let windowFrame: CGRect
     let blocks: [LayerBlock]
+    /// The element each paragraph was read from.
+    let nodes: [AccessibilityLayerNode]
     let scope: LayerScope
     let readsText: Bool
   }
@@ -332,6 +417,10 @@ final class LayerConfigurationPanel: NSPanel {
     hidesOnDeactivate = false
     isReleasedWhenClosed = false
     acceptsMouseMovedEvents = true
+    // The veil is cut open over the pane under the pointer, and a window lets clicks through
+    // its fully transparent pixels unless this is set explicitly: a click there would reach
+    // the app instead of choosing the paragraph.
+    ignoresMouseEvents = false
     title = "翻译图层"
     setAccessibilityIdentifier("translation-layer-configuration")
     setAccessibilityLabel("翻译图层")

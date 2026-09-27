@@ -60,7 +60,12 @@ enum LayerMotionEstimator {
   /// The shift in pixels (positive: content moved up), 0 for no motion, nil when the frames
   /// do not agree on one (the content was replaced, or moved too far to match).
   static func shift(from a: Rows, to b: Rows, minimumOverlap: Int = 80) -> Int? {
-    guard a.hashes.count == b.hashes.count, !a.hashes.isEmpty else { return nil }
+    estimate(from: a, to: b, minimumOverlap: minimumOverlap).shift
+  }
+
+  /// The shift with why it was declined, for the lifecycle log.
+  static func estimate(from a: Rows, to b: Rows, minimumOverlap: Int = 80) -> (shift: Int?, reason: String) {
+    guard a.hashes.count == b.hashes.count, !a.hashes.isEmpty else { return (nil, "no-rows") }
     var shifts: [Int: Int] = [:]
     // Tiles with text that match no shift at all: the content there was replaced.
     var changed = 0
@@ -101,14 +106,17 @@ enum LayerMotionEstimator {
       shifts[best.shift, default: 0] += 1
     }
     let moving = shifts.filter { $0.key != 0 }
-    guard let winner = moving.max(by: { $0.value < $1.value }) else {
-      // A caret or a hover highlight changes one tile; a new channel changes most of them.
-      // Tiles too plain to judge say nothing, which is not a change.
-      return changed >= 2 ? nil : 0
+    let votes = "changed=\(changed) shifts=\(shifts.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" })"
+    // Content moves in at least two tiles at once. One tile alone is not the content: a caret,
+    // a hover highlight, or an overlay scroller whose thumb still slides after the content
+    // stopped (Slack, 2026-09-27, the last frames of every scroll). A new channel changes most
+    // tiles. Tiles too plain to judge say nothing, which is not a change.
+    guard let winner = moving.max(by: { $0.value < $1.value }), winner.value >= 2 else {
+      return changed >= 2 ? (nil, votes) : (0, votes)
     }
     let movingTiles = moving.values.reduce(0, +)
-    guard winner.value >= 2, Double(winner.value) >= Double(movingTiles) * 0.75 else { return nil }
-    return winner.key
+    guard Double(winner.value) >= Double(movingTiles) * 0.75 else { return (nil, votes) }
+    return (winner.key, votes)
   }
 }
 
@@ -125,6 +133,8 @@ final class LayerMotionStream: NSObject, SCStreamOutput, @unchecked Sendable {
   private let queue = DispatchQueue(label: "cida.layer.motion", qos: .userInteractive)
   /// Points the content moved (positive: down the screen), or nil when it could not be followed.
   var onMotion: (@MainActor (CGFloat?) -> Void)?
+  /// Why a frame could not be followed.
+  var onLost: (@MainActor (String) -> Void)?
 
   /// Starts capturing `windowNumber`; `pane` is the pane's frame inside the window, in points.
   func start(windowNumber: CGWindowID, pane: CGRect) async {
@@ -191,13 +201,21 @@ final class LayerMotionStream: NSObject, SCStreamOutput, @unchecked Sendable {
     }
     let (crop, scale) = lock.withLock { (self.crop, self.scale) }
     let rows = LayerMotionEstimator.rows(of: buffer, crop: crop)
+    var lostReason: String?
     let report: CGFloat?? = lock.withLock {
       defer { previous = rows }
       guard let previous else { return .none }
-      guard let shift = LayerMotionEstimator.shift(from: previous, to: rows) else { return .some(nil) }
+      let estimate = LayerMotionEstimator.estimate(from: previous, to: rows)
+      guard let shift = estimate.shift else {
+        lostReason = estimate.reason
+        return .some(nil)
+      }
       guard shift != 0 else { return .none }
       cumulativePixels += shift
       return .some(-CGFloat(cumulativePixels) / scale)
+    }
+    if let lostReason, let onLost {
+      Task { @MainActor in onLost(lostReason) }
     }
     guard let report, let onMotion else { return }
     Task { @MainActor in onMotion(report) }

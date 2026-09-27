@@ -228,11 +228,12 @@ customElements.define("cida-status-menu", CidaStatusMenu);
 
 
 // A translation layer over mock app windows (spec/translation-layer.md):
-// <cida-layer-scene app="chat|browser" layer="configuring|once|translating|peek|translated" paper>.
+// <cida-layer-scene app="chat|browser" layer="configuring|configuring-once|once|translating|peek|translated" paper>.
 // paper draws translations on paper cards, as without the Screen Recording permission.
 // configuring shows both windows under the configuration veil: panes marked
 // data-pane="selected" are lifted out of the veil like the capture sheet, the one marked
-// data-pane="hover" is a dashed preview under the pointer.
+// data-pane="hover" is a dashed preview under the pointer. configuring-once shows the veil
+// over a page whose paragraph translated once is lifted, with the pointer on it.
 class CidaLayerScene extends HTMLElement {
   connectedCallback() {
     const app = this.getAttribute("app") ?? "chat";
@@ -248,12 +249,17 @@ class CidaLayerScene extends HTMLElement {
         <div class="mock-window scaled" style="left: 548px; top: 318px">${this.chat("configuring", wordmark, false)}</div>
         <div class="layer-veil"></div>
         <div class="capture-hint layer-hint">${wordmark}<span>example.dev · 点击：翻译这一段 · ⇧ 点击：一直翻译这个区域 · Esc 取消</span></div>`;
+    } else if (layer === "configuring-once") {
+      scene.innerHTML = `
+        <div class="mock-window scaled" style="left: 20px; top: 76px">${this.browser(layer, false)}</div>
+        <div class="layer-veil"></div>
+        <div class="capture-hint layer-hint">${wordmark}<span>example.dev · 点击：不再翻译这一段 · Esc 取消</span></div>`;
     } else {
       const body = app === "chat" ? this.chat(layer, wordmark, paper) : this.browser(layer, paper);
       scene.innerHTML = `<div class="mock-window">${body}</div>`;
     }
     this.replaceWith(scene);
-    if (layer === "configuring") {
+    if (layer.startsWith("configuring")) {
       // Measure after the page and its fonts have settled; earlier rects are stale.
       // Measure after the page and its fonts settle, and again whenever the page is
       // resized (the renderer resizes it to the board before taking snapshots).
@@ -294,6 +300,13 @@ class CidaLayerScene extends HTMLElement {
         width: `${r.width + 8}px`, height: `${r.height + 4}px`,
       });
       scene.appendChild(box);
+    }
+    if (!panes.some((p) => p.kind === "hover") && paragraph) {
+      const r = paragraph.getBoundingClientRect();
+      const pointer = document.createElement("i");
+      pointer.className = "pointer";
+      Object.assign(pointer.style, { left: `${r.left - origin.left + r.width * 0.55}px`, top: `${r.top - origin.top + r.height * 0.4}px` });
+      scene.appendChild(pointer);
     }
     for (const p of panes) {
       const edge = document.createElement("div");
@@ -363,8 +376,9 @@ class CidaLayerScene extends HTMLElement {
 
   browser(layer, paper) {
     const translated = layer !== "configuring";
+    const once = layer === "once" || layer === "configuring-once";
     const t = (original, translation, key) =>
-      translated && (layer !== "once" || key === "second")
+      translated && (!once || key === "second")
         ? (paper ? `<span class="layer-card">${translation}</span>` : translation) : original;
     const regions = "";
     return `
@@ -377,7 +391,7 @@ class CidaLayerScene extends HTMLElement {
           <div class="meta">${t("Engineering · 8 min read", "工程 · 阅读约 8 分钟")}</div>
           <p>${t("Columnar formats were designed for scans that read a few columns across billions of rows. Modern AI workloads also need fast random access to individual rows, and the old layout made every lookup pay for a full page decode.",
             "列式格式原本是为扫描设计的：在数十亿行里只读取少数几列。如今的 AI 负载还需要快速随机读取单行，而旧的布局让每次查找都得解码一整页。")}</p>
-          <p${layer === "configuring" ? " data-paragraph" : ""}>${t("The new format stores each column in small, independently addressable chunks. A point lookup now touches a single chunk, while scans still stream large contiguous reads from object storage.",
+          <p${layer === "configuring" ? " data-paragraph" : layer === "configuring-once" ? ' data-pane="selected" data-paragraph' : ""}>${t("The new format stores each column in small, independently addressable chunks. A point lookup now touches a single chunk, while scans still stream large contiguous reads from object storage.",
             "新格式把每一列存成可独立寻址的小块。点查询现在只会触及一个小块，而扫描仍然能从对象存储里连续读取大段数据。", "second")}</p>
           <p>${t("In our benchmarks, random access became up to 60 times faster with no regression on full-table scans.",
             "在我们的基准测试中，随机读取最多快了 60 倍，全表扫描没有任何退步。")}</p>

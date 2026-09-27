@@ -526,6 +526,23 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertNil(LayerMotionEstimator.shift(from: start, to: rows(frame(offset: 1_000, replaced: true))))
   }
 
+  /// Slack, measured 2026-09-27: after the content stops, the overlay scroller's thumb in the
+  /// last tile still slides for a few frames. That is not the content moving.
+  func testAScrollerThumbSlidingAloneIsNoMotion() {
+    func withThumb(at top: Int) -> [UInt32] {
+      var pixels = frame(offset: 1_000)
+      let width = 320
+      for y in 0..<400 {
+        for x in (width * 7 / 8)..<width {
+          let inThumb = (top..<(top + 120)).contains(y) && x >= width - 12 && x < width - 4
+          pixels[y * width + x] = inThumb ? 0xFF80_8080 : 0xFFFF_FFFF
+        }
+      }
+      return pixels
+    }
+    XCTAssertEqual(LayerMotionEstimator.shift(from: rows(withThumb(at: 100)), to: rows(withThumb(at: 130))), 0)
+  }
+
   func testOnlyWindowsInFrontCoverAPaneAndWholeDisplayOverlaysDoNot() {
     let own = ProcessInfo.processInfo.processIdentifier
     let display = CGRect(x: 0, y: 0, width: 1512, height: 982)
