@@ -97,7 +97,7 @@ class CidaSettings extends HTMLElement {
         ? row("显示辞达", "在任何应用里唤起", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
         : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ Space</span>`, "end");
     const capture = row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end");
-    const layerShortcut = row("翻译图层", "在原处翻译外文", `<span class="chip">⌥ D</span>`, "end");
+    const layerShortcut = row("原处翻译", "加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
     // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
     const permission = (title, caption) => row(title, caption,
       granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
@@ -159,7 +159,7 @@ class CidaSettings extends HTMLElement {
         <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>`,
       shortcuts: `
         <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}</div>
-        <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图与图层跟随")}</div>`,
+        <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图与原处译文")}</div>`,
       general: `
         <div class="group">${launch}${updates}</div>
         <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>`,
@@ -215,7 +215,7 @@ class CidaStatusMenu extends HTMLElement {
       <section class="status-menu-scene" data-state="${this.getAttribute("state")}">
         <div class="menubar"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
         <div class="status-menu">
-          ${item("显示辞达", "⌥ 空格键")}${item("截图翻译", "⌥ S")}${item("翻译图层", "⌥ D")}${item("设置…", "⌘,")}
+          ${item("显示辞达", "⌥ 空格键")}${item("截图翻译", "⌥ S")}${item("设置…", "⌘,")}
           ${available ? item("安装新版本 1.1.0…") : item("检查更新…")}
           <i class="separator"></i>
           ${item("退出辞达", "⌘Q")}
@@ -227,13 +227,20 @@ class CidaStatusMenu extends HTMLElement {
 customElements.define("cida-status-menu", CidaStatusMenu);
 
 
-// A translation layer over mock app windows (spec/translation-layer.md):
-// <cida-layer-scene app="chat|browser" layer="configuring|configuring-once|once|translating|peek|translated" paper>.
-// paper draws translations on paper cards, as without the Screen Recording permission.
-// configuring shows both windows under the configuration veil: panes marked
-// data-pane="selected" are lifted out of the veil like the capture sheet, the one marked
-// data-pane="hover" is a dashed preview under the pointer. configuring-once shows the veil
-// over a page whose paragraph translated once is lifted, with the pointer on it.
+// Cida's translations over mock app windows (spec/translation-layer.md):
+// <cida-layer-scene app="chat|browser" layer="…" paper>. paper draws translations on
+// paper cards, as without the Screen Recording permission. Chat layers, as a walk through:
+//   once-pointing  the pointer rests on a message; nothing yet
+//   once-pending   ⌥D: that message breathes on accent-soft while it is translated
+//   once-done      it reads in place, among the originals
+//   once-two       ⌥D on another message: both translated, the rest original
+//   once-peek      the pointer rests on a translation: its original shows
+//   once-restore   ⌥D on a translated message: it turns back, the other stays
+//   once-none      ⌥D with no paragraph under the pointer: a hint by the pointer
+//   window-on      ⌥⇧D: the window is outlined and the status pill says how to stop
+//   translating    a new message waits while the rest is translated
+//   window-one-original  ⌥D inside the window turns one message back
+//   window-off     ⌥⇧D again: translations fade, the pill says it stopped
 class CidaLayerScene extends HTMLElement {
   connectedCallback() {
     const app = this.getAttribute("app") ?? "chat";
@@ -243,87 +250,51 @@ class CidaLayerScene extends HTMLElement {
     const scene = document.createElement("section");
     scene.className = "screen desk";
     scene.dataset.state = this.getAttribute("state");
-    if (layer === "configuring") {
-      scene.innerHTML = `
-        <div class="mock-window scaled" style="left: 20px; top: 76px">${this.browser("configuring", false)}</div>
-        <div class="mock-window scaled" style="left: 548px; top: 318px">${this.chat("configuring", wordmark, false)}</div>
-        <div class="layer-veil"></div>
-        <div class="capture-hint layer-hint">${wordmark}<span>example.dev · 点击：翻译这一段 · ⇧ 点击：一直翻译这个区域 · Esc 取消</span></div>`;
-    } else if (layer === "configuring-once") {
-      scene.innerHTML = `
-        <div class="mock-window scaled" style="left: 20px; top: 76px">${this.browser(layer, false)}</div>
-        <div class="layer-veil"></div>
-        <div class="capture-hint layer-hint">${wordmark}<span>example.dev · 点击：不再翻译这一段 · Esc 取消</span></div>`;
-    } else {
-      const body = app === "chat" ? this.chat(layer, wordmark, paper) : this.browser(layer, paper);
-      scene.innerHTML = `<div class="mock-window">${body}</div>`;
-    }
+    const body = app === "chat" ? this.chat(layer, wordmark, paper) : this.browser(layer, paper);
+    const outlined = layer === "window-on" ? " data-outline" : "";
+    scene.innerHTML = `<div class="mock-window"${outlined}>${body}</div>`;
     this.replaceWith(scene);
-    if (layer.startsWith("configuring")) {
-      // Measure after the page and its fonts have settled; earlier rects are stale.
-      // Measure after the page and its fonts settle, and again whenever the page is
-      // resized (the renderer resizes it to the board before taking snapshots).
-      const lift = () => document.fonts.ready.then(() => this.liftPanes(scene));
-      if (document.readyState === "complete") lift();
-      else window.addEventListener("load", lift, { once: true });
-      window.addEventListener("resize", lift);
+    // Measure after the page and its fonts settle, and again whenever the page is resized
+    // (the renderer resizes it to the board before taking snapshots).
+    const place = () => document.fonts.ready.then(() => this.placeMarks(scene, wordmark));
+    if (document.readyState === "complete") place();
+    else window.addEventListener("load", place, { once: true });
+    window.addEventListener("resize", place);
+  }
+
+  // The pointer on the element marked data-pointer, the hint beside it, and the outline
+  // around the element marked data-outline.
+  placeMarks(scene, wordmark) {
+    const origin = scene.getBoundingClientRect();
+    scene.querySelectorAll(".layer-outline, .pointer.placed, .layer-tip").forEach((element) => element.remove());
+    const outlined = scene.querySelector("[data-outline]");
+    if (outlined) {
+      const r = outlined.getBoundingClientRect();
+      const outline = document.createElement("div");
+      outline.className = "layer-outline";
+      Object.assign(outline.style, {
+        left: `${r.left - origin.left - 3}px`, top: `${r.top - origin.top - 3}px`,
+        width: `${r.width + 6}px`, height: `${r.height + 6}px`,
+      });
+      scene.appendChild(outline);
+    }
+    const target = scene.querySelector("[data-pointer]");
+    if (!target) return;
+    const r = target.getBoundingClientRect();
+    const x = r.left - origin.left + Math.min(r.width * 0.45, 260), y = r.top - origin.top + Math.min(r.height * 0.35, 30);
+    const pointer = document.createElement("i");
+    pointer.className = "pointer placed";
+    Object.assign(pointer.style, { left: `${x}px`, top: `${y}px` });
+    scene.appendChild(pointer);
+    if (target.dataset.pointer) {
+      const tip = document.createElement("div");
+      tip.className = "capture-hint layer-tip";
+      tip.innerHTML = `${wordmark}<span>${target.dataset.pointer}</span>`;
+      Object.assign(tip.style, { left: `${x + 18}px`, top: `${y + 24}px` });
+      scene.appendChild(tip);
     }
   }
 
-  // Cuts the panes out of the veil with an SVG mask and draws their edges above it.
-  liftPanes(scene) {
-    const origin = scene.getBoundingClientRect();
-    const rect = (element) => {
-      const r = element.getBoundingClientRect();
-      // The lifted sheet keeps a little air around the pane's content, inside its window.
-      const pad = 6;
-      const w = element.closest(".mock-window").getBoundingClientRect();
-      const left = Math.max(r.left - pad, w.left), top = Math.max(r.top - pad, w.top);
-      const right = Math.min(r.right + pad, w.right), bottom = Math.min(r.bottom + pad, w.bottom);
-      return { x: left - origin.left, y: top - origin.top, w: right - left, h: bottom - top };
-    };
-    const panes = [...scene.querySelectorAll("[data-pane]")].map((element) => ({ kind: element.dataset.pane, ...rect(element) }));
-    const holes = panes.map((p) => `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="black"/>`).join("");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${origin.width}" height="${origin.height}">
-      <defs><mask id="m"><rect width="100%" height="100%" fill="white"/>${holes}</mask></defs>
-      <rect width="100%" height="100%" fill="black" mask="url(#m)"/></svg>`;
-    const veil = scene.querySelector(".layer-veil");
-    veil.style.webkitMaskImage = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
-    scene.querySelectorAll(".layer-lifted, .layer-preview, .layer-paragraph, .pointer").forEach((element) => element.remove());
-    const paragraph = scene.querySelector("[data-paragraph]");
-    if (paragraph) {
-      const r = paragraph.getBoundingClientRect();
-      const box = document.createElement("div");
-      box.className = "layer-paragraph";
-      Object.assign(box.style, {
-        left: `${r.left - origin.left - 4}px`, top: `${r.top - origin.top - 2}px`,
-        width: `${r.width + 8}px`, height: `${r.height + 4}px`,
-      });
-      scene.appendChild(box);
-    }
-    if (!panes.some((p) => p.kind === "hover") && paragraph) {
-      const r = paragraph.getBoundingClientRect();
-      const pointer = document.createElement("i");
-      pointer.className = "pointer";
-      Object.assign(pointer.style, { left: `${r.left - origin.left + r.width * 0.55}px`, top: `${r.top - origin.top + r.height * 0.4}px` });
-      scene.appendChild(pointer);
-    }
-    for (const p of panes) {
-      const edge = document.createElement("div");
-      edge.className = p.kind === "selected" ? "layer-lifted" : "layer-preview";
-      Object.assign(edge.style, { left: `${p.x}px`, top: `${p.y}px`, width: `${p.w}px`, height: `${p.h}px` });
-      scene.appendChild(edge);
-      if (p.kind === "hover") {
-        const target = paragraph ? paragraph.getBoundingClientRect() : null;
-        const pointer = document.createElement("i");
-        pointer.className = "pointer";
-        Object.assign(pointer.style, target
-          ? { left: `${target.left - origin.left + target.width * 0.55}px`, top: `${target.top - origin.top + target.height * 0.4}px` }
-          : { left: `${p.x + p.w * 0.62}px`, top: `${p.y + p.h * 0.45}px` });
-        scene.appendChild(pointer);
-      }
-    }
-  }
   chat(layer, wordmark, paper) {
     const messages = [
       ["Maya Chen", "10:02", "#C9A27E",
@@ -342,23 +313,32 @@ class CidaLayerScene extends HTMLElement {
         "Could it be the new prefetch default? Let's pair on it after standup.",
         "会不会是新的预取默认值导致的？站会后我们一起看看。"],
     ];
-    const translated = true;
+    // Which messages read as translations, which one breathes, which shows its original.
+    const all = [0, 1, 2, 3, 4];
+    const translated = {
+      "once-done": [2], "once-two": [2, 4], "once-peek": [4], "once-restore": [4],
+      "window-on": all, translating: [0, 1, 2, 3], "window-one-original": [0, 1, 3, 4],
+    }[layer] ?? [];
+    const pending = { "once-pending": 2, translating: 4 }[layer];
+    const peek = { "once-peek": 2 }[layer];
+    const pointed = { "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-peek": 2, "once-restore": 2, "window-one-original": 2 }[layer];
     const card = (text) => (paper ? `<span class="layer-card">${text}</span>` : text);
     const rows = messages.map(([who, time, color, original, translation], index) => {
       let text = original;
-      if (translated) {
-        if (layer === "translating" && index === 4) text = original;
-        else if (layer === "peek" && index === 2) text = `<span class="layer-peek">${original}</span>`;
-        else text = card(translation);
-      }
+      if (translated.includes(index)) text = card(translation);
+      if (index === pending) text = `<span class="layer-pending">${original}</span>`;
+      if (index === peek) text = `<span class="layer-peek">${original}</span>`;
+      const pointer = index === pointed ? " data-pointer" : "";
       return `<div class="chat-msg"><i class="avatar" style="background: ${color}"></i>
-        <div><div class="who">${who}<time>${time}</time></div><div class="text">${text}</div></div></div>`;
+        <div><div class="who">${who}<time>${time}</time></div><div class="text"${pointer}>${text}</div></div></div>`;
     }).join("");
+    const empty = layer === "once-none" ? `<div class="chat-empty" data-pointer="这里没有可以翻译的文字"></div>` : "";
+    const status = {
+      translating: `<div class="layer-status">${wordmark}<span>翻译中 · 1 条</span></div>`,
+      "window-on": `<div class="layer-status">${wordmark}<span>翻译整个窗口 · Slack · 再按 ⌥⇧D 停止</span></div>`,
+      "window-off": `<div class="layer-status">${wordmark}<span>已停止翻译这个窗口</span></div>`,
+    }[layer] ?? "";
     const regions = "";
-    const status = layer === "translating"
-      ? `<div class="layer-status">${wordmark}<span>翻译中 · 1 条</span></div>`
-      : "";
-    const pointer = layer === "peek" ? `<i class="pointer" style="left: 432px; top: 196px"></i>` : "";
     return `
       <div class="chat-top"><div class="mock-lights"><i></i><i></i><i></i></div><div class="search">搜索 Storage Team</div></div>
       <div class="chat-body">
@@ -368,31 +348,29 @@ class CidaLayerScene extends HTMLElement {
           <small>私信</small><span>Maya Chen</span><span>Leo Park</span><span>Sam Rivera</span></div>
         <div class="chat-main">
           <div class="chat-header"># storage-eng</div>
-          <div class="chat-messages"${layer === "configuring" ? ' data-pane="selected"' : ""}><div class="chat-day">今天</div>${rows}${regions}${status}${pointer}</div>
+          <div class="chat-messages"><div class="chat-day">今天</div>${rows}${empty}${regions}${status}</div>
           <div class="chat-composer">发消息到 #storage-eng</div>
         </div>
       </div>`;
   }
 
   browser(layer, paper) {
-    const translated = layer !== "configuring";
-    const once = layer === "once" || layer === "configuring-once";
-    const t = (original, translation, key) =>
-      translated && (!once || key === "second")
-        ? (paper ? `<span class="layer-card">${translation}</span>` : translation) : original;
+    const translated = layer === "translated";
+    const t = (original, translation) =>
+      translated ? (paper ? `<span class="layer-card">${translation}</span>` : translation) : original;
     const regions = "";
     return `
       <div class="browser-tabs"><div class="mock-lights"><i></i><i></i><i></i></div><div class="browser-tab">Why we rewrote the file format</div></div>
       <div class="browser-toolbar"><div class="address">example.dev/blog/file-format</div></div>
       <div class="page">
         <div class="page-nav"><b>Example Engineering</b>Blog<br>Docs<br>Community<br>Careers</div>
-        <div class="page-article"${layer === "configuring" ? ' data-pane="hover"' : ""}>
+        <div class="page-article">
           <h1>${t("Why we rewrote the file format", "我们为什么重写了文件格式")}</h1>
           <div class="meta">${t("Engineering · 8 min read", "工程 · 阅读约 8 分钟")}</div>
           <p>${t("Columnar formats were designed for scans that read a few columns across billions of rows. Modern AI workloads also need fast random access to individual rows, and the old layout made every lookup pay for a full page decode.",
             "列式格式原本是为扫描设计的：在数十亿行里只读取少数几列。如今的 AI 负载还需要快速随机读取单行，而旧的布局让每次查找都得解码一整页。")}</p>
-          <p${layer === "configuring" ? " data-paragraph" : layer === "configuring-once" ? ' data-pane="selected" data-paragraph' : ""}>${t("The new format stores each column in small, independently addressable chunks. A point lookup now touches a single chunk, while scans still stream large contiguous reads from object storage.",
-            "新格式把每一列存成可独立寻址的小块。点查询现在只会触及一个小块，而扫描仍然能从对象存储里连续读取大段数据。", "second")}</p>
+          <p>${t("The new format stores each column in small, independently addressable chunks. A point lookup now touches a single chunk, while scans still stream large contiguous reads from object storage.",
+            "新格式把每一列存成可独立寻址的小块。点查询现在只会触及一个小块，而扫描仍然能从对象存储里连续读取大段数据。")}</p>
           <p>${t("In our benchmarks, random access became up to 60 times faster with no regression on full-table scans.",
             "在我们的基准测试中，随机读取最多快了 60 倍，全表扫描没有任何退步。")}</p>
         </div>

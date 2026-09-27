@@ -138,20 +138,20 @@ enum SettingsStore {
     KeychainStore.deleteAPIKey(service: namespace)
   }
 
-  /// The panes chosen for the translation layer (`Design/spec/translation-layer.md` §二).
-  /// They are not settings: nothing in Settings or the command line shows them.
-  static func loadLayerSelections(namespace: String = storageNamespace) -> [LayerSelection] {
-    userDefaults(for: namespace).data(forKey: layerSelectionsKey)
-      .flatMap { try? JSONDecoder().decode([LayerSelection].self, from: $0) } ?? []
+  /// The apps and sites whose windows are translated whole (`Design/spec/translation-layer.md`
+  /// §三). They are not settings: ⌥⇧D turns them on and off, nothing else shows them.
+  static func loadLayerWindowRules(namespace: String = storageNamespace) -> [LayerWindowRule] {
+    userDefaults(for: namespace).data(forKey: layerWindowRulesKey)
+      .flatMap { try? JSONDecoder().decode([LayerWindowRule].self, from: $0) } ?? []
   }
 
-  static func saveLayerSelections(_ selections: [LayerSelection], namespace: String = storageNamespace) {
-    if let data = try? JSONEncoder().encode(selections) {
-      userDefaults(for: namespace).set(data, forKey: layerSelectionsKey)
+  static func saveLayerWindowRules(_ rules: [LayerWindowRule], namespace: String = storageNamespace) {
+    if let data = try? JSONEncoder().encode(rules) {
+      userDefaults(for: namespace).set(data, forKey: layerWindowRulesKey)
     }
   }
 
-  private static let layerSelectionsKey = "cida.translation-layer.selections.v1"
+  private static let layerWindowRulesKey = "cida.translation-layer.windows.v1"
 
   private static func userDefaults(for namespace: String) -> UserDefaults {
     if namespace == storageNamespace {

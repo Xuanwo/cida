@@ -18,7 +18,7 @@
 - **Select text and press <kbd>⌥</kbd> <kbd>Space</kbd>.** The panel appears with your selection and the translation starts streaming in. Text in your language goes into your usual foreign language and anything else comes into yours; they default to Simplified Chinese and English, and Settings takes any language, dialect or register, such as Cantonese or British English.
 - **Press <kbd>Tab</kbd>, then <kbd>Return</kbd>, to improve the writing instead.** The improved text stays in its own language.
 - **For text on the screen, press <kbd>⌥</kbd> <kbd>S</kbd>.** Frame what you want translated; Cida recognizes it on your Mac and translates it.
-- **To read in place, press <kbd>⌥</kbd> <kbd>D</kbd>.** Click a paragraph and its translation covers the original; <kbd>⇧</kbd>-click an area, such as Slack's message list or an article, and its foreign text keeps showing as translations that follow scrolling. Rest the pointer on a translation to see the original; clicks and scrolling still reach the app.
+- **To read in place, point at a paragraph and press <kbd>⌥</kbd> <kbd>D</kbd>.** It turns into its translation where it stands, among the original messages around it; press again to turn it back. To keep reading a language you do not read, press <kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd> to translate the whole window, such as Slack; new messages are translated as they arrive, and a second press stops. Rest the pointer on a translation to see the original; clicks and scrolling still reach the app.
 
 <kbd>Esc</kbd> takes you back to your app. A request keeps running while the panel is hidden, and the result is there when you bring it back.
 
@@ -53,7 +53,7 @@ Two permissions are optional. Turn them on with 去授权 on the 快捷键 tab o
 | --- | --- |
 | <kbd>⌥</kbd> <kbd>Space</kbd> | Show or hide the panel |
 | <kbd>⌥</kbd> <kbd>S</kbd> | Translate text on screen |
-| <kbd>⌥</kbd> <kbd>D</kbd> | Translate in place: click a paragraph once, <kbd>⇧</kbd>-click an area to keep it |
+| <kbd>⌥</kbd> <kbd>D</kbd> | Translate in place: the paragraph under the pointer, again to turn it back; with <kbd>⇧</kbd>, the whole window |
 | <kbd>Tab</kbd> | Switch between translate and improve |
 | <kbd>Return</kbd> | Run (<kbd>⇧</kbd> <kbd>Return</kbd> for a new line) |
 | <kbd>Esc</kbd> | Hide the panel |

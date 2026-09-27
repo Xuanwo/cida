@@ -34,6 +34,7 @@ final class FakeLayerNode: LayerNode {
   }
 
   func bounds(ofCharacters range: NSRange) -> CGRect? { characterBounds(range) }
+  func isSameElement(as other: FakeLayerNode) -> Bool { self === other }
 
   static func text(_ value: String, _ frame: CGRect) -> FakeLayerNode {
     FakeLayerNode(LayerRole.staticText, frame, text: value)
@@ -199,9 +200,9 @@ final class TranslationLayerTests: XCTestCase {
   func testAClickAnywhereAlongALinePicksThatLine() {
     let blocks = LayerBlockExtractor.blocks(in: slackAlertPane().pane)
     // Right of "Service: SaaS", where the line's text stops, still picks it.
-    XCTAssertEqual(LayerConfiguration.paragraph(at: CGPoint(x: 1500, y: 289), in: blocks)?.maskedText, "Service: ⟦0⟧")
-    XCTAssertEqual(LayerConfiguration.paragraph(at: CGPoint(x: 720, y: 310), in: blocks)?.maskedText, "Urgency: ⟦0⟧")
-    XCTAssertNil(LayerConfiguration.paragraph(at: CGPoint(x: 900, y: 390), in: blocks), "Between lines, nothing")
+    XCTAssertEqual(LayerBlockExtractor.paragraph(at: CGPoint(x: 1500, y: 289), in: blocks)?.maskedText, "Service: ⟦0⟧")
+    XCTAssertEqual(LayerBlockExtractor.paragraph(at: CGPoint(x: 720, y: 310), in: blocks)?.maskedText, "Urgency: ⟦0⟧")
+    XCTAssertNil(LayerBlockExtractor.paragraph(at: CGPoint(x: 900, y: 390), in: blocks), "Between lines, nothing")
   }
 
   func testLinesBrokenByHandAreSeparateBlocksWithCodeKeptAndStyledRunsJoined() {
@@ -299,43 +300,71 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(LayerScope.application.label(applicationName: "Slack"), "Slack")
   }
 
-  func testALocatorFindsTheSamePaneAfterTheWindowResizesButNotAStranger() throws {
-    let slack = slackWindow()
-    let locator = LayerPaneLocator(pane: slack.scroller, window: try XCTUnwrap(slack.window.frame))
-    XCTAssertTrue(locator.resolve(in: slack.window) === slack.scroller)
-
-    // Same classes, same place relative to a wider window.
-    let wider = Node(LayerRole.window, CGRect(x: 0, y: 0, width: 3000, height: 1410), children: [
-      Node("AXGroup", CGRect(x: 824, y: 119, width: 2420, height: 1191), classes: ["c-scrollbar__hider"], children: [
-        Node("AXGroup", CGRect(x: 900, y: 200, width: 900, height: 22), children: [.text("hi", CGRect(x: 900, y: 200, width: 20, height: 22))])
-      ])
-    ])
-    XCTAssertNotNil(locator.resolve(in: wider))
-
-    let stranger = Node(LayerRole.window, CGRect(x: 0, y: 0, width: 800, height: 600), children: [
-      Node("AXGroup", CGRect(x: 0, y: 0, width: 800, height: 600), classes: ["something-else"])
-    ])
-    XCTAssertNil(locator.resolve(in: stranger))
-  }
-
-  func testASelectionAppliesToItsAppAndSiteOnly() {
-    let locator = LayerPaneLocator(role: "AXGroup", relativeFrame: .zero)
-    let site = LayerSelection(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome", scope: .site("example.dev"), locator: locator)
+  func testAWindowRuleAppliesToItsAppAndSiteOnlyAndIsKept() {
+    let site = LayerWindowRule(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome", scope: .site("example.dev"))
     XCTAssertTrue(site.applies(to: "com.google.Chrome", site: "example.dev"))
     XCTAssertFalse(site.applies(to: "com.google.Chrome", site: "news.ycombinator.com"))
     XCTAssertFalse(site.applies(to: "com.apple.Safari", site: "example.dev"))
-    let app = LayerSelection(bundleIdentifier: "com.apple.TextEdit", applicationName: "TextEdit", scope: .application, locator: locator)
-    XCTAssertTrue(app.applies(to: "com.apple.TextEdit", site: nil))
-  }
+    let app = LayerWindowRule(bundleIdentifier: "com.tinyspeck.slackmacgap", applicationName: "Slack", scope: .application)
+    XCTAssertTrue(app.applies(to: "com.tinyspeck.slackmacgap", site: "app.slack.com"))
 
-  func testSelectionsRoundTripThroughStorage() throws {
     let namespace = SettingsStore.automationNamespacePrefix + "layer-\(UUID().uuidString)"
     defer { UserDefaults(suiteName: namespace)?.removePersistentDomain(forName: namespace) }
-    let selection = LayerSelection(
-      bundleIdentifier: "com.tinyspeck.slackmacgap", applicationName: "Slack", scope: .site("app.slack.com"),
-      locator: LayerPaneLocator(role: "AXGroup", domClasses: ["c-scrollbar__hider"], relativeFrame: CGRect(x: 0.19, y: 0.08, width: 0.8, height: 0.84)))
-    SettingsStore.saveLayerSelections([selection], namespace: namespace)
-    XCTAssertEqual(SettingsStore.loadLayerSelections(namespace: namespace), [selection])
+    SettingsStore.saveLayerWindowRules([site, app], namespace: namespace)
+    XCTAssertEqual(SettingsStore.loadLayerWindowRules(namespace: namespace), [site, app])
+  }
+
+  /// Slack's window as measured on 2026-09-27: a channel sidebar that is a navigation tree,
+  /// a channel header, the message list, and a thread panel beside it.
+  private func slackWholeWindow() -> (window: Node, messages: Node, thread: Node) {
+    let sidebar = Node(LayerRole.outline, CGRect(x: 339, y: 151, width: 313, height: 1285), children: [
+      Node("AXRow", CGRect(x: 339, y: 160, width: 313, height: 28), children: [.text("storage-eng", CGRect(x: 360, y: 164, width: 120, height: 20))]),
+      Node("AXRow", CGRect(x: 339, y: 190, width: 313, height: 28), children: [.text("Direct messages", CGRect(x: 360, y: 194, width: 140, height: 20))]),
+    ])
+    let header = Node("AXGroup", CGRect(x: 652, y: 70, width: 1148, height: 60), children: [
+      Node(LayerRole.staticText, CGRect(x: 672, y: 90, width: 120, height: 22), text: "storage-eng")
+    ])
+    func message(_ y: CGFloat, _ text: String) -> Node {
+      Node("AXGroup", CGRect(x: 652, y: y, width: 1148, height: 60), classes: ["c-virtual_list__item"], children: [
+        Node("AXGroup", CGRect(x: 716, y: y + 24, width: 900, height: 22), children: [.text(text, CGRect(x: 716, y: y + 24, width: 600, height: 22))])
+      ])
+    }
+    let list = Node("AXList", CGRect(x: 652, y: 1339, width: 1, height: 1), subrole: "AXContentList", children: [
+      message(200, "The compaction job finished overnight."), message(270, "LGTM"), message(340, "好的"), message(410, "好的，我今晚再看一下这个问题"),
+    ])
+    let messages = Node("AXGroup", CGRect(x: 652, y: 149, width: 1148, height: 1191), classes: ["p-message_pane"], children: [list])
+    let replies = Node("AXList", CGRect(x: 1800, y: 250, width: 1, height: 1), subrole: "AXContentList", children: [
+      Node("AXGroup", CGRect(x: 1800, y: 260, width: 721, height: 60), children: [
+        Node("AXGroup", CGRect(x: 1820, y: 280, width: 600, height: 22), children: [.text("Can someone review the retention change?", CGRect(x: 1820, y: 280, width: 400, height: 22))])
+      ]),
+      Node("AXGroup", CGRect(x: 1800, y: 330, width: 721, height: 60), children: [
+        Node("AXGroup", CGRect(x: 1820, y: 350, width: 600, height: 22), children: [.text("I will take a look after lunch.", CGRect(x: 1820, y: 350, width: 400, height: 22))])
+      ]),
+    ])
+    let thread = Node("AXGroup", CGRect(x: 1800, y: 250, width: 721, height: 1117), children: [replies])
+    let content = Node("AXGroup", CGRect(x: 652, y: 70, width: 1869, height: 1366), children: [header, messages, thread])
+    let window = Node(LayerRole.window, CGRect(x: 209, y: 30, width: 2316, height: 1410), children: [sidebar, content])
+    return (window, messages, thread)
+  }
+
+  func testWholeWindowTranslationLeavesNavigationAndOneWordLabelsAlone() {
+    let slack = slackWholeWindow()
+    let texts = LayerBlockExtractor.blocks(in: slack.window, visible: slack.window.frame).map(\.text)
+    XCTAssertTrue(texts.contains("storage-eng") && texts.contains("LGTM"), "⌥D can still point at them")
+    let automatic = LayerBlockExtractor.located(in: slack.window, visible: slack.window.frame, automatic: true).map(\.block.text)
+    XCTAssertEqual(
+      automatic,
+      ["The compaction job finished overnight.", "好的，我今晚再看一下这个问题",
+       "Can someone review the retention change?", "I will take a look after lunch."],
+      "No sidebar, no channel name, no one-word or two-character message")
+  }
+
+  func testAWindowSplitsIntoTheParagraphsOwnPanesSmallerFirst() {
+    let slack = slackWholeWindow()
+    let panes = LayerPaneRule.panes(in: slack.window)
+    XCTAssertEqual(panes.count, 2)
+    XCTAssertTrue(panes.contains { $0 === slack.messages }, "The message list scrolls on its own")
+    XCTAssertTrue(panes.contains { $0 === slack.thread }, "So does the thread beside it")
   }
 
   // MARK: - Language
@@ -466,6 +495,20 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertTrue(model.setShortcut(recorded, for: .translationLayer))
     XCTAssertEqual(model.settings.layerShortcut, recorded)
     XCTAssertEqual(applied, [.translationLayer])
+  }
+
+  func testTheLayerShortcutLeavesShiftToTheWholeWindow() throws {
+    let model = AppModel(saveSettings: { _ in }, applyGlobalShortcut: { _, _ in true })
+    XCTAssertEqual(model.settings.layerShortcut.addingShift.displayText, "⌥ ⇧ D")
+    XCTAssertFalse(model.setShortcut(GlobalShortcut(keyCode: UInt16(kVK_ANSI_L), modifiers: [.option, .shift]), for: .translationLayer))
+    XCTAssertFalse(model.setShortcut(.optionD.addingShift, for: .captureText), "⌥⇧D is the whole window")
+
+    var configuration = EditableConfiguration(settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
+    try ConfigurationField.layerShortcut.apply("option+shift+l", to: &configuration)
+    XCTAssertThrowsError(try ConfigurationField.validate(configuration))
+    ConfigurationField.layerShortcut.reset(in: &configuration)
+    try ConfigurationField.captureShortcut.apply("option+shift+d", to: &configuration)
+    XCTAssertThrowsError(try ConfigurationField.validate(configuration))
   }
 
   func testOlderSettingsDecodeWithOptionDAndACustomLayerShortcutRoundTrips() throws {

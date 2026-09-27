@@ -718,6 +718,8 @@ private struct GlobalShortcutRow: View {
   private enum Feedback {
     case missingModifier
     case rejected
+    /// ⇧ belongs to the layer's whole-window variant.
+    case shiftReserved
   }
 
   private var isRecording: Bool {
@@ -732,19 +734,23 @@ private struct GlobalShortcutRow: View {
     switch action {
     case .showPanel: "显示辞达"
     case .captureText: "截图翻译"
-    case .translationLayer: "翻译图层"
+    case .translationLayer: "原处翻译"
     }
   }
 
   private var caption: String {
     if isRecording {
-      return feedback == .missingModifier ? "要带 ⌘、⌥ 或 ⌃" : "Esc 取消"
+      switch feedback {
+      case .missingModifier: return "要带 ⌘、⌥ 或 ⌃"
+      case .shiftReserved: return "不能带 ⇧"
+      default: return "Esc 取消"
+      }
     }
     if feedback == .rejected { return "这个组合已被占用，换一个" }
     switch action {
     case .showPanel: return "在任何应用里唤起"
     case .captureText: return "框选屏幕文字并翻译"
-    case .translationLayer: return "在原处翻译外文"
+    case .translationLayer: return "加 ⇧ 翻译整个窗口"
     }
   }
 
@@ -760,7 +766,7 @@ private struct GlobalShortcutRow: View {
     switch action {
     case .showPanel: "显示辞达快捷键"
     case .captureText: "截图翻译快捷键"
-    case .translationLayer: "翻译图层快捷键"
+    case .translationLayer: "原处翻译快捷键"
     }
   }
 
@@ -799,7 +805,12 @@ private struct GlobalShortcutRow: View {
             onCapture: { newShortcut in
               feedback = model.setShortcut(newShortcut, for: action) ? nil : .rejected
             },
-            onInvalidPress: { feedback = .missingModifier })
+            onInvalidPress: { feedback = .missingModifier },
+            refuses: { shortcut in
+              guard action == .translationLayer, shortcut.modifiers.contains(.shift) else { return false }
+              feedback = .shiftReserved
+              return true
+            })
         }
         .accessibilityLabel(
           isRecording ? "按下新的\(accessibilityName)" : "\(accessibilityName) \(shortcut.displayText)")
@@ -873,7 +884,7 @@ private struct ScreenRecordingPermissionRow: View {
 
   var body: some View {
     PermissionRow(
-      title: "屏幕录制", caption: "截图与图层跟随", isGranted: model.isCaptureAccessGranted,
+      title: "屏幕录制", caption: "截图与一直翻译", isGranted: model.isCaptureAccessGranted,
       request: model.requestCaptureAccess, identifier: "settings-capture-access"
     )
     .onAppear(perform: model.refreshCaptureAccess)

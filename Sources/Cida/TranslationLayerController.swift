@@ -2,19 +2,19 @@ import AppKit
 import ScreenCaptureKit
 import os
 
-/// Runs the translation layer (`Design/spec/translation-layer.md`): finds the chosen panes in
-/// running applications, reads their paragraphs, translates what is not in the user's own
-/// language, and keeps the translations over the originals while the pane scrolls, moves or
-/// gets covered. It also shows single paragraphs translated once from the configuration.
+/// Runs the translation layer (`Design/spec/translation-layer.md`): ⌥D turns the paragraph
+/// under the pointer into its translation and back (§二), ⌥⇧D translates every window of an
+/// app or site (§三). Each pane in use is a `LayerPaneSession` that reads its paragraphs,
+/// translates what is not in the user's own language, and keeps the translations over the
+/// originals while the pane scrolls, moves or gets covered.
 @MainActor
 final class TranslationLayerController {
   private let settings: () -> CidaSettings
   private let service: any TextProcessingService
   private let namespace: String
   private let persists: Bool
-  private(set) var selections: [LayerSelection]
-  private var sessions: [String: LayerPaneSession] = [:]
-  private var oneOff: LayerPaneSession?
+  private(set) var windowRules: [LayerWindowRule]
+  private var sessions: [LayerPaneSession] = []
   private let cache = LayerTranslationCache()
   private var tick: Timer?
   private var tickCount = 0
@@ -22,6 +22,9 @@ final class TranslationLayerController {
   private var monitors: [Any] = []
   private var discovering = false
   private var enabledTrees: Set<pid_t> = []
+  /// Turning a window on or off, and nothing to translate under the pointer.
+  private let pill = LayerStatusPanel()
+  private let outline = LayerOutlinePanel()
   var lifecycleLog: ((String) -> Void)?
 
   init(
@@ -32,7 +35,7 @@ final class TranslationLayerController {
     self.service = service
     self.namespace = namespace
     self.persists = persists
-    selections = persists ? SettingsStore.loadLayerSelections(namespace: namespace) : []
+    windowRules = persists ? SettingsStore.loadLayerWindowRules(namespace: namespace) : []
   }
 
   func start() {
@@ -47,75 +50,137 @@ final class TranslationLayerController {
       NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
         MainActor.assumeIsolated { self?.noteScroll() }
       } as Any)
-    monitors.append(
-      NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-        // Escape dismisses a paragraph translated once; the key still reaches the app.
-        guard event.keyCode == 53 else { return }
-        MainActor.assumeIsolated {
-          self?.log("layer-escape-elsewhere frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
-          self?.dismissOneOff()
-        }
-      } as Any)
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
     ) { [weak self] notification in
-      let pid = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?
-        .processIdentifier
+      let running = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
       MainActor.assumeIsolated {
-        self?.frontApplicationChanged(to: pid)
+        self?.frontApplicationChanged(to: running?.processIdentifier)
+        // Chromium and Electron build their tree about two seconds after being asked; asking
+        // when they come to the front saves that wait on the first ⌥D (§二 提前读取).
+        if let running, let application = LayerApplication(running) { self?.enableTree(of: application) }
         self?.discover()
       }
     }
   }
 
-  // MARK: Selections
+  // MARK: ⌥D: this paragraph
 
-  func setSelections(_ newSelections: [LayerSelection]) {
-    selections = newSelections
-    if persists { SettingsStore.saveLayerSelections(newSelections, namespace: namespace) }
-    for (key, session) in sessions where !newSelections.contains(where: { $0.id == session.selectionID }) {
-      session.close()
-      sessions[key] = nil
+  /// Turns the paragraph under `point` (top-left screen coordinates) into its translation, or
+  /// back into the original when it already shows one (§二).
+  func toggleParagraph(at point: CGPoint) {
+    let windows = LayerWindowInfo.onScreen()
+    guard let info = LayerWindowInfo.applicationWindow(at: point, in: windows),
+      let running = NSRunningApplication(processIdentifier: info.ownerPID),
+      let application = LayerApplication(running)
+    else {
+      hint("这里没有可以翻译的文字", at: point)
+      return
     }
+    enableTree(of: application)
+    // A pane already in use answers from its last read, so a repeated press is instant.
+    for session in sessions where session.application.processIdentifier == application.processIdentifier
+      && session.paneFrame.contains(point)
+    {
+      if let outcome = session.toggleParagraph(at: point) {
+        log("layer-paragraph-\(outcome) app=\(application.bundleIdentifier)")
+        return
+      }
+    }
+    Task.detached(priority: .userInitiated) {
+      let found = LayerParagraphFinder.find(at: point, in: application)
+      await MainActor.run { [weak self] in self?.applyFoundParagraph(found, application: application, at: point) }
+    }
+  }
+
+  private func applyFoundParagraph(_ found: LayerParagraphFinder.Result, application: LayerApplication, at point: CGPoint) {
+    guard case .paragraph(let block, let node, let pane, let window, let site) = found else {
+      let readsText = if case .nothing(let readsText) = found { readsText } else { true }
+      hint(
+        readsText
+          ? "这里没有可以翻译的文字"
+          : "\(application.name) 里读不到文字，可以用截图翻译 \(settings().captureShortcut.displayText)",
+        at: point)
+      log("layer-paragraph-none app=\(application.bundleIdentifier)")
+      return
+    }
+    let session = sessions.first { $0.pane.isSameElement(as: pane) } ?? {
+      let session = LayerPaneSession(application: application, window: window, pane: pane, owner: self)
+      session.site = site
+      sessions.append(session)
+      return session
+    }()
+    session.pick(block, element: node)
+    log("layer-paragraph-translated app=\(application.bundleIdentifier)")
+  }
+
+  // MARK: ⌥⇧D: the whole window
+
+  /// Starts translating every window of the app, or the site, under `point`; stops when it
+  /// already does (§三).
+  func toggleWindow(at point: CGPoint) {
+    let windows = LayerWindowInfo.onScreen()
+    guard let info = LayerWindowInfo.applicationWindow(at: point, in: windows),
+      let running = NSRunningApplication(processIdentifier: info.ownerPID),
+      let application = LayerApplication(running)
+    else {
+      hint("这里没有可以翻译的窗口", at: point)
+      return
+    }
+    enableTree(of: application)
+    let bounds = info.bounds
+    Task.detached(priority: .userInitiated) {
+      let window = application.windows.first { window in
+        guard let frame = window.frame else { return false }
+        return abs(frame.minX - bounds.minX) < 2 && abs(frame.minY - bounds.minY) < 2
+      }
+      let site = window.flatMap(LayerSiteReader.site(of:))
+      await MainActor.run { [weak self] in self?.applyWindowToggle(application: application, site: site, bounds: bounds) }
+    }
+  }
+
+  private func applyWindowToggle(application: LayerApplication, site: String?, bounds: CGRect) {
+    let frame = LayerScreenGeometry.appKitRect(fromTopLeft: bounds)
+    let matching = windowRules.filter { $0.applies(to: application.bundleIdentifier, site: site) }
+    if !matching.isEmpty {
+      windowRules.removeAll { matching.contains($0) }
+      saveWindowRules()
+      for session in sessions where session.application.bundleIdentifier == application.bundleIdentifier
+        && matching.contains(where: { $0.applies(to: application.bundleIdentifier, site: session.site) })
+      {
+        session.close()
+      }
+      sessions.removeAll(where: \.isFinished)
+      pill.flash(text: "已停止翻译这个窗口", in: frame, for: 1.5)
+      log("layer-window-off app=\(application.bundleIdentifier)")
+      return
+    }
+    let rule = LayerWindowRule(
+      bundleIdentifier: application.bundleIdentifier, applicationName: application.name,
+      scope: site.map { .site($0) } ?? .application)
+    windowRules.append(rule)
+    saveWindowRules()
+    outline.flash(around: frame)
+    let stop = settings().layerShortcut.addingShift.displayText
+    pill.flash(
+      text: "翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止",
+      in: frame, for: 2)
+    log("layer-window-on app=\(application.bundleIdentifier)")
     discover()
   }
 
-  /// The chosen panes on screen now, for the configuration to lift (top-left coordinates).
-  var visibleSelectedPanes: [(selectionID: UUID, frame: CGRect)] {
-    sessions.values.compactMap { session in
-      guard let id = session.selectionID, session.isOnScreen else { return nil }
-      return (id, session.paneFrame)
-    }
+  private func saveWindowRules() {
+    if persists { SettingsStore.saveLayerWindowRules(windowRules, namespace: namespace) }
   }
 
-  /// The paragraph translated once while its translation shows, and the pane it is in, so
-  /// the configuration can lift it and offer to take it away (§二).
-  var translatedOnce: (paragraph: CGRect, pane: CGRect)? {
-    guard let oneOff, !oneOff.isFinished, oneOff.isOnScreen, let frame = oneOff.shownParagraphFrame else {
-      return nil
-    }
-    return (frame, oneOff.paneFrame)
+  private func hint(_ text: String, at point: CGPoint) {
+    pill.flash(text: text, near: LayerScreenGeometry.appKitPoint(fromTopLeft: point))
   }
 
-  // MARK: One paragraph, once
-
-  /// Translates one paragraph in place until it leaves the screen, its text changes or the
-  /// user presses Escape (the configuration's plain click).
-  func translateOnce(
-    paragraph: LayerBlock, element: AccessibilityLayerNode, pane: AccessibilityLayerNode,
-    window: AccessibilityLayerNode, application: LayerApplication
-  ) {
-    dismissOneOff()
-    let session = LayerPaneSession(
-      application: application, window: window, pane: pane, selectionID: nil,
-      paragraph: (paragraph, element), owner: self)
-    oneOff = session
-    session.read()
-  }
-
-  func dismissOneOff() {
-    oneOff?.close()
-    oneOff = nil
+  private func enableTree(of application: LayerApplication) {
+    guard !enabledTrees.contains(application.processIdentifier) else { return }
+    enabledTrees.insert(application.processIdentifier)
+    application.enableAccessibilityTree()
   }
 
   // MARK: Loop
@@ -124,7 +189,7 @@ final class TranslationLayerController {
     tickCount += 1
     if tickCount % 30 == 1 { discover() }
     // Nothing to follow: no window list, no pointer.
-    guard !sessions.isEmpty || oneOff != nil else { return }
+    guard !sessions.isEmpty else { return }
     if let settle = windowsSettleAt, Date() >= settle {
       windowsSettleAt = nil
       windows = LayerWindowInfo.onScreen()
@@ -132,13 +197,13 @@ final class TranslationLayerController {
       windows = LayerWindowInfo.onScreen()
     }
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
-    for session in allSessions {
+    for session in sessions {
       session.step(windows: windows, mouse: mouse)
     }
-    if let oneOff, oneOff.isFinished {
-      oneOff.close()
-      self.oneOff = nil
+    for session in sessions where session.isFinished || session.isEmpty {
+      session.close()
     }
+    sessions.removeAll(where: \.isFinished)
   }
 
   /// When the windows of a newly active app have finished animating into place.
@@ -150,77 +215,78 @@ final class TranslationLayerController {
   private func frontApplicationChanged(to pid: pid_t?) {
     let settle = Date().addingTimeInterval(0.3)
     windowsSettleAt = settle
-    for session in allSessions where session.application.processIdentifier != pid {
+    for session in sessions where session.application.processIdentifier != pid {
       session.hideUntilWindowsSettle(settle)
     }
   }
 
-  private var allSessions: [LayerPaneSession] {
-    Array(sessions.values) + (oneOff.map { [$0] } ?? [])
-  }
-
   private func noteScroll() {
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
-    for session in allSessions where session.paneFrame.contains(mouse) {
+    for session in sessions where session.paneFrame.contains(mouse) {
       session.noteScroll()
     }
   }
 
-  /// Finds the chosen panes in the windows of running applications. Panes already found are
-  /// kept while their element is alive and their window shows the same site.
+  /// Finds the panes of every window translated whole (§三). Panes ⌥D already uses come
+  /// first; a pane no longer found stops translating whole.
   func discover() {
-    guard !discovering, !selections.isEmpty else { return }
+    guard !discovering else { return }
+    guard !windowRules.isEmpty else {
+      for session in sessions where session.translatesAll { session.translatesAll = false }
+      return
+    }
     discovering = true
-    let selections = selections
-    let bundles = Set(selections.map(\.bundleIdentifier))
+    let rules = windowRules
+    let bundles = Set(rules.map(\.bundleIdentifier))
     let applications = NSWorkspace.shared.runningApplications
       .filter { $0.bundleIdentifier.map(bundles.contains) ?? false && !$0.isHidden }
       .compactMap(LayerApplication.init)
-    for application in applications where !enabledTrees.contains(application.processIdentifier) {
-      enabledTrees.insert(application.processIdentifier)
-      application.enableAccessibilityTree()
-    }
-    let existing = sessions.mapValues { ($0.pane, $0.site) }
-    Task.detached(priority: .userInitiated) {
-      var found: [(key: String, selection: LayerSelection, application: LayerApplication,
-        window: AccessibilityLayerNode, pane: AccessibilityLayerNode, site: String?)] = []
+    applications.forEach(enableTree(of:))
+    let inUse = sessions.map { (pid: $0.application.processIdentifier, pane: $0.pane) }
+    Task.detached(priority: .utility) {
+      var found: [(application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode, site: String?)] = []
       for application in applications {
         for window in application.windows {
           let site = LayerSiteReader.site(of: window)
-          for selection in selections where selection.applies(to: application.bundleIdentifier, site: site) {
-            let key = "\(selection.id)-\(CFHash(window.element))"
-            if let (pane, knownSite) = existing[key], knownSite == site, pane.isAlive {
-              found.append((key, selection, application, window, pane, site))
-            } else if let pane = selection.locator.resolve(in: window) {
-              found.append((key, selection, application, window, pane, site))
-            }
+          guard rules.contains(where: { $0.applies(to: application.bundleIdentifier, site: site) }),
+            let windowFrame = window.frame
+          else {
+            continue
+          }
+          let preferred = inUse.filter { $0.pid == application.processIdentifier && $0.pane.isAlive }
+            .map(\.pane)
+            .filter { pane in pane.frame.map(windowFrame.intersects) ?? false }
+          for pane in LayerPaneRule.panes(in: window, preferred: preferred) {
+            found.append((application, window, pane, site))
           }
         }
       }
       let result = found
-      await MainActor.run { [weak self] in
-        self?.applyDiscovery(result.map { ($0.key, $0.selection, $0.application, $0.window, $0.pane, $0.site) })
-      }
+      await MainActor.run { [weak self] in self?.applyDiscovery(result) }
     }
   }
 
   private func applyDiscovery(
-    _ found: [(String, LayerSelection, LayerApplication, AccessibilityLayerNode, AccessibilityLayerNode, String?)]
+    _ found: [(application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode, site: String?)]
   ) {
     discovering = false
-    let keys = Set(found.map(\.0))
-    for (key, session) in sessions where !keys.contains(key) {
-      session.close()
-      sessions[key] = nil
+    for session in sessions where session.translatesAll
+      && !found.contains(where: { $0.pane.isSameElement(as: session.pane) })
+    {
+      session.translatesAll = false
     }
-    for (key, selection, application, window, pane, site) in found {
-      if let session = sessions[key], session.pane.isSameElement(as: pane) { continue }
-      sessions[key]?.close()
-      let session = LayerPaneSession(
-        application: application, window: window, pane: pane, selectionID: selection.id,
-        paragraph: nil, owner: self)
+    for (application, window, pane, site) in found {
+      if let session = sessions.first(where: { $0.pane.isSameElement(as: pane) }) {
+        if !session.translatesAll {
+          session.translatesAll = true
+          session.read()
+        }
+        continue
+      }
+      let session = LayerPaneSession(application: application, window: window, pane: pane, owner: self)
       session.site = site
-      sessions[key] = session
+      session.translatesAll = true
+      sessions.append(session)
       session.read()
       log("layer-pane-found app=\(application.bundleIdentifier)")
     }
@@ -238,6 +304,39 @@ final class TranslationLayerController {
   func log(_ event: String) {
     Self.logger.notice("\(event, privacy: .public)")
     lifecycleLog?(event)
+  }
+
+  /// A paragraph ⌥D asked for is already in the user's own language.
+  fileprivate func noteAlreadyMine(at frame: CGRect) {
+    let language = settings().requestLanguages.my
+    hint("这一段已经是\(language)", at: CGPoint(x: frame.midX, y: frame.maxY))
+  }
+}
+
+/// What ⌥D points at, read in the background from the app's tree.
+enum LayerParagraphFinder {
+  enum Result: @unchecked Sendable {
+    case paragraph(
+      LayerBlock, node: AccessibilityLayerNode, pane: AccessibilityLayerNode, window: AccessibilityLayerNode,
+      site: String?)
+    /// No paragraph there; `readsText` is false when the app shows no text at all.
+    case nothing(readsText: Bool)
+  }
+
+  static func find(at point: CGPoint, in application: LayerApplication) -> Result {
+    guard let hit = application.element(at: point) else { return .nothing(readsText: false) }
+    guard let pane = LayerPaneRule.pane(from: hit), let paneFrame = pane.frame,
+      let window = hit.window ?? pane.window
+    else {
+      return .nothing(readsText: LayerPaneRule.holdsText(hit.window ?? hit))
+    }
+    let located = LayerBlockExtractor.located(in: pane, visible: paneFrame)
+    guard let index = LayerBlockExtractor.paragraphIndex(at: point, in: located.map(\.block)) else {
+      return .nothing(readsText: true)
+    }
+    return .paragraph(
+      located[index].block, node: located[index].node, pane: pane, window: window,
+      site: LayerSiteReader.site(of: window))
   }
 }
 
@@ -270,19 +369,44 @@ extension AccessibilityLayerNode {
   }
 }
 
-/// One pane in one window, or one paragraph translated once.
+/// A paragraph by the element it was read from and its text: an element may hold several
+/// hand-broken lines, and another paragraph with the same text (a repeated alert) is not it.
+struct LayerParagraphMark {
+  let element: AccessibilityLayerNode
+  let text: String
+  /// Reads in a row that did not find it; after two it is gone (§二 自然消失).
+  var misses = 0
+
+  func matches(_ block: LayerBlock, node: AccessibilityLayerNode) -> Bool {
+    block.text == text && node.isSameElement(as: element)
+  }
+}
+
+/// One pane in one window: every paragraph of it while its window is translated whole (§三),
+/// plus the paragraphs ⌥D asked for, minus those ⌥D turned back (§二).
 @MainActor
 final class LayerPaneSession {
   let application: LayerApplication
   let window: AccessibilityLayerNode
   let pane: AccessibilityLayerNode
-  let selectionID: UUID?
-  /// Set for a paragraph translated once: only this text, read from this element, is drawn.
-  /// Another paragraph with the same text elsewhere (a repeated alert) stays untouched.
-  let paragraph: String?
-  private let paragraphElement: AccessibilityLayerNode?
-  private var paragraphFrame: CGRect?
   var site: String?
+  /// The window is translated whole.
+  var translatesAll = false {
+    didSet {
+      guard translatesAll != oldValue else { return }
+      if !translatesAll { restored = [] }
+      needsRead = true
+    }
+  }
+  /// Paragraphs ⌥D asked for; they are translated whatever the whole-window rules say.
+  private var picked: [LayerParagraphMark] = []
+  /// Paragraphs of a window translated whole that ⌥D turned back to their original.
+  private var restored: [LayerParagraphMark] = []
+  /// Every paragraph of the last read, to find the one under the pointer without reading again.
+  private var readBlocks: [LayerBlock] = []
+  private var readNodes: [AccessibilityLayerNode] = []
+  /// The element each shown paragraph was read from, in the order of `blocks`.
+  private var shownNodes: [AccessibilityLayerNode] = []
   private unowned let owner: TranslationLayerController
 
   private let overlay = LayerOverlayPanel()
@@ -309,23 +433,17 @@ final class LayerPaneSession {
   private var peekSuppressed: Int?
   private var hasShownTranslations = false
   private(set) var isFinished = false
-  private var readsWithoutParagraph = 0
   /// Follows the content frame by frame while the screen can be read (§五).
   private var motion: LayerMotionStream?
   private var lastCoveringCount = -1
 
   init(
     application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode,
-    selectionID: UUID?, paragraph: (block: LayerBlock, element: AccessibilityLayerNode)?,
     owner: TranslationLayerController
   ) {
     self.application = application
     self.window = window
     self.pane = pane
-    self.selectionID = selectionID
-    self.paragraph = paragraph?.block.text
-    paragraphElement = paragraph?.element
-    paragraphFrame = paragraph?.block.frame
     self.owner = owner
     status.onRetry = { [weak self] in
       self?.failure = nil
@@ -342,14 +460,41 @@ final class LayerPaneSession {
     isFinished = true
   }
 
-  /// The content moved. Followed frame by frame when the screen can be read; hidden until it
-  /// settles otherwise (§五).
-  /// Where the paragraph translated once is, while its translation is drawn.
-  var shownParagraphFrame: CGRect? {
-    guard paragraph != nil, !overlay.overlayView.drawings.isEmpty else { return nil }
-    return blocks.first?.frame
+  /// Nothing left to translate: neither the whole window nor a paragraph ⌥D asked for.
+  var isEmpty: Bool { !translatesAll && picked.isEmpty }
+
+  // MARK: ⌥D
+
+  /// Translates this paragraph from now on (§二).
+  func pick(_ block: LayerBlock, element: AccessibilityLayerNode) {
+    restored.removeAll { $0.matches(block, node: element) }
+    if !picked.contains(where: { $0.matches(block, node: element) }) {
+      picked.append(LayerParagraphMark(element: element, text: block.text))
+    }
+    needsRead = true
+    read()
   }
 
+  /// ⌥D on a paragraph of this pane from the last read: turns a translation back into its
+  /// original, or an original into its translation. Nil when no paragraph is there.
+  func toggleParagraph(at point: CGPoint) -> String? {
+    guard let index = LayerBlockExtractor.paragraphIndex(at: point, in: readBlocks) else { return nil }
+    let block = readBlocks[index]
+    let node = readNodes[index]
+    let isShown = blocks.contains { $0 == block }
+    if isShown {
+      picked.removeAll { $0.matches(block, node: node) }
+      if translatesAll { restored.append(LayerParagraphMark(element: node, text: block.text)) }
+      needsRead = true
+      read()
+      return "restored"
+    }
+    pick(block, element: node)
+    return "translated"
+  }
+
+  /// The content moved. Followed frame by frame when the screen can be read; hidden until it
+  /// settles otherwise (§五).
   /// Hidden while another app's windows move in front (see `frontApplicationChanged`).
   func hideUntilWindowsSettle(_ date: Date) {
     if windowsSettle == nil, overlay.alphaValue > 0 { owner.log("layer-hidden-for-app-switch") }
@@ -497,12 +642,15 @@ final class LayerPaneSession {
     let pane = pane
     let window = window
     let wantsColors = Self.readsScreen
+    let translatesAll = translatesAll
     Task.detached(priority: .userInitiated) {
       guard let frame = pane.currentFrame else {
         await MainActor.run { [weak self] in self?.isFinished = true }
         return
       }
       let located = LayerBlockExtractor.located(in: pane, visible: frame)
+      // Whole-window translation leaves navigation and one-word labels alone (§四).
+      let automatic = translatesAll ? LayerBlockExtractor.located(in: pane, visible: frame, automatic: true) : []
       var image: CGImage?
       var windowFrame: CGRect?
       if wantsColors, let current = window.currentFrame {
@@ -511,46 +659,54 @@ final class LayerPaneSession {
       }
       let blocks = located.map(\.block)
       let nodes = located.map(\.node)
+      let automaticIndices = Set(located.indices.filter { index in
+        automatic.contains { $0.block == located[index].block && $0.node.isSameElement(as: located[index].node) }
+      })
       let capturedImage = image
       let capturedWindowFrame = windowFrame
       await MainActor.run { [weak self] in
         self?.applyRead(
-          frame: frame, blocks: blocks, nodes: nodes, image: capturedImage,
+          frame: frame, blocks: blocks, nodes: nodes, automatic: automaticIndices, image: capturedImage,
           windowFrame: capturedWindowFrame)
       }
     }
   }
 
   private func applyRead(
-    frame: CGRect, blocks newBlocks: [LayerBlock], nodes: [AccessibilityLayerNode], image: CGImage?,
-    windowFrame: CGRect?
+    frame: CGRect, blocks newBlocks: [LayerBlock], nodes: [AccessibilityLayerNode], automatic: Set<Int>,
+    image: CGImage?, windowFrame: CGRect?
   ) {
     isReading = false
     lastRead = Date()
     place(frame)
-    var blocks = newBlocks
-    var nodes = nodes
-    if let paragraph {
-      // The element it was read from, and the same line in it: an element may hold several
-      // hand-broken lines.
-      let matches = blocks.indices.filter {
-        blocks[$0].text == paragraph && paragraphElement.map(nodes[$0].isSameElement) ?? true
-      }
-      let last = paragraphFrame ?? .zero
-      let keep = matches.min { abs(blocks[$0].frame.midY - last.midY) < abs(blocks[$1].frame.midY - last.midY) }
-        .map { [$0] } ?? []
-      if let index = keep.first { paragraphFrame = blocks[index].frame }
-      blocks = keep.map { blocks[$0] }
-      nodes = keep.map { nodes[$0] }
-      readsWithoutParagraph = blocks.isEmpty ? readsWithoutParagraph + 1 : 0
-      // Gone from the screen, or its text changed: the one-off translation ends.
-      if readsWithoutParagraph >= 2 { isFinished = true }
+    readBlocks = newBlocks
+    readNodes = nodes
+    // What shows: the whole window's paragraphs but those turned back, and those ⌥D asked for.
+    for index in picked.indices {
+      let found = newBlocks.indices.contains { picked[index].matches(newBlocks[$0], node: nodes[$0]) }
+      picked[index].misses = found ? 0 : picked[index].misses + 1
     }
-    self.blocks = blocks
+    picked.removeAll { $0.misses >= 2 }
+    let shown = newBlocks.indices.filter { index in
+      let block = newBlocks[index], node = nodes[index]
+      if picked.contains(where: { $0.matches(block, node: node) }) { return true }
+      return automatic.contains(index) && !restored.contains(where: { $0.matches(block, node: node) })
+    }
+    // ⌥D on a paragraph already in the user's own language has nothing to show.
+    let filter = LayerLanguageFilter(myLanguage: owner.currentSettings.requestLanguages.my)
+    for index in shown where !filter.needsTranslation(newBlocks[index].text) {
+      let block = newBlocks[index], node = nodes[index]
+      guard picked.contains(where: { $0.matches(block, node: node) }) else { continue }
+      picked.removeAll { $0.matches(block, node: node) }
+      owner.noteAlreadyMine(at: block.frame)
+    }
+    blocks = shown.map { newBlocks[$0] }
+    shownNodes = shown.map { nodes[$0] }
     if let windowFrame = window.frame {
       motion?.resetBaseline(pane: frame.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY))
     }
-    let picks = [0, blocks.count / 2, blocks.count - 1].filter { $0 >= 0 && $0 < nodes.count }
+    // Motion is noticed from any paragraph of the pane, shown or not.
+    let picks = [0, nodes.count / 2, nodes.count - 1].filter { $0 >= 0 && $0 < nodes.count }
     anchors = Array(Set(picks)).sorted().map { nodes[$0] }
     anchorFrames = anchors.map(\.frame)
     if let image, let windowFrame {
@@ -626,6 +782,13 @@ final class LayerPaneSession {
         text: text, lineHeight: block.lineHeight, style: styles[block.maskedText] ?? paper)
     }
     overlay.overlayView.show(drawings, scale: scale)
+    // Paragraphs ⌥D asked for breathe until their translation arrives (§二 等待).
+    let waiting = failure == nil
+      ? zip(blocks, shownNodes).filter { block, node in
+        owner.translations[block.maskedText] == nil && picked.contains { $0.matches(block, node: node) }
+      }.map(\.0) : []
+    overlay.overlayView.setPending(waiting.map { $0.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) })
+    if isOnScreen, !waiting.isEmpty { overlay.orderFront(nil) }
     let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
     if settled {
       NSAnimationContext.runAnimationGroup { context in
@@ -652,7 +815,8 @@ final class LayerPaneSession {
       status.show(
         text: failure == .notConfigured ? "还没有模型服务" : "翻译失败 · 点按重试",
         retryable: failure != .notConfigured, in: pane)
-    } else if translating != nil {
+    } else if translating != nil, translatesAll {
+      // A paragraph ⌥D asked for says it is waiting by breathing (§二); the pill is for windows.
       let count = Set(pendingBlocks.map(\.maskedText)).count
       if count > 0 { status.show(text: "翻译中 · \(count) 条", retryable: false, in: pane) }
     } else {

@@ -279,4 +279,8 @@ enum LayerScreenGeometry {
   static func topLeftPoint(fromAppKit point: CGPoint) -> CGPoint {
     CGPoint(x: point.x, y: primaryHeight - point.y)
   }
+
+  static func appKitPoint(fromTopLeft point: CGPoint) -> CGPoint {
+    CGPoint(x: point.x, y: primaryHeight - point.y)
+  }
 }

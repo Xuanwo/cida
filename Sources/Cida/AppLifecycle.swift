@@ -62,6 +62,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         self?.globalHotKey?.setSuspended(isSuspended)
         self?.captureHotKey?.setSuspended(isSuspended)
         self?.layerHotKey?.setSuspended(isSuspended)
+        self?.layerWindowHotKey?.setSuspended(isSuspended)
       },
       selectionAccess: launchOptions.selectionAccess,
       captureAccess: launchOptions.captureAccess,
@@ -84,15 +85,15 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private let updater = CidaUpdater()
   private var showPanelMenuItem: NSMenuItem?
   private var captureMenuItem: NSMenuItem?
-  private var layerMenuItem: NSMenuItem?
   private var globalHotKey: GlobalHotKey?
   private var captureHotKey: GlobalHotKey?
   private var layerHotKey: GlobalHotKey?
+  /// The layer shortcut with ⇧: the whole window (`Design/spec/translation-layer.md` §三).
+  private var layerWindowHotKey: GlobalHotKey?
   /// The translation layer (`Design/spec/translation-layer.md`); nil in automation that shows
   /// no interactive UI.
   private var translationLayer: TranslationLayerController?
   /// The layer's configuration is over the screen; the other shortcuts wait for it.
-  private var isConfiguringLayer = false
   private var performanceProbeView: FramePacingProbeNSView?
   private var millionCharacterPasteWorkload: MillionCharacterPasteWorkload?
   private var inputInteractionProbe: InputInteractionProbe?
@@ -143,7 +144,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         self?.handleCaptureShortcut()
       }
       layerHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut) { [weak self] in
-        self?.handleLayerShortcut()
+        self?.handleLayerShortcut(wholeWindow: false)
+      }
+      layerWindowHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut.addingShift) { [weak self] in
+        self?.handleLayerShortcut(wholeWindow: true)
       }
       startTranslationLayer()
       warmUpTextRecognition()
@@ -220,7 +224,15 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       case .captureText: captureHotKey
       case .translationLayer: layerHotKey
       }
+    let previous = hotKey?.shortcut
     if let hotKey, !hotKey.update(to: shortcut) {
+      return false
+    }
+    // The layer's ⇧ variant moves with it; both register or neither changes.
+    if action == .translationLayer, let windowHotKey = layerWindowHotKey,
+      !windowHotKey.update(to: shortcut.addingShift)
+    {
+      if let previous { _ = hotKey?.update(to: previous) }
       return false
     }
     updateMenuItem(for: action, shortcut: shortcut)
@@ -228,11 +240,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func updateMenuItem(for action: GlobalShortcutAction, shortcut: GlobalShortcut) {
+    // The layer acts on what is under the pointer, so it has no menu item.
     let item =
       switch action {
       case .showPanel: showPanelMenuItem
       case .captureText: captureMenuItem
-      case .translationLayer: layerMenuItem
+      case .translationLayer: nil as NSMenuItem?
       }
     item?.keyEquivalent = shortcut.menuKeyEquivalent
     item?.keyEquivalentModifierMask = shortcut.menuModifierMask
@@ -243,7 +256,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// already being translated (`Design/spec/panel.md` §一 带入选区). The
   /// menu bar item shows the panel without reading anything.
   private func handleGlobalShortcut() {
-    guard let panelController, !isCapturing, !isConfiguringLayer else { return }
+    guard let panelController, !isCapturing else { return }
     if panelController.isVisible {
       panelController.hide()
       return
@@ -269,7 +282,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// permission it asks for it instead.
   @objc
   func handleCaptureShortcut() {
-    guard !isCapturing, !isReadingSelection, !isConfiguringLayer else { return }
+    guard !isCapturing, !isReadingSelection else { return }
     panelController?.hide()
     model.refreshCaptureAccess()
     guard model.isCaptureAccessGranted else {
@@ -317,29 +330,24 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     translationLayer = controller
   }
 
-  /// The layer shortcut (`Design/spec/translation-layer.md` §二): the configuration over the
-  /// screen under the pointer. Without the Accessibility permission it asks for it instead.
-  @objc
-  func handleLayerShortcut() {
-    guard let translationLayer, !isCapturing, !isReadingSelection, !isConfiguringLayer else { return }
-    panelController?.hide()
+  /// The layer shortcut (`Design/spec/translation-layer.md` §二, §三): the paragraph under
+  /// the pointer turns into its translation and back; with ⇧, the whole window. Without the
+  /// Accessibility permission it asks for it instead.
+  private func handleLayerShortcut(wholeWindow: Bool) {
+    guard let translationLayer, !isCapturing, !isReadingSelection else { return }
     model.refreshSelectionAccess()
     guard model.isSelectionAccessGranted else {
       model.requestSelectionAccess()
       return
     }
-    let mouse = NSEvent.mouseLocation
-    guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main
-    else { return }
     // The request may need the Keychain key, which the first show recovers.
     recoverAPIKeyIfNeeded()
-    isConfiguringLayer = true
-    lifecycleLog?.record("layer-configuration-shown")
-    Task { @MainActor [weak self] in
-      LayerConfiguration.captureShortcutText = self?.model.settings.captureShortcut.displayText ?? "⌥ S"
-      await LayerConfiguration(controller: translationLayer, screen: screen).run()
-      self?.isConfiguringLayer = false
-      self?.lifecycleLog?.record("layer-configuration-closed")
+    let point = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
+    lifecycleLog?.record(wholeWindow ? "layer-window-shortcut" : "layer-paragraph-shortcut")
+    if wholeWindow {
+      translationLayer.toggleWindow(at: point)
+    } else {
+      translationLayer.toggleParagraph(at: point)
     }
   }
 
@@ -452,12 +460,6 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     menu.addItem(capture)
     captureMenuItem = capture
     updateMenuItem(for: .captureText, shortcut: model.settings.captureShortcut)
-    let layer = NSMenuItem(
-      title: "翻译图层", action: #selector(handleLayerShortcut), keyEquivalent: "")
-    layer.target = self
-    menu.addItem(layer)
-    layerMenuItem = layer
-    updateMenuItem(for: .translationLayer, shortcut: model.settings.layerShortcut)
     let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)

@@ -174,36 +174,43 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse(driver.stopButton.exists, "Nothing was requested")
   }
 
-  /// `Design/spec/translation-layer.md`: ⌥D shows the configuration over the screen; a click
-  /// translates the paragraph under the pointer once, ⇧-click keeps translating the pane, which
-  /// follows scrolling and is found again after Cida relaunches.
-  func testTranslationLayerTranslatesAParagraphOnceAndKeepsAChosenPane() throws {
+  /// `Design/spec/translation-layer.md`: ⌥D turns the paragraph under the pointer into its
+  /// translation and back, a paragraph at a time; ⌥⇧D translates the whole window, follows
+  /// scrolling, is kept across a relaunch, and stops on a second press.
+  func testTranslationLayerTogglesParagraphsAndTheWholeWindow() throws {
     driver.launch()
     driver.hidePanel()
     let source = SourceApplication()
     source.launch()
     addTeardownBlock { [source] in source.app.terminate() }
-    let configuration = driver.app.dialogs["translation-layer-configuration"]
-    let content = driver.element(identifier: "translation-layer-content")
+    let overlays = driver.app.descendants(matching: .any).matching(identifier: "translation-layer-content")
     func paragraph(_ number: Int) -> XCUIElement {
       source.app.staticTexts.matching(
         NSPredicate(format: "value BEGINSWITH %@ OR label BEGINSWITH %@",
           "CIDA LAYER PARAGRAPH \(number).", "CIDA LAYER PARAGRAPH \(number).")
       ).firstMatch
     }
-    func translations(timeout: TimeInterval, containing marker: String) -> String? {
+    /// Everything the layer draws now, across its panes.
+    func shown() -> String {
+      overlays.allElementsBoundByIndex.compactMap { $0.value as? String }.joined(separator: "\n")
+    }
+    func wait(timeout: TimeInterval, until condition: (String) -> Bool) -> String? {
       let deadline = Date().addingTimeInterval(timeout)
       repeat {
-        if content.exists, let value = content.value as? String, value.contains(marker) { return value }
+        let text = shown()
+        if condition(text) { return text }
         RunLoop.current.run(until: Date().addingTimeInterval(0.2))
       } while Date() < deadline
       return nil
     }
-    func attach(_ name: String, movingPointerAway: Bool = true) {
-      // A pointer resting on a translation shows the original (§四); the fade takes 150 ms.
-      if movingPointerAway {
-        source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-      }
+    func press(on number: Int, wholeWindow: Bool = false) {
+      paragraph(number).coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).hover()
+      RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+      source.press("d", modifierFlags: wholeWindow ? [.option, .shift] : .option)
+    }
+    func attach(_ name: String) {
+      // A pointer resting on a translation shows the original (§六); the fade takes 150 ms.
+      source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
       RunLoop.current.run(until: Date().addingTimeInterval(0.6))
       let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
       shot.name = name
@@ -212,55 +219,48 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     }
     XCTAssertTrue(paragraph(2).waitForExistence(timeout: 5), "The source shows its article")
 
-    // One paragraph, once.
-    source.press("d", modifierFlags: .option)
-    XCTAssertTrue(configuration.waitForExistence(timeout: 5), "⌥D shows the configuration")
-    let second = paragraph(2).coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-    second.hover()
-    RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-    attach("layer-configuration", movingPointerAway: false)
-    second.click()
-    XCTAssertTrue(configuration.waitForNonExistence(timeout: 5), "A click closes the configuration")
-    let once = try XCTUnwrap(
-      translations(timeout: 20, containing: "CIDA_LAYER_TRANSLATED_2"), "The paragraph is translated in place")
-    XCTAssertFalse(once.contains("CIDA_LAYER_TRANSLATED_3"), "Only that paragraph")
+    // ⌥D: this paragraph, then another; the rest stay original.
+    press(on: 2)
+    let one = try XCTUnwrap(wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") }, "⌥D translates it in place")
+    XCTAssertFalse(one.contains("CIDA_LAYER_TRANSLATED_3"), "Only that paragraph")
     attach("layer-one-paragraph")
-    source.app.typeKey(.escape, modifierFlags: [])
-    XCTAssertTrue(content.waitForNonExistence(timeout: 5), "Escape ends it")
+    press(on: 3)
+    XCTAssertNotNil(
+      wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
+      "A second paragraph joins the first")
+    attach("layer-two-paragraphs")
 
-    // A pane, kept.
-    source.press("d", modifierFlags: .option)
-    XCTAssertTrue(configuration.waitForExistence(timeout: 5))
-    second.hover()
-    RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-    XCUIElement.perform(withKeyModifiers: .shift) { second.click() }
-    let hint = driver.element(identifier: "translation-layer-hint")
-    let chosen = NSPredicate(format: "label CONTAINS %@", "不再翻译这个区域")
-    XCTAssertEqual(
-      XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: chosen, object: hint)], timeout: 5),
-      .completed, "⇧-click keeps the pane and offers to stop")
-    attach("layer-configuration-lifted", movingPointerAway: false)
-    driver.app.typeKey(.return, modifierFlags: [])
-    XCTAssertTrue(configuration.waitForNonExistence(timeout: 5), "⏎ finishes")
-    let kept = try XCTUnwrap(translations(timeout: 20, containing: "CIDA_LAYER_TRANSLATED_3"))
-    XCTAssertTrue(kept.contains("CIDA_LAYER_TRANSLATED_1"), "Every visible paragraph of the pane")
-    attach("layer-pane")
+    // ⌥D on a translation turns it back.
+    press(on: 2)
+    XCTAssertNotNil(
+      wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
+      "Only the paragraph pressed on turns back")
+
+    // ⌥⇧D: the whole window.
+    press(on: 2, wholeWindow: true)
+    XCTAssertNotNil(
+      wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_1") && $0.contains("CIDA_LAYER_TRANSLATED_2") },
+      "Every paragraph of the window")
+    attach("layer-whole-window")
 
     // New paragraphs scrolled into view are translated too.
     let article = source.app.descendants(matching: .any).matching(identifier: "source-article").firstMatch
     let firstTop = paragraph(1).frame.minY
     article.scroll(byDeltaX: 0, deltaY: -600)
     if abs(paragraph(1).frame.minY - firstTop) < 1 { article.scroll(byDeltaX: 0, deltaY: 600) }
-    XCTAssertNotNil(translations(timeout: 20, containing: "CIDA_LAYER_TRANSLATED_12"), "Scrolled-in paragraphs follow")
+    XCTAssertNotNil(wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_12") }, "Scrolled-in paragraphs follow")
     attach("layer-after-scroll")
 
-    // The pane is remembered.
+    // The window is remembered, and a second ⌥⇧D stops it.
     driver.terminate()
     driver.launch()
     driver.hidePanel()
     source.app.activate()
     XCTAssertNotNil(
-      translations(timeout: 25, containing: "CIDA_LAYER_TRANSLATED_"), "The chosen pane comes back after a relaunch")
+      wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_") }, "The whole window comes back after a relaunch")
+    source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+    source.press("d", modifierFlags: [.option, .shift])
+    XCTAssertNotNil(wait(timeout: 10) { $0.isEmpty }, "⌥⇧D again stops it")
   }
 
   /// `Design/spec/configuration.md` §四: Settings starts with the onboarding card, copies the
@@ -389,7 +389,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       driver.app.buttons["settings-shortcut-reset"].exists, "The default has nothing to restore")
     let captureChip = driver.app.buttons["settings-capture-shortcut"]
     XCTAssertEqual(captureChip.label, "截图翻译快捷键 ⌥ S")
-    XCTAssertEqual(driver.app.buttons["settings-layer-shortcut"].label, "翻译图层快捷键 ⌥ D")
+    XCTAssertEqual(driver.app.buttons["settings-layer-shortcut"].label, "原处翻译快捷键 ⌥ D")
     XCTAssertTrue(
       driver.element(identifier: "settings-selection-access-granted").exists,
       "The guest granted Accessibility, and the 权限 group reads it")

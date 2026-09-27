@@ -22,6 +22,8 @@ protocol LayerNode {
   var url: URL? { get }
   /// The bounds of a character range in a text area, for documents held in one element.
   func bounds(ofCharacters range: NSRange) -> CGRect?
+  /// Whether two reads refer to the same element of the application.
+  func isSameElement(as other: Self) -> Bool
 }
 
 enum LayerRole {
@@ -31,6 +33,8 @@ enum LayerRole {
   static let listMarker = "AXListMarker"
   static let textArea = "AXTextArea"
   static let webArea = "AXWebArea"
+  /// A navigation tree: Slack's channel list, Finder's sidebar, Mail's mailboxes.
+  static let outline = "AXOutline"
   static let window = "AXWindow"
   static let application = "AXApplication"
 
@@ -109,6 +113,43 @@ enum LayerPaneRule {
     }
     guard let firstLarge else { return nil }
     return viewport(of: firstLarge)
+  }
+
+  /// A window's panes, for whole-window translation (§三): the pane of each paragraph, the
+  /// smaller one where two overlap, `preferred` panes (those ⌥D already uses) first.
+  /// Paragraphs outside every pane stay untranslated.
+  static func panes<Node: LayerNode>(in window: Node, preferred: [Node] = []) -> [Node] {
+    guard let windowFrame = window.frame else { return preferred }
+    var candidates: [(node: Node, frame: CGRect)] = preferred.compactMap { node in node.frame.map { (node, $0) } }
+    let windowArea = windowFrame.width * windowFrame.height
+    for (block, node) in LayerBlockExtractor.located(in: window, visible: windowFrame, automatic: true) {
+      let center = CGPoint(x: block.frame.midX, y: block.frame.midY)
+      // A paragraph already inside a pane of reasonable size has its pane; one inside only a
+      // pane that spans most of the window may still sit in a smaller one of its own.
+      if candidates.contains(where: { $0.frame.contains(center) && $0.frame.width * $0.frame.height < windowArea / 2 }) {
+        continue
+      }
+      guard let pane = pane(from: node), let frame = pane.frame, pane.role != LayerRole.outline,
+        !candidates.contains(where: { $0.node.isSameElement(as: pane) })
+      else {
+        continue
+      }
+      candidates.append((pane, frame))
+    }
+    // Where two overlap the smaller one scrolls on its own; the larger adds only its margins.
+    var chosen: [(node: Node, frame: CGRect)] = []
+    let preferredCount = min(preferred.count, candidates.count)
+    let ordered = Array(candidates[..<preferredCount])
+      + candidates[preferredCount...].sorted { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+    for candidate in ordered {
+      let overlaps = chosen.contains { existing in
+        let shared = existing.frame.intersection(candidate.frame)
+        let smaller = min(existing.frame.width * existing.frame.height, candidate.frame.width * candidate.frame.height)
+        return !shared.isNull && shared.width * shared.height > smaller * 0.1
+      }
+      if !overlaps { chosen.append(candidate) }
+    }
+    return chosen.map(\.node)
   }
 
   static func enclosingList<Node: LayerNode>(of node: Node) -> Node? {
@@ -210,77 +251,6 @@ enum LayerScope: Hashable, Codable, Sendable {
   }
 }
 
-// MARK: - Locating a pane again
-
-/// How a chosen pane is found again after relaunches, channel switches and resizes: what it
-/// is (role, DOM classes, identifier) and where it sits in its window, relative to the window.
-struct LayerPaneLocator: Codable, Equatable, Sendable {
-  var role: String
-  var subrole: String?
-  var domClasses: [String]
-  var identifier: String?
-  /// The pane's frame as fractions of its window's frame.
-  var relativeFrame: CGRect
-
-  init<Node: LayerNode>(pane: Node, window: CGRect) {
-    role = pane.role
-    subrole = pane.subrole
-    domClasses = pane.domClasses
-    identifier = pane.identifier
-    relativeFrame = Self.relative(pane.frame ?? .zero, in: window)
-  }
-
-  init(
-    role: String, subrole: String? = nil, domClasses: [String] = [], identifier: String? = nil,
-    relativeFrame: CGRect
-  ) {
-    self.role = role
-    self.subrole = subrole
-    self.domClasses = domClasses
-    self.identifier = identifier
-    self.relativeFrame = relativeFrame
-  }
-
-  static func relative(_ frame: CGRect, in window: CGRect) -> CGRect {
-    guard window.width > 0, window.height > 0 else { return .zero }
-    return CGRect(
-      x: (frame.minX - window.minX) / window.width, y: (frame.minY - window.minY) / window.height,
-      width: frame.width / window.width, height: frame.height / window.height)
-  }
-
-  /// Whether `node` is the same kind of element: same role, and the same identifier or
-  /// DOM classes when the pane had them.
-  func matches<Node: LayerNode>(_ node: Node) -> Bool {
-    guard node.role == role, node.subrole == subrole else { return false }
-    if let identifier, !identifier.isEmpty { return node.identifier == identifier }
-    // State classes (hovered, selected, focus) come and go; the first class names the component.
-    if let first = domClasses.first { return node.domClasses.first == first }
-    return true
-  }
-
-  /// The matching element in `window` whose relative frame is closest to the remembered one.
-  func resolve<Node: LayerNode>(in window: Node, limit: Int = 20_000) -> Node? {
-    guard let windowFrame = window.frame else { return nil }
-    var best: (node: Node, distance: CGFloat)?
-    var stack = [window]
-    var visited = 0
-    while let node = stack.popLast(), visited < limit {
-      visited += 1
-      if matches(node), let frame = node.frame, LayerPaneRule.isLargeEnough(frame) {
-        let candidate = Self.relative(frame, in: windowFrame)
-        let distance =
-          abs(candidate.minX - relativeFrame.minX) + abs(candidate.minY - relativeFrame.minY)
-          + abs(candidate.width - relativeFrame.width) + abs(candidate.height - relativeFrame.height)
-        if best == nil || distance < best!.distance { best = (node, distance) }
-      }
-      stack.append(contentsOf: node.children)
-    }
-    // Far off means the layout changed beyond recognition; better nothing than the wrong pane.
-    guard let best, best.distance < 0.8 else { return nil }
-    return best.node
-  }
-}
-
 // MARK: - Blocks
 
 /// One paragraph to translate (§三 分块). Link text (mentions, URLs, channel names) stays as
@@ -313,6 +283,19 @@ struct LayerBlock: Equatable, Sendable {
 
   var verbatimTexts: [String] { pieces.filter(\.isVerbatim).map(\.text) }
 
+  /// A one-word label (a channel, file or branch name) rather than prose: fewer than two words
+  /// in scripts that separate words with spaces, fewer than four characters in those that do
+  /// not (§四). Whole-window translation leaves it alone.
+  var isLabel: Bool {
+    let prose = pieces.filter { !$0.isVerbatim }.map(\.text).joined()
+    let letters = prose.unicodeScalars.filter(CharacterSet.letters.contains)
+    let unspaced = letters.filter { (0x3040...0x30FF).contains($0.value) || (0x3400...0x9FFF).contains($0.value) }
+    if unspaced.count * 2 >= letters.count, !letters.isEmpty { return unspaced.count < 4 }
+    let words = prose.split(whereSeparator: { $0.isWhitespace })
+      .filter { $0.unicodeScalars.contains(where: CharacterSet.letters.contains) }
+    return words.count < 2
+  }
+
   /// Puts link and code text back where the model kept the placeholders.
   func restoringVerbatim(in translation: String) -> String {
     var restored = translation
@@ -333,8 +316,11 @@ enum LayerBlockExtractor {
 
   /// The paragraphs with the element each came from, so their positions can be read again
   /// without walking the pane.
+  ///
+  /// `automatic` is for whole-window translation (§四): navigation trees and one-word labels
+  /// are left alone there. Text the user is writing is never read.
   static func located<Node: LayerNode>(
-    in pane: Node, visible: CGRect? = nil
+    in pane: Node, visible: CGRect? = nil, automatic: Bool = false
   ) -> [(block: LayerBlock, node: Node)] {
     let clip = visible ?? pane.frame ?? .infinite
     var blocks: [(block: LayerBlock, node: Node)] = []
@@ -343,6 +329,9 @@ enum LayerBlockExtractor {
     while let node = stack.popLast(), visited < nodeLimit {
       visited += 1
       if let frame = node.frame, frame.height > 0, !frame.intersects(clip) { continue }
+      if automatic, node.role == LayerRole.outline { continue }
+      // A small editable area is an input field (a chat composer), as for panes.
+      if node.role == LayerRole.textArea, !LayerPaneRule.isLargeEnough(node.frame) { continue }
       if node.role == LayerRole.textArea {
         blocks.append(contentsOf: documentBlocks(of: node, visible: clip).map { ($0, node) })
         continue
@@ -367,7 +356,7 @@ enum LayerBlockExtractor {
       // Walk children in reading order.
       stack.append(contentsOf: children.reversed())
     }
-    return blocks
+    return automatic ? blocks.filter { !$0.block.isLabel } : blocks
   }
 
   /// Two or more texts, no links, one below the other without sharing a line: a native
@@ -480,6 +469,22 @@ enum LayerBlockExtractor {
         text: pieces.map(\.text).joined(), frame: frame, smallestPiece: smallestPiece))
   }
 
+  /// The paragraph on the pointer's line (§二): the one under it, or the nearest beside it,
+  /// so a press anywhere along a line picks that line even where its text stops short.
+  static func paragraph(at point: CGPoint, in blocks: [LayerBlock]) -> LayerBlock? {
+    paragraphIndex(at: point, in: blocks).map { blocks[$0] }
+  }
+
+  static func paragraphIndex(at point: CGPoint, in blocks: [LayerBlock]) -> Int? {
+    if let under = blocks.firstIndex(where: { $0.frame.contains(point) }) { return under }
+    func distance(_ frame: CGRect) -> CGFloat {
+      point.x < frame.minX ? frame.minX - point.x : max(0, point.x - frame.maxX)
+    }
+    return blocks.indices
+      .filter { blocks[$0].frame.minY - 2 <= point.y && point.y <= blocks[$0].frame.maxY + 2 }
+      .min { distance(blocks[$0].frame) < distance(blocks[$1].frame) }
+  }
+
   /// Without a character box, a line is judged from how much text fills the frame: at font
   /// size f a line is about 1.3 f tall and holds width / (0.52 f) characters, so the frame
   /// holds width × height / (0.68 f²). A piece shorter than two such lines is one line itself.
@@ -527,18 +532,16 @@ enum LayerBlockExtractor {
   }
 }
 
-// MARK: - Selections
+// MARK: - Whole windows
 
-/// A pane the user chose: in which app, for which site when it sits in web content, and how
-/// to find it again.
-struct LayerSelection: Codable, Equatable, Identifiable, Sendable {
-  var id = UUID()
+/// An app, or a site in a browser, whose windows are translated whole (§三). Kept across
+/// relaunches.
+struct LayerWindowRule: Codable, Equatable, Hashable, Sendable {
   var bundleIdentifier: String
   var applicationName: String
   var scope: LayerScope
-  var locator: LayerPaneLocator
 
-  /// Whether this selection applies to a window of `bundleIdentifier` showing `site`.
+  /// Whether a window of `bundleIdentifier` showing `site` is translated.
   func applies(to bundleIdentifier: String, site: String?) -> Bool {
     guard bundleIdentifier == self.bundleIdentifier else { return false }
     switch scope {

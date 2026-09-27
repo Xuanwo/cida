@@ -136,7 +136,7 @@ final class LayerOverlayPanel: NSPanel {
     isReleasedWhenClosed = false
     contentView = overlayView
     setAccessibilityIdentifier("translation-layer-overlay")
-    setAccessibilityLabel("翻译图层")
+    setAccessibilityLabel("原处译文")
   }
 
   override var canBecomeKey: Bool { false }
@@ -148,6 +148,9 @@ final class LayerOverlayPanel: NSPanel {
 final class LayerOverlayView: NSView {
   private var blockLayers: [CALayer] = []
   private let blocksLayer = CALayer()
+  /// Paragraphs ⌥D asked for, breathing on accent while their translation is on the way.
+  private let pendingLayer = CALayer()
+  private(set) var pendingFrames: [CGRect] = []
   private let occlusionMask = CAShapeLayer()
   private(set) var drawings: [LayerDrawing] = []
   private(set) var peekedIndex: Int?
@@ -158,6 +161,7 @@ final class LayerOverlayView: NSView {
     super.init(frame: frame)
     wantsLayer = true
     layer?.addSublayer(blocksLayer)
+    blocksLayer.addSublayer(pendingLayer)
     occlusionMask.fillRule = .evenOdd
     blocksLayer.mask = occlusionMask
     setAccessibilityElement(true)
@@ -177,6 +181,36 @@ final class LayerOverlayView: NSView {
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     blocksLayer.frame = bounds
+    pendingLayer.frame = bounds
+    CATransaction.commit()
+  }
+
+  /// The paragraphs waiting for their translation (§二 等待), in this view's coordinates:
+  /// accent at 16%, breathing down to 7% over `motion-breathe-ms`.
+  func setPending(_ frames: [CGRect]) {
+    guard frames != pendingFrames else { return }
+    pendingFrames = frames
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    pendingLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
+    for frame in frames {
+      let underlay = CALayer()
+      underlay.frame = frame.insetBy(dx: -3, dy: -3)
+      underlay.cornerRadius = 4
+      underlay.cornerCurve = .continuous
+      underlay.backgroundColor = CidaDesign.Palette.accent.appKit.withAlphaComponent(0.16).cgColor
+      if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        let breathe = CABasicAnimation(keyPath: "opacity")
+        breathe.fromValue = 1
+        breathe.toValue = 0.07 / 0.16
+        breathe.duration = CidaMotion.breatheHalfCycleSeconds
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        breathe.timingFunction = CidaMotion.Curve.easeInOut.timingFunction
+        underlay.add(breathe, forKey: "breathe")
+      }
+      pendingLayer.addSublayer(underlay)
+    }
     CATransaction.commit()
   }
 
@@ -198,6 +232,8 @@ final class LayerOverlayView: NSView {
     blockLayers.forEach { $0.removeFromSuperlayer() }
     blockLayers = drawings.compactMap { makeLayer(for: $0, scale: scale) }
     blockLayers.forEach(blocksLayer.addSublayer)
+    pendingLayer.removeFromSuperlayer()
+    blocksLayer.insertSublayer(pendingLayer, at: 0)
     blocksLayer.sublayerTransform = CATransform3DIdentity
     CATransaction.commit()
     setAccessibilityValue(drawings.map(\.text).joined(separator: "\n"))
@@ -282,6 +318,8 @@ final class LayerOverlayView: NSView {
 final class LayerStatusPanel: NSPanel {
   private let hosting: NSHostingView<LayerStatusPill>
   var onRetry: (() -> Void)?
+  /// When the latest transient message appeared; an older one's fade leaves it alone.
+  fileprivate var lastFlash: Date?
 
   init() {
     hosting = NSHostingView(rootView: LayerStatusPill(text: ""))
@@ -313,6 +351,103 @@ final class LayerStatusPanel: NSPanel {
     ignoresMouseEvents = !retryable
     setAccessibilityValue(text)
     orderFront(nil)
+  }
+}
+
+extension LayerStatusPanel {
+  /// Shows `text` for `seconds` at the lower right of `rect` (AppKit coordinates): turning a
+  /// window's translation on or off (§三).
+  func flash(text: String, in rect: CGRect, for seconds: Double) {
+    show(text: text, retryable: false, in: rect)
+    fadeOut(after: seconds)
+  }
+
+  /// Shows `text` beside the pointer (AppKit coordinates) for 1.2 s: nothing to translate
+  /// there (§二).
+  func flash(text: String, near point: CGPoint) {
+    show(text: text, retryable: false, in: CGRect(x: point.x, y: point.y, width: 0, height: 0))
+    let size = frame.size
+    setFrameOrigin(
+      CGPoint(x: point.x + 14 - LayerStatusPill.shadowMargin, y: point.y - 22 - size.height + LayerStatusPill.shadowMargin))
+    fadeOut(after: 1.2)
+  }
+
+  private func fadeOut(after seconds: Double) {
+    alphaValue = 1
+    let shown = Date()
+    lastFlash = shown
+    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+      guard let self, lastFlash == shown else { return }
+      NSAnimationContext.runAnimationGroup { context in
+        context.duration = CidaMotion.resolvedDuration(0.3, in: self)
+        self.animator().alphaValue = 0
+      } completionHandler: { [weak self] in
+        MainActor.assumeIsolated {
+          guard let self, self.lastFlash == shown else { return }
+          self.orderOut(nil)
+          self.alphaValue = 1
+        }
+      }
+    }
+  }
+}
+
+/// A window outlined for a moment when its translation turns on (§三): 1.5 pt accent, fading
+/// in over 150 ms, holding 600 ms, fading out over 300 ms.
+final class LayerOutlinePanel: NSPanel {
+  private let outline = CAShapeLayer()
+
+  init() {
+    super.init(
+      contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
+      defer: false)
+    level = .floating
+    collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+    isOpaque = false
+    backgroundColor = .clear
+    hasShadow = false
+    ignoresMouseEvents = true
+    animationBehavior = .none
+    hidesOnDeactivate = false
+    isReleasedWhenClosed = false
+    let view = NSView()
+    view.wantsLayer = true
+    view.layer?.addSublayer(outline)
+    contentView = view
+    outline.fillColor = nil
+    outline.strokeColor = CidaDesign.Palette.accent.appKit.cgColor
+    outline.lineWidth = 1.5
+    setAccessibilityIdentifier("translation-layer-outline")
+  }
+
+  override var canBecomeKey: Bool { false }
+
+  /// Outlines `rect` (AppKit coordinates) just outside its edge.
+  func flash(around rect: CGRect) {
+    let frame = rect.insetBy(dx: -3, dy: -3)
+    setFrame(frame, display: false)
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    outline.frame = CGRect(origin: .zero, size: frame.size)
+    outline.path = CGPath(
+      roundedRect: outline.frame.insetBy(dx: 0.75, dy: 0.75), cornerWidth: 12, cornerHeight: 12, transform: nil)
+    CATransaction.commit()
+    alphaValue = 0
+    orderFront(nil)
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = CidaMotion.resolvedDuration(0.15, in: self)
+      self.animator().alphaValue = 1
+    } completionHandler: { [weak self] in
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        guard let self else { return }
+        NSAnimationContext.runAnimationGroup { context in
+          context.duration = CidaMotion.resolvedDuration(0.3, in: self)
+          self.animator().alphaValue = 0
+        } completionHandler: { [weak self] in
+          MainActor.assumeIsolated { self?.orderOut(nil) }
+        }
+      }
+    }
   }
 }
 

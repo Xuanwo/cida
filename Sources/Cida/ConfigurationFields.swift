@@ -127,7 +127,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       Schema(
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionD.configurationText,
         example: "control+option+d",
-        description: "翻译图层的快捷键：选择要持续翻译的区域，写法同 shortcut，三个快捷键不能相同")
+        description: "原处翻译的快捷键：把指针下这一段换成译文、再按换回；加 shift 翻译整个窗口。写法同 shortcut，不能带 shift，三个快捷键（含加 shift 的这个）不能相同")
     case .launchAtLogin:
       Schema(
         type: "boolean", values: ["true", "false"], defaultValue: "false", example: "true",
@@ -245,6 +245,14 @@ enum ConfigurationField: String, CaseIterable, Sendable {
   /// Rules that span fields; checked after every change in a command is applied.
   static func validate(_ configuration: EditableConfiguration) throws(InvalidValue) {
     let settings = configuration.settings
+    if settings.layerShortcut.modifiers.contains(.shift) {
+      throw InvalidValue(field: "layer-shortcut", message: "layer-shortcut 不能带 shift：加 shift 是翻译整个窗口")
+    }
+    for field in [ConfigurationField.shortcut, .captureShortcut]
+    where settings.shortcut(for: field.shortcutAction!) == settings.layerShortcut.addingShift {
+      throw InvalidValue(
+        field: field.rawValue, message: "\(field.rawValue) 不能与 layer-shortcut 加 shift 相同（翻译整个窗口）")
+    }
     let fields: [ConfigurationField] = [.shortcut, .captureShortcut, .layerShortcut]
     for (index, field) in fields.enumerated() {
       for earlier in fields[..<index]

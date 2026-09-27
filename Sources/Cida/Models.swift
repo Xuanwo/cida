@@ -239,6 +239,16 @@ struct CidaSettings: Equatable, Sendable {
     }
   }
 
+  /// Every combination the global shortcuts hold: the layer's also holds its ⇧ variant.
+  var heldShortcuts: [GlobalShortcut] {
+    [shortcut, captureShortcut, layerShortcut, layerShortcut.addingShift]
+  }
+
+  /// No two shortcuts share a combination, and the layer's leaves ⇧ to its whole-window variant.
+  var hasValidShortcuts: Bool {
+    !layerShortcut.modifiers.contains(.shift) && Set(heldShortcuts).count == heldShortcuts.count
+  }
+
   mutating func setShortcut(_ newShortcut: GlobalShortcut, for action: GlobalShortcutAction) {
     switch action {
     case .showPanel: shortcut = newShortcut

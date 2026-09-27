@@ -82,6 +82,12 @@ struct GlobalShortcut: Equatable, Hashable, Sendable {
     self.init(keyCode: keyCode, modifiers: modifiers)
   }
 
+  /// The same key with ⇧ added: ⌥D's ⇧ variant translates the whole window
+  /// (`Design/spec/translation-layer.md` §三).
+  var addingShift: GlobalShortcut {
+    GlobalShortcut(keyCode: keyCode, modifiers: modifiers.union(.shift))
+  }
+
   /// The chip text: modifier symbols, then the key, separated by spaces.
   var displayText: String {
     (modifiers.symbols + [keyDisplayName]).joined(separator: " ")

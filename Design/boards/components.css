@@ -744,7 +744,7 @@ body {
 
 /* ---- Menu bar menu (spec/updates.md) ------------------------------------ */
 
-.status-menu-scene { position: relative; width: 320px; height: 236px; }
+.status-menu-scene { position: relative; width: 320px; height: 210px; }
 .status-menu-scene .menubar { width: 320px; }
 .status-menu {
   position: absolute;
@@ -907,14 +907,20 @@ body {
 .page-toc b { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.06em; color: #202124; }
 
 /* The layer's own parts. */
-.layer-hint { top: 14px; }
-/* Configuration: the veil covers every screen but the panes cut out of it; selected panes
- * are lifted like the capture sheet, the pane under the pointer is a dashed preview. */
-.mock-window.scaled { transform: scale(0.6); transform-origin: top left; }
-.layer-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--surface-paper) 72%, transparent); }
-.layer-lifted { position: absolute; border: 1px solid var(--panel-edge); border-radius: var(--radius-card); box-shadow: var(--panel-shadow); }
-.layer-preview { position: absolute; border: 1.5px dashed var(--accent); border-radius: var(--radius-card); }
-.layer-paragraph { position: absolute; border: 1.5px dotted var(--accent); border-radius: 4px; background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+/* ⌥D: the paragraph breathes on accent-soft while its translation is on the way. */
+.layer-pending {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* A hint by the pointer when there is nothing under it to translate. */
+.layer-tip { top: auto; transform: none; }
+.chat-empty { height: 120px; margin: 0 20px; }
+/* ⌥⇧D: the window outlined for a moment when it starts. */
+.layer-outline { position: absolute; border: 1.5px solid var(--accent); border-radius: 15px; pointer-events: none; }
+
 /* Without Screen Recording there is no background to sample: translations sit on paper. */
 .layer-card {
   display: block;

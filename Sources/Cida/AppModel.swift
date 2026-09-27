@@ -650,10 +650,9 @@ final class AppModel {
     for action: GlobalShortcutAction = .showPanel
   ) -> Bool {
     guard shortcut != settings.shortcut(for: action) else { return true }
-    let isHeldByAnotherAction = GlobalShortcutAction.allCases.contains {
-      $0 != action && settings.shortcut(for: $0) == shortcut
-    }
-    guard !isHeldByAnotherAction, applyGlobalShortcut(shortcut, action) else { return false }
+    var candidate = settings
+    candidate.setShortcut(shortcut, for: action)
+    guard candidate.hasValidShortcuts, applyGlobalShortcut(shortcut, action) else { return false }
     settings.setShortcut(shortcut, for: action)
     return true
   }
