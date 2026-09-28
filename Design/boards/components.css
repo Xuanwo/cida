@@ -904,6 +904,7 @@ body {
 .page-article h1 { margin: 0 0 8px; font-size: 30px; line-height: 38px; color: #202124; }
 .page-article .meta { margin-bottom: 20px; font-size: 13px; color: #5F6368; }
 .page-article p { margin: 0 0 16px; font-size: 16px; line-height: 27px; color: #3C4043; }
+.page-code { margin: 0 0 16px; padding: 12px 14px; border-radius: 6px; background: #F6F8FA; font: 13px/20px ui-monospace, Menlo, monospace; color: #24292F; }
 .page-toc { width: 170px; flex: none; font-size: 13px; line-height: 26px; color: #5F6368; }
 .page-toc b { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.06em; color: #202124; }
 
@@ -932,9 +933,9 @@ body {
   background: var(--surface-paper);
   color: var(--text-ink);
 }
-/* The sheet ends 3px below its last line, not at the bottom of the column. */
-.page-article.layer-sheet { align-self: flex-start; }
+/* A sheet ends 3px below its last line; what follows keeps its place. */
 .layer-sheet > :last-child { margin-bottom: 0; }
+.layer-sheet + .page-code { margin-top: 16px; }
 /* A translation: Cida's result serif; links in accent. Once written it carries no caret. */
 .layer-text { font-family: var(--font-result-cjk); }
 /* Waiting: Cida's caret breathes after the original (drawn at its brightest). */

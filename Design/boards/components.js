@@ -349,7 +349,9 @@ class CidaLayerScene extends HTMLElement {
 
   browser(layer) {
     const translated = layer === "translated";
-    // The article's paragraphs share one sheet of paper.
+    // The article's paragraphs share a sheet of paper; the code between them stays as it is
+    // and breaks the sheet in two.
+    const sheet = translated ? "layer-sheet" : "";
     const t = (original, translation) =>
       translated ? `<span class="layer-text">${translation}</span>` : original;
     return `
@@ -357,15 +359,21 @@ class CidaLayerScene extends HTMLElement {
       <div class="browser-toolbar"><div class="address">example.dev/blog/file-format</div></div>
       <div class="page">
         <div class="page-nav"><b>Example Engineering</b>Blog<br>Docs<br>Community<br>Careers</div>
-        <div class="page-article${translated ? " layer-sheet" : ""}">
-          <h1>${t("Why we rewrote the file format", "我们为什么重写了文件格式")}</h1>
-          <div class="meta">${t("Engineering · 8 min read", "工程 · 阅读约 8 分钟")}</div>
-          <p>${t("Columnar formats were designed for scans that read a few columns across billions of rows. Modern AI workloads also need fast random access to individual rows, and the old layout made every lookup pay for a full page decode.",
-            "列式格式原本是为扫描设计的：在数十亿行里只读取少数几列。如今的 AI 负载还需要快速随机读取单行，而旧的布局让每次查找都得解码一整页。")}</p>
-          <p>${t("The new format stores each column in small, independently addressable chunks. A point lookup now touches a single chunk, while scans still stream large contiguous reads from object storage.",
-            "新格式把每一列存成可独立寻址的小块。点查询现在只会触及一个小块，而扫描仍然能从对象存储里连续读取大段数据。")}</p>
-          <p>${t("In our benchmarks, random access became up to 60 times faster with no regression on full-table scans.",
-            "在我们的基准测试中，随机读取最多快了 60 倍，全表扫描没有任何退步。")}</p>
+        <div class="page-article">
+          <div class="${sheet}">
+            <h1>${t("Why we rewrote the file format", "我们为什么重写了文件格式")}</h1>
+            <div class="meta">${t("Engineering · 8 min read", "工程 · 阅读约 8 分钟")}</div>
+            <p>${t("Columnar formats were designed for scans that read a few columns across billions of rows. Modern AI workloads also need fast random access to individual rows, and the old layout made every lookup pay for a full page decode.",
+              "列式格式原本是为扫描设计的：在数十亿行里只读取少数几列。如今的 AI 负载还需要快速随机读取单行，而旧的布局让每次查找都得解码一整页。")}</p>
+            <p>${t("The new format stores each column in small, independently addressable chunks. A point lookup now touches a single chunk:",
+              "新格式把每一列存成可独立寻址的小块。点查询现在只会触及一个小块：")}</p>
+          </div>
+          <pre class="page-code">rows = table.take([42, 1337])
+print(len(rows))</pre>
+          <div class="${sheet}">
+            <p>${t("In our benchmarks, random access became up to 60 times faster with no regression on full-table scans.",
+              "在我们的基准测试中，随机读取最多快了 60 倍，全表扫描没有任何退步。")}</p>
+          </div>
         </div>
         <div class="page-toc"><b>ON THIS PAGE</b>Background<br>The new layout<br>Benchmarks<br>What's next</div>
       </div>`;

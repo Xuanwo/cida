@@ -310,6 +310,18 @@ struct LayerBlock: Equatable, Sendable {
     return words.count < 2
   }
 
+  /// Prose that reads as code: most of its lines are commands, statements, JSON or stack
+  /// frames (§四). Whole-window translation leaves it alone; ⌥D still translates it, so a
+  /// paragraph misjudged here is one key away.
+  var looksLikeCode: Bool {
+    let prose = pieces.filter { !$0.isVerbatim }.map(\.text).joined()
+    let lines = prose.split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+    guard !lines.isEmpty else { return false }
+    return lines.filter(LayerCodeText.isCodeLine).count * 3 >= lines.count * 2
+  }
+
   /// Puts link and code text back where the model kept the placeholders.
   func restoringVerbatim(in translation: String) -> String {
     restoring(in: translation).text
@@ -345,6 +357,80 @@ struct LayerBlock: Equatable, Sendable {
     return last.height <= lineHeight * 1.5
       ? CGPoint(x: last.maxX, y: last.minY)
       : CGPoint(x: frame.maxX, y: frame.maxY - lineHeight)
+  }
+}
+
+/// Code set in a monospaced face without a code element around it, like the ``` blocks of
+/// Slack, which Chromium exposes as a plain group of text (§四). Every character of a
+/// monospaced face is equally wide; in a proportional face a narrow character (`i`, `l`, `.`)
+/// is at least a fifth of the size narrower than the rest. Chromium rounds each character's box
+/// to whole points, so monospaced advances read as 7 and 8 alike.
+enum LayerMonospace {
+  static let narrow = Set("ijltfrI!|.,:;'`()[]{}")
+  static let wide = Set("mwMW@%")
+
+  static func isMonospaced(_ text: String, bounds: (NSRange) -> CGRect?) -> Bool {
+    var widths: [(isOdd: Bool, width: CGFloat)] = []
+    var hasNarrow = false, hasWide = false, hasMiddle = false
+    var firstLine: CGFloat?
+    var lastLeft = -CGFloat.greatestFiniteMagnitude
+    var offset = 0
+    for character in text {
+      let length = character.utf16.count
+      defer { offset += length }
+      if character.isNewline || widths.count >= 24 { break }
+      guard character.isASCII, !character.isWhitespace else { continue }
+      guard let box = bounds(NSRange(location: offset, length: length)), box.width > 0 else { return false }
+      // Only the first line: a wrapped line starts again at the left.
+      if let top = firstLine, abs(box.midY - top) > box.height / 2 { break }
+      // Some apps answer every range with the element's own box; those say nothing.
+      guard box.minX > lastLeft, box.width < box.height * 1.2 else { return false }
+      lastLeft = box.minX
+      firstLine = firstLine ?? box.midY
+      let isNarrow = narrow.contains(character), isWide = wide.contains(character)
+      hasNarrow = hasNarrow || isNarrow
+      hasWide = hasWide || isWide
+      hasMiddle = hasMiddle || (!isNarrow && !isWide)
+      widths.append((isNarrow || isWide, box.width))
+      let all = widths.map(\.width)
+      // Proportional as soon as characters differ by more than rounding.
+      if all.max()! - all.min()! > 1.5 { return false }
+    }
+    // Equal widths only mean something when the sample holds characters a proportional face
+    // sets differently.
+    let telling = (hasNarrow && (hasMiddle || hasWide)) || (hasWide && hasMiddle)
+    return widths.count >= 6 && telling
+  }
+}
+
+/// Lines of prose that read as code (§四): a shell prompt, a statement, an operator, JSON, a
+/// stack frame, or words that are mostly identifiers, paths and flags.
+enum LayerCodeText {
+  static func isCodeLine(_ line: String) -> Bool {
+    // Chat prose uses `->` for "becomes" and starts lines with `[WIP]`, so neither counts.
+    let starts = ["$ ", "#!", "//", "/*", "{", "}"]
+    let operators = ["=>", "::", "==", "!=", "&&", "||", ":=", "();", "</", "/>", "+=", "${"]
+    if line.hasPrefix("at "), line.contains(":"), line.contains("(") { return true }
+    // A JSON or YAML member: `"key": value`.
+    if line.hasPrefix("\""), line.contains("\":") { return true }
+    if starts.contains(where: line.hasPrefix) { return true }
+    if line.hasSuffix(";") || line.hasSuffix("{") || operators.contains(where: line.contains) { return true }
+    let words = line.split(whereSeparator: \.isWhitespace)
+    guard words.count >= 2 else { return words.first.map(isIdentifier) ?? false }
+    // "Fix parse_args() in cli.rs" is a sentence about code, not code.
+    return words.filter(isIdentifier).count * 3 >= words.count * 2
+  }
+
+  /// `snake_case`, `camelCase`, `a.b.c`, `/a/b`, `--flag`, `key=value`, `call(x)`.
+  static func isIdentifier(_ word: Substring) -> Bool {
+    let word = word.trimmingCharacters(in: CharacterSet(charactersIn: ",.;:!?\"'"))
+    guard word.contains(where: \.isLetter) else { return false }
+    if word.contains("_") || word.contains("=") || word.contains("(") || word.contains("/") { return true }
+    if word.hasPrefix("-"), word.count > 1 { return true }
+    let parts = word.split(separator: ".")
+    if parts.count > 1, parts.allSatisfy({ !$0.isEmpty }) { return true }
+    // An upper-case letter after a lower-case one: camelCase.
+    return zip(word, word.dropFirst()).contains { $0.isLowercase && $1.isUppercase }
   }
 }
 
@@ -408,7 +494,7 @@ enum LayerBlockExtractor {
       stack.append(contentsOf: children.reversed())
     }
     let paragraphs = continuingLines(blocks).filter(\.block.hasProse)
-    return automatic ? paragraphs.filter { !$0.block.isLabel } : paragraphs
+    return automatic ? paragraphs.filter { !$0.block.isLabel && !$0.block.looksLikeCode } : paragraphs
   }
 
   /// Joins runs that continue one line into one paragraph (§三). Apps put pieces of a line in
@@ -490,7 +576,9 @@ enum LayerBlockExtractor {
       switch child.role {
       case LayerRole.staticText:
         if let text = child.textValue, !text.isEmpty {
-          runs.append(Run(piece: .init(text: text, isVerbatim: false, frame: child.frame), frame: child.frame, text: child))
+          // Text set in a monospaced face is code, as if it were in a code element.
+          let isCode = LayerMonospace.isMonospaced(text, bounds: child.bounds(ofCharacters:))
+          runs.append(Run(piece: .init(text: text, isVerbatim: isCode, frame: child.frame), frame: child.frame, text: child))
         }
       case LayerRole.link:
         let text = plainText(child)

@@ -289,6 +289,74 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(LayerBlockExtractor.blocks(in: row).map(\.text), ["Point lookup", "Full scan"])
   }
 
+  /// Slack's ``` blocks are a plain group of text in Chromium, with no code element; only the
+  /// face tells them apart. Text in a monospaced face is code: a block of it is left alone, and
+  /// a run of it inside prose goes back unchanged like a code element.
+  func testTextInAMonospacedFaceIsCode() {
+    // Chromium rounds each character's box to whole points (measured in Slack, 2026-09-28):
+    // a 12 pt monospaced face reads 7 or 8 wide, a 15 pt proportional one 3 to 12.
+    func text(_ value: String, _ frame: CGRect, width: @escaping (Character) -> CGFloat) -> Node {
+      let node = Node.text(value, frame)
+      let characters = Array(value)
+      node.characterBounds = { range in
+        guard range.length == 1, range.location < characters.count else { return nil }
+        let left = characters[..<range.location].map(width).reduce(frame.minX, +)
+        return CGRect(x: left, y: frame.minY, width: width(characters[range.location]), height: 18)
+      }
+      return node
+    }
+    let mono: (Character) -> CGFloat = { $0 == "(" || $0 == "l" ? 8 : 7 }
+    let proportional: (Character) -> CGFloat = { LayerMonospace.narrow.contains($0) ? 4 : "mw".contains($0) ? 12 : 8 }
+
+    let block = Node("AXGroup", CGRect(x: 760, y: 400, width: 600, height: 36), children: [
+      text("print(len(rows))\nrows.clear()", CGRect(x: 760, y: 400, width: 200, height: 36), width: mono),
+    ])
+    XCTAssertTrue(LayerBlockExtractor.blocks(in: block).isEmpty)
+
+    let mixed = Node("AXGroup", CGRect(x: 751, y: 500, width: 900, height: 22), children: [
+      text("Run the ", CGRect(x: 751, y: 500, width: 60, height: 22), width: proportional),
+      text("make release", CGRect(x: 811, y: 500, width: 90, height: 22), width: mono),
+      text(" target before you tag it.", CGRect(x: 901, y: 500, width: 190, height: 22), width: proportional),
+    ])
+    let paragraph = LayerBlockExtractor.blocks(in: mixed)
+    XCTAssertEqual(paragraph.map(\.maskedText), ["Run the ⟦0⟧ target before you tag it."])
+
+    func advancing(_ width: CGFloat) -> (NSRange) -> CGRect? {
+      { CGRect(x: CGFloat($0.location) * width, y: 0, width: width, height: 18) }
+    }
+    // Equal widths alone say nothing when every character is of middling width, when the app
+    // answers every range with one box, or when it answers none.
+    XCTAssertFalse(LayerMonospace.isMonospaced("abcdeghk", bounds: advancing(8)))
+    XCTAssertTrue(LayerMonospace.isMonospaced("hello_world", bounds: advancing(7)))
+    XCTAssertFalse(LayerMonospace.isMonospaced("hello_world", bounds: { _ in CGRect(x: 0, y: 0, width: 7, height: 18) }))
+    XCTAssertFalse(LayerMonospace.isMonospaced("hello_world", bounds: { _ in nil }))
+  }
+
+  /// Whole-window translation leaves prose that reads as code alone: a shell session, a stack
+  /// trace, JSON. Sentences about code stay prose; ⌥D translates the rest on request.
+  func testWholeWindowTranslationLeavesTextThatReadsAsCodeAlone() {
+    func block(_ text: String) -> LayerBlock {
+      LayerBlock(pieces: [.init(text: text, isVerbatim: false)], frame: .zero, lineHeight: 18)
+    }
+    for code in [
+      "$ cargo build --release\n$ ./target/release/lance",
+      "at com.lancedb.Scanner.next(Scanner.java:42)\nat com.lancedb.Table.scan(Table.java:118)",
+      "{\n\"retention\": \"7d\",\n\"compact\": true\n}",
+      "let rows = table.scan().await?;",
+      "PREFETCH_DEPTH=8 read_ahead_bytes=65536",
+    ] {
+      XCTAssertTrue(block(code).looksLikeCode, code)
+    }
+    for prose in [
+      "Fix parse_args() in cli.rs before the release.",
+      "The compaction job finished overnight, but the manifest count went up.",
+      "[WIP] status: open -> closed after review",
+      "压缩任务昨晚跑完了，但 manifest 数涨了三倍。",
+    ] {
+      XCTAssertFalse(block(prose).looksLikeCode, prose)
+    }
+  }
+
   /// A paragraph that wraps, with a link and more text after it on its last line, each in a
   /// container of its own (the issue post in Slack, 2026-09-28): the link and the text after it
   /// continue the paragraph rather than starting a new one part way along the line.
