@@ -219,12 +219,9 @@ final class TranslationLayerController {
     if tickCount % 30 == 1 { discover() }
     // Nothing to follow: no window list, no pointer.
     guard !sessions.isEmpty else { return }
-    if let settle = windowsSettleAt, Date() >= settle {
-      windowsSettleAt = nil
-      windows = LayerWindowInfo.onScreen()
-    } else if tickCount % 5 == 1 {
-      windows = LayerWindowInfo.onScreen()
-    }
+    // Every tick (about 0.6 ms): a window landing back in place, as Stage Manager brings it
+    // from the strip, shows its translations within a frame instead of a quarter second.
+    windows = LayerWindowInfo.onScreen()
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     for session in sessions {
       session.step(windows: windows, mouse: mouse)
@@ -236,17 +233,21 @@ final class TranslationLayerController {
     updateFailureHint()
   }
 
-  /// When the windows of a newly active app have finished animating into place.
-  private var windowsSettleAt: Date?
-
   /// Another app came to the front: its windows grow over the panes while they animate in,
   /// faster than the window list can follow. The translations of every other app are hidden
   /// at once and come back where they are still visible once the windows settle.
   private func frontApplicationChanged(to pid: pid_t?) {
+    guard !sessions.isEmpty else { return }
+    log("layer-front-changed translated=\(sessions.contains { $0.application.processIdentifier == pid })")
     let settle = Date().addingTimeInterval(0.3)
-    windowsSettleAt = settle
-    for session in sessions where session.application.processIdentifier != pid {
-      session.hideUntilWindowsSettle(settle)
+    for session in sessions {
+      if session.application.processIdentifier == pid {
+        // Back in front before the last switch settled: its own windows are not the ones
+        // animating over it.
+        session.stopWaitingForWindowsToSettle()
+      } else {
+        session.hideUntilWindowsSettle(settle)
+      }
     }
   }
 
@@ -536,6 +537,11 @@ final class LayerPaneSession {
     if windowsSettle == nil, overlay.alphaValue > 0 { owner.log("layer-hidden-for-app-switch") }
     windowsSettle = date
     overlay.alphaValue = 0
+  }
+
+  /// The next tick places the pane and shows it again, as when the wait ends.
+  func stopWaitingForWindowsToSettle() {
+    if windowsSettle != nil { windowsSettle = Date() }
   }
 
   /// The user scrolled over the pane.
