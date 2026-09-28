@@ -159,7 +159,7 @@ class CidaSettings extends HTMLElement {
         <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>`,
       shortcuts: `
         <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}</div>
-        <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图与原处译文")}</div>`,
+        <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图翻译")}</div>`,
       general: `
         <div class="group">${launch}${updates}</div>
         <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>`,
@@ -228,8 +228,8 @@ customElements.define("cida-status-menu", CidaStatusMenu);
 
 
 // Cida's translations over mock app windows (spec/translation-layer.md):
-// <cida-layer-scene app="chat|browser" layer="…" paper>. paper draws translations on
-// paper cards, as without the Screen Recording permission. Chat layers, as a walk through:
+// <cida-layer-scene app="chat|browser" layer="…">. Translations are always on Cida's paper,
+// whatever the app looks like. Chat layers, as a walk through:
 //   once-pointing  the pointer rests on a message; nothing yet
 //   once-pending   ⌥D: a caret breathes after that message while it is translated
 //   once-done      it reads in place, among the originals
@@ -247,11 +247,10 @@ class CidaLayerScene extends HTMLElement {
     const app = this.getAttribute("app") ?? "chat";
     const layer = this.getAttribute("layer") ?? "translated";
     const wordmark = `<span class="wordmark">辞达</span>`;
-    const paper = this.hasAttribute("paper");
     const scene = document.createElement("section");
     scene.className = "screen desk";
     scene.dataset.state = this.getAttribute("state");
-    const body = app === "chat" ? this.chat(layer, wordmark, paper) : this.browser(layer, paper);
+    const body = app === "chat" ? this.chat(layer, wordmark) : this.browser(layer);
     const outlined = layer === "window-on" ? " data-outline" : "";
     // What Cida says, at the panel's height (spec/translation-layer.md §五 提示胶囊).
     const hint = {
@@ -297,7 +296,7 @@ class CidaLayerScene extends HTMLElement {
     scene.appendChild(pointer);
   }
 
-  chat(layer, wordmark, paper) {
+  chat(layer, wordmark) {
     const messages = [
       ["Maya Chen", "10:02", "#C9A27E",
         "Morning! The compaction job finished overnight, but the manifest count on the prod table went from 1.2k to 3.4k: <span class=\"link\">lancedb#3669</span>",
@@ -323,7 +322,7 @@ class CidaLayerScene extends HTMLElement {
     }[layer] ?? [];
     const pending = { "once-pending": 2, translating: 4 }[layer];
     const pointed = { "once-failed": 2, "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-restore": 2, "window-one-original": 2 }[layer];
-    const card = (text) => `<span class="${paper ? "layer-card layer-text" : "layer-text"}">${text}</span>`;
+    const card = (text) => `<span class="layer-card layer-text">${text}</span>`;
     const rows = messages.map(([who, time, color, original, translation], index) => {
       let text = original;
       if (translated.includes(index)) text = card(translation);
@@ -348,10 +347,10 @@ class CidaLayerScene extends HTMLElement {
       </div>`;
   }
 
-  browser(layer, paper) {
+  browser(layer) {
     const translated = layer === "translated";
     const t = (original, translation) =>
-      translated ? `<span class="${paper ? "layer-card layer-text" : "layer-text"}">${translation}</span>` : original;
+      translated ? `<span class="layer-card layer-text">${translation}</span>` : original;
     return `
       <div class="browser-tabs"><div class="mock-lights"><i></i><i></i><i></i></div><div class="browser-tab">Why we rewrote the file format</div></div>
       <div class="browser-toolbar"><div class="address">example.dev/blog/file-format</div></div>

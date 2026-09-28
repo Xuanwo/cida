@@ -913,12 +913,11 @@ body {
    its 16px corners. */
 .layer-outline { position: absolute; border: 1.5px solid var(--accent); border-radius: 19px; pointer-events: none; }
 
-/* Without Screen Recording there is no background to sample: translations sit on paper. */
+/* Translations sit on Cida's paper in Cida's ink, whatever the app looks like. */
 .layer-card {
   display: block;
   margin: -3px -8px;
   padding: 3px 8px;
-  border: 1px solid var(--panel-edge);
   border-radius: var(--radius-chip);
   background: var(--surface-paper);
   color: var(--text-ink);

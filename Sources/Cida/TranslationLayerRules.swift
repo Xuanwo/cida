@@ -432,8 +432,12 @@ enum LayerBlockExtractor {
         continue
       }
       let line = min(current.block.lineHeight, next.block.lineHeight)
+      // A run that wraps ends on its last line, somewhere short of its frame's right edge.
+      let wraps = end.height > line * 1.5
+      let lastLine = wraps ? CGRect(x: end.minX, y: end.maxY - line, width: end.width, height: line) : end
       let gap = start.minX - end.maxX
-      guard abs(end.midY - start.midY) < line * 0.6, gap > -4, gap < line * 1.5 else {
+      let continues = wraps ? start.minX >= end.minX - 4 && start.minX < end.maxX : gap > -4 && gap < line * 1.5
+      guard abs(lastLine.midY - start.midY) < line * 0.6, continues else {
         joined.append(next)
         continue
       }

@@ -418,6 +418,24 @@ struct LayerParagraphMark {
   }
 }
 
+extension [LayerDrawing] {
+  /// Only the last of paragraphs set one under another (less than about a line and a half
+  /// apart, overlapping sideways) keeps its caret: one caret a message, not one a paragraph of
+  /// an unfurled issue (§五).
+  func caretsOnLastOfEachRun() -> [LayerDrawing] {
+    indices.map { index in
+      var drawing = self[index]
+      if index + 1 < count {
+        let next = self[index + 1].frame
+        let gap = next.minY - drawing.frame.maxY
+        let beside = next.minX < drawing.frame.maxX && next.maxX > drawing.frame.minX
+        if gap >= -2, gap < drawing.lineHeight * 1.6, beside { drawing.showsCaret = false }
+      }
+      return drawing
+    }
+  }
+}
+
 /// One pane in one window: every paragraph of it while its window is translated whole (§三),
 /// plus the paragraphs ⌥D asked for, minus those ⌥D turned back (§二).
 @MainActor
@@ -462,7 +480,6 @@ final class LayerPaneSession {
   private var lastRead = Date.distantPast
   private var translating: Task<Void, Never>?
   private(set) var failure: LayerTranslationError?
-  private var styles: [String: LayerTextStyle] = [:]
   private(set) var isFinished = false
   private var lastCoveringCount = -1
 
@@ -549,8 +566,6 @@ final class LayerPaneSession {
     overlay.alphaValue = 0
   }
 
-  /// The screen can be read: colours come from it (§五).
-  static var readsScreen: Bool { CGPreflightScreenCaptureAccess() }
 
   /// Nothing has moved for long enough to trust the tree's positions: no scroll and no move in
   /// the tree for 0.2 s. Chromium updates the tree's positions about every 150 ms while
@@ -671,8 +686,6 @@ final class LayerPaneSession {
     isReading = true
     needsRead = false
     let pane = pane
-    let window = window
-    let wantsColors = Self.readsScreen
     let translatesAll = translatesAll
     Task.detached(priority: .userInitiated) {
       guard let frame = pane.currentFrame else {
@@ -682,30 +695,19 @@ final class LayerPaneSession {
       let located = LayerBlockExtractor.located(in: pane, visible: frame)
       // Whole-window translation leaves navigation and one-word labels alone (§四).
       let automatic = translatesAll ? LayerBlockExtractor.located(in: pane, visible: frame, automatic: true) : []
-      var image: CGImage?
-      var windowFrame: CGRect?
-      if wantsColors, let current = window.currentFrame {
-        windowFrame = current
-        image = await LayerWindowCapture.image(ofWindowAt: current, pid: pane.processIdentifier)
-      }
       let blocks = located.map(\.block)
       let nodes = located.map(\.node)
       let automaticIndices = Set(located.indices.filter { index in
         automatic.contains { $0.block == located[index].block && $0.node.isSameElement(as: located[index].node) }
       })
-      let capturedImage = image
-      let capturedWindowFrame = windowFrame
       await MainActor.run { [weak self] in
-        self?.applyRead(
-          frame: frame, blocks: blocks, nodes: nodes, automatic: automaticIndices, image: capturedImage,
-          windowFrame: capturedWindowFrame)
+        self?.applyRead(frame: frame, blocks: blocks, nodes: nodes, automatic: automaticIndices)
       }
     }
   }
 
   private func applyRead(
-    frame: CGRect, blocks newBlocks: [LayerBlock], nodes: [AccessibilityLayerNode], automatic: Set<Int>,
-    image: CGImage?, windowFrame: CGRect?
+    frame: CGRect, blocks newBlocks: [LayerBlock], nodes: [AccessibilityLayerNode], automatic: Set<Int>
   ) {
     isReading = false
     guard !isFinished else { return }
@@ -724,16 +726,6 @@ final class LayerPaneSession {
     let picks = [0, nodes.count / 2, nodes.count - 1].filter { $0 >= 0 && $0 < nodes.count }
     anchors = Array(Set(picks)).sorted().map { nodes[$0] }
     anchorFrames = anchors.map(\.frame)
-    if let image, let windowFrame {
-      // Every paragraph read, shown or not, so ⌥D can show one at once in its colours.
-      let scale = CGFloat(image.width) / max(windowFrame.width, 1)
-      for block in newBlocks where styles[block.maskedText] == nil {
-        let pixels = CGRect(
-          x: (block.frame.minX - windowFrame.minX) * scale, y: (block.frame.minY - windowFrame.minY) * scale,
-          width: block.frame.width * scale, height: block.frame.height * scale)
-        if let style = LayerColorSampler.style(in: image, pixelRect: pixels) { styles[block.maskedText] = style }
-      }
-    }
     redraw()
     translatePending()
   }
@@ -802,15 +794,15 @@ final class LayerPaneSession {
     guard !isFinished else { return }
     let scale = overlay.backingScaleFactor
     let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-    let paper = LayerTextStyle.paper(darkAppearance: dark)
+    let style = LayerTextStyle.paper(darkAppearance: dark)
     let drawings: [LayerDrawing] = blocks.compactMap { block in
       guard let translation = owner.translations[block.maskedText] else { return nil }
       let (text, links) = block.restoring(in: translation)
       guard text != block.text else { return nil }
       return LayerDrawing(
         frame: block.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY),
-        text: text, links: links, lineHeight: block.lineHeight, style: styles[block.maskedText] ?? paper)
-    }
+        text: text, links: links, lineHeight: block.lineHeight, style: style)
+    }.caretsOnLastOfEachRun()
     overlay.overlayView.show(drawings, scale: scale)
     // A caret breathes after every paragraph waiting for its translation (§二 等待, §五 等待).
     let waiting = failure == nil ? pendingBlocks : []
@@ -829,8 +821,7 @@ final class LayerPaneSession {
     owner.log(
       "layer-drawn drawings=\(drawings.count) painted=\(overlay.overlayView.paintedCount) blocks=\(blocks.count) onScreen=\(isOnScreen)"
         + " visible=\(overlay.isVisible) alpha=\(overlay.alphaValue) settled=\(settled)"
-        + " frame=\(Int(overlay.frame.minX)),\(Int(overlay.frame.minY)),\(Int(overlay.frame.width))x\(Int(overlay.frame.height))"
-        + " paper=\(drawings.first?.style.isPaper ?? true)")
+        + " frame=\(Int(overlay.frame.minX)),\(Int(overlay.frame.minY)),\(Int(overlay.frame.width))x\(Int(overlay.frame.height))")
   }
 }
 
@@ -842,24 +833,3 @@ extension AccessibilityLayerNode {
   }
 }
 
-/// One capture of a window for sampling colours; only with Screen Recording granted.
-enum LayerWindowCapture {
-  static func image(ofWindowAt frame: CGRect, pid: pid_t) async -> CGImage? {
-    guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
-      let window = content.windows.first(where: {
-        $0.owningApplication?.processID == pid && abs($0.frame.minX - frame.minX) < 2
-          && abs($0.frame.minY - frame.minY) < 2 && abs($0.frame.width - frame.width) < 2
-      })
-    else {
-      return nil
-    }
-    let configuration = SCStreamConfiguration()
-    let scale = NSScreen.screens.first { $0.frame.intersects(LayerScreenGeometry.appKitRect(fromTopLeft: frame)) }?
-      .backingScaleFactor ?? 2
-    configuration.width = Int(frame.width * scale)
-    configuration.height = Int(frame.height * scale)
-    configuration.showsCursor = false
-    return try? await SCScreenshotManager.captureImage(
-      contentFilter: SCContentFilter(desktopIndependentWindow: window), configuration: configuration)
-  }
-}

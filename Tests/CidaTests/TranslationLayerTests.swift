@@ -289,6 +289,22 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(LayerBlockExtractor.blocks(in: row).map(\.text), ["Point lookup", "Full scan"])
   }
 
+  /// A paragraph that wraps, with a link and more text after it on its last line, each in a
+  /// container of its own (the issue post in Slack, 2026-09-28): the link and the text after it
+  /// continue the paragraph rather than starting a new one part way along the line.
+  func testALinkOnTheLastLineOfAWrappedParagraphContinuesIt() {
+    func box(_ child: Node) -> Node { Node("AXGroup", child.frame, children: [child]) }
+    let message = Node("AXGroup", CGRect(x: 687, y: 494, width: 1869, height: 120), children: [
+      box(.text("I proposed gating the read and write paths so new types can land before they are complete; I opened an issue and would like feedback on whether this is the right direction:", CGRect(x: 751, y: 552, width: 1780, height: 40))),
+      box(.link("github.com/apache/iceberg-rust/issues/3258", CGRect(x: 1227, y: 574, width: 301, height: 18))),
+      box(.text(" (I'm hoping to put up a draft PR this week.)", CGRect(x: 1529, y: 574, width: 257, height: 18))),
+    ])
+    let blocks = LayerBlockExtractor.blocks(in: message)
+    XCTAssertEqual(blocks.count, 1)
+    XCTAssertEqual(blocks.first?.frame, CGRect(x: 751, y: 552, width: 1780, height: 40))
+    XCTAssertEqual(blocks.first?.verbatimTexts, ["github.com/apache/iceberg-rust/issues/3258"])
+  }
+
   func testADocumentInOneTextAreaSplitsIntoPlacedParagraphs() {
     let text = "Meeting notes.\n\nWe moved the review to Thursday.\nAction items follow.\n"
     let document = Node(LayerRole.textArea, CGRect(x: 0, y: 0, width: 600, height: 400), text: text)
@@ -522,47 +538,18 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(links.map { (text as NSString).substring(with: $0) }, ["lancedb#3669"])
   }
 
-  func testPaperAndInkAreSampledFromTheWindow() throws {
-    let width = 200, height = 40
-    let context = try XCTUnwrap(CGContext(
-      data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-    context.setFillColor(CGColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-    context.setFillColor(CGColor(red: 0.95, green: 0.95, blue: 0.95, alpha: 1))
-    for x in stride(from: 10, to: 190, by: 6) { context.fill(CGRect(x: x, y: 12, width: 3, height: 16)) }
-    let style = try XCTUnwrap(LayerColorSampler.style(
-      in: try XCTUnwrap(context.makeImage()), pixelRect: CGRect(x: 0, y: 0, width: width, height: height)))
-    XCTAssertLessThan(style.background.usingColorSpace(.sRGB)!.redComponent, 0.2)
-    XCTAssertGreaterThan(style.foreground.usingColorSpace(.sRGB)!.redComponent, 0.8)
-    XCTAssertFalse(style.isPaper)
-  }
-
-  /// A wide paragraph of thin black strokes on white: blending pixels while shrinking the
-  /// crop painted the translation grey on a page one shade darker than the app's, which
-  /// showed as a box around it.
-  func testThinBlackTextOnWhiteSamplesExactlyBlackOnWhite() throws {
-    let width = 2600, height = 80
-    let context = try XCTUnwrap(CGContext(
-      data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-    context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-    for x in stride(from: 20, to: 2580, by: 9) {
-      context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
-      context.fill(CGRect(x: x, y: 20, width: 2, height: 40))
-      // Antialiased edges on either side of each stroke.
-      context.setFillColor(CGColor(red: 0.6, green: 0.6, blue: 0.6, alpha: 1))
-      context.fill(CGRect(x: x - 1, y: 20, width: 1, height: 40))
-      context.setFillColor(CGColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1))
-      context.fill(CGRect(x: x + 2, y: 20, width: 1, height: 40))
+  /// One caret a run of translated paragraphs, not one a paragraph: an unfurled issue in Slack
+  /// set a caret after each of its short paragraphs.
+  func testOnlyTheLastOfParagraphsSetOneUnderAnotherKeepsItsCaret() {
+    let style = LayerTextStyle.paper(darkAppearance: false)
+    func drawing(_ y: CGFloat, _ height: CGFloat = 18, x: CGFloat = 80) -> LayerDrawing {
+      LayerDrawing(frame: CGRect(x: x, y: y, width: 600, height: height), text: "译文", lineHeight: 18, style: style)
     }
-    let style = try XCTUnwrap(LayerColorSampler.style(
-      in: try XCTUnwrap(context.makeImage()), pixelRect: CGRect(x: 0, y: 0, width: width, height: height)))
-    let paper = try XCTUnwrap(style.background.usingColorSpace(.sRGB))
-    let ink = try XCTUnwrap(style.foreground.usingColorSpace(.sRGB))
-    XCTAssertEqual(paper.redComponent, 1, accuracy: 0.001)
-    XCTAssertEqual(ink.redComponent, 0, accuracy: 0.001)
+    let carets = [drawing(100), drawing(128, 40), drawing(180), drawing(260), drawing(290, x: 900)]
+      .caretsOnLastOfEachRun().map(\.showsCaret)
+    // 100 → 128 and 168 → 180 are paragraph gaps; 198 → 260 starts another message; the last
+    // one sits beside, not under.
+    XCTAssertEqual(carets, [false, false, true, true, true])
   }
 
   // MARK: - The third shortcut

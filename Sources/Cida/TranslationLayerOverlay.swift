@@ -2,21 +2,16 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
-/// How one translated paragraph is painted (`Design/spec/translation-layer.md` §三): with the
-/// original's colours when the screen can be read, on paper when it cannot.
+/// How a translation is painted (`Design/spec/translation-layer.md` §五): always on Cida's paper in
+/// Cida's ink, whatever the app looks like; paper and ink trade places in a dark appearance.
 struct LayerTextStyle: Equatable {
   let background: NSColor
   let foreground: NSColor
-  let isPaper: Bool
 
   static func paper(darkAppearance: Bool) -> LayerTextStyle {
     darkAppearance
-      ? LayerTextStyle(
-        background: CidaDesign.Palette.textInk.appKit,
-        foreground: CidaDesign.Palette.surfacePaper.appKit, isPaper: true)
-      : LayerTextStyle(
-        background: CidaDesign.Palette.surfacePaper.appKit,
-        foreground: CidaDesign.Palette.textInk.appKit, isPaper: true)
+      ? LayerTextStyle(background: CidaDesign.Palette.textInk.appKit, foreground: CidaDesign.Palette.surfacePaper.appKit)
+      : LayerTextStyle(background: CidaDesign.Palette.surfacePaper.appKit, foreground: CidaDesign.Palette.textInk.appKit)
   }
 }
 
@@ -28,6 +23,9 @@ struct LayerDrawing: Equatable {
   var links: [NSRange] = []
   let lineHeight: CGFloat
   let style: LayerTextStyle
+  /// The last paragraph of a run of translated ones ends with Cida's caret (§五); one caret a
+  /// message, not one a line.
+  var showsCaret = true
 }
 
 /// A translation set in Cida's result serif (§五): the largest size up to the original's that
@@ -144,74 +142,6 @@ struct LayerTypeset {
       CTLineDraw(piece, context)
     }
     return context.makeImage()
-  }
-}
-
-/// Paper and ink of a paragraph in a window capture: the most common colour is the paper,
-/// the populated colour furthest from it in luminance is the ink. Carried over from the
-/// in-place screenshot translation.
-enum LayerColorSampler {
-  static func style(in image: CGImage, pixelRect: CGRect) -> LayerTextStyle? {
-    let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
-    guard let crop = image.cropping(to: pixelRect.insetBy(dx: -2, dy: -2).integral.intersection(bounds))
-    else {
-      return nil
-    }
-    let scale = min(1, 256 / CGFloat(max(crop.width, crop.height)))
-    let width = max(1, Int(CGFloat(crop.width) * scale))
-    let height = max(1, Int(CGFloat(crop.height) * scale))
-    var bytes = [UInt8](repeating: 0, count: width * height * 4)
-    let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
-      guard
-        let context = CGContext(
-          data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-          bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-          bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.noneSkipLast.rawValue)
-      else { return false }
-      // Skips pixels instead of blending them: a blended thin stroke turns black ink grey
-      // and pulls a white page a shade darker, and either shows around the translation.
-      context.interpolationQuality = .none
-      context.draw(crop, in: CGRect(x: 0, y: 0, width: width, height: height))
-      return true
-    }
-    guard drawn else { return nil }
-    // Near colours count together; each group paints with its most common exact colour.
-    var exact: [UInt32: Int] = [:]
-    for index in stride(from: 0, to: bytes.count, by: 4) {
-      let rgb = UInt32(bytes[index]) << 16 | UInt32(bytes[index + 1]) << 8 | UInt32(bytes[index + 2])
-      exact[rgb, default: 0] += 1
-    }
-    var groups: [Int: (count: Int, top: UInt32, topCount: Int)] = [:]
-    for (rgb, count) in exact {
-      let key = Int(rgb >> 16 & 0xFF) / 24 * 121 + Int(rgb >> 8 & 0xFF) / 24 * 11 + Int(rgb & 0xFF) / 24
-      var group = groups[key] ?? (0, rgb, 0)
-      group.count += count
-      if count > group.topCount { (group.top, group.topCount) = (rgb, count) }
-      groups[key] = group
-    }
-    let colors = groups.values.map { group in
-      (
-        count: group.count,
-        color: NSColor(
-          srgbRed: CGFloat(group.top >> 16 & 0xFF) / 255, green: CGFloat(group.top >> 8 & 0xFF) / 255,
-          blue: CGFloat(group.top & 0xFF) / 255, alpha: 1)
-      )
-    }.sorted { $0.count > $1.count }
-    guard let background = colors.first?.color else { return nil }
-    func luminance(_ color: NSColor) -> CGFloat {
-      0.2126 * color.redComponent + 0.7152 * color.greenComponent + 0.0722 * color.blueComponent
-    }
-    let backgroundLuminance = luminance(background)
-    // Antialiased edges outnumber solid ink; take a populated colour of clear contrast.
-    let foreground =
-      colors.filter {
-        $0.count >= max(2, width * height / 1_000)
-          && abs(luminance($0.color) - backgroundLuminance) > 0.3
-      }.max {
-        abs(luminance($0.color) - backgroundLuminance) < abs(luminance($1.color) - backgroundLuminance)
-      }?.color
-      ?? (backgroundLuminance > 0.5 ? NSColor.black : NSColor.white)
-    return LayerTextStyle(background: background, foreground: foreground, isPaper: false)
   }
 }
 
@@ -344,8 +274,7 @@ final class LayerOverlayView: NSView {
   }
 
 
-  /// A paragraph's paper card, and the underlay it replaces: 8 pt wider on each side, 3 pt
-  /// taller (§五).
+  /// A paragraph's paper: 8 pt wider than the original on each side, 3 pt taller (§五).
   static func cardFrame(around paragraph: CGRect) -> CGRect {
     paragraph.insetBy(dx: -8, dy: -3)
   }
@@ -357,24 +286,21 @@ final class LayerOverlayView: NSView {
     else {
       return nil
     }
-    // Paper stands a little proud of the original; the app's own background covers it exactly.
+    // The paper stands a little proud of the original it covers.
     let text = drawing.frame.insetBy(dx: 0, dy: -LayerTypeset.bleed)
-    let frame = drawing.style.isPaper ? Self.cardFrame(around: drawing.frame).union(text) : text.insetBy(dx: -1, dy: 0)
+    let frame = Self.cardFrame(around: drawing.frame).union(text)
     let container = CALayer()
     container.frame = frame
     container.backgroundColor = drawing.style.background.cgColor
-    if drawing.style.isPaper {
-      container.cornerRadius = CidaDesign.Radius.chip
-      container.cornerCurve = .continuous
-      container.borderWidth = 1
-      container.borderColor = NSColor.black.withAlphaComponent(0x12 / 255).cgColor
-    }
+    container.cornerRadius = CidaDesign.Radius.chip
+    container.cornerCurve = .continuous
     let paragraph = CALayer()
     paragraph.frame = text.offsetBy(dx: -frame.minX, dy: -frame.minY)
     paragraph.contents = image
     paragraph.contentsScale = scale
     container.addSublayer(paragraph)
     // Cida's caret after the last character, at rest: this paragraph is Cida's (§五).
+    guard drawing.showsCaret else { return container }
     let caret = CALayer()
     caret.frame = typeset.caret.offsetBy(dx: drawing.frame.minX - frame.minX, dy: drawing.frame.minY - frame.minY)
     caret.cornerRadius = CidaMotion.cursorWidth / 2

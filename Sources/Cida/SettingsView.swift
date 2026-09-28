@@ -884,7 +884,7 @@ private struct ScreenRecordingPermissionRow: View {
 
   var body: some View {
     PermissionRow(
-      title: "屏幕录制", caption: "截图与原处译文", isGranted: model.isCaptureAccessGranted,
+      title: "屏幕录制", caption: "截图翻译", isGranted: model.isCaptureAccessGranted,
       request: model.requestCaptureAccess, identifier: "settings-capture-access"
     )
     .onAppear(perform: model.refreshCaptureAccess)
