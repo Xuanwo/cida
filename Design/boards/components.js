@@ -234,7 +234,6 @@ customElements.define("cida-status-menu", CidaStatusMenu);
 //   once-pending   ⌥D: a caret breathes after that message while it is translated
 //   once-done      it reads in place, among the originals
 //   once-two       ⌥D on another message: both translated, the rest original
-//   once-peek      the pointer rests on a translation: its original shows
 //   once-restore   ⌥D on a translated message: it turns back, the other stays
 //   once-none      ⌥D with no paragraph under the pointer: the hint pill says so
 //   once-failed    the request failed: the paragraph stays original, the hint offers a retry
@@ -316,15 +315,14 @@ class CidaLayerScene extends HTMLElement {
         "Could it be the new prefetch default? Let's pair on it after standup.",
         "会不会是新的预取默认值导致的？站会后我们一起看看。"],
     ];
-    // Which messages read as translations and which one breathes; the one peeked at shows its
-    // original, so it is simply not translated here.
+    // Which messages read as translations and which one breathes.
     const all = [0, 1, 2, 3, 4];
     const translated = {
-      "once-done": [2], "once-two": [2, 4], "once-peek": [4], "once-restore": [4],
+      "once-done": [2], "once-two": [2, 4], "once-restore": [4],
       "window-on": all, translating: [0, 1, 2, 3], "window-one-original": [0, 1, 3, 4],
     }[layer] ?? [];
     const pending = { "once-pending": 2, translating: 4 }[layer];
-    const pointed = { "once-failed": 2, "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-peek": 2, "once-restore": 2, "window-one-original": 2 }[layer];
+    const pointed = { "once-failed": 2, "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-restore": 2, "window-one-original": 2 }[layer];
     const card = (text) => `<span class="${paper ? "layer-card layer-text" : "layer-text"}">${text}</span>`;
     const rows = messages.map(([who, time, color, original, translation], index) => {
       let text = original;

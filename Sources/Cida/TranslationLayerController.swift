@@ -469,6 +469,8 @@ final class LayerPaneSession {
   /// Every paragraph of the last read, to find the one under the pointer without reading again.
   private var readBlocks: [LayerBlock] = []
   private var readNodes: [AccessibilityLayerNode] = []
+  /// Which paragraphs of the last read whole-window translation takes (§四).
+  private var readAutomatic: Set<Int> = []
   private unowned let owner: TranslationLayerController
 
   private let overlay = LayerOverlayPanel()
@@ -492,11 +494,6 @@ final class LayerPaneSession {
   private var translating: Task<Void, Never>?
   private(set) var failure: LayerTranslationError?
   private var styles: [String: LayerTextStyle] = [:]
-  private var peekCandidate: (index: Int, since: Date)?
-  /// The paragraph under the pointer when translations first appeared: the pointer is there
-  /// because the user just clicked it, so it waits until the pointer has left once.
-  private var peekSuppressed: Int?
-  private var hasShownTranslations = false
   private(set) var isFinished = false
   private var lastCoveringCount = -1
 
@@ -549,12 +546,17 @@ final class LayerPaneSession {
     if isShown {
       picked.removeAll { $0.matches(block, node: node) }
       if translatesAll { restored.append(LayerParagraphMark(element: node, text: block.text)) }
-      needsRead = true
-      read()
-      return "restored"
+    } else {
+      restored.removeAll { $0.matches(block, node: node) }
+      if !picked.contains(where: { $0.matches(block, node: node) }) {
+        picked.append(LayerParagraphMark(element: node, text: block.text))
+      }
     }
-    pick(block, element: node)
-    return "translated"
+    // At once, from the last read: the key is the only thing that changes what shows (§二).
+    showChosenParagraphs()
+    redraw()
+    translatePending()
+    return isShown ? "restored" : "translated"
   }
 
   /// Hidden while another app's windows move in front (see `frontApplicationChanged`).
@@ -609,7 +611,6 @@ final class LayerPaneSession {
     if settled, !isReading, needsRead || Date().timeIntervalSince(lastRead) > 1.0 {
       read()
     }
-    updatePeek(mouse: mouse, settled: settled)
   }
 
   // MARK: Where the pane is
@@ -752,25 +753,12 @@ final class LayerPaneSession {
     place(frame)
     readBlocks = newBlocks
     readNodes = nodes
-    // What shows: the whole window's paragraphs but those turned back, and those ⌥D asked for.
+    readAutomatic = automatic
     for index in picked.indices {
       let found = newBlocks.indices.contains { picked[index].matches(newBlocks[$0], node: nodes[$0]) }
       picked[index].misses = found ? 0 : picked[index].misses + 1
     }
     picked.removeAll { $0.misses >= 2 }
-    let shown = newBlocks.indices.filter { index in
-      let block = newBlocks[index], node = nodes[index]
-      if picked.contains(where: { $0.matches(block, node: node) }) { return true }
-      return automatic.contains(index) && !restored.contains(where: { $0.matches(block, node: node) })
-    }
-    // ⌥D on a paragraph already in the user's own language has nothing to show.
-    let filter = LayerLanguageFilter(myLanguage: owner.currentSettings.requestLanguages.my)
-    for index in shown where !filter.needsTranslation(newBlocks[index].text) {
-      let block = newBlocks[index], node = nodes[index]
-      guard picked.contains(where: { $0.matches(block, node: node) }) else { continue }
-      picked.removeAll { $0.matches(block, node: node) }
-      owner.noteAlreadyMine(at: block.frame)
-    }
     // How well the wheel foretold where the paragraphs went: the same paragraph's move since the
     // last read against the scroll applied meanwhile (§七).
     let predicted = overlay.overlayView.offset
@@ -779,14 +767,15 @@ final class LayerPaneSession {
     }).first {
       owner.log("layer-scroll-settled predicted=\(Int(predicted.rounded())) moved=\(Int(moved.rounded()))")
     }
-    blocks = shown.map { newBlocks[$0] }
+    showChosenParagraphs()
     // Motion is noticed from any paragraph of the pane, shown or not.
     let picks = [0, nodes.count / 2, nodes.count - 1].filter { $0 >= 0 && $0 < nodes.count }
     anchors = Array(Set(picks)).sorted().map { nodes[$0] }
     anchorFrames = anchors.map(\.frame)
     if let image, let windowFrame {
+      // Every paragraph read, shown or not, so ⌥D can show one at once in its colours.
       let scale = CGFloat(image.width) / max(windowFrame.width, 1)
-      for block in blocks where styles[block.maskedText] == nil {
+      for block in newBlocks where styles[block.maskedText] == nil {
         let pixels = CGRect(
           x: (block.frame.minX - windowFrame.minX) * scale, y: (block.frame.minY - windowFrame.minY) * scale,
           width: block.frame.width * scale, height: block.frame.height * scale)
@@ -795,6 +784,25 @@ final class LayerPaneSession {
     }
     redraw()
     translatePending()
+  }
+
+  /// What shows, from the last read: the whole window's paragraphs but those turned back, and
+  /// those ⌥D asked for.
+  private func showChosenParagraphs() {
+    let shown = readBlocks.indices.filter { index in
+      let block = readBlocks[index], node = readNodes[index]
+      if picked.contains(where: { $0.matches(block, node: node) }) { return true }
+      return readAutomatic.contains(index) && !restored.contains(where: { $0.matches(block, node: node) })
+    }
+    // ⌥D on a paragraph already in the user's own language has nothing to show.
+    let filter = LayerLanguageFilter(myLanguage: owner.currentSettings.requestLanguages.my)
+    for index in shown where !filter.needsTranslation(readBlocks[index].text) {
+      let block = readBlocks[index], node = readNodes[index]
+      guard picked.contains(where: { $0.matches(block, node: node) }) else { continue }
+      picked.removeAll { $0.matches(block, node: node) }
+      owner.noteAlreadyMine(at: block.frame)
+    }
+    blocks = shown.map { readBlocks[$0] }
   }
 
   private var pendingBlocks: [LayerBlock] {
@@ -871,31 +879,6 @@ final class LayerPaneSession {
         + " visible=\(overlay.isVisible) alpha=\(overlay.alphaValue) settled=\(settled)"
         + " frame=\(Int(overlay.frame.minX)),\(Int(overlay.frame.minY)),\(Int(overlay.frame.width))x\(Int(overlay.frame.height))"
         + " paper=\(drawings.first?.style.isPaper ?? true)")
-  }
-
-  // MARK: Showing the original
-
-  /// The pointer rests 300 ms on a paragraph: it shows the original until the pointer leaves
-  /// (§四).
-  private func updatePeek(mouse: CGPoint, settled: Bool) {
-    let local = CGPoint(x: mouse.x - paneFrame.minX, y: mouse.y - paneFrame.minY)
-    let hovered = paneFrame.contains(mouse) ? overlay.overlayView.index(at: local) : nil
-    if !hasShownTranslations, !overlay.overlayView.drawings.isEmpty {
-      hasShownTranslations = true
-      peekSuppressed = hovered
-    }
-    if hovered != peekSuppressed { peekSuppressed = nil }
-    guard settled, let index = hovered, index != peekSuppressed else {
-      peekCandidate = nil
-      overlay.overlayView.setPeek(nil, animated: true)
-      return
-    }
-    if peekCandidate?.index != index {
-      peekCandidate = (index, Date())
-      overlay.overlayView.setPeek(nil, animated: true)
-    } else if let candidate = peekCandidate, Date().timeIntervalSince(candidate.since) >= 0.3 {
-      overlay.overlayView.setPeek(index, animated: true)
-    }
   }
 }
 

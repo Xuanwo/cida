@@ -209,7 +209,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       source.press("d", modifierFlags: wholeWindow ? [.option, .shift] : .option)
     }
     func attach(_ name: String) {
-      // A pointer resting on a translation shows the original (§六); the fade takes 150 ms.
+      // Out of the way of the paragraphs, so the shot shows them whole.
       source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
       RunLoop.current.run(until: Date().addingTimeInterval(0.6))
       let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

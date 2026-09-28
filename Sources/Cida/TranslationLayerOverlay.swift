@@ -253,7 +253,6 @@ final class LayerOverlayView: NSView {
   private(set) var pendingFrames: [CGRect] = []
   private let occlusionMask = CAShapeLayer()
   private(set) var drawings: [LayerDrawing] = []
-  private(set) var peekedIndex: Int?
   /// Moves every paragraph by this much, from the screen's own motion, until the next read.
   private(set) var offset: CGFloat = 0
 
@@ -325,7 +324,6 @@ final class LayerOverlayView: NSView {
       return
     }
     self.drawings = drawings
-    peekedIndex = nil
     offset = 0
     CATransaction.begin()
     CATransaction.setDisableActions(true)
@@ -360,22 +358,6 @@ final class LayerOverlayView: NSView {
     CATransaction.commit()
   }
 
-  /// The pointer rests on a paragraph: it fades to show the original (§四).
-  func setPeek(_ index: Int?, animated: Bool) {
-    guard index != peekedIndex else { return }
-    peekedIndex = index
-    CATransaction.begin()
-    CATransaction.setAnimationDuration(animated ? CidaMotion.heightSeconds : 0)
-    for (layerIndex, layer) in blockLayers.enumerated() {
-      layer.opacity = layerIndex == index ? 0 : 1
-    }
-    CATransaction.commit()
-  }
-
-  func index(at point: CGPoint) -> Int? {
-    let shifted = CGPoint(x: point.x, y: point.y - offset)
-    return drawings.firstIndex { $0.frame.contains(shifted) }
-  }
 
   /// A paragraph's paper card, and the underlay it replaces: 8 pt wider on each side, 3 pt
   /// taller (§五).
