@@ -102,8 +102,10 @@ Updates follow `Design/spec/updates.md`. The R2 bucket `cida-releases`, served a
 | --- | --- | --- |
 | `appcast.xml` | 5 minutes | last, EdDSA-signed |
 | `releases/<version>-<build>/Cida-<version>-<build>.zip` | a year, immutable | first; the archive Sparkle installs |
-| `releases/<version>-<build>/Cida-<version>-<build>.dmg` | a year, immutable | second; every version's installer |
+| `releases/<version>-<build>/Cida-<version>-<build>.dmg` | a year, immutable | second; that version's installer |
 | `latest/Cida.dmg` | 5 minutes | for releases only, before the feed; the READMEs' download link |
+
+The feed keeps the two newest builds of each channel (`Design/spec/updates.md` §四). After uploading the feed, the script deletes every `releases/` folder it no longer lists; if that fails, the job only warns and the next publish deletes them. The GitHub releases keep every version's DMG.
 
 A release candidate's item carries Sparkle's `beta` channel, and its bundle carries `CidaUpdateChannel = beta`, so only candidates look for candidates. The EdDSA private key signs every zip and the feed; the app trusts only the public key in `Resources/Cida-Info.plist` (`SUPublicEDKey`). Losing the private key means shipped copies can no longer be updated, so keep the login keychain item "Private key for signing Sparkle updates" (service `https://sparkle-project.org`, account `cida`) backed up; Sparkle's `sign_update --account cida` signs with it locally.
 
