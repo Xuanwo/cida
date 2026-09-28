@@ -24,36 +24,126 @@ struct LayerTextStyle: Equatable {
 struct LayerDrawing: Equatable {
   let frame: CGRect
   let text: String
+  /// Where the links are in `text`; they are drawn in accent.
+  var links: [NSRange] = []
   let lineHeight: CGFloat
   let style: LayerTextStyle
 }
 
-enum LayerTextFitting {
-  /// The largest system font, up to the original's size, at which `text` wraps into `size`;
-  /// nil when even 8 pt does not fit, and the original then stays visible (§三: 不裁字).
-  static func fittedFont(text: String, size: CGSize, maximum: CGFloat) -> NSFont? {
-    let minimum = min(8, maximum)
-    func fits(_ pointSize: CGFloat) -> Bool {
-      let measured = (text as NSString).boundingRect(
-        with: CGSize(width: size.width, height: .greatestFiniteMagnitude),
-        options: [.usesLineFragmentOrigin, .usesFontLeading],
-        attributes: [.font: NSFont.systemFont(ofSize: pointSize)])
-      return ceil(measured.height) <= size.height + 1 && ceil(measured.width) <= size.width + 1
-    }
-    guard size.width > 0, size.height > 0, fits(minimum) else { return nil }
-    var low = minimum
-    var high = max(maximum, minimum)
-    if fits(high) { return .systemFont(ofSize: high) }
-    for _ in 0..<10 {
-      let middle = (low + high) / 2
-      if fits(middle) { low = middle } else { high = middle }
-    }
-    return .systemFont(ofSize: low)
+/// A translation set in Cida's result serif (§五): the largest size up to the original's that
+/// fits its paragraph, lines as far apart as the face needs, and where the caret after the last
+/// line goes. Coordinates are top-left, inside the paragraph's frame.
+struct LayerTypeset {
+  struct Line {
+    let line: CTLine
+    /// The baseline's start.
+    let origin: CGPoint
   }
 
-  /// A line of body text is about 1.3 times its font size.
+  let font: NSFont
+  let lines: [Line]
+  /// Cida's caret after the last character, as if Cida had just written it.
+  let caret: CGRect
+
+  /// A line of body text is about 1.2 times its font size: an app's text box that tall holds
+  /// text of that size (Slack's 18 pt boxes hold 15 pt text).
   static func fontSize(forLineHeight lineHeight: CGFloat) -> CGFloat {
-    min(max(lineHeight / 1.3, 9), 28)
+    min(max(lineHeight / 1.2, 9), 28)
+  }
+
+  /// Glyphs may reach this far past the paragraph's frame, above and below.
+  static let bleed: CGFloat = 2
+
+  /// Nil when even 8 pt does not fit, and the original then stays (不裁字).
+  static func fitting(_ text: String, in size: CGSize, lineHeight: CGFloat) -> LayerTypeset? {
+    let language = TextLanguageDetector.typography(of: text) ?? .chinese
+    let maximum = fontSize(forLineHeight: lineHeight)
+    let minimum = min(8, maximum)
+    func set(_ pointSize: CGFloat) -> LayerTypeset? {
+      typeset(text, font: CidaDesign.appKitResult(for: language, size: pointSize), in: size, lineHeight: lineHeight)
+    }
+    guard size.width > 0, size.height > 0, set(minimum) != nil else { return nil }
+    if let largest = set(maximum) { return largest }
+    var low = minimum
+    var high = maximum
+    for _ in 0..<10 {
+      let middle = (low + high) / 2
+      if set(middle) != nil { low = middle } else { high = middle }
+    }
+    return set(low)
+  }
+
+  /// Lines start where the original's do: the first is centred on the original's first line,
+  /// the rest follow at the face's own spacing, however many lines the original took.
+  private static func typeset(_ text: String, font: NSFont, in size: CGSize, lineHeight: CGFloat) -> LayerTypeset? {
+    let string = NSAttributedString(string: text, attributes: [.font: font])
+    let typesetter = CTTypesetterCreateWithAttributedString(string)
+    let length = string.length
+    var ranges: [CFRange] = []
+    var start = 0
+    while start < length {
+      let count = CTTypesetterSuggestLineBreak(typesetter, start, Double(size.width))
+      guard count > 0 else { return nil }
+      ranges.append(CFRange(location: start, length: count))
+      start += count
+    }
+    let ascent = font.ascender
+    let glyphs = font.ascender - font.descender
+    let pitch = max(glyphs, font.pointSize * 1.4)
+    let top = (min(lineHeight, size.height) - pitch) / 2
+    guard top >= -bleed, top + CGFloat(ranges.count) * pitch <= size.height + bleed else { return nil }
+    var lines: [Line] = []
+    var lastWidth: CGFloat = 0
+    for (index, range) in ranges.enumerated() {
+      let line = CTTypesetterCreateLine(typesetter, range)
+      let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil) - CTLineGetTrailingWhitespaceWidth(line))
+      guard width <= size.width + 1 else { return nil }
+      let baseline = top + CGFloat(index) * pitch + (pitch - glyphs) / 2 + ascent
+      lines.append(Line(line: line, origin: CGPoint(x: 0, y: baseline)))
+      lastWidth = width
+    }
+    // The caret stands as tall as the text, centred on its middle (about a third of the size
+    // above the baseline).
+    let height = font.pointSize
+    let middle = (lines.last?.origin.y ?? 0) - font.pointSize * 0.35
+    let caret = CGRect(x: lastWidth + 3, y: middle - height / 2, width: CidaMotion.cursorWidth, height: height)
+    return LayerTypeset(font: font, lines: lines, caret: caret)
+  }
+
+  /// The paragraph drawn onto `background` with font smoothing, as the app draws its own text:
+  /// a text layer drawn over transparency comes out about a sixth lighter than native text.
+  func image(
+    of text: String, links: [NSRange], size: CGSize, style: LayerTextStyle, scale: CGFloat
+  ) -> CGImage? {
+    let height = size.height + Self.bleed * 2
+    guard
+      let context = CGContext(
+        data: nil, width: Int((size.width * scale).rounded(.up)), height: Int((height * scale).rounded(.up)),
+        bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+    context.scaleBy(x: scale, y: scale)
+    context.setFillColor(style.background.cgColor)
+    context.fill(CGRect(x: 0, y: 0, width: size.width, height: height))
+    context.setAllowsFontSmoothing(true)
+    context.setShouldSmoothFonts(true)
+    let colored = NSMutableAttributedString(
+      string: text,
+      attributes: [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): style.foreground.cgColor])
+    for link in links where NSMaxRange(link) <= colored.length {
+      colored.addAttribute(
+        NSAttributedString.Key(kCTForegroundColorAttributeName as String), value: CidaDesign.Palette.accent.appKit.cgColor,
+        range: link)
+    }
+    // The same lines, in colour: breaks and positions come from the plain layout.
+    for line in lines {
+      let range = CTLineGetStringRange(line.line)
+      let piece = CTLineCreateWithAttributedString(
+        colored.attributedSubstring(from: NSRange(location: range.location, length: range.length)))
+      context.textPosition = CGPoint(x: line.origin.x, y: height - Self.bleed - line.origin.y)
+      CTLineDraw(piece, context)
+    }
+    return context.makeImage()
   }
 }
 
@@ -158,7 +248,7 @@ final class LayerOverlayPanel: NSPanel {
 final class LayerOverlayView: NSView {
   private var blockLayers: [CALayer] = []
   private let blocksLayer = CALayer()
-  /// Paragraphs ⌥D asked for, breathing on accent while their translation is on the way.
+  /// Carets breathing after the paragraphs whose translation is on the way.
   private let pendingLayer = CALayer()
   private(set) var pendingFrames: [CGRect] = []
   private let occlusionMask = CAShapeLayer()
@@ -195,31 +285,31 @@ final class LayerOverlayView: NSView {
     CATransaction.commit()
   }
 
-  /// The paragraphs waiting for their translation (§二 等待), in this view's coordinates:
-  /// accent at 16%, breathing down to 7% over `motion-breathe-ms`, in the paper card's shape.
-  func setPending(_ frames: [CGRect]) {
-    guard frames != pendingFrames else { return }
-    pendingFrames = frames
+  /// The paragraphs waiting for their translation (§二 等待): Cida's caret after each one's
+  /// last line, breathing between full and `motion-cursor-opacity-min` over
+  /// `motion-breathe-ms`, as if Cida were writing. `carets` are in this view's coordinates.
+  func setPending(_ carets: [CGRect]) {
+    guard carets != pendingFrames else { return }
+    pendingFrames = carets
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     pendingLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
-    for frame in frames {
-      let underlay = CALayer()
-      underlay.frame = Self.cardFrame(around: frame)
-      underlay.cornerRadius = CidaDesign.Radius.chip
-      underlay.cornerCurve = .continuous
-      underlay.backgroundColor = CidaDesign.Palette.accent.appKit.withAlphaComponent(0.16).cgColor
+    for frame in carets {
+      let caret = CALayer()
+      caret.frame = frame
+      caret.cornerRadius = CidaMotion.cursorWidth / 2
+      caret.backgroundColor = CidaDesign.Palette.accent.appKit.cgColor
       if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
         let breathe = CABasicAnimation(keyPath: "opacity")
         breathe.fromValue = 1
-        breathe.toValue = 0.07 / 0.16
+        breathe.toValue = CidaMotion.cursorMinimumOpacity
         breathe.duration = CidaMotion.breatheHalfCycleSeconds
         breathe.autoreverses = true
         breathe.repeatCount = .infinity
         breathe.timingFunction = CidaMotion.Curve.easeInOut.timingFunction
-        underlay.add(breathe, forKey: "breathe")
+        caret.add(breathe, forKey: "breathe")
       }
-      pendingLayer.addSublayer(underlay)
+      pendingLayer.addSublayer(caret)
     }
     CATransaction.commit()
   }
@@ -294,16 +384,15 @@ final class LayerOverlayView: NSView {
   }
 
   private func makeLayer(for drawing: LayerDrawing, scale: CGFloat) -> CALayer? {
-    // Paper stands a little proud of the original; sampled paint covers it exactly.
-    let frame = drawing.style.isPaper ? Self.cardFrame(around: drawing.frame) : drawing.frame.insetBy(dx: -1, dy: -1)
-    let textFrame = drawing.frame
-    let maximum = LayerTextFitting.fontSize(forLineHeight: drawing.lineHeight)
-    guard
-      let font = LayerTextFitting.fittedFont(
-        text: drawing.text, size: textFrame.size, maximum: maximum)
+    guard let typeset = LayerTypeset.fitting(drawing.text, in: drawing.frame.size, lineHeight: drawing.lineHeight),
+      let image = typeset.image(
+        of: drawing.text, links: drawing.links, size: drawing.frame.size, style: drawing.style, scale: scale)
     else {
       return nil
     }
+    // Paper stands a little proud of the original; the app's own background covers it exactly.
+    let text = drawing.frame.insetBy(dx: 0, dy: -LayerTypeset.bleed)
+    let frame = drawing.style.isPaper ? Self.cardFrame(around: drawing.frame).union(text) : text.insetBy(dx: -1, dy: 0)
     let container = CALayer()
     container.frame = frame
     container.backgroundColor = drawing.style.background.cgColor
@@ -313,16 +402,17 @@ final class LayerOverlayView: NSView {
       container.borderWidth = 1
       container.borderColor = NSColor.black.withAlphaComponent(0x12 / 255).cgColor
     }
-    let text = CATextLayer()
-    text.frame = CGRect(
-      x: textFrame.minX - frame.minX, y: textFrame.minY - frame.minY,
-      width: textFrame.width, height: textFrame.height)
-    text.string = NSAttributedString(
-      string: drawing.text,
-      attributes: [.font: font, .foregroundColor: drawing.style.foreground])
-    text.isWrapped = true
-    text.contentsScale = scale
-    container.addSublayer(text)
+    let paragraph = CALayer()
+    paragraph.frame = text.offsetBy(dx: -frame.minX, dy: -frame.minY)
+    paragraph.contents = image
+    paragraph.contentsScale = scale
+    container.addSublayer(paragraph)
+    // Cida's caret after the last character, at rest: this paragraph is Cida's (§五).
+    let caret = CALayer()
+    caret.frame = typeset.caret.offsetBy(dx: drawing.frame.minX - frame.minX, dy: drawing.frame.minY - frame.minY)
+    caret.cornerRadius = CidaMotion.cursorWidth / 2
+    caret.backgroundColor = CidaDesign.Palette.accent.appKit.withAlphaComponent(0.45).cgColor
+    container.addSublayer(caret)
     return container
   }
 }

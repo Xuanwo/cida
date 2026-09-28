@@ -256,6 +256,39 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(LayerScope.of(page.children[1]), .site("example.dev"))
   }
 
+  /// A bridged Discord message in Slack, as measured on 2026-09-28: each run of one line
+  /// sits in a container of its own, the link in another. Read container by container, the
+  /// link was left out and the shorter translation of the rest left a gap before it. Runs that
+  /// continue one line are one paragraph, the link travelling as a placeholder; separate lines
+  /// and table cells stay apart.
+  func testRunsContinuingOneLineAreOneParagraphWithTheirLink() throws {
+    func box(_ child: Node) -> Node { Node("AXGroup", child.frame, children: [child]) }
+    let message = Node("AXGroup", CGRect(x: 652, y: 440, width: 1869, height: 126), children: [
+      box(.text("LanceDB / # ", CGRect(x: 716, y: 468, width: 84, height: 18))),
+      box(Node(LayerRole.image, CGRect(x: 802, y: 468, width: 18, height: 18))),
+      box(.text("questions", CGRect(x: 821, y: 468, width: 65, height: 18))),
+      box(.link("Open in Discord", CGRect(x: 898, y: 468, width: 107, height: 18))),
+      box(.text("Zhuang Keju: ", CGRect(x: 716, y: 490, width: 88, height: 18))),
+      box(.text("Hi all, I reported the issue below: ", CGRect(x: 803, y: 490, width: 322, height: 18))),
+      box(.link("https://github.com/lancedb/lancedb/issues/3669", CGRect(x: 1124, y: 490, width: 324, height: 18))),
+      box(.text("It is closed now, but I can still reproduce it after the fix, and the script never reaches the path the fix handles.", CGRect(x: 716, y: 520, width: 1691, height: 40))),
+    ])
+    let blocks = LayerBlockExtractor.blocks(in: message)
+    XCTAssertEqual(blocks.map(\.maskedText), [
+      "LanceDB / # questions⟦0⟧",
+      "Zhuang Keju: Hi all, I reported the issue below: ⟦0⟧",
+      "It is closed now, but I can still reproduce it after the fix, and the script never reaches the path the fix handles.",
+    ])
+    let issue = try XCTUnwrap(blocks.dropFirst().first)
+    XCTAssertEqual(issue.frame, CGRect(x: 716, y: 490, width: 732, height: 18))
+
+    let row = Node("AXRow", CGRect(x: 0, y: 0, width: 400, height: 24), children: [
+      Node("AXCell", CGRect(x: 0, y: 0, width: 120, height: 24), children: [.text("Point lookup", CGRect(x: 0, y: 0, width: 110, height: 24))]),
+      Node("AXCell", CGRect(x: 120, y: 0, width: 120, height: 24), children: [.text("Full scan", CGRect(x: 124, y: 0, width: 80, height: 24))]),
+    ])
+    XCTAssertEqual(LayerBlockExtractor.blocks(in: row).map(\.text), ["Point lookup", "Full scan"])
+  }
+
   func testADocumentInOneTextAreaSplitsIntoPlacedParagraphs() {
     let text = "Meeting notes.\n\nWe moved the review to Thursday.\nAction items follow.\n"
     let document = Node(LayerRole.textArea, CGRect(x: 0, y: 0, width: 600, height: 400), text: text)
@@ -452,15 +485,41 @@ final class TranslationLayerTests: XCTestCase {
 
   // MARK: - Drawing
 
-  func testTranslationsShrinkToFitButNeverClip() {
-    let fitted = LayerTextFitting.fittedFont(
-      text: "这是较长的一段译文，需要换行显示。", size: CGSize(width: 130, height: 44), maximum: 24)
-    XCTAssertNotNil(fitted)
-    XCTAssertLessThan(fitted!.pointSize, 24)
-    XCTAssertGreaterThanOrEqual(fitted!.pointSize, 8)
-    XCTAssertNil(LayerTextFitting.fittedFont(
-      text: String(repeating: "很多文字", count: 100), size: CGSize(width: 30, height: 10), maximum: 20))
-    XCTAssertEqual(LayerTextFitting.fontSize(forLineHeight: 22), 22 / 1.3, accuracy: 0.01)
+  /// Translations are set in Cida's result serif (§五): at the original's size where they fit,
+  /// smaller where they do not, never clipped, with Cida's caret just after the last character.
+  func testTranslationsAreSetInTheResultSerifEndingWithCidasCaret() throws {
+    FontRegistrar.registerBundledFonts()
+    XCTAssertEqual(LayerTypeset.fontSize(forLineHeight: 18), 15)
+    let short = try XCTUnwrap(LayerTypeset.fitting("同意，我来核对保留策略。", in: CGSize(width: 600, height: 18), lineHeight: 18))
+    XCTAssertEqual(short.font.pointSize, 15)
+    XCTAssertEqual(short.font.familyName, "Noto Serif SC")
+    XCTAssertEqual(short.lines.count, 1)
+    let lineEnd = CGFloat(CTLineGetTypographicBounds(short.lines[0].line, nil, nil, nil))
+    XCTAssertEqual(short.caret.minX, lineEnd + 3, accuracy: 0.5)
+    XCTAssertEqual(short.caret.width, 2)
+    XCTAssertTrue(short.caret.minY >= -LayerTypeset.bleed && short.caret.maxY <= 18 + LayerTypeset.bleed)
+
+    let long = String(repeating: "压缩任务昨晚跑完了，但生产表的清单数涨了三倍。", count: 3)
+    let shrunk = try XCTUnwrap(LayerTypeset.fitting(long, in: CGSize(width: 300, height: 40), lineHeight: 18))
+    XCTAssertLessThan(shrunk.font.pointSize, 15)
+    XCTAssertGreaterThanOrEqual(shrunk.font.pointSize, 8)
+    XCTAssertNil(LayerTypeset.fitting(String(repeating: long, count: 10), in: CGSize(width: 60, height: 12), lineHeight: 12))
+  }
+
+  /// Links come back where the model kept their placeholders, and the drawing knows where they
+  /// are to set them in accent.
+  func testLinksComeBackIntoTheTranslationWhereTheModelKeptThem() {
+    let block = LayerBlock(
+      pieces: [
+        .init(text: "I reported ", isVerbatim: false),
+        .init(text: "lancedb#3669", isVerbatim: true, isLink: true),
+        .init(text: " and ", isVerbatim: false),
+        .init(text: "compact()", isVerbatim: true),
+      ],
+      frame: .zero, lineHeight: 18)
+    let (text, links) = block.restoring(in: "我在 ⟦1⟧ 之后报告了 ⟦0⟧")
+    XCTAssertEqual(text, "我在 compact() 之后报告了 lancedb#3669")
+    XCTAssertEqual(links.map { (text as NSString).substring(with: $0) }, ["lancedb#3669"])
   }
 
   func testPaperAndInkAreSampledFromTheWindow() throws {

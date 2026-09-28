@@ -845,16 +845,22 @@ final class LayerPaneSession {
     let paper = LayerTextStyle.paper(darkAppearance: dark)
     let drawings: [LayerDrawing] = blocks.compactMap { block in
       guard let translation = owner.translations[block.maskedText] else { return nil }
-      let text = block.restoringVerbatim(in: translation)
+      let (text, links) = block.restoring(in: translation)
       guard text != block.text else { return nil }
       return LayerDrawing(
         frame: block.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY),
-        text: text, lineHeight: block.lineHeight, style: styles[block.maskedText] ?? paper)
+        text: text, links: links, lineHeight: block.lineHeight, style: styles[block.maskedText] ?? paper)
     }
     overlay.overlayView.show(drawings, scale: scale)
-    // Every paragraph waiting for its translation breathes (§二 等待, §五 等待).
+    // A caret breathes after every paragraph waiting for its translation (§二 等待, §五 等待).
     let waiting = failure == nil ? pendingBlocks : []
-    overlay.overlayView.setPending(waiting.map { $0.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) })
+    overlay.overlayView.setPending(waiting.map { block in
+      let end = block.endOfText
+      let height = LayerTypeset.fontSize(forLineHeight: block.lineHeight)
+      return CGRect(
+        x: end.x + 3 - paneFrame.minX, y: end.y + (block.lineHeight - height) / 2 - paneFrame.minY,
+        width: CidaMotion.cursorWidth, height: height)
+    })
     if isOnScreen, !waiting.isEmpty { overlay.orderFront(nil) }
     let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
     // A read landing while another app's windows animate in stays hidden with the rest.

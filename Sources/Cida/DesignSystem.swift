@@ -139,8 +139,8 @@ enum CidaDesign {
   /// The result face: Source Serif 4 for Latin results, Noto Serif SC for
   /// Chinese ones, each cascading to the other for mixed text. Wherever Noto
   /// Serif SC sets Chinese, its punctuation follows `cjkPunctuationFeatures`.
-  static func appKitResult(for language: Language) -> NSFont {
-    let size = language == .chinese ? Typography.resultSizeCJK : Typography.resultSize
+  static func appKitResult(for language: Language, size: CGFloat? = nil) -> NSFont {
+    let size = size ?? (language == .chinese ? Typography.resultSizeCJK : Typography.resultSize)
     let latin = NSFontDescriptor(fontAttributes: [.family: "Source Serif 4"])
     let cjk = NSFontDescriptor(fontAttributes: [
       .family: "Noto Serif SC",

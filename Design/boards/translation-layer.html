@@ -9,7 +9,7 @@
 </head>
 <body>
 <!-- Rules: ../spec/translation-layer.md. The app windows are mock-ups; Cida's own parts
-     are the translations, the breathing underlay, the window outline and the hint pill. -->
+     are the translations with their caret, the window outline and the hint pill. -->
 <main class="board" data-board="translation-layer">
   <div class="board-title">States — 原处翻译</div>
   <p class="caption">规则见 spec/translation-layer.md。译文出现在原文的位置上,前后的消息都还在原处,带着上下文读。两个一键动作:⌥D 把指针下这一段换成译文,再按换回;⌥⇧D 把整个窗口换成译文,新消息自动翻译,再按停止。没有纸雾,不用点击。文字只取自应用的辅助功能树,应用本身不改动。下面的应用窗口是示意。</p>
@@ -20,10 +20,10 @@
   <div class="state-label">① 读到卡住的一句 — 指针停在这条消息上;按下之前什么都不显示</div>
   <cida-layer-scene state="layer-once-pointing" app="chat" layer="once-pointing"></cida-layer-scene>
 
-  <div class="state-label">② 按 ⌥D · 翻译中 — 这一段立即垫一层 accent,形状同纸片(左右各宽 8pt、上下各高 3pt,radius-chip),不透明度在 16% 与 7% 之间呼吸(motion-breathe-ms);原文照常可读</div>
+  <div class="state-label">② 按 ⌥D · 翻译中 — 这一段末尾立即出现辞达的光标(2px accent),按 motion-breathe-ms 呼吸,像辞达正在写;原文照常可读,没有底色</div>
   <cida-layer-scene state="layer-once-pending" app="chat" layer="once-pending"></cida-layer-scene>
 
-  <div class="state-label">③ 换上 — 约 1.5 秒后译文画在原文的位置上,交叉淡入(motion-height-ms),底色同时淡出。整段一次换上;前后的消息仍是原文,带着上下文读</div>
+  <div class="state-label">③ 换上 — 约 1.5 秒后原文被应用自己的底色盖住,译文用面板结果的衬线字写在原位,交叉淡入(motion-height-ms);光标停在译文末尾,降到 45%,标出这是辞达的译文;链接用 accent。前后的消息仍是原文,带着上下文读</div>
   <cida-layer-scene state="layer-once-done" app="chat" layer="once-done"></cida-layer-scene>
 
   <div class="state-label">④ 再指一段再按 — 那一段也换成译文,已换好的保持不变;几段译文与原文穿插着读,一起跟随滚动</div>
@@ -41,7 +41,7 @@
   <div class="state-label">⑦′ 翻译失败 — 底色停止呼吸淡出,这一段保持原文;提示胶囊「翻译失败 · 点按重试」停留到点按重试或下一次成功,是原处翻译里唯一接收点击的地方。还没有模型服务时 ⌥D 显示面板的欢迎,不在这里说</div>
   <cida-layer-scene state="layer-once-failed" app="chat" layer="once-failed"></cida-layer-scene>
 
-  <div class="state-label">⑧ 未授予屏幕录制 — 取不到原文的底色,译文画在纸片上(surface-paper、text-ink、radius-chip、panel-edge 描边);跟随滚动与有屏幕录制时相同:按滚动事件移动,停下后按辅助功能校准</div>
+  <div class="state-label">⑧ 未授予屏幕录制 — 取不到应用的底色,译文写在纸片上(surface-paper、text-ink、radius-chip、panel-edge 描边),同样的衬线字与末尾光标;跟随滚动与有屏幕录制时相同</div>
   <cida-layer-scene state="layer-once-two-paper" app="chat" layer="once-two" paper></cida-layer-scene>
 
   <div class="divider"></div>
@@ -50,7 +50,7 @@
   <div class="state-label">⑨ 按 ⌥⇧D · 开始 — 窗口外 3pt 闪一圈 1.5px accent 实线轮廓,圆角 19,与窗口 16pt 的圆角同心(motion-height-ms 淡入、停 600ms、300ms 淡出);提示胶囊「翻译整个窗口 · Slack · 再按 ⌥ ⇧ D 停止」2.5 秒;窗口里所有外文段落先呼吸、再换成译文,按应用(网页按网站)记住。频道栏是导航树、频道名只有一个词,都保持原文</div>
   <cida-layer-scene state="layer-window-on" app="chat" layer="window-on"></cida-layer-scene>
 
-  <div class="state-label">⑩ 新消息 — 先显示原文并垫上同样呼吸的底色,译好后整块一次换上;没有进度胶囊,「正在翻译」就显示在那条消息本身上</div>
+  <div class="state-label">⑩ 新消息 — 先显示原文,末尾的光标呼吸;译好后整块一次换上,光标停在译文末尾;没有进度胶囊,「正在翻译」就显示在那条消息本身上</div>
   <cida-layer-scene state="layer-translating-chat" app="chat" layer="translating"></cida-layer-scene>
 
   <div class="state-label">⑪ 窗口里换回一段 — 指着一段译文按 ⌥D,只有这一段换回原文,窗口照常翻译;翻错或不该翻的段落也这样处理</div>
@@ -63,7 +63,6 @@
   <cida-layer-scene state="layer-translated-browser-paper" app="browser" layer="translated" paper></cida-layer-scene>
 
   <div class="divider"></div>
-
   <p class="caption">设置「快捷键」页在「截图翻译」下方是「原处翻译 ⌥ D」一行,说明「加 ⇧ 翻译整个窗口」(settings-states.html);录制时不能带 ⇧。菜单栏菜单没有这一项:它翻译的是指针下的内容,从菜单里触发没有对象。</p>
 </main>
 </body>

@@ -231,7 +231,7 @@ customElements.define("cida-status-menu", CidaStatusMenu);
 // <cida-layer-scene app="chat|browser" layer="…" paper>. paper draws translations on
 // paper cards, as without the Screen Recording permission. Chat layers, as a walk through:
 //   once-pointing  the pointer rests on a message; nothing yet
-//   once-pending   ⌥D: that message breathes on accent while it is translated
+//   once-pending   ⌥D: a caret breathes after that message while it is translated
 //   once-done      it reads in place, among the originals
 //   once-two       ⌥D on another message: both translated, the rest original
 //   once-peek      the pointer rests on a translation: its original shows
@@ -301,8 +301,8 @@ class CidaLayerScene extends HTMLElement {
   chat(layer, wordmark, paper) {
     const messages = [
       ["Maya Chen", "10:02", "#C9A27E",
-        "Morning! The compaction job finished overnight, but the manifest count on the prod table went from 1.2k to 3.4k.",
-        "早！压缩任务昨晚跑完了，但生产表的 manifest 数从 1.2k 涨到了 3.4k。"],
+        "Morning! The compaction job finished overnight, but the manifest count on the prod table went from 1.2k to 3.4k: <span class=\"link\">lancedb#3669</span>",
+        "早！压缩任务昨晚跑完了，但生产表的 manifest 数从 1.2k 涨到了 3.4k：<span class=\"link\">lancedb#3669</span>"],
       ["Leo Park", "10:05", "#7E9CC9",
         "That's expected after the schema change. We should schedule a cleanup before Friday's release.",
         "改完 schema 之后这是正常的。我们应该在周五发版前安排一次清理。"],
@@ -325,11 +325,11 @@ class CidaLayerScene extends HTMLElement {
     }[layer] ?? [];
     const pending = { "once-pending": 2, translating: 4 }[layer];
     const pointed = { "once-failed": 2, "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-peek": 2, "once-restore": 2, "window-one-original": 2 }[layer];
-    const card = (text) => (paper ? `<span class="layer-card">${text}</span>` : text);
+    const card = (text) => `<span class="${paper ? "layer-card layer-text" : "layer-text"}">${text}</span>`;
     const rows = messages.map(([who, time, color, original, translation], index) => {
       let text = original;
       if (translated.includes(index)) text = card(translation);
-      if (index === pending) text = `<span class="layer-pending">${original}</span>`;
+      if (index === pending) text = `<span class="layer-waiting">${original}</span>`;
       const pointer = index === pointed ? " data-pointer" : "";
       return `<div class="chat-msg"><i class="avatar" style="background: ${color}"></i>
         <div><div class="who">${who}<time>${time}</time></div><div class="text"${pointer}>${text}</div></div></div>`;
@@ -353,7 +353,7 @@ class CidaLayerScene extends HTMLElement {
   browser(layer, paper) {
     const translated = layer === "translated";
     const t = (original, translation) =>
-      translated ? (paper ? `<span class="layer-card">${translation}</span>` : translation) : original;
+      translated ? `<span class="${paper ? "layer-card layer-text" : "layer-text"}">${translation}</span>` : original;
     return `
       <div class="browser-tabs"><div class="mock-lights"><i></i><i></i><i></i></div><div class="browser-tab">Why we rewrote the file format</div></div>
       <div class="browser-toolbar"><div class="address">example.dev/blog/file-format</div></div>

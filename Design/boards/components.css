@@ -908,15 +908,6 @@ body {
 .page-toc b { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.06em; color: #202124; }
 
 /* The layer's own parts. */
-/* ⌥D: the paragraph breathes on accent while its translation is on the way, in the shape
-   of the paper card that may replace it. */
-.layer-pending {
-  display: block;
-  margin: -3px -8px;
-  padding: 3px 8px;
-  border-radius: var(--radius-chip);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
 .chat-empty { height: 120px; margin: 0 20px; }
 /* ⌥⇧D: the window outlined for a moment when it starts, 3px outside and concentric with
    its 16px corners. */
@@ -932,6 +923,24 @@ body {
   background: var(--surface-paper);
   color: var(--text-ink);
 }
+.chat-msg .text .link { color: #1264A3; }
+/* A translation: Cida's result serif on the app's own background, ending with Cida's caret as
+   if Cida had just written it; links in accent. */
+.layer-text { font-family: var(--font-result-cjk); }
+.layer-text::after, .layer-waiting::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 15px;
+  margin-left: 3px;
+  vertical-align: -2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.45;
+}
+/* Waiting: the caret breathes after the original (drawn at its brightest). */
+.layer-waiting::after { opacity: 1; }
+.chat-msg .text .layer-text .link, .page .layer-text .link { color: var(--accent); }
 .pointer {
   position: absolute;
   width: 16px;

@@ -35,6 +35,8 @@ enum LayerRole {
   static let webArea = "AXWebArea"
   /// A navigation tree: Slack's channel list, Finder's sidebar, Mail's mailboxes.
   static let outline = "AXOutline"
+  /// A table cell: cells beside each other are separate paragraphs.
+  static let cell = "AXCell"
   static let window = "AXWindow"
   static let application = "AXApplication"
 
@@ -260,13 +262,25 @@ struct LayerBlock: Equatable, Sendable {
     let text: String
     /// Link or code text: sent to the model as ⟦n⟧ and put back unchanged.
     let isVerbatim: Bool
+    /// Where it is on screen: runs continuing a line are joined by it, and the caret that
+    /// breathes while the translation is on the way sits after the last one.
+    var frame: CGRect? = nil
+    /// A link, drawn in accent in the translation (§五).
+    var isLink: Bool = false
   }
 
   let pieces: [Piece]
   /// Screen points, top-left origin.
   let frame: CGRect
-  /// The height of one line, from the smallest text piece; it sizes the translation's font.
+  /// The height of one line of text, from the smallest text piece; it sizes the translation's
+  /// font (§五).
   let lineHeight: CGFloat
+
+  /// Some of it is prose rather than link or code text (§三): names, times, navigation and
+  /// identifiers are left alone.
+  var hasProse: Bool {
+    pieces.contains { !$0.isVerbatim && $0.text.contains(where: \.isLetter) }
+  }
 
   /// What the reader sees, links included.
   var text: String { pieces.map(\.text).joined() }
@@ -298,11 +312,39 @@ struct LayerBlock: Equatable, Sendable {
 
   /// Puts link and code text back where the model kept the placeholders.
   func restoringVerbatim(in translation: String) -> String {
-    var restored = translation
-    for (index, text) in verbatimTexts.enumerated() {
-      restored = restored.replacingOccurrences(of: "⟦\(index)⟧", with: text)
+    restoring(in: translation).text
+  }
+
+  /// The translation with link and code text put back, and where the links landed in it.
+  func restoring(in translation: String) -> (text: String, links: [NSRange]) {
+    let verbatim = pieces.filter(\.isVerbatim)
+    var text = ""
+    var links: [NSRange] = []
+    var rest = Substring(translation)
+    while let match = rest.firstMatch(of: /⟦(\d+)⟧/) {
+      text += rest[..<match.range.lowerBound]
+      if let index = Int(match.1), verbatim.indices.contains(index) {
+        let piece = verbatim[index]
+        if piece.isLink { links.append(NSRange(location: (text as NSString).length, length: (piece.text as NSString).length)) }
+        text += piece.text
+      } else {
+        text += match.0
+      }
+      rest = rest[match.range.upperBound...]
     }
-    return restored
+    return (text + rest, links)
+  }
+
+  /// Where the original's last line ends: the top-left of the caret that breathes after it while
+  /// its translation is on the way (§二 等待).
+  var endOfText: CGPoint {
+    guard let last = pieces.last(where: { $0.frame != nil })?.frame else {
+      return CGPoint(x: frame.maxX, y: frame.maxY - lineHeight)
+    }
+    // A piece taller than a line wraps; its last line ends at the paragraph's right edge.
+    return last.height <= lineHeight * 1.5
+      ? CGPoint(x: last.maxX, y: last.minY)
+      : CGPoint(x: frame.maxX, y: frame.maxY - lineHeight)
   }
 }
 
@@ -336,6 +378,15 @@ enum LayerBlockExtractor {
         blocks.append(contentsOf: documentBlocks(of: node, visible: clip).map { ($0, node) })
         continue
       }
+      // A link on its own is left alone, unless it continues a line of prose (`continuingLines`).
+      if node.role == LayerRole.link {
+        let text = plainText(node)
+        if !text.isEmpty, let frame = node.frame, frame.height >= 6, frame.intersects(clip) {
+          let piece = LayerBlock.Piece(text: text, isVerbatim: true, frame: frame, isLink: true)
+          blocks.append((LayerBlock(pieces: [piece], frame: frame, lineHeight: frame.height), node))
+        }
+        continue
+      }
       let children = node.children
       if LayerRole.formParagraph(children) {
         if isStack(children) {
@@ -356,7 +407,44 @@ enum LayerBlockExtractor {
       // Walk children in reading order.
       stack.append(contentsOf: children.reversed())
     }
-    return automatic ? blocks.filter { !$0.block.isLabel } : blocks
+    let paragraphs = continuingLines(blocks).filter(\.block.hasProse)
+    return automatic ? paragraphs.filter { !$0.block.isLabel } : paragraphs
+  }
+
+  /// Joins runs that continue one line into one paragraph (§三). Apps put pieces of a line in
+  /// containers of their own (a bridged chat message, a styled span); translated one by one,
+  /// a link between them was left out and the shorter translation of the rest left a gap
+  /// before it. Two runs continue a line when they sit on it together and the second starts
+  /// where the first ends, give or take an emoji. Table cells beside each other stay apart.
+  private static func continuingLines<Node: LayerNode>(
+    _ blocks: [(block: LayerBlock, node: Node)]
+  ) -> [(block: LayerBlock, node: Node)] {
+    func isCell(_ node: Node) -> Bool {
+      node.role == LayerRole.cell || node.parent?.role == LayerRole.cell
+    }
+    var joined: [(block: LayerBlock, node: Node)] = []
+    for next in blocks {
+      guard let current = joined.last, !isCell(current.node), !isCell(next.node),
+        let end = current.block.pieces.last(where: { $0.frame != nil })?.frame,
+        let start = next.block.pieces.first(where: { $0.frame != nil })?.frame
+      else {
+        joined.append(next)
+        continue
+      }
+      let line = min(current.block.lineHeight, next.block.lineHeight)
+      let gap = start.minX - end.maxX
+      guard abs(end.midY - start.midY) < line * 0.6, gap > -4, gap < line * 1.5 else {
+        joined.append(next)
+        continue
+      }
+      joined[joined.count - 1] = (
+        LayerBlock(
+          pieces: current.block.pieces + next.block.pieces, frame: current.block.frame.union(next.block.frame),
+          lineHeight: line),
+        current.node
+      )
+    }
+    return joined
   }
 
   /// Two or more texts, no links, one below the other without sharing a line: a native
@@ -398,15 +486,20 @@ enum LayerBlockExtractor {
       switch child.role {
       case LayerRole.staticText:
         if let text = child.textValue, !text.isEmpty {
-          runs.append(Run(piece: .init(text: text, isVerbatim: false), frame: child.frame, text: child))
+          runs.append(Run(piece: .init(text: text, isVerbatim: false, frame: child.frame), frame: child.frame, text: child))
         }
       case LayerRole.link:
         let text = plainText(child)
-        if !text.isEmpty { runs.append(Run(piece: .init(text: text, isVerbatim: true), frame: child.frame, text: nil)) }
+        if !text.isEmpty {
+          runs.append(
+            Run(piece: .init(text: text, isVerbatim: true, frame: child.frame, isLink: true), frame: child.frame, text: nil))
+        }
       default:
         if child.subrole == LayerRole.codeStyleGroup {
           let text = plainText(child)
-          if !text.isEmpty { runs.append(Run(piece: .init(text: text, isVerbatim: true), frame: child.frame, text: nil)) }
+          if !text.isEmpty {
+            runs.append(Run(piece: .init(text: text, isVerbatim: true, frame: child.frame), frame: child.frame, text: nil))
+          }
         } else if LayerRole.isStyleGroup(child) {
           child.children.forEach(append)
         } else {
@@ -442,10 +535,8 @@ enum LayerBlockExtractor {
 
   private static func block<Node: LayerNode>(from runs: [Run<Node>], visible: CGRect) -> LayerBlock? {
     let pieces = runs.compactMap(\.piece)
-    // All the text sits in links or code: names, times, navigation, identifiers (§三).
-    guard pieces.contains(where: { !$0.isVerbatim && $0.text.contains(where: { $0.isLetter }) }) else {
-      return nil
-    }
+    // Link-only runs are kept until the runs continuing their line are joined (`continuingLines`).
+    guard !pieces.isEmpty else { return nil }
     let frames = runs.compactMap(\.frame).filter { $0.width > 0 && $0.height > 0 }
     guard let first = frames.first else { return nil }
     let frame = frames.dropFirst().reduce(first) { $0.union($1) }
