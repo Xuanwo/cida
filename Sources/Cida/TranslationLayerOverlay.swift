@@ -23,14 +23,21 @@ struct LayerDrawing: Equatable {
   var links: [NSRange] = []
   let lineHeight: CGFloat
   let style: LayerTextStyle
-  /// The last paragraph of a run of translated ones ends with Cida's caret (§五); one caret a
-  /// message, not one a line.
-  var showsCaret = true
+  /// The paper under the paragraph; paragraphs of one sheet share their edges (§五).
+  var paper: CGRect?
+  /// The rounded corners of `paper`: a sheet rounds only its outer ones.
+  var corners: CACornerMask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+
+  /// The paper of a paragraph on its own: 8 pt wider than the original on each side, 3 pt
+  /// taller, and never shorter than the lines set on it (§五).
+  var ownPaper: CGRect {
+    frame.insetBy(dx: -8, dy: -3).union(frame.insetBy(dx: 0, dy: -LayerTypeset.bleed))
+  }
 }
 
 /// A translation set in Cida's result serif (§五): the largest size up to the original's that
-/// fits its paragraph, lines as far apart as the face needs, and where the caret after the last
-/// line goes. Coordinates are top-left, inside the paragraph's frame.
+/// fits its paragraph, lines as far apart as the face needs. Coordinates are top-left, inside
+/// the paragraph's frame.
 struct LayerTypeset {
   struct Line {
     let line: CTLine
@@ -40,8 +47,6 @@ struct LayerTypeset {
 
   let font: NSFont
   let lines: [Line]
-  /// Cida's caret after the last character, as if Cida had just written it.
-  let caret: CGRect
 
   /// A line of body text is about 1.2 times its font size: an app's text box that tall holds
   /// text of that size (Slack's 18 pt boxes hold 15 pt text).
@@ -91,21 +96,14 @@ struct LayerTypeset {
     let top = (min(lineHeight, size.height) - pitch) / 2
     guard top >= -bleed, top + CGFloat(ranges.count) * pitch <= size.height + bleed else { return nil }
     var lines: [Line] = []
-    var lastWidth: CGFloat = 0
     for (index, range) in ranges.enumerated() {
       let line = CTTypesetterCreateLine(typesetter, range)
       let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil) - CTLineGetTrailingWhitespaceWidth(line))
       guard width <= size.width + 1 else { return nil }
       let baseline = top + CGFloat(index) * pitch + (pitch - glyphs) / 2 + ascent
       lines.append(Line(line: line, origin: CGPoint(x: 0, y: baseline)))
-      lastWidth = width
     }
-    // The caret stands as tall as the text, centred on its middle (about a third of the size
-    // above the baseline).
-    let height = font.pointSize
-    let middle = (lines.last?.origin.y ?? 0) - font.pointSize * 0.35
-    let caret = CGRect(x: lastWidth + 3, y: middle - height / 2, width: CidaMotion.cursorWidth, height: height)
-    return LayerTypeset(font: font, lines: lines, caret: caret)
+    return LayerTypeset(font: font, lines: lines)
   }
 
   /// The paragraph drawn onto `background` with font smoothing, as the app draws its own text:
@@ -274,11 +272,6 @@ final class LayerOverlayView: NSView {
   }
 
 
-  /// A paragraph's paper: 8 pt wider than the original on each side, 3 pt taller (§五).
-  static func cardFrame(around paragraph: CGRect) -> CGRect {
-    paragraph.insetBy(dx: -8, dy: -3)
-  }
-
   private func makeLayer(for drawing: LayerDrawing, scale: CGFloat) -> CALayer? {
     guard let typeset = LayerTypeset.fitting(drawing.text, in: drawing.frame.size, lineHeight: drawing.lineHeight),
       let image = typeset.image(
@@ -288,24 +281,18 @@ final class LayerOverlayView: NSView {
     }
     // The paper stands a little proud of the original it covers.
     let text = drawing.frame.insetBy(dx: 0, dy: -LayerTypeset.bleed)
-    let frame = Self.cardFrame(around: drawing.frame).union(text)
+    let frame = drawing.paper ?? drawing.ownPaper
     let container = CALayer()
     container.frame = frame
     container.backgroundColor = drawing.style.background.cgColor
     container.cornerRadius = CidaDesign.Radius.chip
     container.cornerCurve = .continuous
+    container.maskedCorners = drawing.corners
     let paragraph = CALayer()
     paragraph.frame = text.offsetBy(dx: -frame.minX, dy: -frame.minY)
     paragraph.contents = image
     paragraph.contentsScale = scale
     container.addSublayer(paragraph)
-    // Cida's caret after the last character, at rest: this paragraph is Cida's (§五).
-    guard drawing.showsCaret else { return container }
-    let caret = CALayer()
-    caret.frame = typeset.caret.offsetBy(dx: drawing.frame.minX - frame.minX, dy: drawing.frame.minY - frame.minY)
-    caret.cornerRadius = CidaMotion.cursorWidth / 2
-    caret.backgroundColor = CidaDesign.Palette.accent.appKit.withAlphaComponent(0.45).cgColor
-    container.addSublayer(caret)
     return container
   }
 }

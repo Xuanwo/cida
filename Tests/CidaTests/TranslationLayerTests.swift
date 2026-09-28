@@ -502,18 +502,14 @@ final class TranslationLayerTests: XCTestCase {
   // MARK: - Drawing
 
   /// Translations are set in Cida's result serif (§五): at the original's size where they fit,
-  /// smaller where they do not, never clipped, with Cida's caret just after the last character.
-  func testTranslationsAreSetInTheResultSerifEndingWithCidasCaret() throws {
+  /// smaller where they do not, never clipped.
+  func testTranslationsAreSetInTheResultSerif() throws {
     FontRegistrar.registerBundledFonts()
     XCTAssertEqual(LayerTypeset.fontSize(forLineHeight: 18), 15)
     let short = try XCTUnwrap(LayerTypeset.fitting("同意，我来核对保留策略。", in: CGSize(width: 600, height: 18), lineHeight: 18))
     XCTAssertEqual(short.font.pointSize, 15)
     XCTAssertEqual(short.font.familyName, "Noto Serif SC")
     XCTAssertEqual(short.lines.count, 1)
-    let lineEnd = CGFloat(CTLineGetTypographicBounds(short.lines[0].line, nil, nil, nil))
-    XCTAssertEqual(short.caret.minX, lineEnd + 3, accuracy: 0.5)
-    XCTAssertEqual(short.caret.width, 2)
-    XCTAssertTrue(short.caret.minY >= -LayerTypeset.bleed && short.caret.maxY <= 18 + LayerTypeset.bleed)
 
     let long = String(repeating: "压缩任务昨晚跑完了，但生产表的清单数涨了三倍。", count: 3)
     let shrunk = try XCTUnwrap(LayerTypeset.fitting(long, in: CGSize(width: 300, height: 40), lineHeight: 18))
@@ -538,18 +534,32 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(links.map { (text as NSString).substring(with: $0) }, ["lancedb#3669"])
   }
 
-  /// One caret a run of translated paragraphs, not one a paragraph: an unfurled issue in Slack
-  /// set a caret after each of its short paragraphs.
-  func testOnlyTheLastOfParagraphsSetOneUnderAnotherKeepsItsCaret() {
+  /// An unfurled issue in Slack read as a stack of patches of different widths: paragraphs set
+  /// one under another at one left edge share a sheet as wide as the widest, rounded only
+  /// outside, unless the original keeps text between or beside them.
+  func testParagraphsSetOneUnderAnotherShareOneSheet() {
     let style = LayerTextStyle.paper(darkAppearance: false)
-    func drawing(_ y: CGFloat, _ height: CGFloat = 18, x: CGFloat = 80) -> LayerDrawing {
-      LayerDrawing(frame: CGRect(x: x, y: y, width: 600, height: height), text: "译文", lineHeight: 18, style: style)
+    func drawing(_ y: CGFloat, width: CGFloat = 300, height: CGFloat = 18, x: CGFloat = 80) -> LayerDrawing {
+      LayerDrawing(frame: CGRect(x: x, y: y, width: width, height: height), text: "译文", lineHeight: 18, style: style)
     }
-    let carets = [drawing(100), drawing(128, 40), drawing(180), drawing(260), drawing(290, x: 900)]
-      .caretsOnLastOfEachRun().map(\.showsCaret)
+    let sheet = [drawing(100), drawing(128, width: 500, height: 40), drawing(180), drawing(260), drawing(290, x: 90)]
+      .sharingSheets(around: [])
     // 100 → 128 and 168 → 180 are paragraph gaps; 198 → 260 starts another message; the last
-    // one sits beside, not under.
-    XCTAssertEqual(carets, [false, false, true, true, true])
+    // one starts at another left edge.
+    XCTAssertEqual(sheet[0].paper, CGRect(x: 72, y: 97, width: 516, height: 28))
+    XCTAssertEqual(sheet[1].paper, CGRect(x: 72, y: 125, width: 516, height: 52))
+    XCTAssertEqual(sheet[2].paper, CGRect(x: 72, y: 177, width: 516, height: 24))
+    XCTAssertEqual(sheet[0].corners, [.layerMinXMinYCorner, .layerMaxXMinYCorner])
+    XCTAssertEqual(sheet[1].corners, [])
+    XCTAssertEqual(sheet[2].corners, [.layerMinXMaxYCorner, .layerMaxXMaxYCorner])
+    XCTAssertNil(sheet[3].paper)
+    XCTAssertNil(sheet[4].paper)
+
+    // A heading left in English between two paragraphs, or a button beside the narrow one.
+    let heading = [drawing(100), drawing(140)].sharingSheets(around: [CGRect(x: 80, y: 121, width: 60, height: 16)])
+    XCTAssertEqual(heading.map(\.paper), [nil, nil])
+    let beside = [drawing(100), drawing(128, width: 500)].sharingSheets(around: [CGRect(x: 420, y: 100, width: 60, height: 18)])
+    XCTAssertEqual(beside.map(\.paper), [nil, nil])
   }
 
   // MARK: - The third shortcut

@@ -349,14 +349,15 @@ class CidaLayerScene extends HTMLElement {
 
   browser(layer) {
     const translated = layer === "translated";
+    // The article's paragraphs share one sheet of paper.
     const t = (original, translation) =>
-      translated ? `<span class="layer-card layer-text">${translation}</span>` : original;
+      translated ? `<span class="layer-text">${translation}</span>` : original;
     return `
       <div class="browser-tabs"><div class="mock-lights"><i></i><i></i><i></i></div><div class="browser-tab">Why we rewrote the file format</div></div>
       <div class="browser-toolbar"><div class="address">example.dev/blog/file-format</div></div>
       <div class="page">
         <div class="page-nav"><b>Example Engineering</b>Blog<br>Docs<br>Community<br>Careers</div>
-        <div class="page-article">
+        <div class="page-article${translated ? " layer-sheet" : ""}">
           <h1>${t("Why we rewrote the file format", "我们为什么重写了文件格式")}</h1>
           <div class="meta">${t("Engineering · 8 min read", "工程 · 阅读约 8 分钟")}</div>
           <p>${t("Columnar formats were designed for scans that read a few columns across billions of rows. Modern AI workloads also need fast random access to individual rows, and the old layout made every lookup pay for a full page decode.",

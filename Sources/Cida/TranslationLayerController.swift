@@ -419,19 +419,50 @@ struct LayerParagraphMark {
 }
 
 extension [LayerDrawing] {
-  /// Only the last of paragraphs set one under another (less than about a line and a half
-  /// apart, overlapping sideways) keeps its caret: one caret a message, not one a paragraph of
-  /// an unfurled issue (§五).
-  func caretsOnLastOfEachRun() -> [LayerDrawing] {
-    indices.map { index in
-      var drawing = self[index]
-      if index + 1 < count {
-        let next = self[index + 1].frame
-        let gap = next.minY - drawing.frame.maxY
-        let beside = next.minX < drawing.frame.maxX && next.maxX > drawing.frame.minX
-        if gap >= -2, gap < drawing.lineHeight * 1.6, beside { drawing.showsCaret = false }
-      }
-      return drawing
+  /// Paragraphs set one under another at the same left edge, less than about a line and a half
+  /// apart, share one sheet of paper as wide as the widest (§五): an unfurled issue in Slack
+  /// read as a stack of patches of different widths. A sheet never grows over `others`, the
+  /// text left in the original between or beside its paragraphs; those stay on paper of
+  /// their own.
+  func sharingSheets(around others: [CGRect]) -> [LayerDrawing] {
+    var result = self
+    var start = 0
+    for index in indices.dropFirst() where !continuesSheet(self[index - 1], self[index], others: others) {
+      result.shareSheet(start..<index, others: others)
+      start = index
+    }
+    if !isEmpty { result.shareSheet(start..<count, others: others) }
+    return result
+  }
+
+  private func continuesSheet(_ above: LayerDrawing, _ below: LayerDrawing, others: [CGRect]) -> Bool {
+    let gap = below.frame.minY - above.frame.maxY
+    guard abs(below.frame.minX - above.frame.minX) <= 3, gap >= -2, gap < above.lineHeight * 1.6 else { return false }
+    let between = CGRect(
+      x: Swift.min(above.frame.minX, below.frame.minX), y: above.frame.maxY,
+      width: Swift.max(above.frame.maxX, below.frame.maxX) - Swift.min(above.frame.minX, below.frame.minX),
+      height: Swift.max(gap, 0))
+    return !others.contains { $0.intersects(between) }
+  }
+
+  private mutating func shareSheet(_ range: Range<Int>, others: [CGRect]) {
+    guard range.count > 1 else { return }
+    let papers = range.map { self[$0].ownPaper }
+    let left = papers.map(\.minX).min()!, right = papers.map(\.maxX).max()!
+    // Widening a narrow paragraph must not cover what sits beside it.
+    let widened = papers.map { CGRect(x: left, y: $0.minY, width: right - left, height: $0.height) }
+    guard !zip(papers, widened).contains(where: { own, wide in
+      others.contains { $0.intersects(wide) && !$0.intersects(own) }
+    }) else { return }
+    for (offset, index) in range.enumerated() {
+      // Each paper reaches down to the next, closing the gap between paragraphs.
+      let own = papers[offset]
+      let bottom = offset == papers.count - 1 ? own.maxY : Swift.max(papers[offset + 1].minY, own.maxY)
+      self[index].paper = CGRect(x: left, y: own.minY, width: right - left, height: bottom - own.minY)
+      var corners: CACornerMask = []
+      if offset == 0 { corners.formUnion([.layerMinXMinYCorner, .layerMaxXMinYCorner]) }
+      if offset == papers.count - 1 { corners.formUnion([.layerMinXMaxYCorner, .layerMaxXMaxYCorner]) }
+      self[index].corners = corners
     }
   }
 }
@@ -795,15 +826,21 @@ final class LayerPaneSession {
     let scale = overlay.backingScaleFactor
     let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     let style = LayerTextStyle.paper(darkAppearance: dark)
+    let origin = CGPoint(x: -paneFrame.minX, y: -paneFrame.minY)
+    var drawn: [CGRect] = []
     let drawings: [LayerDrawing] = blocks.compactMap { block in
       guard let translation = owner.translations[block.maskedText] else { return nil }
       let (text, links) = block.restoring(in: translation)
       guard text != block.text else { return nil }
+      drawn.append(block.frame)
       return LayerDrawing(
-        frame: block.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY),
+        frame: block.frame.offsetBy(dx: origin.x, dy: origin.y),
         text: text, links: links, lineHeight: block.lineHeight, style: style)
-    }.caretsOnLastOfEachRun()
-    overlay.overlayView.show(drawings, scale: scale)
+    }
+    let untouched = readBlocks.map(\.frame).filter { !drawn.contains($0) }
+      .map { $0.offsetBy(dx: origin.x, dy: origin.y) }
+    let sheets = drawings.sharingSheets(around: untouched)
+    overlay.overlayView.show(sheets, scale: scale)
     // A caret breathes after every paragraph waiting for its translation (§二 等待, §五 等待).
     let waiting = failure == nil ? pendingBlocks : []
     overlay.overlayView.setPending(waiting.map { block in

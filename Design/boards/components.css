@@ -923,10 +923,22 @@ body {
   color: var(--text-ink);
 }
 .chat-msg .text .link { color: #1264A3; }
-/* A translation: Cida's result serif on the app's own background, ending with Cida's caret as
-   if Cida had just written it; links in accent. */
+/* Paragraphs set one under another at one left edge share one sheet as wide as the widest,
+   the gaps between them filled. */
+.layer-sheet {
+  margin: -3px -8px;
+  padding: 3px 8px;
+  border-radius: var(--radius-chip);
+  background: var(--surface-paper);
+  color: var(--text-ink);
+}
+/* The sheet ends 3px below its last line, not at the bottom of the column. */
+.page-article.layer-sheet { align-self: flex-start; }
+.layer-sheet > :last-child { margin-bottom: 0; }
+/* A translation: Cida's result serif; links in accent. Once written it carries no caret. */
 .layer-text { font-family: var(--font-result-cjk); }
-.layer-text::after, .layer-waiting::after {
+/* Waiting: Cida's caret breathes after the original (drawn at its brightest). */
+.layer-waiting::after {
   content: "";
   display: inline-block;
   width: 2px;
@@ -935,10 +947,7 @@ body {
   vertical-align: -2px;
   border-radius: 1px;
   background: var(--accent);
-  opacity: 0.45;
 }
-/* Waiting: the caret breathes after the original (drawn at its brightest). */
-.layer-waiting::after { opacity: 1; }
 .chat-msg .text .layer-text .link, .page .layer-text .link { color: var(--accent); }
 .pointer {
   position: absolute;
