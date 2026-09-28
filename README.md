@@ -9,16 +9,27 @@
   <a href="https://cida-releases.xuanwo.io/latest/Cida.dmg">下载</a> · <a href="README.en.md">English</a>
 </p>
 
-<p align="center">
-  <img src="docs/images/demo.gif" width="800" alt="选中一段英文按 ⌥Space 翻译成中文，按 Tab 润色，再用 ⌥S 框选屏幕上的文字翻译">
-</p>
-
 ## 怎么用
 
 - **选中文字，按 <kbd>⌥</kbd> <kbd>Space</kbd>。** 面板带着选中的文字出现，译文随即开始流出。你的语言译成常用外语，其他语言都译成你的语言；两者默认是简体中文和英文，可以在设置里写成任何语言、方言或文体，比如粤语、英式英语。
+
+  <img src="docs/images/demo-translate.gif" width="720" alt="在 Chrome 里选中一段英文，按 ⌥Space，面板里流出中文译文">
+
 - **按 <kbd>Tab</kbd> 再按 <kbd>Return</kbd>，改成润色。** 润色后的文字保持原来的语言。
+
+  <img src="docs/images/demo-improve.gif" width="720" alt="选中评论框里的英文回复，按 ⌥Space 后按 Tab 和 Return，得到润色后的英文">
+
 - **屏幕上的文字，按 <kbd>⌥</kbd> <kbd>S</kbd>。** 框出要翻译的部分，辞达在本机识别后翻译。
-- **在原处读外文，指着一段按 <kbd>⌥</kbd> <kbd>D</kbd>。** 这一段就地换成译文，前后的消息还是原文，带着上下文读；再按一次换回。要连续读一门看不懂的语言，按 <kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd> 翻译整个窗口（比如 Slack），新消息出现就翻译，再按一次停止；想看某一段的原文，指着它按 <kbd>⌥</kbd> <kbd>D</kbd>。译文写在辞达的纸上，代码保持原样；点击和滚动照常落到原来的应用。
+
+  <img src="docs/images/demo-capture.gif" width="720" alt="按 ⌥S 框选文章里的图表，辞达识别图里的文字并翻译">
+
+- **在原处读外文，指着一段按 <kbd>⌥</kbd> <kbd>D</kbd>。** 这一段就地换成译文，前后的消息还是原文，带着上下文读；再按一次换回。
+
+  <img src="docs/images/demo-paragraph.gif" width="720" alt="指着一段按 ⌥D，这一段就地换成译文；再按一次换回原文">
+
+- **要连续读一门看不懂的语言，按 <kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd> 翻译整个窗口。** 比如 Slack 的频道或一篇长文：新内容出现就翻译，再按一次停止；想看某一段的原文，指着它按 <kbd>⌥</kbd> <kbd>D</kbd>。译文写在辞达的纸上，代码保持原样；点击和滚动照常落到原来的应用。
+
+  <img src="docs/images/demo-window.gif" width="720" alt="按 ⌥⇧D 整页换成译文；滚动时译文隐去，停下后接着翻译新出现的段落，代码与图片保持原样">
 
 按 <kbd>Esc</kbd> 回到原来的应用。面板隐藏后请求会继续完成，下次唤出时结果还在。
 

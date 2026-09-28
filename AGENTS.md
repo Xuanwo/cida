@@ -12,7 +12,7 @@ Working rules for anyone changing Cida, human or agent. [`docs/development.md`](
 | `Design` | The design source: rules in `spec/*.md`, states in `boards/*.html`, tokens in `boards/tokens.css` |
 | `Resources` | `Cida-Info.plist` and the app icon (`AppIcon.icon`) |
 | `scripts` | Building, signing, notarizing, design rendering and the verification gates |
-| `docs` | Development notes, QA records and the README demo (`docs/images/demo.gif`) |
+| `docs` | Development notes, QA records and the README demos (`docs/images/demo-*.gif`) |
 
 ## Design comes first
 
@@ -27,7 +27,7 @@ Every change that touches the interface or an interaction, whether a view, a win
 
 - Static states: run `scripts/capture-design-states.sh` and attach the matching `Design/QACurrent/comparison-<state>.png`, which puts the board next to the native capture.
 - States without a fixture, interactions and motion: attach the screenshots that the Tart XCUI journey saves in its `.xcresult`, or a short screen recording.
-- When a change alters what `docs/images/demo.gif` shows (the panel, translating, improving, the capture overlay), say so in the pull request so the demo is recorded again.
+- When a change alters what a README demo (`docs/images/demo-*.gif`) shows (the panel, translating, improving, the capture overlay, the translation layer), say so in the pull request so that clip is recorded again.
 - A changed pixel baseline (`UITests/Resources/VisualBaselines/manifest.json`) is re-approved in the same pull request, with the new comparison image attached.
 
 A pull request that changes the UI without screenshots is not ready for review.
