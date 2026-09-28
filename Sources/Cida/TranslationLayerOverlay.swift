@@ -186,30 +186,12 @@ final class LayerOverlayView: NSView {
 
   override var isFlipped: Bool { true }
 
-  /// How much smaller than the pane the view is drawn while its window animates into place;
-  /// the paragraphs keep the pane's coordinates.
-  private(set) var scale = CGSize(width: 1, height: 1)
-
-  /// Lays the content out again as well, since the view's own size changes with the scale.
-  func setScale(_ scale: CGSize) {
-    self.scale = scale
-    layoutContent()
-  }
-
   override func layout() {
     super.layout()
-    layoutContent()
-  }
-
-  private func layoutContent() {
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    blocksLayer.anchorPoint = .zero
-    blocksLayer.position = .zero
-    blocksLayer.bounds = CGRect(
-      x: 0, y: 0, width: bounds.width / scale.width, height: bounds.height / scale.height)
-    blocksLayer.transform = CATransform3DMakeScale(scale.width, scale.height, 1)
-    pendingLayer.frame = blocksLayer.bounds
+    blocksLayer.frame = bounds
+    pendingLayer.frame = bounds
     CATransaction.commit()
   }
 
@@ -278,13 +260,12 @@ final class LayerOverlayView: NSView {
 
   /// Parts covered by other windows are not painted (§五), in this view's coordinates.
   func setOcclusion(_ covered: [CGRect]) {
-    let content = blocksLayer.bounds
     let path = CGMutablePath()
-    path.addRect(content)
-    for rect in covered where rect.intersects(content) { path.addRect(rect.intersection(content)) }
+    path.addRect(bounds)
+    for rect in covered where rect.intersects(bounds) { path.addRect(rect.intersection(bounds)) }
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    occlusionMask.frame = content
+    occlusionMask.frame = bounds
     occlusionMask.path = path
     CATransaction.commit()
   }

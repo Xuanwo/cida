@@ -244,8 +244,27 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       "Every paragraph of the window")
     attach("layer-whole-window")
 
-    // New paragraphs scrolled into view are translated too.
+    // The translations move with the wheel, and where the tree finds the text once it stops
+    // is where the wheel put them (§七): a hover or an animation cannot move them.
     let article = source.app.descendants(matching: .any).matching(identifier: "source-article").firstMatch
+    let lifecycle = "\(e2eEnvironment.lifecycleLogDirectory)/\(driver.settingsNamespace).log"
+    func settledScrolls() -> [(predicted: Int, moved: Int)] {
+      ((try? String(contentsOfFile: lifecycle, encoding: .utf8)) ?? "").split(separator: "\n").compactMap { line in
+        guard let match = line.firstMatch(of: /layer-scroll-settled predicted=(-?\d+) moved=(-?\d+)/),
+          let predicted = Int(match.1), let moved = Int(match.2)
+        else { return nil }
+        return (predicted, moved)
+      }
+    }
+    article.hover()
+    article.scroll(byDeltaX: 0, deltaY: -60)
+    let deadline = Date().addingTimeInterval(5)
+    while settledScrolls().isEmpty, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+    let small = try XCTUnwrap(settledScrolls().last, "The small scroll settled")
+    XCTAssertNotEqual(small.predicted, 0)
+    XCTAssertEqual(small.predicted, small.moved, accuracy: 2, "The wheel foretold where the paragraphs went")
+
+    // New paragraphs scrolled into view are translated too.
     let firstTop = paragraph(1).frame.minY
     article.scroll(byDeltaX: 0, deltaY: -600)
     if abs(paragraph(1).frame.minY - firstTop) < 1 { article.scroll(byDeltaX: 0, deltaY: 600) }

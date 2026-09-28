@@ -559,59 +559,15 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(configuration.settings.layerShortcut, GlobalShortcut.optionD)
   }
 
-  // MARK: - Following motion
+  // MARK: - Following scrolls
 
-  /// A tall "document" of pseudo-random text rows with blank gaps, viewed through a 400-row
-  /// window at different offsets, plus a static sidebar in the left eighth.
-  private func frame(offset: Int, width: Int = 320, height: Int = 400, replaced: Bool = false) -> [UInt32] {
-    var pixels = [UInt32](repeating: 0xFFFF_FFFF, count: width * height)
-    for y in 0..<height {
-      let documentRow = y + offset
-      for x in 0..<width {
-        if x < width / 8 {
-          pixels[y * width + x] = UInt32(truncatingIfNeeded: (y * 31 + x * 7) % 251) | 0xFF00_0000
-        } else if documentRow % 24 < 16 {
-          var seed = UInt64(documentRow &* 2_654_435_761 &+ (replaced ? 99 : 0)) &* UInt64(x + 1)
-          seed ^= seed >> 13
-          pixels[y * width + x] = seed % 5 == 0 ? 0xFF10_1010 : 0xFFFF_FFFF
-        }
-      }
-    }
-    return pixels
-  }
-
-  private func rows(_ pixels: [UInt32], width: Int = 320, height: Int = 400) -> LayerMotionEstimator.Rows {
-    pixels.withUnsafeBytes { raw in
-      LayerMotionEstimator.rows(
-        base: raw.bindMemory(to: UInt8.self).baseAddress!, bytesPerRow: width * 4, width: width,
-        height: height, crop: CGRect(x: 0, y: 0, width: width, height: height))
-    }
-  }
-
-  func testScrolledContentShiftsByExactRowsPastAStaticSidebarAndReplacementDeclines() {
-    let start = rows(frame(offset: 1_000))
-    for delta in [2, 40, 120, -60] {
-      XCTAssertEqual(LayerMotionEstimator.shift(from: start, to: rows(frame(offset: 1_000 + delta))), delta)
-    }
-    XCTAssertEqual(LayerMotionEstimator.shift(from: start, to: start), 0)
-    XCTAssertNil(LayerMotionEstimator.shift(from: start, to: rows(frame(offset: 1_000, replaced: true))))
-  }
-
-  /// Slack, measured 2026-09-27: after the content stops, the overlay scroller's thumb in the
-  /// last tile still slides for a few frames. That is not the content moving.
-  func testAScrollerThumbSlidingAloneIsNoMotion() {
-    func withThumb(at top: Int) -> [UInt32] {
-      var pixels = frame(offset: 1_000)
-      let width = 320
-      for y in 0..<400 {
-        for x in (width * 7 / 8)..<width {
-          let inThumb = (top..<(top + 120)).contains(y) && x >= width - 12 && x < width - 4
-          pixels[y * width + x] = inThumb ? 0xFF80_8080 : 0xFFFF_FFFF
-        }
-      }
-      return pixels
-    }
-    XCTAssertEqual(LayerMotionEstimator.shift(from: rows(withThumb(at: 100)), to: rows(withThumb(at: 130))), 0)
+  /// Translations move with the input, not the pixels: a trackpad's points one to one, a
+  /// wheel's lines by Chromium's 40 pt, and a wheel in an app whose line distance is its own
+  /// not at all (they hide until the tree is read again).
+  func testTranslationsMoveWithTheScrollNotWithWhatThePixelsSuggest() {
+    XCTAssertEqual(LayerScroll(deltaY: -37.5, isPrecise: true).contentShift(linesScrollChromiumDistance: false), -37.5)
+    XCTAssertEqual(LayerScroll(deltaY: -3, isPrecise: false).contentShift(linesScrollChromiumDistance: true), -120)
+    XCTAssertNil(LayerScroll(deltaY: -3, isPrecise: false).contentShift(linesScrollChromiumDistance: false))
   }
 
   /// Cida says everything in one place (§五 提示胶囊): centred on the screen under the
@@ -654,27 +610,6 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertTrue(LayerWindowInfo.isInPlace(front, windowFrame: slack))
     XCTAssertTrue(LayerWindowInfo.isInPlace(front, windowFrame: slack.offsetBy(dx: 1, dy: -1)))
     XCTAssertFalse(LayerWindowInfo.isInPlace(inTheStrip, windowFrame: slack))
-  }
-
-  /// Stage Manager brings a window back from the strip on an ease-out curve whose last few
-  /// points take as long as the rest (sampled in the VM: 97% of the width 0.28 s in, within
-  /// 2 pt only at 0.5 s). Nearly there, the translations scale and move with the window.
-  func testAWindowLandingInPlaceCarriesItsTranslationsWithIt() throws {
-    let tree = CGRect(x: 160, y: 55, width: 674, height: 440)
-    func shown(_ bounds: CGRect) -> CGAffineTransform? {
-      LayerWindowInfo.placement(of: LayerWindowInfo(number: 1, ownerPID: 900, bounds: bounds, layer: 0), windowFrame: tree)
-    }
-    XCTAssertEqual(shown(tree), .identity)
-    XCTAssertNil(shown(CGRect(x: 16, y: 411, width: 79, height: 100)), "A thumbnail in the strip")
-    XCTAssertNil(shown(CGRect(x: 169, y: 148, width: 487, height: 357)), "Still far away")
-    let landing = CGRect(x: 160, y: 66, width: 652, height: 430)
-    let placement = try XCTUnwrap(shown(landing))
-    // The pane keeps its place within the window as the window scales.
-    let pane = CGRect(x: 360, y: 155, width: 400, height: 300)
-    let moved = pane.applying(placement)
-    XCTAssertEqual(moved.minX, landing.minX + (pane.minX - tree.minX) * 652 / 674, accuracy: 0.01)
-    XCTAssertEqual(moved.minY, landing.minY + (pane.minY - tree.minY) * 430 / 440, accuracy: 0.01)
-    XCTAssertEqual(moved.width, 400 * 652 / 674, accuracy: 0.01)
   }
 
   /// While Stage Manager animates a window, its WindowManager process holds a copy of it just

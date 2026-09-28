@@ -264,27 +264,11 @@ struct LayerWindowInfo: Equatable, Sendable {
     return covering
   }
 
-  /// How the window server shows a window whose tree reports `windowFrame`, as a map from
-  /// the tree's coordinates to the screen: identity where it is, a scale and a move while it
-  /// animates nearly there (Stage Manager bringing it back from the strip, whose last few
-  /// points take as long as the rest), nil while it is far from there (a thumbnail in the
-  /// strip, minimizing).
-  static func placement(of info: LayerWindowInfo, windowFrame: CGRect) -> CGAffineTransform? {
-    if isInPlace(info, windowFrame: windowFrame) { return .identity }
-    guard windowFrame.width > 0, windowFrame.height > 0 else { return nil }
-    let scaleX = info.bounds.width / windowFrame.width
-    let scaleY = info.bounds.height / windowFrame.height
-    guard (0.9...1.1).contains(scaleX), (0.9...1.1).contains(scaleY) else { return nil }
-    return CGAffineTransform(
-      a: scaleX, b: 0, c: 0, d: scaleY,
-      tx: info.bounds.minX - windowFrame.minX * scaleX, ty: info.bounds.minY - windowFrame.minY * scaleY)
-  }
-
   /// Whether the window server shows `info` where the app's accessibility tree says its
   /// window is: not while Stage Manager shrinks it into the strip, or while it minimizes.
-  static func isInPlace(_ info: LayerWindowInfo, windowFrame: CGRect) -> Bool {
-    abs(info.bounds.minX - windowFrame.minX) < 2 && abs(info.bounds.minY - windowFrame.minY) < 2
-      && abs(info.bounds.width - windowFrame.width) < 2
+  static func isInPlace(_ info: LayerWindowInfo, windowFrame: CGRect, within tolerance: CGFloat = 2) -> Bool {
+    abs(info.bounds.minX - windowFrame.minX) < tolerance && abs(info.bounds.minY - windowFrame.minY) < tolerance
+      && abs(info.bounds.width - windowFrame.width) < tolerance
   }
 
   /// Every display's frame in top-left screen points.

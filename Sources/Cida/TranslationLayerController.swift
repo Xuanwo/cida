@@ -49,8 +49,9 @@ final class TranslationLayerController {
     RunLoop.main.add(timer, forMode: .common)
     tick = timer
     monitors.append(
-      NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
-        MainActor.assumeIsolated { self?.noteScroll() }
+      NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+        let scroll = LayerScroll(event)
+        MainActor.assumeIsolated { self?.noteScroll(scroll) }
       } as Any)
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -219,8 +220,8 @@ final class TranslationLayerController {
     if tickCount % 30 == 1 { discover() }
     // Nothing to follow: no window list, no pointer.
     guard !sessions.isEmpty else { return }
-    // Every tick (about 0.6 ms): a window landing back in place, as Stage Manager brings it
-    // from the strip, shows its translations within a frame instead of a quarter second.
+    // Every tick (about 0.6 ms): a window back in place, as Stage Manager brings it from the
+    // strip, shows its translations within a tick of landing.
     windows = LayerWindowInfo.onScreen()
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     for session in sessions {
@@ -231,34 +232,6 @@ final class TranslationLayerController {
     }
     sessions.removeAll(where: \.isFinished)
     updateFailureHint()
-    updateFollowing()
-  }
-
-  /// Follows windows animating into place at the display's rate, so their translations move
-  /// with them instead of a tick behind (§七).
-  private var following: Timer?
-
-  private func updateFollowing() {
-    let arriving = sessions.contains(where: \.isArriving)
-    if arriving, following == nil {
-      let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-        MainActor.assumeIsolated { self?.followArrivingWindows() }
-      }
-      RunLoop.main.add(timer, forMode: .common)
-      following = timer
-    } else if !arriving {
-      following?.invalidate()
-      following = nil
-    }
-  }
-
-  private func followArrivingWindows() {
-    guard sessions.contains(where: \.isArriving) else {
-      updateFollowing()
-      return
-    }
-    windows = LayerWindowInfo.onScreen()
-    for session in sessions { session.follow(windows) }
   }
 
   /// Another app came to the front: its windows grow over the panes while they animate in,
@@ -279,10 +252,11 @@ final class TranslationLayerController {
     }
   }
 
-  private func noteScroll() {
+  /// The pane under the pointer scrolls with the wheel (§七).
+  private func noteScroll(_ scroll: LayerScroll) {
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     for session in sessions where session.paneFrame.contains(mouse) {
-      session.noteScroll()
+      session.scrolled(scroll)
     }
   }
 
@@ -445,6 +419,33 @@ struct LayerParagraphMark {
   }
 }
 
+/// One scroll of a wheel or trackpad, as far as it moves the content under the pointer (§七).
+/// The translations follow the input rather than the pixels: a hover highlight moving from one
+/// chat message to the next looks exactly like the list scrolling by a message, and reading
+/// the screen for motion moved every translation by a message each time the pointer passed.
+struct LayerScroll: Equatable, Sendable {
+  /// How far the content moves down: points from a trackpad or Magic Mouse, lines from the
+  /// clicks of a wheel.
+  let deltaY: CGFloat
+  let isPrecise: Bool
+
+  init(deltaY: CGFloat, isPrecise: Bool) {
+    self.deltaY = deltaY
+    self.isPrecise = isPrecise
+  }
+
+  init(_ event: NSEvent) {
+    self.init(deltaY: event.scrollingDeltaY, isPrecise: event.hasPreciseScrollingDeltas)
+  }
+
+  /// Points the content moves down, or nil when a wheel's lines move it by a distance only the
+  /// app knows. Chromium, and so Electron, moves 40 pt a line.
+  func contentShift(linesScrollChromiumDistance: Bool) -> CGFloat? {
+    if isPrecise { return deltaY }
+    return linesScrollChromiumDistance ? deltaY * 40 : nil
+  }
+}
+
 /// One pane in one window: every paragraph of it while its window is translated whole (§三),
 /// plus the paragraphs ⌥D asked for, minus those ⌥D turned back (§二).
 @MainActor
@@ -474,11 +475,9 @@ final class LayerPaneSession {
   private(set) var paneFrame: CGRect = .zero
   /// The window's frame as its accessibility tree reports it, read with the pane's.
   private var windowFrame: CGRect?
-  /// Where the window server shows the window relative to that frame (§七).
-  private var placement = CGAffineTransform.identity
-  private var lastWindowBounds: CGRect?
-  private var windowMovedAt = Date.distantPast
   private var windowNumber: CGWindowID?
+  /// Chromium scrolls a mouse wheel's line by 40 pt; other apps by amounts only they know.
+  private lazy var linesScrollChromiumDistance = LayerApplication.isChromiumBrowser(pid: application.processIdentifier)
   private(set) var isOnScreen = false
   private var blocks: [LayerBlock] = []
   private var anchors: [AccessibilityLayerNode] = []
@@ -499,8 +498,6 @@ final class LayerPaneSession {
   private var peekSuppressed: Int?
   private var hasShownTranslations = false
   private(set) var isFinished = false
-  /// Follows the content frame by frame while the screen can be read (§五).
-  private var motion: LayerMotionStream?
   private var lastCoveringCount = -1
 
   init(
@@ -523,8 +520,6 @@ final class LayerPaneSession {
   /// never show the overlay again, or it would float over every app with no one to hide it.
   func close() {
     translating?.cancel()
-    motion?.stop()
-    motion = nil
     overlay.orderOut(nil)
     isFinished = true
   }
@@ -562,8 +557,6 @@ final class LayerPaneSession {
     return "translated"
   }
 
-  /// The content moved. Followed frame by frame when the screen can be read; hidden until it
-  /// settles otherwise (§五).
   /// Hidden while another app's windows move in front (see `frontApplicationChanged`).
   func hideUntilWindowsSettle(_ date: Date) {
     if windowsSettle == nil, overlay.alphaValue > 0 { owner.log("layer-hidden-for-app-switch") }
@@ -576,49 +569,30 @@ final class LayerPaneSession {
     if windowsSettle != nil { windowsSettle = Date() }
   }
 
-  /// The user scrolled over the pane.
-  func noteScroll() {
+  /// The user scrolled over the pane (§七): the translations move by what the wheel moves the
+  /// content, and the tree puts them exactly where the text is once it stops. A wheel whose
+  /// lines this app scrolls by an unknown distance hides them until then.
+  func scrolled(_ scroll: LayerScroll) {
     lastScroll = Date()
-    noteMotion()
+    lastMotion = Date()
+    needsRead = true
+    if let shift = scroll.contentShift(linesScrollChromiumDistance: linesScrollChromiumDistance) {
+      overlay.overlayView.setOffset(overlay.overlayView.offset + shift)
+    } else {
+      overlay.alphaValue = 0
+    }
   }
 
+  /// The content changed without a scroll to follow (a message arrived, the keyboard paged):
+  /// hidden until it settles and the tree is read again.
   func noteMotion() {
     lastMotion = Date()
     needsRead = true
-    if motion == nil { overlay.alphaValue = 0 }
+    overlay.alphaValue = 0
   }
 
-  /// The screen can be read: colours come from it and motion is followed (§三, §五).
+  /// The screen can be read: colours come from it (§五).
   static var readsScreen: Bool { CGPreflightScreenCaptureAccess() }
-
-  private func followMotion() {
-    guard motion == nil, Self.readsScreen, isOnScreen, let windowNumber,
-      !overlay.overlayView.drawings.isEmpty, let windowFrame = window.frame
-    else {
-      return
-    }
-    let stream = LayerMotionStream()
-    stream.onLost = { [weak self] reason in self?.owner.log("layer-motion-unexplained \(reason)") }
-    stream.onMotion = { [weak self] offset in
-      guard let self else { return }
-      needsRead = true
-      if let offset {
-        lastMotion = Date()
-        overlay.overlayView.setOffset(offset)
-      } else if let lastScroll, Date().timeIntervalSince(lastScroll) < 0.5 {
-        // Scrolled too fast to follow: hidden until it settles.
-        owner.log("layer-motion-lost")
-        lastMotion = Date()
-        overlay.alphaValue = 0
-      }
-      // Otherwise pixels changed in place (a hover toolbar, an animation, a new message): the
-      // translations stay and the next read of the tree puts them where the text is.
-    }
-    motion = stream
-    owner.log("layer-motion-followed")
-    let pane = paneFrame.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY)
-    Task { await stream.start(windowNumber: windowNumber, pane: pane) }
-  }
 
   func step(windows: [LayerWindowInfo], mouse: CGPoint) {
     guard !isFinished else { return }
@@ -649,34 +623,26 @@ final class LayerPaneSession {
         $0.ownerPID == ownerPID && LayerWindowInfo.isInPlace($0, windowFrame: frame)
       }?.number
     }
-    // Stage Manager keeps a window in the list while it shows it as a thumbnail in the strip,
-    // and a window is also elsewhere while it minimizes or Mission Control shows it: its
-    // paragraphs are not where the tree says, so nothing is drawn. Nearly there, as it lands
-    // back, the translations scale and move with it.
-    let info = windows.first { $0.number == windowNumber }
-    if let bounds = info?.bounds, bounds != lastWindowBounds {
-      lastWindowBounds = bounds
-      windowMovedAt = Date()
-    }
-    guard let windowNumber, let info,
-      let placement = windowFrame.map({ LayerWindowInfo.placement(of: info, windowFrame: $0) }) ?? .identity
+    // Stage Manager keeps a window in the list while it shows it as a thumbnail in the strip
+    // and animates it back with a 3D tilt; a window is also elsewhere while it minimizes or
+    // Mission Control shows it. Its paragraphs are not where the tree says, so nothing is
+    // drawn until the window is in place, give or take the point or two the list wavers by.
+    let wasOnScreen = isOnScreen
+    guard let windowNumber, let info = windows.first(where: { $0.number == windowNumber }),
+      windowFrame.map({ LayerWindowInfo.isInPlace(info, windowFrame: $0, within: wasOnScreen ? 4 : 2) }) ?? true
     else {
       isOnScreen = false
       overlay.orderOut(nil)
-      motion?.stop()
-      motion = nil
       return
     }
     isOnScreen = true
-    if placement != self.placement {
-      self.placement = placement
-      applyPlacement()
+    if !wasOnScreen, windowsSettle == nil {
+      // Back in place: the translations fade in rather than pop over the landed window.
+      overlay.alphaValue = 0
+      reveal()
     }
     let occluders = LayerWindowInfo.occluders(of: windowNumber, in: windows)
-    let toPane = placement.inverted()
-    let covered = occluders.map {
-      $0.bounds.applying(toPane).offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY)
-    }
+    let covered = occluders.map { $0.bounds.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) }
     overlay.overlayView.setOcclusion(covered)
     let coveringPane = occluders.filter { $0.bounds.intersects(paneFrame) }
     if coveringPane.count != lastCoveringCount {
@@ -685,20 +651,14 @@ final class LayerPaneSession {
         "layer-occluded count=\(coveringPane.count) by=\(coveringPane.map { "\($0.ownerName) \(Int($0.bounds.width))x\(Int($0.bounds.height))" })")
     }
     if !overlay.isVisible, !overlay.overlayView.drawings.isEmpty { overlay.orderFront(nil) }
-    // Frame-by-frame motion is measured against the window in place.
-    if placement.isIdentity { followMotion() }
   }
 
-  /// The window is moving and not yet where its tree says: the controller follows it at the
-  /// display's rate until it lands.
-  var isArriving: Bool {
-    !isFinished && windowsSettle == nil && Date().timeIntervalSince(windowMovedAt) < 0.25
-  }
-
-  /// Places the pane over its window between ticks, while the window animates (§七).
-  func follow(_ windows: [LayerWindowInfo]) {
-    guard isArriving else { return }
-    placeOverWindow(windows)
+  /// Fades the translations in over `motion-height-ms`.
+  private func reveal() {
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: overlay)
+      overlay.animator().alphaValue = 1
+    }
   }
 
   /// Reads a few paragraph positions and the pane's frame; any change means the content or
@@ -722,11 +682,14 @@ final class LayerPaneSession {
           return
         }
         if paneFrame != self.paneFrame {
-          // The window moved or resized: the overlay goes with it.
-          noteMotion()
-          overlay.alphaValue = 0
+          // The window moved or resized: the overlay goes with it. A window away from its
+          // place (in the Stage Manager strip) shows nothing to hide.
           place(paneFrame)
-        } else if frames.count == anchorFrames.count, frames != anchorFrames {
+          if isOnScreen { noteMotion() } else { needsRead = true }
+        } else if frames.count == anchorFrames.count, frames != anchorFrames,
+          lastScroll.map({ Date().timeIntervalSince($0) > 0.3 }) ?? true
+        {
+          // Paragraphs moved with no wheel to follow; while scrolling the wheel moves them.
           noteMotion()
         }
         anchorFrames = frames
@@ -736,15 +699,8 @@ final class LayerPaneSession {
 
   private func place(_ frame: CGRect) {
     paneFrame = frame
-    applyPlacement()
-  }
-
-  /// The overlay covers the pane where the window server shows it, its content scaled with
-  /// the window while that animates.
-  private func applyPlacement() {
-    let shown = LayerScreenGeometry.appKitRect(fromTopLeft: paneFrame.applying(placement))
+    let shown = LayerScreenGeometry.appKitRect(fromTopLeft: frame)
     if overlay.frame != shown { overlay.setFrame(shown, display: false) }
-    overlay.overlayView.setScale(CGSize(width: placement.a, height: placement.d))
   }
 
   // MARK: Paragraphs
@@ -815,10 +771,15 @@ final class LayerPaneSession {
       picked.removeAll { $0.matches(block, node: node) }
       owner.noteAlreadyMine(at: block.frame)
     }
-    blocks = shown.map { newBlocks[$0] }
-    if let windowFrame = window.frame {
-      motion?.resetBaseline(pane: frame.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY))
+    // How well the wheel foretold where the paragraphs went: the same paragraph's move since the
+    // last read against the scroll applied meanwhile (§七).
+    let predicted = overlay.overlayView.offset
+    if predicted != 0, let moved = newBlocks.lazy.compactMap({ block in
+      self.blocks.first { $0.maskedText == block.maskedText }.map { block.frame.minY - $0.frame.minY }
+    }).first {
+      owner.log("layer-scroll-settled predicted=\(Int(predicted.rounded())) moved=\(Int(moved.rounded()))")
     }
+    blocks = shown.map { newBlocks[$0] }
     // Motion is noticed from any paragraph of the pane, shown or not.
     let picks = [0, nodes.count / 2, nodes.count - 1].filter { $0 >= 0 && $0 < nodes.count }
     anchors = Array(Set(picks)).sorted().map { nodes[$0] }
@@ -897,12 +858,7 @@ final class LayerPaneSession {
     if isOnScreen, !waiting.isEmpty { overlay.orderFront(nil) }
     let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
     // A read landing while another app's windows animate in stays hidden with the rest.
-    if settled, windowsSettle == nil {
-      NSAnimationContext.runAnimationGroup { context in
-        context.duration = CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: overlay)
-        overlay.animator().alphaValue = 1
-      }
-    }
+    if settled, windowsSettle == nil { reveal() }
     if isOnScreen, !drawings.isEmpty { overlay.orderFront(nil) }
     owner.log(
       "layer-drawn drawings=\(drawings.count) painted=\(overlay.overlayView.paintedCount) blocks=\(blocks.count) onScreen=\(isOnScreen)"
