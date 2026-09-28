@@ -229,7 +229,9 @@ private struct SettingsBody: View {
       case .general:
         SettingsGroup(isFirst: true) {
           LaunchAtLoginRow(model: model)
-          AutomaticUpdatesRow(updates: updates)
+          if updates.isAvailable {
+            AutomaticUpdatesRow(updates: updates)
+          }
         }
         AboutFooter()
       }
@@ -980,10 +982,10 @@ private struct AutomaticUpdatesRow: View {
 }
 
 private struct AboutFooter: View {
-  /// The bundle's CFBundleShortVersionString; a release build sets it from its tag. Unbundled
-  /// runs (`swift run`) have none and show only the motto.
-  private let version =
-    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+  /// The bundle's CFBundleShortVersionString; a release build sets it from its tag, and a
+  /// development build names itself. Unbundled runs (`swift run`) have none and show only the
+  /// motto.
+  private let version = CidaBuild.current.developmentLabel ?? CidaBuild.current.version
 
   var body: some View {
     HStack(spacing: 8) {

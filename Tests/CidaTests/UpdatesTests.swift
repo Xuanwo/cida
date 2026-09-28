@@ -26,6 +26,24 @@ final class UpdatesTests: XCTestCase {
     XCTAssertFalse(CidaUpdater.isConfigured(in: .main), "The test runner is not Cida.app")
   }
 
+  /// A development build (`CIDA_VARIANT=dev`) has no feed, so it offers no update controls, and
+  /// it names itself with its version, build and commit wherever Cida names itself.
+  func testADevelopmentBuildNamesItselfAndDoesNotUpdate() throws {
+    let info: [String: Any] = [
+      "CidaBuildVariant": "dev", "CFBundleShortVersionString": "1.2.0", "CFBundleVersion": "170",
+      "CidaSourceRevision": "c243eb7+", "SUPublicEDKey": "key",
+    ]
+    XCTAssertFalse(CidaUpdater(bundle: try makeApp(info: info)).state.isAvailable)
+    XCTAssertEqual(CidaBuild(info: info).developmentLabel, "开发版 1.2.0 (170) · c243eb7+")
+
+    let release: [String: Any] = [
+      "CFBundleShortVersionString": "1.2.0", "SUFeedURL": "https://cida-releases.xuanwo.io/appcast.xml",
+      "SUPublicEDKey": "key",
+    ]
+    XCTAssertTrue(CidaUpdater(bundle: try makeApp(info: release)).state.isAvailable)
+    XCTAssertNil(CidaBuild(info: release).developmentLabel)
+  }
+
   /// An empty `.app` bundle whose Info.plist holds `info`, removed after the test.
   private func makeApp(info: [String: Any]) throws -> Bundle {
     let app = FileManager.default.temporaryDirectory

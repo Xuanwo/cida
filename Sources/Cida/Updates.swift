@@ -10,6 +10,9 @@ final class UpdateState {
   /// A newer version a scheduled check found while the user was elsewhere; the menu bar item and
   /// Settings offer to install it instead of interrupting with the panel.
   var availableVersion: String?
+  /// Whether this build updates itself. A development build has no feed, so the menu and Settings
+  /// offer no update controls.
+  var isAvailable = true
 
   @ObservationIgnored var performCheck: @MainActor () -> Void = {}
   @ObservationIgnored var applyAutomaticChecks: @MainActor (Bool) -> Void = { _ in }
@@ -72,6 +75,7 @@ final class CidaUpdater: NSObject, SPUUpdaterDelegate {
   init(bundle: Bundle = .main) {
     channel = bundle.object(forInfoDictionaryKey: "CidaUpdateChannel") as? String
     state = UpdateState()
+    state.isAvailable = Self.isConfigured(in: bundle)
     super.init()
   }
 
