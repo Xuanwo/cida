@@ -22,6 +22,8 @@ protocol LayerNode {
   var url: URL? { get }
   /// The bounds of a character range in a text area, for documents held in one element.
   func bounds(ofCharacters range: NSRange) -> CGRect?
+  /// The point size of the text's first character, where the app tells it.
+  var fontSize: CGFloat? { get }
   /// Whether two reads refer to the same element of the application.
   func isSameElement(as other: Self) -> Bool
 }
@@ -369,8 +371,9 @@ enum LayerMonospace {
   static let narrow = Set("ijltfrI!|.,:;'`()[]{}")
   static let wide = Set("mwMW@%")
 
-  static func isMonospaced(_ text: String, bounds: (NSRange) -> CGRect?) -> Bool {
+  static func isMonospaced(_ text: String, bounds: (NSRange) -> CGRect?, fontSize: () -> CGFloat? = { nil }) -> Bool {
     var widths: [(isOdd: Bool, width: CGFloat)] = []
+    var span: (left: CGFloat, right: CGFloat)?
     var hasNarrow = false, hasWide = false, hasMiddle = false
     var firstLine: CGFloat?
     var lastLeft = -CGFloat.greatestFiniteMagnitude
@@ -386,6 +389,7 @@ enum LayerMonospace {
       // Some apps answer every range with the element's own box; those say nothing.
       guard box.minX > lastLeft, box.width < box.height * 1.2 else { return false }
       lastLeft = box.minX
+      span = (span?.left ?? box.minX, box.maxX)
       firstLine = firstLine ?? box.midY
       let isNarrow = narrow.contains(character), isWide = wide.contains(character)
       hasNarrow = hasNarrow || isNarrow
@@ -399,7 +403,13 @@ enum LayerMonospace {
     // Equal widths only mean something when the sample holds characters a proportional face
     // sets differently.
     let telling = (hasNarrow && (hasMiddle || hasWide)) || (hasWide && hasMiddle)
-    return widths.count >= 6 && telling
+    if widths.count >= 6, telling { return true }
+    // Letters of middling width alone (a Slack block of plain words): a monospaced face
+    // advances about 0.6 of its size for every character, a proportional one about half its
+    // size for these letters (Slack's 12 pt code advanced 7.3 pt a character).
+    guard widths.count >= 5, let span, let size = fontSize(), size > 0 else { return false }
+    let advance = (span.right - span.left) / CGFloat(widths.count) / size
+    return (0.57...0.63).contains(advance)
   }
 }
 
@@ -577,7 +587,8 @@ enum LayerBlockExtractor {
       case LayerRole.staticText:
         if let text = child.textValue, !text.isEmpty {
           // Text set in a monospaced face is code, as if it were in a code element.
-          let isCode = LayerMonospace.isMonospaced(text, bounds: child.bounds(ofCharacters:))
+          let isCode = LayerMonospace.isMonospaced(
+            text, bounds: child.bounds(ofCharacters:), fontSize: { child.fontSize })
           runs.append(Run(piece: .init(text: text, isVerbatim: isCode, frame: child.frame), frame: child.frame, text: child))
         }
       case LayerRole.link:

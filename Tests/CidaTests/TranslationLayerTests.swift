@@ -17,6 +17,7 @@ final class FakeLayerNode: LayerNode {
   private(set) var children: [FakeLayerNode] = []
   weak var parent: FakeLayerNode?
   var characterBounds: (NSRange) -> CGRect? = { _ in nil }
+  var fontSize: CGFloat?
 
   init(
     _ role: String, _ frame: CGRect? = nil, text: String? = nil, classes: [String] = [],
@@ -330,6 +331,11 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertTrue(LayerMonospace.isMonospaced("hello_world", bounds: advancing(7)))
     XCTAssertFalse(LayerMonospace.isMonospaced("hello_world", bounds: { _ in CGRect(x: 0, y: 0, width: 7, height: 18) }))
     XCTAssertFalse(LayerMonospace.isMonospaced("hello_world", bounds: { _ in nil }))
+    // Middling letters only, as in a Slack block measured on 2026-09-28: the advance against
+    // the size tells, 7.3 pt at 12 pt for the monospaced face, about 6.4 for a proportional one.
+    XCTAssertTrue(LayerMonospace.isMonospaced("seasons", bounds: advancing(7.3), fontSize: { 12 }))
+    XCTAssertFalse(LayerMonospace.isMonospaced("seasons", bounds: advancing(6.4), fontSize: { 12 }))
+    XCTAssertFalse(LayerMonospace.isMonospaced("seasons", bounds: advancing(7.3)))
   }
 
   /// Whole-window translation leaves prose that reads as code alone: a shell session, a stack

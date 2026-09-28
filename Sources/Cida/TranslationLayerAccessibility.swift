@@ -47,6 +47,35 @@ final class AccessibilityLayerNode: LayerNode, @unchecked Sendable {
     return nil
   }
 
+  /// Chromium answers only through text markers, and only with the size and weight; native
+  /// text answers the character range.
+  var fontSize: CGFloat? {
+    func size(of value: CFTypeRef?) -> CGFloat? {
+      guard let string = value as? NSAttributedString, string.length > 0 else { return nil }
+      let font = string.attribute(NSAttributedString.Key("AXFont"), at: 0, effectiveRange: nil)
+      return ((font as? [String: Any])?["AXFontSize"] as? NSNumber).map { CGFloat($0.doubleValue) }
+    }
+    var value: CFTypeRef?
+    var markers: CFTypeRef?
+    if AXUIElementCopyParameterizedAttributeValue(
+      element, "AXTextMarkerRangeForUIElement" as CFString, element, &markers) == .success,
+      let markers,
+      AXUIElementCopyParameterizedAttributeValue(
+        element, "AXAttributedStringForTextMarkerRange" as CFString, markers, &value) == .success,
+      let found = size(of: value)
+    {
+      return found
+    }
+    var range = CFRange(location: 0, length: 1)
+    guard let parameter = AXValueCreate(.cfRange, &range),
+      AXUIElementCopyParameterizedAttributeValue(
+        element, kAXAttributedStringForRangeParameterizedAttribute as CFString, parameter, &value) == .success
+    else {
+      return nil
+    }
+    return size(of: value)
+  }
+
   func bounds(ofCharacters range: NSRange) -> CGRect? {
     var cfRange = CFRange(location: range.location, length: range.length)
     guard let parameter = AXValueCreate(.cfRange, &cfRange) else { return nil }
