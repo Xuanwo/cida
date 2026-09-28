@@ -9,16 +9,27 @@
   <a href="https://cida-releases.xuanwo.io/latest/Cida.dmg">Download</a> · <a href="README.md">简体中文</a>
 </p>
 
-<p align="center">
-  <img src="docs/images/demo.gif" width="800" alt="Selecting English text and pressing Option-Space translates it into Chinese; Tab improves it; Option-S translates text framed on screen">
-</p>
-
 ## How it works
 
 - **Select text and press <kbd>⌥</kbd> <kbd>Space</kbd>.** The panel appears with your selection and the translation starts streaming in. Text in your language goes into your usual foreign language and anything else comes into yours; they default to Simplified Chinese and English, and Settings takes any language, dialect or register, such as Cantonese or British English.
+
+  <img src="docs/images/demo-translate.gif" width="720" alt="Selecting a paragraph in Chrome and pressing Option-Space streams its Chinese translation into the panel">
+
 - **Press <kbd>Tab</kbd>, then <kbd>Return</kbd>, to improve the writing instead.** The improved text stays in its own language.
+
+  <img src="docs/images/demo-improve.gif" width="720" alt="Selecting an English reply in a comment box, pressing Option-Space, then Tab and Return, gives the improved English">
+
 - **For text on the screen, press <kbd>⌥</kbd> <kbd>S</kbd>.** Frame what you want translated; Cida recognizes it on your Mac and translates it.
-- **To read in place, point at a paragraph and press <kbd>⌥</kbd> <kbd>D</kbd>.** It turns into its translation where it stands, among the original messages around it; press again to turn it back. To keep reading a language you do not read, press <kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd> to translate the whole window, such as Slack; new messages are translated as they arrive, and a second press stops; to see one paragraph in the original, point at it and press <kbd>⌥</kbd> <kbd>D</kbd>. Translations are set on Cida's paper and code stays as it is; clicks and scrolling still reach the app.
+
+  <img src="docs/images/demo-capture.gif" width="720" alt="Pressing Option-S and framing a chart in the article translates the text inside the image">
+
+- **To read in place, point at a paragraph and press <kbd>⌥</kbd> <kbd>D</kbd>.** It turns into its translation where it stands, among the original messages around it; press again to turn it back.
+
+  <img src="docs/images/demo-paragraph.gif" width="720" alt="Pointing at a paragraph and pressing Option-D turns it into its translation in place; pressing again turns it back">
+
+- **To keep reading a language you do not read, press <kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd> to translate the whole window.** In a Slack channel or a long article, new text is translated as it appears, and a second press stops; to see one paragraph in the original, point at it and press <kbd>⌥</kbd> <kbd>D</kbd>. Translations are set on Cida's paper and code stays as it is; clicks and scrolling still reach the app.
+
+  <img src="docs/images/demo-window.gif" width="720" alt="Option-Shift-D translates the whole page; translations hide while it scrolls and follow once it stops, and code and images stay as they are">
 
 <kbd>Esc</kbd> takes you back to your app. A request keeps running while the panel is hidden, and the result is there when you bring it back.
 

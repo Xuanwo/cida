@@ -37,7 +37,7 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 `scripts/capture-design-states.sh` captures every panel and Settings state from an isolated, non-activating build into `Design/ImplementationCurrent` and compares each with its board.
 
-The README's `docs/images/demo.gif` is a screen recording of the signed Release app driven by an XCUI journey in a Tart guest: a selection translated with ⌥Space, improved with Tab, and a line framed with ⌥S. The model's replies came from the loopback scenario server, and the desktop's widgets were hidden. That recording journey is not part of the regression suite; when the panel's look or the flow changes, record the demo again the same way.
+The README's demos (`docs/images/demo-*.gif`, one per way of translating) are screen recordings of the signed Release app driven by an XCUI journey in a Tart guest, on a blog post served locally and read in Chrome: a selection translated with ⌥Space, a reply improved with Tab, a chart framed with ⌥S, a paragraph turned with ⌥D, and the whole page with ⌥⇧D. The runner records the display with ScreenCaptureKit; the model's replies came from the loopback scenario server, and system banners and desktop widgets were cleared from the guest first. The Chrome window is 1180 × 760 pt in the middle of the 1512 × 982 pt display, and each clip is cropped to the window with a margin of wallpaper, idle stretches shortened. That recording journey is not part of the regression suite; when the panel's look or a flow changes, record the affected clip again the same way.
 
 ## Verification
 
