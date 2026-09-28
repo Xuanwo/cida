@@ -253,8 +253,6 @@ final class LayerOverlayView: NSView {
   private(set) var pendingFrames: [CGRect] = []
   private let occlusionMask = CAShapeLayer()
   private(set) var drawings: [LayerDrawing] = []
-  /// Moves every paragraph by this much, from the screen's own motion, until the next read.
-  private(set) var offset: CGFloat = 0
 
   override init(frame: NSRect) {
     super.init(frame: frame)
@@ -319,12 +317,8 @@ final class LayerOverlayView: NSView {
   func show(_ drawings: [LayerDrawing], scale: CGFloat) {
     // The tree is read again every second; unchanged paragraphs keep their layers and a
     // paragraph showing its original keeps showing it.
-    if drawings == self.drawings {
-      setOffset(0)
-      return
-    }
+    if drawings == self.drawings { return }
     self.drawings = drawings
-    offset = 0
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     blockLayers.forEach { $0.removeFromSuperlayer() }
@@ -332,19 +326,10 @@ final class LayerOverlayView: NSView {
     blockLayers.forEach(blocksLayer.addSublayer)
     pendingLayer.removeFromSuperlayer()
     blocksLayer.insertSublayer(pendingLayer, at: 0)
-    blocksLayer.sublayerTransform = CATransform3DIdentity
     CATransaction.commit()
     setAccessibilityValue(drawings.map(\.text).joined(separator: "\n"))
   }
 
-  /// Everything moves with the content between two reads of the tree (§五).
-  func setOffset(_ offset: CGFloat) {
-    self.offset = offset
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    blocksLayer.sublayerTransform = CATransform3DMakeTranslation(0, offset, 0)
-    CATransaction.commit()
-  }
 
   /// Parts covered by other windows are not painted (§五), in this view's coordinates.
   func setOcclusion(_ covered: [CGRect]) {

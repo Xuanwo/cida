@@ -618,17 +618,6 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(configuration.settings.layerShortcut, GlobalShortcut.optionD)
   }
 
-  // MARK: - Following scrolls
-
-  /// Translations move with the input, not the pixels: a trackpad's points one to one, a
-  /// wheel's lines by Chromium's 40 pt, and a wheel in an app whose line distance is its own
-  /// not at all (they hide until the tree is read again).
-  func testTranslationsMoveWithTheScrollNotWithWhatThePixelsSuggest() {
-    XCTAssertEqual(LayerScroll(deltaY: -37.5, isPrecise: true).contentShift(linesScrollChromiumDistance: false), -37.5)
-    XCTAssertEqual(LayerScroll(deltaY: -3, isPrecise: false).contentShift(linesScrollChromiumDistance: true), -120)
-    XCTAssertNil(LayerScroll(deltaY: -3, isPrecise: false).contentShift(linesScrollChromiumDistance: false))
-  }
-
   /// Cida says everything in one place (§五 提示胶囊): centred on the screen under the
   /// pointer, the pill's top edge on the panel's, which leaves out the menu bar and the Dock.
   func testTheLayerAndCaptureHintsSitOnThePanelsTopEdge() throws {

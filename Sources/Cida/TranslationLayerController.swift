@@ -49,9 +49,8 @@ final class TranslationLayerController {
     RunLoop.main.add(timer, forMode: .common)
     tick = timer
     monitors.append(
-      NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-        let scroll = LayerScroll(event)
-        MainActor.assumeIsolated { self?.noteScroll(scroll) }
+      NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
+        MainActor.assumeIsolated { self?.noteScroll() }
       } as Any)
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -252,11 +251,11 @@ final class TranslationLayerController {
     }
   }
 
-  /// The pane under the pointer scrolls with the wheel (§七).
-  private func noteScroll(_ scroll: LayerScroll) {
+  /// The pane under the pointer scrolls with the wheel or trackpad (§七).
+  private func noteScroll() {
     let mouse = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
     for session in sessions where session.paneFrame.contains(mouse) {
-      session.scrolled(scroll)
+      session.noteMotion()
     }
   }
 
@@ -419,33 +418,6 @@ struct LayerParagraphMark {
   }
 }
 
-/// One scroll of a wheel or trackpad, as far as it moves the content under the pointer (§七).
-/// The translations follow the input rather than the pixels: a hover highlight moving from one
-/// chat message to the next looks exactly like the list scrolling by a message, and reading
-/// the screen for motion moved every translation by a message each time the pointer passed.
-struct LayerScroll: Equatable, Sendable {
-  /// How far the content moves down: points from a trackpad or Magic Mouse, lines from the
-  /// clicks of a wheel.
-  let deltaY: CGFloat
-  let isPrecise: Bool
-
-  init(deltaY: CGFloat, isPrecise: Bool) {
-    self.deltaY = deltaY
-    self.isPrecise = isPrecise
-  }
-
-  init(_ event: NSEvent) {
-    self.init(deltaY: event.scrollingDeltaY, isPrecise: event.hasPreciseScrollingDeltas)
-  }
-
-  /// Points the content moves down, or nil when a wheel's lines move it by a distance only the
-  /// app knows. Chromium, and so Electron, moves 40 pt a line.
-  func contentShift(linesScrollChromiumDistance: Bool) -> CGFloat? {
-    if isPrecise { return deltaY }
-    return linesScrollChromiumDistance ? deltaY * 40 : nil
-  }
-}
-
 /// One pane in one window: every paragraph of it while its window is translated whole (§三),
 /// plus the paragraphs ⌥D asked for, minus those ⌥D turned back (§二).
 @MainActor
@@ -478,14 +450,11 @@ final class LayerPaneSession {
   /// The window's frame as its accessibility tree reports it, read with the pane's.
   private var windowFrame: CGRect?
   private var windowNumber: CGWindowID?
-  /// Chromium scrolls a mouse wheel's line by 40 pt; other apps by amounts only they know.
-  private lazy var linesScrollChromiumDistance = LayerApplication.isChromiumBrowser(pid: application.processIdentifier)
   private(set) var isOnScreen = false
   private var blocks: [LayerBlock] = []
   private var anchors: [AccessibilityLayerNode] = []
   private var anchorFrames: [CGRect?] = []
   private var lastMotion: Date?
-  private var lastScroll: Date?
   private var windowsSettle: Date?
   private var isReading = false
   private var isProbing = false
@@ -571,22 +540,9 @@ final class LayerPaneSession {
     if windowsSettle != nil { windowsSettle = Date() }
   }
 
-  /// The user scrolled over the pane (§七): the translations move by what the wheel moves the
-  /// content, and the tree puts them exactly where the text is once it stops. A wheel whose
-  /// lines this app scrolls by an unknown distance hides them until then.
-  func scrolled(_ scroll: LayerScroll) {
-    lastScroll = Date()
-    lastMotion = Date()
-    needsRead = true
-    if let shift = scroll.contentShift(linesScrollChromiumDistance: linesScrollChromiumDistance) {
-      overlay.overlayView.setOffset(overlay.overlayView.offset + shift)
-    } else {
-      overlay.alphaValue = 0
-    }
-  }
-
-  /// The content changed without a scroll to follow (a message arrived, the keyboard paged):
-  /// hidden until it settles and the tree is read again.
+  /// The content may be moving (§七): a scroll over the pane, its paragraphs or frame moving in
+  /// the tree. The translations go at once and come back where the text is once it is still;
+  /// no outside view of another app's content keeps pace with it while it moves.
   func noteMotion() {
     lastMotion = Date()
     needsRead = true
@@ -595,6 +551,13 @@ final class LayerPaneSession {
 
   /// The screen can be read: colours come from it (§五).
   static var readsScreen: Bool { CGPreflightScreenCaptureAccess() }
+
+  /// Nothing has moved for long enough to trust the tree's positions: no scroll and no move in
+  /// the tree for 0.2 s. Chromium updates the tree's positions about every 150 ms while
+  /// content moves, and eases a wheel's scroll in over some 150 ms after the last click.
+  private var isStill: Bool {
+    lastMotion.map { Date().timeIntervalSince($0) > 0.2 } ?? true
+  }
 
   func step(windows: [LayerWindowInfo], mouse: CGPoint) {
     guard !isFinished else { return }
@@ -607,7 +570,7 @@ final class LayerPaneSession {
     }
     placeOverWindow(windows)
     probeMotion()
-    let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
+    let settled = isStill
     if settled, !isReading, needsRead || Date().timeIntervalSince(lastRead) > 1.0 {
       read()
     }
@@ -687,10 +650,7 @@ final class LayerPaneSession {
           // place (in the Stage Manager strip) shows nothing to hide.
           place(paneFrame)
           if isOnScreen { noteMotion() } else { needsRead = true }
-        } else if frames.count == anchorFrames.count, frames != anchorFrames,
-          lastScroll.map({ Date().timeIntervalSince($0) > 0.3 }) ?? true
-        {
-          // Paragraphs moved with no wheel to follow; while scrolling the wheel moves them.
+        } else if frames.count == anchorFrames.count, frames != anchorFrames {
           noteMotion()
         }
         anchorFrames = frames
@@ -759,14 +719,6 @@ final class LayerPaneSession {
       picked[index].misses = found ? 0 : picked[index].misses + 1
     }
     picked.removeAll { $0.misses >= 2 }
-    // How well the wheel foretold where the paragraphs went: the same paragraph's move since the
-    // last read against the scroll applied meanwhile (§七).
-    let predicted = overlay.overlayView.offset
-    if predicted != 0, let moved = newBlocks.lazy.compactMap({ block in
-      self.blocks.first { $0.maskedText == block.maskedText }.map { block.frame.minY - $0.frame.minY }
-    }).first {
-      owner.log("layer-scroll-settled predicted=\(Int(predicted.rounded())) moved=\(Int(moved.rounded()))")
-    }
     showChosenParagraphs()
     // Motion is noticed from any paragraph of the pane, shown or not.
     let picks = [0, nodes.count / 2, nodes.count - 1].filter { $0 >= 0 && $0 < nodes.count }
@@ -870,7 +822,7 @@ final class LayerPaneSession {
         width: CidaMotion.cursorWidth, height: height)
     })
     if isOnScreen, !waiting.isEmpty { overlay.orderFront(nil) }
-    let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
+    let settled = isStill
     // A read landing while another app's windows animate in stays hidden with the rest.
     if settled, windowsSettle == nil { reveal() }
     if isOnScreen, !drawings.isEmpty { overlay.orderFront(nil) }
