@@ -57,7 +57,8 @@ customElements.define("cida-bar", CidaBar);
 customElements.define("cida-note", CidaNote);
 customElements.define("cida-motion-note", CidaMotionNote);
 
-// The Settings window (spec/settings.md). Attributes name what a state
+// The Settings window (spec/settings.md). tab="model|translation|shortcuts|general"
+// picks the tab (model by default); the other attributes name what a state
 // changes: config (see below), language="editing", editing="improve",
 // shortcut="custom|recording", grants="all", launch="on", update="available".
 class CidaSettings extends HTMLElement {
@@ -89,17 +90,17 @@ class CidaSettings extends HTMLElement {
          </div>`
       : prompt("改进", "You are a writing assistant. Improve the user-provided text…");
 
+    // spec/settings.md §四: three recordable shortcuts.
     const shortcut = is("shortcut", "recording")
-      ? row("全局快捷键", "Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
+      ? row("显示辞达", "Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
       : is("shortcut", "custom")
-        ? row("全局快捷键", "在任何应用里显示辞达", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
-        : row("全局快捷键", "在任何应用里显示辞达", `<span class="chip">⌥ Space</span>`, "end");
-    const capture = granted
-      ? row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end")
-      : row("截图翻译", "需要屏幕录制权限", `<span class="button">去授权</span><span class="chip">⌥ S</span>`, "end");
-    const selection = granted
-      ? row("选中文字", "唤起时带入并翻译", `<span class="status">已开启</span>`, "end")
-      : row("选中文字", "需要辅助功能权限", `<span class="button">去授权</span>`, "end");
+        ? row("显示辞达", "在任何应用里唤起", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
+        : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ Space</span>`, "end");
+    const capture = row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end");
+    const layerShortcut = row("原处翻译", "加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
+    // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
+    const permission = (title, caption) => row(title, caption,
+      granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
     const launch = row("开机启动", "", `<span class="toggle${is("launch", "on") ? " on" : ""}"></span>`, "end");
     const updates = is("update", "available")
       ? row("自动检查更新", "新版本 1.1.0 可以安装", `<span class="button">安装…</span><span class="toggle on"></span>`, "end spaced")
@@ -143,17 +144,32 @@ class CidaSettings extends HTMLElement {
         ? onboarding(config === "unset-copied")
         : `${serviceRow}${failure}${adjustRow}`;
 
+    const tab = this.getAttribute("tab") ?? "model";
+    const tabs = [
+      ["model", "模型", "sparkles"], ["translation", "翻译", "languages"],
+      ["shortcuts", "快捷键", "keyboard"], ["general", "通用", "sliders-horizontal"],
+    ];
+    const tabBar = `<div class="settings-tabs">${tabs.map(([key, title, icon]) =>
+      `<span class="${key === tab ? "on" : ""}"><i class="icon icon-${icon}"></i>${title}</span>`).join("")}</div>`;
+    // A tab with one group has no heading: the title names it.
+    const content = {
+      model: `<div class="group">${modelGroup}</div>`,
+      translation: `
+        <div class="group"><h3>语言</h3>${languages}</div>
+        <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>`,
+      shortcuts: `
+        <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}</div>
+        <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图翻译")}</div>`,
+      general: `
+        <div class="group">${launch}${updates}</div>
+        <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>`,
+    }[tab];
+
     this.outerHTML = `
       <section class="window" style="position: relative" data-state="${this.getAttribute("state")}">
-        <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">设置</div></div>
-        <div class="settings">
-          <div class="group"><h3>模型</h3>${modelGroup}</div>
-          <div class="group"><h3>语言</h3>${languages}</div>
-          <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>
-          <div class="group"><h3>唤起</h3>${shortcut}${capture}${selection}${launch}</div>
-          <div class="group"><h3>更新</h3>${updates}</div>
-          <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>
-        </div>
+        <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">${tabs.find(([key]) => key === tab)[1]}</div></div>
+        ${tabBar}
+        <div class="settings">${content}</div>
       </section>`;
   }
 }
@@ -209,3 +225,159 @@ class CidaStatusMenu extends HTMLElement {
 }
 
 customElements.define("cida-status-menu", CidaStatusMenu);
+
+
+// Cida's translations over mock app windows (spec/translation-layer.md):
+// <cida-layer-scene app="chat|browser" layer="…">. Translations are always on Cida's paper,
+// whatever the app looks like. Chat layers, as a walk through:
+//   once-pointing  the pointer rests on a message; nothing yet
+//   once-pending   ⌥D: a caret breathes after that message while it is translated
+//   once-done      it reads in place, among the originals
+//   once-two       ⌥D on another message: both translated, the rest original
+//   once-restore   ⌥D on a translated message: it turns back, the other stays
+//   once-none      ⌥D with no paragraph under the pointer: the hint pill says so
+//   once-failed    the request failed: the paragraph stays original, the hint offers a retry
+//   window-on      ⌥⇧D: the window is outlined and the hint pill says how to stop
+//   translating    a new message breathes while it waits; the rest is translated
+//   window-one-original  ⌥D inside the window turns one message back
+//   window-off     ⌥⇧D again: translations fade, the hint pill says it stopped
+// Every message sits in the hint pill where the panel and the capture hint appear.
+class CidaLayerScene extends HTMLElement {
+  connectedCallback() {
+    const app = this.getAttribute("app") ?? "chat";
+    const layer = this.getAttribute("layer") ?? "translated";
+    const wordmark = `<span class="wordmark">辞达</span>`;
+    const scene = document.createElement("section");
+    scene.className = "screen desk";
+    scene.dataset.state = this.getAttribute("state");
+    const body = app === "chat" ? this.chat(layer, wordmark) : this.browser(layer);
+    const outlined = layer === "window-on" ? " data-outline" : "";
+    // What Cida says, at the panel's height (spec/translation-layer.md §五 提示胶囊).
+    const hint = {
+      "once-none": "这里没有可以翻译的文字",
+      "once-failed": "翻译失败 · 点按重试",
+      "window-on": "翻译整个窗口 · Slack · 再按 ⌥ ⇧ D 停止",
+      "window-off": "已停止翻译这个窗口",
+    }[layer];
+    const pill = hint ? `<div class="capture-hint">${wordmark}<span>${hint}</span></div>` : "";
+    scene.innerHTML = `<div class="mock-window"${outlined}>${body}</div>${pill}`;
+    this.replaceWith(scene);
+    // Measure after the page and its fonts settle, and again whenever the page is resized
+    // (the renderer resizes it to the board before taking snapshots).
+    const place = () => document.fonts.ready.then(() => this.placeMarks(scene, wordmark));
+    if (document.readyState === "complete") place();
+    else window.addEventListener("load", place, { once: true });
+    window.addEventListener("resize", place);
+  }
+
+  // The pointer on the element marked data-pointer, the hint beside it, and the outline
+  // around the element marked data-outline.
+  placeMarks(scene, wordmark) {
+    const origin = scene.getBoundingClientRect();
+    scene.querySelectorAll(".layer-outline, .pointer.placed").forEach((element) => element.remove());
+    const outlined = scene.querySelector("[data-outline]");
+    if (outlined) {
+      const r = outlined.getBoundingClientRect();
+      const outline = document.createElement("div");
+      outline.className = "layer-outline";
+      Object.assign(outline.style, {
+        left: `${r.left - origin.left - 3}px`, top: `${r.top - origin.top - 3}px`,
+        width: `${r.width + 6}px`, height: `${r.height + 6}px`,
+      });
+      scene.appendChild(outline);
+    }
+    const target = scene.querySelector("[data-pointer]");
+    if (!target) return;
+    const r = target.getBoundingClientRect();
+    const x = r.left - origin.left + Math.min(r.width * 0.45, 260), y = r.top - origin.top + Math.min(r.height * 0.35, 30);
+    const pointer = document.createElement("i");
+    pointer.className = "pointer placed";
+    Object.assign(pointer.style, { left: `${x}px`, top: `${y}px` });
+    scene.appendChild(pointer);
+  }
+
+  chat(layer, wordmark) {
+    const messages = [
+      ["Maya Chen", "10:02", "#C9A27E",
+        "Morning! The compaction job finished overnight, but the manifest count on the prod table went from 1.2k to 3.4k: <span class=\"link\">lancedb#3669</span>",
+        "早！压缩任务昨晚跑完了，但生产表的 manifest 数从 1.2k 涨到了 3.4k：<span class=\"link\">lancedb#3669</span>"],
+      ["Leo Park", "10:05", "#7E9CC9",
+        "That's expected after the schema change. We should schedule a cleanup before Friday's release.",
+        "改完 schema 之后这是正常的。我们应该在周五发版前安排一次清理。"],
+      ["Maya Chen", "10:07", "#C9A27E",
+        "Agreed. Can someone double-check the retention settings? I don't want to drop versions people still query.",
+        "同意。有人能再核对一下保留策略吗？我不想删掉大家还在查询的版本。"],
+      ["Sam Rivera", "10:12", "#8FB89A",
+        "I'll take it. Heads up: the nightly benchmark regressed about 12% on scan-heavy workloads.",
+        "我来。提醒一下：夜间基准测试在扫描密集型负载上退步了约 12%。"],
+      ["Leo Park", "10:14", "#7E9CC9",
+        "Could it be the new prefetch default? Let's pair on it after standup.",
+        "会不会是新的预取默认值导致的？站会后我们一起看看。"],
+    ];
+    // Which messages read as translations and which one breathes.
+    const all = [0, 1, 2, 3, 4];
+    const translated = {
+      "once-done": [2], "once-two": [2, 4], "once-restore": [4],
+      "window-on": all, translating: [0, 1, 2, 3], "window-one-original": [0, 1, 3, 4],
+    }[layer] ?? [];
+    const pending = { "once-pending": 2, translating: 4 }[layer];
+    const pointed = { "once-failed": 2, "once-pointing": 2, "once-pending": 2, "once-done": 2, "once-two": 4, "once-restore": 2, "window-one-original": 2 }[layer];
+    const card = (text) => `<span class="layer-card layer-text">${text}</span>`;
+    const rows = messages.map(([who, time, color, original, translation], index) => {
+      let text = original;
+      if (translated.includes(index)) text = card(translation);
+      if (index === pending) text = `<span class="layer-waiting">${original}</span>`;
+      const pointer = index === pointed ? " data-pointer" : "";
+      return `<div class="chat-msg"><i class="avatar" style="background: ${color}"></i>
+        <div><div class="who">${who}<time>${time}</time></div><div class="text"${pointer}>${text}</div></div></div>`;
+    }).join("");
+    const empty = layer === "once-none" ? `<div class="chat-empty" data-pointer></div>` : "";
+    return `
+      <div class="chat-top"><div class="mock-lights"><i></i><i></i><i></i></div><div class="search">搜索 Storage Team</div></div>
+      <div class="chat-body">
+        <div class="chat-rail"><i></i></div>
+        <div class="chat-sidebar"><b>Storage Team</b><small>频道</small>
+          <span># general</span><span class="on"># storage-eng</span><span># release</span><span># random</span>
+          <small>私信</small><span>Maya Chen</span><span>Leo Park</span><span>Sam Rivera</span></div>
+        <div class="chat-main">
+          <div class="chat-header"># storage-eng</div>
+          <div class="chat-messages"><div class="chat-day">今天</div>${rows}${empty}</div>
+          <div class="chat-composer">发消息到 #storage-eng</div>
+        </div>
+      </div>`;
+  }
+
+  browser(layer) {
+    const translated = layer === "translated";
+    // The article's paragraphs share a sheet of paper; the code between them stays as it is
+    // and breaks the sheet in two.
+    const sheet = translated ? "layer-sheet" : "";
+    const t = (original, translation) =>
+      translated ? `<span class="layer-text">${translation}</span>` : original;
+    return `
+      <div class="browser-tabs"><div class="mock-lights"><i></i><i></i><i></i></div><div class="browser-tab">Why we rewrote the file format</div></div>
+      <div class="browser-toolbar"><div class="address">example.dev/blog/file-format</div></div>
+      <div class="page">
+        <div class="page-nav"><b>Example Engineering</b>Blog<br>Docs<br>Community<br>Careers</div>
+        <div class="page-article">
+          <div class="${sheet}">
+            <h1>${t("Why we rewrote the file format", "我们为什么重写了文件格式")}</h1>
+            <div class="meta">${t("Engineering · 8 min read", "工程 · 阅读约 8 分钟")}</div>
+            <p>${t("Columnar formats were designed for scans that read a few columns across billions of rows. Modern AI workloads also need fast random access to individual rows, and the old layout made every lookup pay for a full page decode.",
+              "列式格式原本是为扫描设计的：在数十亿行里只读取少数几列。如今的 AI 负载还需要快速随机读取单行，而旧的布局让每次查找都得解码一整页。")}</p>
+            <p>${t("The new format stores each column in small, independently addressable chunks. A point lookup now touches a single chunk:",
+              "新格式把每一列存成可独立寻址的小块。点查询现在只会触及一个小块：")}</p>
+          </div>
+          <pre class="page-code">rows = table.take([42, 1337])
+print(len(rows))</pre>
+          <div class="${sheet}">
+            <p>${t("In our benchmarks, random access became up to 60 times faster with no regression on full-table scans.",
+              "在我们的基准测试中，随机读取最多快了 60 倍，全表扫描没有任何退步。")}</p>
+          </div>
+        </div>
+        <div class="page-toc"><b>ON THIS PAGE</b>Background<br>The new layout<br>Benchmarks<br>What's next</div>
+      </div>`;
+  }
+}
+
+customElements.define("cida-layer-scene", CidaLayerScene);

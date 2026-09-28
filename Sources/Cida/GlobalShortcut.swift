@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 /// A key combination that works from any application: showing the panel or
-/// capturing text on screen (`Design/spec/settings.md` §五). It always carries ⌘,
+/// capturing text on screen (`Design/spec/settings.md` §四). It always carries ⌘,
 /// ⌥ or ⌃, so plain typing in another application can never trigger it.
 struct GlobalShortcut: Equatable, Hashable, Sendable {
   struct Modifiers: OptionSet, Hashable, Sendable {
@@ -62,6 +62,7 @@ struct GlobalShortcut: Equatable, Hashable, Sendable {
 
   static let optionSpace = GlobalShortcut(keyCode: UInt16(kVK_Space), modifiers: .option)
   static let optionS = GlobalShortcut(keyCode: UInt16(kVK_ANSI_S), modifiers: .option)
+  static let optionD = GlobalShortcut(keyCode: UInt16(kVK_ANSI_D), modifiers: .option)
 
   init(keyCode: UInt16, modifiers: Modifiers) {
     self.keyCode = keyCode
@@ -79,6 +80,12 @@ struct GlobalShortcut: Equatable, Hashable, Sendable {
       return nil
     }
     self.init(keyCode: keyCode, modifiers: modifiers)
+  }
+
+  /// The same key with ⇧ added: ⌥D's ⇧ variant translates the whole window
+  /// (`Design/spec/translation-layer.md` §三).
+  var addingShift: GlobalShortcut {
+    GlobalShortcut(keyCode: keyCode, modifiers: modifiers.union(.shift))
   }
 
   /// The chip text: modifier symbols, then the key, separated by spaces.
@@ -200,11 +207,14 @@ enum GlobalShortcutAction: CaseIterable, Sendable {
   case showPanel
   /// Freezes the screen, lets the user frame some text, and translates it.
   case captureText
+  /// Opens the translation layer's configuration over the screen.
+  case translationLayer
 
   var defaultShortcut: GlobalShortcut {
     switch self {
     case .showPanel: .optionSpace
     case .captureText: .optionS
+    case .translationLayer: .optionD
     }
   }
 }

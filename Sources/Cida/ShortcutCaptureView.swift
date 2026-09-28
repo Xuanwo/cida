@@ -10,6 +10,8 @@ struct ShortcutCaptureView: NSViewRepresentable {
   @Binding var isRecording: Bool
   let onCapture: @MainActor (GlobalShortcut) -> Void
   let onInvalidPress: @MainActor () -> Void
+  /// A combination this recorder cannot take; recording goes on and the owner says why.
+  var refuses: @MainActor (GlobalShortcut) -> Bool = { _ in false }
 
   func makeNSView(context: Context) -> ShortcutCaptureNSView {
     ShortcutCaptureNSView()
@@ -18,6 +20,7 @@ struct ShortcutCaptureView: NSViewRepresentable {
   func updateNSView(_ view: ShortcutCaptureNSView, context: Context) {
     view.onCapture = onCapture
     view.onInvalidPress = onInvalidPress
+    view.refuses = refuses
     view.onEnd = { isRecording = false }
     view.wantsKeyFocus = isRecording
   }
@@ -26,6 +29,7 @@ struct ShortcutCaptureView: NSViewRepresentable {
 final class ShortcutCaptureNSView: NSView {
   var onCapture: @MainActor (GlobalShortcut) -> Void = { _ in }
   var onInvalidPress: @MainActor () -> Void = {}
+  var refuses: @MainActor (GlobalShortcut) -> Bool = { _ in false }
   var onEnd: @MainActor () -> Void = {}
 
   /// Recording holds the keyboard. SwiftUI may set this before the view is in a window (the
@@ -83,6 +87,7 @@ final class ShortcutCaptureNSView: NSView {
       onInvalidPress()
       return true
     }
+    if refuses(shortcut) { return true }
     onCapture(shortcut)
     onEnd()
     return true

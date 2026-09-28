@@ -89,6 +89,17 @@ enum CidaDesign {
     static let controlBarHeight: CGFloat = 50
     static let compactEditorHeight: CGFloat = 27
     static let composerLineHeight: CGFloat = 26
+
+    /// Where the panel's top edge sits on a screen, in AppKit coordinates: `panel-top-ratio`
+    /// down the part of the screen the menu bar and Dock leave free. The hint pills share it.
+    static func topEdge(in visibleFrame: CGRect) -> CGFloat {
+      visibleFrame.maxY - floor(visibleFrame.height * topRatio)
+    }
+
+    /// The middle of the panel's top edge: centred on the screen's free area.
+    static func topCenter(in visibleFrame: CGRect) -> CGPoint {
+      CGPoint(x: visibleFrame.midX, y: topEdge(in: visibleFrame))
+    }
   }
 
   /// The design's result typography (`font-size-result*` × `line-height-result*`,
@@ -128,8 +139,8 @@ enum CidaDesign {
   /// The result face: Source Serif 4 for Latin results, Noto Serif SC for
   /// Chinese ones, each cascading to the other for mixed text. Wherever Noto
   /// Serif SC sets Chinese, its punctuation follows `cjkPunctuationFeatures`.
-  static func appKitResult(for language: Language) -> NSFont {
-    let size = language == .chinese ? Typography.resultSizeCJK : Typography.resultSize
+  static func appKitResult(for language: Language, size: CGFloat? = nil) -> NSFont {
+    let size = size ?? (language == .chinese ? Typography.resultSizeCJK : Typography.resultSize)
     let latin = NSFontDescriptor(fontAttributes: [.family: "Source Serif 4"])
     let cjk = NSFontDescriptor(fontAttributes: [
       .family: "Noto Serif SC",
@@ -340,6 +351,33 @@ struct WindowSurface<Content: View>: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background(CidaDesign.background)
       .ignoresSafeArea(.container, edges: .top)
+  }
+}
+
+/// Where Cida says something outside the panel: the wordmark, then one sentence, in a pill
+/// whose top edge sits where the panel's does (`Design/spec/panel.md` §一 截图翻译,
+/// `Design/spec/translation-layer.md` §五 提示胶囊).
+struct CidaHintPill: View {
+  /// Room around the pill for its shadow inside the hosting view.
+  static let shadowMargin: CGFloat = 40
+  let text: String
+
+  var body: some View {
+    HStack(spacing: 12) {
+      CidaWordmark()
+      Text(text)
+        .font(CidaDesign.ui(12.5, weight: .medium))
+        .foregroundStyle(CidaDesign.textControl)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 8)
+    .background(CidaDesign.surface, in: Capsule())
+    .overlay { Capsule().strokeBorder(Color.black.opacity(0x12 / 255), lineWidth: 1) }
+    .shadow(color: CidaDesign.textPrimary.opacity(0x14 / 255), radius: 3, y: 2)
+    .shadow(color: CidaDesign.textPrimary.opacity(0x30 / 255), radius: 36, y: 28)
+    .contentShape(Capsule())
+    .padding(Self.shadowMargin)
+    .accessibilityElement(children: .combine)
   }
 }
 

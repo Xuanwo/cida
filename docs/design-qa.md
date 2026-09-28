@@ -33,11 +33,15 @@ compared natively:
 | ⑩ 带入选区 | `selection-imported` | (global shortcut; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
 | ⑪ 截图 · 未识别到文字 | `capture-unrecognized` | (capture shortcut; XCUI `testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt`) |
 | ⑫ 最大高度 | `long` | `long` |
-| 设置 · 默认 | `settings` | `settings` |
-| 设置 · 编辑改进提示词 · 自定义快捷键 · 已授权 · 开机启动 | `settings-custom` | `settings-custom` |
-| 设置 · 录制快捷键 | `settings-recording` | `settings-recording` |
-| 设置 · 常用外语输入中 | `settings-language-editing` | `settings-language-editing` |
-| 设置 · 有新版本可以安装 | `settings-update-available` | `settings-update-available` |
+| 设置 · 模型（默认） | `settings` | `settings` |
+| 设置 · 翻译 | `settings-translation` | `settings-translation` |
+| 设置 · 翻译 · 常用外语输入中 | `settings-language-editing` | `settings-language-editing` |
+| 设置 · 翻译 · 编辑改进提示词 | `settings-prompt-editing` | `settings-prompt-editing` |
+| 设置 · 快捷键 · 未授权 | `settings-shortcuts` | `settings-shortcuts` |
+| 设置 · 快捷键 · 自定义快捷键 · 已授权 | `settings-shortcuts-custom` | `settings-shortcuts-custom` |
+| 设置 · 快捷键 · 录制中 | `settings-recording` | `settings-recording` |
+| 设置 · 通用 | `settings-general` | `settings-general` |
+| 设置 · 通用 · 有新版本可以安装 | `settings-update-available` | `settings-update-available` |
 | 配置 · 还没有模型服务 | `settings-config-unset` | `settings-config-unset` |
 | 配置 · 已复制提示词 | `settings-config-copied` | `settings-config-copied` |
 | 配置 · 已就绪 | `settings-config-ready` | `settings-config-ready` |
@@ -67,7 +71,7 @@ render once the boards are rendered again.
 | Baseline | Logical size | Mask |
 | --- | ---: | --- |
 | Panel, empty | 800 × 113 | none |
-| Settings, default | 560 × 744 | native title bar, 46 pt |
+| Settings, 模型 (the tab it opens on first) | 560 × 249 | native title bar, 46 pt |
 
 The remaining states are retained as reviewable reference/current comparisons and are protected by
 deterministic geometry and interaction assertions (panel height budget, source cap, result

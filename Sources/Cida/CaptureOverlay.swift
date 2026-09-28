@@ -16,6 +16,8 @@ enum CaptureOverlay {
     let view = CaptureOverlayView(
       frame: NSRect(origin: .zero, size: screen.frame.size), image: image,
       veil: CaptureVeil(forScreen: image))
+    let anchor = CidaDesign.Panel.topCenter(in: screen.visibleFrame)
+    view.hintAnchor = CGPoint(x: anchor.x - screen.frame.minX, y: anchor.y - screen.frame.minY)
     panel.contentView = view
     defer { panel.orderOut(nil) }
     return await withCheckedContinuation { continuation in
@@ -163,6 +165,11 @@ final class CaptureOverlayView: NSView {
   private let ambientShadowLayer = CALayer()
   private let sheetLayer = CALayer()
   private let hint: NSHostingView<CaptureHint>
+  /// The middle of the panel's top edge on this screen, in this view's coordinates; the
+  /// whole view counts as the screen's free area when it is not set.
+  var hintAnchor: CGPoint? {
+    didSet { needsLayout = true }
+  }
 
   init(frame: NSRect, image: CGImage, veil: CaptureVeil) {
     self.image = image
@@ -235,13 +242,13 @@ final class CaptureOverlayView: NSView {
 
   override func layout() {
     super.layout()
-    // Centred, with the pill's top edge where the panel's is
+    // On the panel's axis, with the pill's top edge where the panel's is
     // (`panel-top-ratio`); the hosting view also holds the shadow margin.
     let size = hint.fittingSize
-    let pillTop = bounds.height * (1 - CidaDesign.Panel.topRatio)
+    let anchor = hintAnchor ?? CidaDesign.Panel.topCenter(in: bounds)
     hint.frame = NSRect(
-      x: floor((bounds.width - size.width) / 2),
-      y: floor(pillTop + CaptureHint.shadowMargin - size.height),
+      x: floor(anchor.x - size.width / 2),
+      y: floor(anchor.y + CaptureHint.shadowMargin - size.height),
       width: size.width, height: size.height)
     updateLayers()
   }
@@ -356,26 +363,12 @@ extension CaptureGeometry {
   }
 }
 
-/// The pill at the panel's height: the wordmark, then what to do.
+/// The capture's words in the hint pill.
 struct CaptureHint: View {
-  /// Room around the pill for its shadow inside the hosting view.
-  static let shadowMargin: CGFloat = 40
+  static let shadowMargin = CidaHintPill.shadowMargin
 
   var body: some View {
-    HStack(spacing: 12) {
-      CidaWordmark()
-      Text("拖动框选要翻译的文字 · Esc 取消")
-        .font(CidaDesign.ui(12.5, weight: .medium))
-        .foregroundStyle(CidaDesign.textControl)
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 8)
-    .background(CidaDesign.surface, in: Capsule())
-    .overlay { Capsule().strokeBorder(Color.black.opacity(0x12 / 255), lineWidth: 1) }
-    .shadow(color: CidaDesign.textPrimary.opacity(0x14 / 255), radius: 3, y: 2)
-    .shadow(color: CidaDesign.textPrimary.opacity(0x30 / 255), radius: 36, y: 28)
-    .padding(Self.shadowMargin)
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("capture-overlay-hint")
+    CidaHintPill(text: "拖动框选要翻译的文字 · Esc 取消")
+      .accessibilityIdentifier("capture-overlay-hint")
   }
 }

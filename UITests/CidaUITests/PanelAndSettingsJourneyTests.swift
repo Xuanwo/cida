@@ -174,6 +174,98 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse(driver.stopButton.exists, "Nothing was requested")
   }
 
+  /// `Design/spec/translation-layer.md`: ⌥D turns the paragraph under the pointer into its
+  /// translation and back, a paragraph at a time; ⌥⇧D translates the whole window, follows
+  /// scrolling, is kept across a relaunch, and stops on a second press.
+  func testTranslationLayerTogglesParagraphsAndTheWholeWindow() throws {
+    driver.launch()
+    driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    let overlays = driver.app.descendants(matching: .any).matching(identifier: "translation-layer-content")
+    func paragraph(_ number: Int) -> XCUIElement {
+      source.app.staticTexts.matching(
+        NSPredicate(format: "value BEGINSWITH %@ OR label BEGINSWITH %@",
+          "CIDA LAYER PARAGRAPH \(number).", "CIDA LAYER PARAGRAPH \(number).")
+      ).firstMatch
+    }
+    /// Everything the layer draws now, across its panes.
+    func shown() -> String {
+      overlays.allElementsBoundByIndex.compactMap { $0.value as? String }.joined(separator: "\n")
+    }
+    func wait(timeout: TimeInterval, until condition: (String) -> Bool) -> String? {
+      let deadline = Date().addingTimeInterval(timeout)
+      repeat {
+        let text = shown()
+        if condition(text) { return text }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+      } while Date() < deadline
+      return nil
+    }
+    func press(on number: Int, wholeWindow: Bool = false) {
+      paragraph(number).coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).hover()
+      RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+      source.press("d", modifierFlags: wholeWindow ? [.option, .shift] : .option)
+    }
+    func attach(_ name: String) {
+      // Out of the way of the paragraphs, so the shot shows them whole.
+      source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+      RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+      let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+      shot.name = name
+      shot.lifetime = .keepAlways
+      add(shot)
+    }
+    XCTAssertTrue(paragraph(2).waitForExistence(timeout: 5), "The source shows its article")
+
+    // ⌥D: this paragraph, then another; the rest stay original.
+    press(on: 2)
+    let one = try XCTUnwrap(wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") }, "⌥D translates it in place")
+    XCTAssertFalse(one.contains("CIDA_LAYER_TRANSLATED_3"), "Only that paragraph")
+    attach("layer-one-paragraph")
+    press(on: 3)
+    XCTAssertNotNil(
+      wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
+      "A second paragraph joins the first")
+    attach("layer-two-paragraphs")
+
+    // ⌥D on a translation turns it back.
+    press(on: 2)
+    XCTAssertNotNil(
+      wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
+      "Only the paragraph pressed on turns back")
+
+    // ⌥⇧D: the whole window. (Its hint lasts 2 s, shorter than a synthesized key press takes
+    // to return here while the host's caret blinks; TranslationLayerTests places the pill.)
+    press(on: 2, wholeWindow: true)
+    XCTAssertNotNil(
+      wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_1") && $0.contains("CIDA_LAYER_TRANSLATED_2") },
+      "Every paragraph of the window")
+    attach("layer-whole-window")
+
+    let article = source.app.descendants(matching: .any).matching(identifier: "source-article").firstMatch
+    // A wheel scrolls what is under the pointer.
+    article.hover()
+    // New paragraphs scrolled into view are translated too.
+    let firstTop = paragraph(1).frame.minY
+    article.scroll(byDeltaX: 0, deltaY: -600)
+    if abs(paragraph(1).frame.minY - firstTop) < 1 { article.scroll(byDeltaX: 0, deltaY: 600) }
+    XCTAssertNotNil(wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_12") }, "Scrolled-in paragraphs follow")
+    attach("layer-after-scroll")
+
+    // The window is remembered, and a second ⌥⇧D stops it.
+    driver.terminate()
+    driver.launch()
+    driver.hidePanel()
+    source.app.activate()
+    XCTAssertNotNil(
+      wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_") }, "The whole window comes back after a relaunch")
+    source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+    source.press("d", modifierFlags: [.option, .shift])
+    XCTAssertNotNil(wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_") }, "⌥⇧D again stops it")
+  }
+
   /// `Design/spec/configuration.md` §四: Settings starts with the onboarding card, copies the
   /// prompt, and follows what the artifact's own command line writes and checks while the
   /// window stays open. Prompts are still edited in Settings.
@@ -247,6 +339,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       "A changed configuration is 已就绪 until it is checked")
     XCTAssertFalse(driver.modelFailure.exists)
 
+    driver.showSettingsTab("translation", title: "翻译")
     XCTAssertFalse(driver.app.textViews["settings-prompt-editor-improve"].exists, "Prompts start collapsed")
     driver.app.buttons["settings-prompt-edit-improve"].click()
     let improveEditor = driver.app.textViews["settings-prompt-editor-improve"]
@@ -259,6 +352,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
     driver.showPanel()
     driver.openSettings()
+    XCTAssertTrue(
+      driver.waitForTitle("翻译", of: settingsWindow, timeout: 3), "Settings reopens on the last tab")
     XCTAssertEqual(
       driver.app.textViews["settings-prompt-editor-improve"].value as? String,
       customPrompt
@@ -279,32 +374,37 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
         timeout: 3
       )
     )
+    driver.showSettingsTab("general", title: "通用")
     let launchAtLogin = driver.element(identifier: "settings-launch-at-login-toggle")
-    XCTAssertTrue(launchAtLogin.exists)
+    XCTAssertTrue(launchAtLogin.waitForExistence(timeout: 3))
     XCTAssertEqual(launchAtLogin.elementType, .checkBox)
   }
 
   func testGlobalShortcutIsRecordedInSettingsAndSummonsThePanel() {
     driver.launch()
     driver.openSettings()
+    XCTAssertTrue(driver.waitForTitle("模型", of: driver.settingsWindow, timeout: 3), "Settings opens on 模型")
+    driver.showSettingsTab("shortcuts", title: "快捷键")
     let chip = driver.app.buttons["settings-shortcut"]
     XCTAssertTrue(chip.waitForExistence(timeout: 3))
-    XCTAssertEqual(chip.label, "全局快捷键 ⌥ Space")
+    XCTAssertEqual(chip.label, "显示辞达快捷键 ⌥ Space")
     XCTAssertFalse(
       driver.app.buttons["settings-shortcut-reset"].exists, "The default has nothing to restore")
-    XCTAssertTrue(
-      driver.element(identifier: "settings-selection-access-granted").exists,
-      "The guest granted Accessibility, and the selection row reads it")
     let captureChip = driver.app.buttons["settings-capture-shortcut"]
     XCTAssertEqual(captureChip.label, "截图翻译快捷键 ⌥ S")
-    XCTAssertFalse(
-      driver.app.buttons["settings-capture-access-request"].exists,
-      "The guest granted Screen Recording, so the capture row asks for nothing")
+    XCTAssertEqual(driver.app.buttons["settings-layer-shortcut"].label, "原处翻译快捷键 ⌥ D")
+    XCTAssertTrue(
+      driver.element(identifier: "settings-selection-access-granted").exists,
+      "The guest granted Accessibility, and the 权限 group reads it")
+    XCTAssertTrue(
+      driver.element(identifier: "settings-capture-access-granted").exists,
+      "The guest granted Screen Recording, and the 权限 group reads it")
+    XCTAssertFalse(driver.app.buttons["settings-capture-access-request"].exists)
 
     chip.click()
-    XCTAssertTrue(driver.waitForLabel("按下新的全局快捷键", in: chip, timeout: 3), "A click starts recording")
+    XCTAssertTrue(driver.waitForLabel("按下新的显示辞达快捷键", in: chip, timeout: 3), "A click starts recording")
     driver.app.typeKey("t", modifierFlags: [.control, .option])
-    XCTAssertTrue(driver.waitForLabel("全局快捷键 ⌃ ⌥ T", in: chip, timeout: 3), "The next combination is kept")
+    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌃ ⌥ T", in: chip, timeout: 3), "The next combination is kept")
     let reset = driver.app.buttons["settings-shortcut-reset"]
     XCTAssertTrue(reset.waitForExistence(timeout: 3))
 
@@ -321,7 +421,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.openSettings()
     XCTAssertTrue(reset.waitForExistence(timeout: 3))
     reset.click()
-    XCTAssertTrue(driver.waitForLabel("全局快捷键 ⌥ Space", in: chip, timeout: 3))
+    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌥ Space", in: chip, timeout: 3))
     XCTAssertTrue(reset.waitForNonExistence(timeout: 3), "The default has nothing to restore")
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))

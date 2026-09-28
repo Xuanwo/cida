@@ -2,6 +2,7 @@
 
 import http.server
 import json
+import re
 import os
 import pathlib
 import pwd
@@ -205,6 +206,28 @@ def plan_for(submitted_text):
     }
     if submitted_text in plans:
         return plans[submitted_text]
+    # The translation layer sends numbered paragraphs as JSON and wants them back the same way.
+    layer_blocks = None
+    if submitted_text.startswith("["):
+        try:
+            layer_blocks = json.loads(submitted_text)
+        except ValueError:
+            layer_blocks = None
+    if isinstance(layer_blocks, list) and layer_blocks and all(
+        isinstance(block, dict) and "id" in block and "text" in block for block in layer_blocks
+    ):
+        def translated(text):
+            match = re.search(r"PARAGRAPH (\d+)", text)
+            number = match.group(1) if match else "?"
+            return f"第 {number} 段译文 CIDA_LAYER_TRANSLATED_{number}"
+        reply = json.dumps(
+            [{"id": block["id"], "text": translated(block["text"])} for block in layer_blocks],
+            ensure_ascii=False,
+        )
+        return {
+            "chunks": [reply[: len(reply) // 2], reply[len(reply) // 2 :]],
+            "requiredSystemFragments": ["Keep every ⟦n⟧ placeholder exactly as written"],
+        }
     if submitted_text == "CIDA CAPTURE SCENARIO":
         # What Vision reads from the source application's line of text.
         return {

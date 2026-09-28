@@ -32,6 +32,22 @@ private struct SourceView: View {
         .frame(height: 180)
         .accessibilityElement()
         .accessibilityIdentifier("source-blank")
+      // The translation layer's journey: a pane of English paragraphs that scrolls.
+      ScrollView {
+        VStack(alignment: .leading, spacing: 18) {
+          ForEach(1...16, id: \.self) { number in
+            Text(
+              "CIDA LAYER PARAGRAPH \(number). The storage engine keeps every write in an append-only log and compacts it in the background."
+            )
+            .font(.system(size: 15))
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
+        }
+        .padding(.vertical, 8)
+      }
+      .frame(height: 240)
+      .accessibilityIdentifier("source-article")
     }
     .padding(40)
     .frame(width: 760)

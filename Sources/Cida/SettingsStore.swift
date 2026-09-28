@@ -80,6 +80,7 @@ enum SettingsStore {
     stored.foreignLanguage = settings.foreignLanguage
     stored.shortcut = settings.shortcut
     stored.captureShortcut = settings.captureShortcut
+    stored.layerShortcut = settings.layerShortcut
     stored.launchAtLogin = settings.launchAtLogin
     save(stored, namespace: namespace)
   }
@@ -136,6 +137,21 @@ enum SettingsStore {
     defaults.removeObject(forKey: lastCheckKey)
     KeychainStore.deleteAPIKey(service: namespace)
   }
+
+  /// The apps and sites whose windows are translated whole (`Design/spec/translation-layer.md`
+  /// §三). They are not settings: ⌥⇧D turns them on and off, nothing else shows them.
+  static func loadLayerWindowRules(namespace: String = storageNamespace) -> [LayerWindowRule] {
+    userDefaults(for: namespace).data(forKey: layerWindowRulesKey)
+      .flatMap { try? JSONDecoder().decode([LayerWindowRule].self, from: $0) } ?? []
+  }
+
+  static func saveLayerWindowRules(_ rules: [LayerWindowRule], namespace: String = storageNamespace) {
+    if let data = try? JSONEncoder().encode(rules) {
+      userDefaults(for: namespace).set(data, forKey: layerWindowRulesKey)
+    }
+  }
+
+  private static let layerWindowRulesKey = "cida.translation-layer.windows.v1"
 
   private static func userDefaults(for namespace: String) -> UserDefaults {
     if namespace == storageNamespace {

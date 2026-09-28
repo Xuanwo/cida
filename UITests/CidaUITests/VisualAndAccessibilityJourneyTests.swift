@@ -22,9 +22,9 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     }
   }
 
-  /// The approved image is Settings with the board's deepseek-chat service and before any
-  /// permission is granted; the command line configures the service before launch, and the
-  /// guest grants both permissions, so the launch pins them to "not granted".
+  /// The approved image is Settings' 模型 tab, where it first opens, with the board's
+  /// deepseek-chat service; the command line configures the service before launch. The launch
+  /// pins both permissions to "not granted" as the board draws them, whatever the guest granted.
   func testSettingsMatchesTheApprovedDesignBaseline() throws {
     let set = try driver.runCommandLine([
       "config", "set", "endpoint=https://api.deepseek.com/chat/completions",
@@ -44,7 +44,7 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(settingsWindow.frame.width, CGFloat(baseline.logicalWidth), accuracy: 1)
     XCTAssertEqual(
       settingsWindow.frame.height, CGFloat(baseline.logicalHeight), accuracy: 1,
-      "The approved 默认 state")
+      "The approved 模型 tab")
     try XCTContext.runActivity(named: "Design visual baseline: settings") { activity in
       try PixelDiff.assertScreenshot(
         settingsWindow.screenshot(),

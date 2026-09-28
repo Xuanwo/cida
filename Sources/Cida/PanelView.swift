@@ -536,7 +536,9 @@ private struct WelcomePane: View {
   }
 
   private var shortcutsLine: String {
-    "\(model.settings.shortcut.displayText) 随时唤起 · \(model.settings.captureShortcut.displayText) 截图翻译 · 辞达住在菜单栏"
+    let settings = model.settings
+    return "\(settings.shortcut.displayText) 随时唤起 · \(settings.captureShortcut.displayText) 截图翻译 · "
+      + "\(settings.layerShortcut.displayText) 原处翻译 · 辞达住在菜单栏"
   }
 }
 

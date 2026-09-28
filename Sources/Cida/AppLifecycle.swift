@@ -61,6 +61,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       suspendGlobalShortcuts: { [weak self] isSuspended in
         self?.globalHotKey?.setSuspended(isSuspended)
         self?.captureHotKey?.setSuspended(isSuspended)
+        self?.layerHotKey?.setSuspended(isSuspended)
+        self?.layerWindowHotKey?.setSuspended(isSuspended)
       },
       selectionAccess: launchOptions.selectionAccess,
       captureAccess: launchOptions.captureAccess,
@@ -85,6 +87,13 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var captureMenuItem: NSMenuItem?
   private var globalHotKey: GlobalHotKey?
   private var captureHotKey: GlobalHotKey?
+  private var layerHotKey: GlobalHotKey?
+  /// The layer shortcut with ⇧: the whole window (`Design/spec/translation-layer.md` §三).
+  private var layerWindowHotKey: GlobalHotKey?
+  /// The translation layer (`Design/spec/translation-layer.md`); nil in automation that shows
+  /// no interactive UI.
+  private var translationLayer: TranslationLayerController?
+  /// The layer's configuration is over the screen; the other shortcuts wait for it.
   private var performanceProbeView: FramePacingProbeNSView?
   private var millionCharacterPasteWorkload: MillionCharacterPasteWorkload?
   private var inputInteractionProbe: InputInteractionProbe?
@@ -106,7 +115,11 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     let panelController = PanelController(
       model: model,
       hidesOnResignKey: !launchOptions.isAutomation || launchOptions.displaysInteractiveAutomationUI,
-      openSettings: { [weak self] in self?.showSettings() }
+      // Without a model service, Settings opens where it is configured.
+      openSettings: { [weak self] in
+        guard let self else { return }
+        openSettings(on: model.isModelServiceConfigured ? nil : .model)
+      }
     )
     self.panelController = panelController
     if let logURL = launchOptions.lifecycleLogURL {
@@ -130,6 +143,13 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       captureHotKey = GlobalHotKey(shortcut: model.settings.captureShortcut) { [weak self] in
         self?.handleCaptureShortcut()
       }
+      layerHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut) { [weak self] in
+        self?.handleLayerShortcut(wholeWindow: false)
+      }
+      layerWindowHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut.addingShift) { [weak self] in
+        self?.handleLayerShortcut(wholeWindow: true)
+      }
+      startTranslationLayer()
       warmUpTextRecognition()
     }
     // Only a user's own launch talks to the update feed; automation and E2E never do.
@@ -198,8 +218,21 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     _ shortcut: GlobalShortcut,
     for action: GlobalShortcutAction
   ) -> Bool {
-    let hotKey = action == .showPanel ? globalHotKey : captureHotKey
+    let hotKey =
+      switch action {
+      case .showPanel: globalHotKey
+      case .captureText: captureHotKey
+      case .translationLayer: layerHotKey
+      }
+    let previous = hotKey?.shortcut
     if let hotKey, !hotKey.update(to: shortcut) {
+      return false
+    }
+    // The layer's ⇧ variant moves with it; both register or neither changes.
+    if action == .translationLayer, let windowHotKey = layerWindowHotKey,
+      !windowHotKey.update(to: shortcut.addingShift)
+    {
+      if let previous { _ = hotKey?.update(to: previous) }
       return false
     }
     updateMenuItem(for: action, shortcut: shortcut)
@@ -207,7 +240,13 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func updateMenuItem(for action: GlobalShortcutAction, shortcut: GlobalShortcut) {
-    let item = action == .showPanel ? showPanelMenuItem : captureMenuItem
+    // The layer acts on what is under the pointer, so it has no menu item.
+    let item =
+      switch action {
+      case .showPanel: showPanelMenuItem
+      case .captureText: captureMenuItem
+      case .translationLayer: nil as NSMenuItem?
+      }
     item?.keyEquivalent = shortcut.menuKeyEquivalent
     item?.keyEquivalentModifierMask = shortcut.menuModifierMask
   }
@@ -280,6 +319,45 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     showPanel()
   }
 
+  private func startTranslationLayer() {
+    let controller = TranslationLayerController(
+      settings: { [weak self] in self?.model.settings ?? CidaSettings() },
+      service: launchOptions.textProcessingService,
+      namespace: launchOptions.settingsStorageNamespace,
+      persists: launchOptions.persistsSettings)
+    controller.lifecycleLog = { [weak self] event in self?.lifecycleLog?.record(event) }
+    controller.start()
+    translationLayer = controller
+  }
+
+  /// The layer shortcut (`Design/spec/translation-layer.md` §二, §三): the paragraph under
+  /// the pointer turns into its translation and back; with ⇧, the whole window. Without the
+  /// Accessibility permission it asks for it instead, and without a model service it shows
+  /// the panel's welcome.
+  private func handleLayerShortcut(wholeWindow: Bool) {
+    guard let translationLayer, !isCapturing, !isReadingSelection else { return }
+    model.refreshSelectionAccess()
+    guard model.isSelectionAccessGranted else {
+      model.requestSelectionAccess()
+      return
+    }
+    // The request may need the Keychain key, which the first show recovers.
+    recoverAPIKeyIfNeeded()
+    // The welcome says what to do, as it does for ⌥Space and ⌥S (`spec/lifecycle.md` §三).
+    guard !model.needsModelConfiguration else {
+      lifecycleLog?.record("layer-needs-configuration")
+      showPanel()
+      return
+    }
+    let point = LayerScreenGeometry.topLeftPoint(fromAppKit: NSEvent.mouseLocation)
+    lifecycleLog?.record(wholeWindow ? "layer-window-shortcut" : "layer-paragraph-shortcut")
+    if wholeWindow {
+      translationLayer.toggleWindow(at: point)
+    } else {
+      translationLayer.toggleParagraph(at: point)
+    }
+  }
+
   /// The first recognition in a process loads the models, which takes
   /// seconds; do it in the background once the app is up.
   private func warmUpTextRecognition() {
@@ -299,6 +377,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   @objc
   func showSettings() {
+    openSettings(on: nil)
+  }
+
+  /// Opens Settings on `tab`, or on the tab it showed last.
+  func openSettings(on tab: SettingsTab?) {
+    if let tab { model.settingsTab = tab }
     ensureSettingsWindowController()
 
     guard let window = settingsWindowController?.window else { return }
@@ -466,7 +550,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private func ensureSettingsWindowController() {
     guard settingsWindowController == nil else { return }
     #if DEBUG
-      if launchOptions.designState == .settingsCustom {
+      if let tab = launchOptions.designState.settingsTab {
+        model.settingsTab = tab
+      }
+      if launchOptions.designState == .settingsPromptEditing {
         model.editingPrompt = .improve
       }
       if launchOptions.designState == .settingsRecording {
@@ -675,10 +762,14 @@ private enum DesignState: String {
   case failed
   case long
   case settings
-  case settingsCustom = "settings-custom"
-  case settingsRecording = "settings-recording"
-  case settingsUpdateAvailable = "settings-update-available"
+  case settingsTranslation = "settings-translation"
   case settingsLanguageEditing = "settings-language-editing"
+  case settingsPromptEditing = "settings-prompt-editing"
+  case settingsShortcuts = "settings-shortcuts"
+  case settingsShortcutsCustom = "settings-shortcuts-custom"
+  case settingsRecording = "settings-recording"
+  case settingsGeneral = "settings-general"
+  case settingsUpdateAvailable = "settings-update-available"
   case settingsConfigUnset = "settings-config-unset"
   case settingsConfigCopied = "settings-config-copied"
   case settingsConfigReady = "settings-config-ready"
@@ -700,13 +791,18 @@ private enum DesignState: String {
     self == .lifecycleWelcome || self == .lifecycleWelcomeSubmitted
   }
 
-  var isSettings: Bool {
+  var isSettings: Bool { settingsTab != nil }
+
+  /// The Settings tab the state shows, or nil for a panel state.
+  var settingsTab: SettingsTab? {
     switch self {
-    case .settings, .settingsCustom, .settingsRecording, .settingsLanguageEditing, .settingsUpdateAvailable,
-      .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
-      .settingsConfigChecking, .settingsConfigFailed:
-      true
-    default: false
+    case .settings, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
+      .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed:
+      .model
+    case .settingsTranslation, .settingsLanguageEditing, .settingsPromptEditing: .translation
+    case .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording: .shortcuts
+    case .settingsGeneral, .settingsUpdateAvailable: .general
+    default: nil
     }
   }
 }
@@ -765,8 +861,7 @@ private struct LaunchOptions {
         settings.modelService = ModelConfiguration()
         settings.apiKey = ""
       }
-      if usesDesignFixtures, designState == .settingsCustom {
-        settings.launchAtLogin = true
+      if usesDesignFixtures, designState == .settingsShortcutsCustom {
         settings.shortcut = GlobalShortcut(
           keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
       }
@@ -794,12 +889,12 @@ private struct LaunchOptions {
   }
 
   var selectionAccess: SystemPermission {
-    if usesDesignFixtures { return .fixed(granted: designState == .settingsCustom) }
+    if usesDesignFixtures { return .fixed(granted: designState == .settingsShortcutsCustom) }
     return automationDeniesPermissions ? .fixed(granted: false) : .accessibility
   }
 
   var captureAccess: SystemPermission {
-    if usesDesignFixtures { return .fixed(granted: designState == .settingsCustom) }
+    if usesDesignFixtures { return .fixed(granted: designState == .settingsShortcutsCustom) }
     return automationDeniesPermissions ? .fixed(granted: false) : .screenRecording
   }
 
@@ -835,12 +930,14 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
-      case .empty, .streaming, .settings, .settingsCustom, .settingsRecording,
-        .settingsUpdateAvailable, .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
-        .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed,
-        .lifecycleWelcome, .lifecycleWelcomeSubmitted, .lifecycleUpdateChecking,
-        .lifecycleUpdateFound, .lifecycleUpdateDownloading, .lifecycleUpdateReady,
-        .lifecycleUpdateCurrent, .lifecycleUpdateFailed, .lifecycleUpdateReadOnly:
+      case .empty, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
+        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording,
+        .settingsGeneral, .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied,
+        .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
+        .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted,
+        .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
+        .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
+        .lifecycleUpdateReadOnly:
         return nil
       }
     #else
@@ -862,12 +959,13 @@ private struct LaunchOptions {
         ResultRecord.designLongInput
       case .lifecycleWelcomeSubmitted:
         "Consistency is the last refuge of the unimaginative."
-      case .empty, .settings, .settingsCustom, .settingsRecording, .settingsUpdateAvailable,
-        .settingsLanguageEditing, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady, .settingsConfigUpdated,
-        .settingsConfigChecking, .settingsConfigFailed, .lifecycleWelcome,
-        .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
-        .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
-        .lifecycleUpdateReadOnly:
+      case .empty, .settings, .settingsTranslation, .settingsLanguageEditing,
+        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording,
+        .settingsGeneral, .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied,
+        .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
+        .settingsConfigFailed, .lifecycleWelcome, .lifecycleUpdateChecking, .lifecycleUpdateFound,
+        .lifecycleUpdateDownloading, .lifecycleUpdateReady, .lifecycleUpdateCurrent,
+        .lifecycleUpdateFailed, .lifecycleUpdateReadOnly:
         ""
       }
     #else
