@@ -241,18 +241,43 @@ struct LayerWindowInfo: Equatable, Sendable {
   /// What covers `window` from the front: the windows above it, Cida's excluded. A window
   /// exactly the size of a whole display, menu bar included, is a transparent overlay (a
   /// recording or automation shield): a real app in full screen has a Space of its own, and a
-  /// zoomed window leaves the menu bar.
+  /// zoomed window leaves the menu bar. Stage Manager animates a window through a copy of it
+  /// that its WindowManager process holds just above it, at the same frame: that copy is the
+  /// window itself.
   static func occluders(
     of window: CGWindowID, in windows: [LayerWindowInfo], displays: [CGRect] = displayFrames
   ) -> [LayerWindowInfo] {
     let ownPID = ProcessInfo.processInfo.processIdentifier
+    let own = windows.first { $0.number == window }?.bounds
     var covering: [LayerWindowInfo] = []
     for info in windows {
       if info.number == window { return covering }
       guard info.ownerPID != ownPID, info.layer >= 0, info.layer < 1_000 else { continue }
+      if info.ownerName == "WindowManager", let own,
+        abs(info.bounds.minX - own.minX) < 2, abs(info.bounds.minY - own.minY) < 2,
+        abs(info.bounds.width - own.width) < 2, abs(info.bounds.height - own.height) < 2
+      {
+        continue
+      }
       if !isDisplayOverlay(info, displays: displays) { covering.append(info) }
     }
     return covering
+  }
+
+  /// How the window server shows a window whose tree reports `windowFrame`, as a map from
+  /// the tree's coordinates to the screen: identity where it is, a scale and a move while it
+  /// animates nearly there (Stage Manager bringing it back from the strip, whose last few
+  /// points take as long as the rest), nil while it is far from there (a thumbnail in the
+  /// strip, minimizing).
+  static func placement(of info: LayerWindowInfo, windowFrame: CGRect) -> CGAffineTransform? {
+    if isInPlace(info, windowFrame: windowFrame) { return .identity }
+    guard windowFrame.width > 0, windowFrame.height > 0 else { return nil }
+    let scaleX = info.bounds.width / windowFrame.width
+    let scaleY = info.bounds.height / windowFrame.height
+    guard (0.9...1.1).contains(scaleX), (0.9...1.1).contains(scaleY) else { return nil }
+    return CGAffineTransform(
+      a: scaleX, b: 0, c: 0, d: scaleY,
+      tx: info.bounds.minX - windowFrame.minX * scaleX, ty: info.bounds.minY - windowFrame.minY * scaleY)
   }
 
   /// Whether the window server shows `info` where the app's accessibility tree says its

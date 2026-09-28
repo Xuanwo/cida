@@ -231,6 +231,34 @@ final class TranslationLayerController {
     }
     sessions.removeAll(where: \.isFinished)
     updateFailureHint()
+    updateFollowing()
+  }
+
+  /// Follows windows animating into place at the display's rate, so their translations move
+  /// with them instead of a tick behind (§七).
+  private var following: Timer?
+
+  private func updateFollowing() {
+    let arriving = sessions.contains(where: \.isArriving)
+    if arriving, following == nil {
+      let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+        MainActor.assumeIsolated { self?.followArrivingWindows() }
+      }
+      RunLoop.main.add(timer, forMode: .common)
+      following = timer
+    } else if !arriving {
+      following?.invalidate()
+      following = nil
+    }
+  }
+
+  private func followArrivingWindows() {
+    guard sessions.contains(where: \.isArriving) else {
+      updateFollowing()
+      return
+    }
+    windows = LayerWindowInfo.onScreen()
+    for session in sessions { session.follow(windows) }
   }
 
   /// Another app came to the front: its windows grow over the panes while they animate in,
@@ -446,6 +474,10 @@ final class LayerPaneSession {
   private(set) var paneFrame: CGRect = .zero
   /// The window's frame as its accessibility tree reports it, read with the pane's.
   private var windowFrame: CGRect?
+  /// Where the window server shows the window relative to that frame (§七).
+  private var placement = CGAffineTransform.identity
+  private var lastWindowBounds: CGRect?
+  private var windowMovedAt = Date.distantPast
   private var windowNumber: CGWindowID?
   private(set) var isOnScreen = false
   private var blocks: [LayerBlock] = []
@@ -619,9 +651,15 @@ final class LayerPaneSession {
     }
     // Stage Manager keeps a window in the list while it shows it as a thumbnail in the strip,
     // and a window is also elsewhere while it minimizes or Mission Control shows it: its
-    // paragraphs are not where the tree says, so nothing is drawn.
-    guard let windowNumber, let info = windows.first(where: { $0.number == windowNumber }),
-      windowFrame.map({ LayerWindowInfo.isInPlace(info, windowFrame: $0) }) ?? true
+    // paragraphs are not where the tree says, so nothing is drawn. Nearly there, as it lands
+    // back, the translations scale and move with it.
+    let info = windows.first { $0.number == windowNumber }
+    if let bounds = info?.bounds, bounds != lastWindowBounds {
+      lastWindowBounds = bounds
+      windowMovedAt = Date()
+    }
+    guard let windowNumber, let info,
+      let placement = windowFrame.map({ LayerWindowInfo.placement(of: info, windowFrame: $0) }) ?? .identity
     else {
       isOnScreen = false
       overlay.orderOut(nil)
@@ -630,8 +668,15 @@ final class LayerPaneSession {
       return
     }
     isOnScreen = true
+    if placement != self.placement {
+      self.placement = placement
+      applyPlacement()
+    }
     let occluders = LayerWindowInfo.occluders(of: windowNumber, in: windows)
-    let covered = occluders.map { $0.bounds.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) }
+    let toPane = placement.inverted()
+    let covered = occluders.map {
+      $0.bounds.applying(toPane).offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY)
+    }
     overlay.overlayView.setOcclusion(covered)
     let coveringPane = occluders.filter { $0.bounds.intersects(paneFrame) }
     if coveringPane.count != lastCoveringCount {
@@ -640,7 +685,20 @@ final class LayerPaneSession {
         "layer-occluded count=\(coveringPane.count) by=\(coveringPane.map { "\($0.ownerName) \(Int($0.bounds.width))x\(Int($0.bounds.height))" })")
     }
     if !overlay.isVisible, !overlay.overlayView.drawings.isEmpty { overlay.orderFront(nil) }
-    followMotion()
+    // Frame-by-frame motion is measured against the window in place.
+    if placement.isIdentity { followMotion() }
+  }
+
+  /// The window is moving and not yet where its tree says: the controller follows it at the
+  /// display's rate until it lands.
+  var isArriving: Bool {
+    !isFinished && windowsSettle == nil && Date().timeIntervalSince(windowMovedAt) < 0.25
+  }
+
+  /// Places the pane over its window between ticks, while the window animates (§七).
+  func follow(_ windows: [LayerWindowInfo]) {
+    guard isArriving else { return }
+    placeOverWindow(windows)
   }
 
   /// Reads a few paragraph positions and the pane's frame; any change means the content or
@@ -678,7 +736,15 @@ final class LayerPaneSession {
 
   private func place(_ frame: CGRect) {
     paneFrame = frame
-    overlay.setFrame(LayerScreenGeometry.appKitRect(fromTopLeft: frame), display: false)
+    applyPlacement()
+  }
+
+  /// The overlay covers the pane where the window server shows it, its content scaled with
+  /// the window while that animates.
+  private func applyPlacement() {
+    let shown = LayerScreenGeometry.appKitRect(fromTopLeft: paneFrame.applying(placement))
+    if overlay.frame != shown { overlay.setFrame(shown, display: false) }
+    overlay.overlayView.setScale(CGSize(width: placement.a, height: placement.d))
   }
 
   // MARK: Paragraphs
@@ -830,7 +896,8 @@ final class LayerPaneSession {
     overlay.overlayView.setPending(waiting.map { $0.frame.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) })
     if isOnScreen, !waiting.isEmpty { overlay.orderFront(nil) }
     let settled = lastMotion.map { Date().timeIntervalSince($0) > 0.15 } ?? true
-    if settled {
+    // A read landing while another app's windows animate in stays hidden with the rest.
+    if settled, windowsSettle == nil {
       NSAnimationContext.runAnimationGroup { context in
         context.duration = CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: overlay)
         overlay.animator().alphaValue = 1

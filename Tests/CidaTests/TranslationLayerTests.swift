@@ -656,6 +656,40 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertFalse(LayerWindowInfo.isInPlace(inTheStrip, windowFrame: slack))
   }
 
+  /// Stage Manager brings a window back from the strip on an ease-out curve whose last few
+  /// points take as long as the rest (sampled in the VM: 97% of the width 0.28 s in, within
+  /// 2 pt only at 0.5 s). Nearly there, the translations scale and move with the window.
+  func testAWindowLandingInPlaceCarriesItsTranslationsWithIt() throws {
+    let tree = CGRect(x: 160, y: 55, width: 674, height: 440)
+    func shown(_ bounds: CGRect) -> CGAffineTransform? {
+      LayerWindowInfo.placement(of: LayerWindowInfo(number: 1, ownerPID: 900, bounds: bounds, layer: 0), windowFrame: tree)
+    }
+    XCTAssertEqual(shown(tree), .identity)
+    XCTAssertNil(shown(CGRect(x: 16, y: 411, width: 79, height: 100)), "A thumbnail in the strip")
+    XCTAssertNil(shown(CGRect(x: 169, y: 148, width: 487, height: 357)), "Still far away")
+    let landing = CGRect(x: 160, y: 66, width: 652, height: 430)
+    let placement = try XCTUnwrap(shown(landing))
+    // The pane keeps its place within the window as the window scales.
+    let pane = CGRect(x: 360, y: 155, width: 400, height: 300)
+    let moved = pane.applying(placement)
+    XCTAssertEqual(moved.minX, landing.minX + (pane.minX - tree.minX) * 652 / 674, accuracy: 0.01)
+    XCTAssertEqual(moved.minY, landing.minY + (pane.minY - tree.minY) * 430 / 440, accuracy: 0.01)
+    XCTAssertEqual(moved.width, 400 * 652 / 674, accuracy: 0.01)
+  }
+
+  /// While Stage Manager animates a window, its WindowManager process holds a copy of it just
+  /// above, at the same frame; that copy masked the translations until the window landed.
+  func testStageManagersCopyOfTheWindowDoesNotCoverIt() {
+    let bounds = CGRect(x: 191, y: 110, width: 614, height: 416)
+    let windows = [
+      LayerWindowInfo(number: 5, ownerPID: 80, bounds: bounds, layer: 0, ownerName: "WindowManager"),
+      LayerWindowInfo(number: 6, ownerPID: 81, bounds: CGRect(x: 0, y: 0, width: 300, height: 300), layer: 0, ownerName: "Notes"),
+      LayerWindowInfo(number: 7, ownerPID: 900, bounds: bounds, layer: 0, ownerName: "TextEdit"),
+    ]
+    let covering = LayerWindowInfo.occluders(of: 7, in: windows, displays: [])
+    XCTAssertEqual(covering.map(\.number), [6])
+  }
+
   func testOnlyWindowsInFrontCoverAPaneAndWholeDisplayOverlaysDoNot() {
     let own = ProcessInfo.processInfo.processIdentifier
     let display = CGRect(x: 0, y: 0, width: 1512, height: 982)
