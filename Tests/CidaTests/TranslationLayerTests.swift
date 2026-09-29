@@ -573,6 +573,64 @@ final class TranslationLayerTests: XCTestCase {
     }
   }
 
+  func testACachedTranslationCountsOnlyUnderTheSettingsThatProducedIt() {
+    let cache = LayerTranslationCache()
+    var settings = CidaSettings()
+    settings.modelService.model = "model-a"
+    let original = LayerTranslationContext(settings: settings)
+    cache.store("你好", for: "Hello", in: original)
+    XCTAssertEqual(cache.translation(for: "Hello", in: LayerTranslationContext(settings: settings)), "你好")
+
+    var changes: [(String, (inout CidaSettings) -> Void)] = [
+      ("model", { $0.modelService.model = "model-b" }),
+      ("request body", { $0.modelService.body = ["temperature": .number(0)] }),
+      ("key", { $0.apiKey = "another key" }),
+      ("translation prompt", { $0.translationPrompt = "Translate formally." }),
+      ("my language", { $0.myLanguage = "日本語" }),
+    ]
+    for (name, change) in changes {
+      var changed = settings
+      change(&changed)
+      XCTAssertNil(cache.translation(for: "Hello", in: LayerTranslationContext(settings: changed)), "A new \(name) asks again")
+    }
+    changes = [
+      ("foreign language", { $0.foreignLanguage = "Français" }),
+      ("improvement prompt", { $0.improvementPrompt = "Polish it." }),
+    ]
+    for (name, change) in changes {
+      var changed = settings
+      change(&changed)
+      XCTAssertEqual(
+        cache.translation(for: "Hello", in: LayerTranslationContext(settings: changed)), "你好", "The layer never sends the \(name)")
+    }
+  }
+
+  func testBeyondItsByteLimitTheCacheDropsTheParagraphSeenLongestAgo() {
+    // Each pair below is 4 bytes of source and 3 of translation (one CJK character in UTF-8).
+    let pair = 7 + LayerTranslationCache.entryOverhead
+    let cache = LayerTranslationCache(byteLimit: 3 * pair)
+    let context = LayerTranslationContext(settings: CidaSettings())
+    cache.store("一", for: "aaaa", in: context)
+    cache.store("二", for: "bbbb", in: context)
+    cache.store("三", for: "cccc", in: context)
+    XCTAssertEqual(cache.bytes, 3 * pair)
+    XCTAssertEqual(cache.translation(for: "aaaa", in: context), "一", "Looking a paragraph up keeps it")
+    cache.store("四", for: "dddd", in: context)
+    XCTAssertNil(cache.translation(for: "bbbb", in: context))
+    XCTAssertEqual(cache.translation(for: "aaaa", in: context), "一")
+    XCTAssertEqual(cache.translation(for: "cccc", in: context), "三")
+    XCTAssertEqual(cache.translation(for: "dddd", in: context), "四")
+    XCTAssertEqual(cache.bytes, 3 * pair)
+
+    cache.store("四四", for: "dddd", in: context)
+    XCTAssertEqual(cache.bytes, 2 * pair + 3, "A new translation of a kept paragraph replaces its size")
+    XCTAssertNil(cache.translation(for: "aaaa", in: context))
+
+    cache.store(String(repeating: "长", count: pair), for: "eeee", in: context)
+    XCTAssertNil(cache.translation(for: "eeee", in: context), "A pair over the whole limit is not kept")
+    XCTAssertEqual(cache.translation(for: "cccc", in: context), "三", "and costs no one else their place")
+  }
+
   // MARK: - Drawing
 
   /// Translations are set in Cida's result serif (§五): at the original's size where they fit,
