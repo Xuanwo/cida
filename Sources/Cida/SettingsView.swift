@@ -847,7 +847,7 @@ private struct GlobalShortcutRow: View {
     model.recordingShortcut == action
   }
 
-  private var shortcut: GlobalShortcut {
+  private var shortcut: GlobalShortcut? {
     model.settings.shortcut(for: action)
   }
 
@@ -864,7 +864,7 @@ private struct GlobalShortcutRow: View {
       switch feedback {
       case .missingModifier: return "要带 ⌘、⌥ 或 ⌃"
       case .shiftReserved: return "不能带 ⇧"
-      default: return "Esc 取消"
+      default: return "⌫ 不设置 · Esc 取消"
       }
     }
     if feedback == .rejected { return "这个组合已被占用，换一个" }
@@ -908,8 +908,8 @@ private struct GlobalShortcutRow: View {
           model.recordingShortcut = action
         } label: {
           ShortcutChip(
-            text: isRecording ? "按下新组合…" : shortcut.displayText,
-            isRecording: isRecording)
+            text: isRecording ? "按下新组合…" : shortcut?.displayText ?? "未设置",
+            isRecording: isRecording, isUnset: shortcut == nil)
         }
         .buttonStyle(.plain)
         .background {
@@ -934,7 +934,8 @@ private struct GlobalShortcutRow: View {
             })
         }
         .accessibilityLabel(
-          isRecording ? "按下新的\(accessibilityName)" : "\(accessibilityName) \(shortcut.displayText)")
+          isRecording
+            ? "按下新的\(accessibilityName)" : "\(accessibilityName) \(shortcut?.displayText ?? "未设置")")
         .accessibilityIdentifier(identifierPrefix)
       }
     }
@@ -944,11 +945,14 @@ private struct GlobalShortcutRow: View {
 private struct ShortcutChip: View {
   let text: String
   let isRecording: Bool
+  /// 未设置 is quieter than a combination.
+  let isUnset: Bool
 
   var body: some View {
     Text(text)
       .font(CidaDesign.ui(12, weight: .medium))
-      .foregroundStyle(isRecording ? CidaDesign.textTertiary : CidaDesign.textSecondary)
+      .foregroundStyle(
+        isRecording || isUnset ? CidaDesign.textTertiary : CidaDesign.textSecondary)
       .padding(.horizontal, 9)
       .padding(.vertical, 4)
       .background(isRecording ? CidaDesign.surface : CidaDesign.surfaceDim)

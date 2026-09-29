@@ -242,7 +242,7 @@ final class InteractionReproductionTests: XCTestCase {
       saveSettings: { _ in },
       applyGlobalShortcut: { shortcut, _ in
         applied.values.append(shortcut)
-        return shortcut.keyCode != UInt16(kVK_ANSI_Q)
+        return shortcut?.keyCode != UInt16(kVK_ANSI_Q)
       })
     model.settingsTab = .shortcuts
     let controller = SettingsWindowFactory.makeWindowController(model: model, updates: UpdateState())
@@ -260,7 +260,7 @@ final class InteractionReproductionTests: XCTestCase {
     // Shift alone is not a shortcut: the recorder keeps waiting.
     recorder.record(keyEvent(kVK_ANSI_T, "t", [.shift]))
     XCTAssertEqual(model.recordingShortcut, .showPanel)
-    XCTAssertEqual(model.settings.shortcut, .optionA)
+    XCTAssertEqual(model.settings.shortcut, GlobalShortcut.optionA)
 
     recorder.record(keyEvent(kVK_ANSI_T, "t", [.control, .option]))
     let recorded = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
@@ -282,6 +282,21 @@ final class InteractionReproductionTests: XCTestCase {
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(model.settings.shortcut, recorded)
     XCTAssertEqual(applied.values.count, 2)
+
+    // ⌫ alone leaves the action without a shortcut; the system only releases it.
+    model.recordingShortcut = .showPanel
+    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    recorder.record(keyEvent(kVK_Delete, "\u{7F}", []))
+    try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
+    XCTAssertNil(model.settings.shortcut)
+    XCTAssertEqual(applied.values.last, .some(nil))
+    // ⌥⌫ is a combination like any other.
+    model.recordingShortcut = .showPanel
+    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    recorder.record(keyEvent(kVK_Delete, "\u{7F}", [.option]))
+    try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
+    XCTAssertEqual(
+      model.settings.shortcut, GlobalShortcut(keyCode: UInt16(kVK_Delete), modifiers: .option))
     assertTestProcessIsNotFrontmost()
   }
 
@@ -309,7 +324,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   private final class AppliedShortcuts {
-    var values: [GlobalShortcut] = []
+    var values: [GlobalShortcut?] = []
   }
 
   private func keyEvent(_ keyCode: Int, _ characters: String, _ flags: NSEvent.ModifierFlags) -> NSEvent {

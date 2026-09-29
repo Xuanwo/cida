@@ -4,11 +4,12 @@ import SwiftUI
 
 /// Sits invisibly behind the shortcut chip and, while recording, holds the
 /// window's first responder so the next key press becomes the shortcut.
-/// Escape and losing the first responder end the recording unchanged; a
-/// press without ⌘, ⌥ or ⌃ is reported and recording continues.
+/// Escape and losing the first responder end the recording unchanged; ⌫ or
+/// ⌦ alone leaves the action without a shortcut (nil); any other press
+/// without ⌘, ⌥ or ⌃ is reported and recording continues.
 struct ShortcutCaptureView: NSViewRepresentable {
   @Binding var isRecording: Bool
-  let onCapture: @MainActor (GlobalShortcut) -> Void
+  let onCapture: @MainActor (GlobalShortcut?) -> Void
   let onInvalidPress: @MainActor () -> Void
   /// A combination this recorder cannot take; recording goes on and the owner says why.
   var refuses: @MainActor (GlobalShortcut) -> Bool = { _ in false }
@@ -27,7 +28,7 @@ struct ShortcutCaptureView: NSViewRepresentable {
 }
 
 final class ShortcutCaptureNSView: NSView {
-  var onCapture: @MainActor (GlobalShortcut) -> Void = { _ in }
+  var onCapture: @MainActor (GlobalShortcut?) -> Void = { _ in }
   var onInvalidPress: @MainActor () -> Void = {}
   var refuses: @MainActor (GlobalShortcut) -> Bool = { _ in false }
   var onEnd: @MainActor () -> Void = {}
@@ -79,7 +80,14 @@ final class ShortcutCaptureNSView: NSView {
   @discardableResult
   func record(_ event: NSEvent) -> Bool {
     let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-    if event.keyCode == UInt16(kVK_Escape), flags.subtracting(.function).isEmpty {
+    // Arrow and function keys carry .function even when no modifier is held.
+    let isBare = flags.subtracting(.function).isEmpty
+    if event.keyCode == UInt16(kVK_Escape), isBare {
+      onEnd()
+      return true
+    }
+    if [UInt16(kVK_Delete), UInt16(kVK_ForwardDelete)].contains(event.keyCode), isBare {
+      onCapture(nil)
       onEnd()
       return true
     }

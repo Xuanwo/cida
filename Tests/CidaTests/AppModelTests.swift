@@ -519,7 +519,7 @@ final class AppModelTests: XCTestCase {
     let legacy = Data(
       #"{"apiKey":"","model":"deepseek-chat","translationPrompt":"translate","improvementPrompt":"improve","launchAtLogin":false}"#
         .utf8)
-    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: legacy).shortcut, .optionA)
+    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: legacy).shortcut, GlobalShortcut.optionA)
 
     var settings = CidaSettings()
     settings.shortcut = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
@@ -532,7 +532,7 @@ final class AppModelTests: XCTestCase {
     let model = AppModel(saveSettings: { _ in }, applyGlobalShortcut: { shortcut, _ in shortcut != refused })
 
     XCTAssertFalse(model.setShortcut(refused))
-    XCTAssertEqual(model.settings.shortcut, .optionA)
+    XCTAssertEqual(model.settings.shortcut, GlobalShortcut.optionA)
 
     let accepted = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
     XCTAssertTrue(model.setShortcut(accepted))

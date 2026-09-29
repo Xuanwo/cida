@@ -212,12 +212,13 @@ struct CidaSettings: Equatable, Sendable {
   /// What text in `myLanguage` is translated into.
   var foreignLanguage = defaultLanguages().foreign
   var launchAtLogin = false
-  /// The combination that shows the panel from any application.
-  var shortcut = GlobalShortcut.optionA
+  /// The combination that shows the panel from any application. Each of the three can be left
+  /// without one (nil): the action then has no global shortcut and the combination is free.
+  var shortcut: GlobalShortcut? = .optionA
   /// The combination that captures text on screen and translates it.
-  var captureShortcut = GlobalShortcut.optionS
-  /// The combination that opens the translation layer's configuration.
-  var layerShortcut = GlobalShortcut.optionD
+  var captureShortcut: GlobalShortcut? = .optionS
+  /// The combination that translates the paragraph under the pointer; with ⇧, the whole window.
+  var layerShortcut: GlobalShortcut? = .optionD
 
   /// Whether requests can be sent (`Design/spec/configuration.md`): a valid endpoint, a model,
   /// and a key unless the endpoint is on this Mac or `auth` is `none`.
@@ -231,7 +232,7 @@ struct CidaSettings: Equatable, Sendable {
 
   init() {}
 
-  func shortcut(for action: GlobalShortcutAction) -> GlobalShortcut {
+  func shortcut(for action: GlobalShortcutAction) -> GlobalShortcut? {
     switch action {
     case .showPanel: shortcut
     case .captureText: captureShortcut
@@ -241,15 +242,16 @@ struct CidaSettings: Equatable, Sendable {
 
   /// Every combination the global shortcuts hold: the layer's also holds its ⇧ variant.
   var heldShortcuts: [GlobalShortcut] {
-    [shortcut, captureShortcut, layerShortcut, layerShortcut.addingShift]
+    [shortcut, captureShortcut, layerShortcut, layerShortcut?.addingShift].compactMap(\.self)
   }
 
   /// No two shortcuts share a combination, and the layer's leaves ⇧ to its whole-window variant.
   var hasValidShortcuts: Bool {
-    !layerShortcut.modifiers.contains(.shift) && Set(heldShortcuts).count == heldShortcuts.count
+    layerShortcut?.modifiers.contains(.shift) != true
+      && Set(heldShortcuts).count == heldShortcuts.count
   }
 
-  mutating func setShortcut(_ newShortcut: GlobalShortcut, for action: GlobalShortcutAction) {
+  mutating func setShortcut(_ newShortcut: GlobalShortcut?, for action: GlobalShortcutAction) {
     switch action {
     case .showPanel: shortcut = newShortcut
     case .captureText: captureShortcut = newShortcut
@@ -363,12 +365,15 @@ extension CidaSettings: Codable {
     foreignLanguage =
       try container.decodeIfPresent(String.self, forKey: .foreignLanguage) ?? defaults.foreign
     launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
-    shortcut =
-      try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionA
-    captureShortcut =
-      try container.decodeIfPresent(GlobalShortcut.self, forKey: .captureShortcut) ?? .optionS
-    layerShortcut =
-      try container.decodeIfPresent(GlobalShortcut.self, forKey: .layerShortcut) ?? .optionD
+    // A missing key is the default; null is a shortcut the user cleared.
+    func decodeShortcut(_ key: CodingKeys, default: GlobalShortcut) throws -> GlobalShortcut? {
+      guard container.contains(key) else { return `default` }
+      return try container.decodeNil(forKey: key)
+        ? nil : container.decode(GlobalShortcut.self, forKey: key)
+    }
+    shortcut = try decodeShortcut(.shortcut, default: .optionA)
+    captureShortcut = try decodeShortcut(.captureShortcut, default: .optionS)
+    layerShortcut = try decodeShortcut(.layerShortcut, default: .optionD)
   }
 
   func encode(to encoder: Encoder) throws {
@@ -379,9 +384,16 @@ extension CidaSettings: Codable {
     try container.encode(myLanguage, forKey: .myLanguage)
     try container.encode(foreignLanguage, forKey: .foreignLanguage)
     try container.encode(launchAtLogin, forKey: .launchAtLogin)
-    try container.encode(shortcut, forKey: .shortcut)
-    try container.encode(captureShortcut, forKey: .captureShortcut)
-    try container.encode(layerShortcut, forKey: .layerShortcut)
+    for (value, key) in [
+      (shortcut, CodingKeys.shortcut), (captureShortcut, .captureShortcut),
+      (layerShortcut, .layerShortcut),
+    ] {
+      if let value {
+        try container.encode(value, forKey: key)
+      } else {
+        try container.encodeNil(forKey: key)
+      }
+    }
     try container.encode(Self.currentPromptContractVersion, forKey: .promptContractVersion)
   }
 }

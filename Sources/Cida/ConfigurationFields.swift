@@ -117,17 +117,17 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionA.configurationText,
         example: "control+option+t",
         description:
-          "显示辞达的全局快捷键，与设置里的相同：修饰键（control、option、shift、command）加一个键，用 + 连接，至少带 control、option、command 之一")
+          "显示辞达的全局快捷键，与设置里的相同：修饰键（control、option、shift、command）加一个键，用 + 连接，至少带 control、option、command 之一；none 表示不设置")
     case .captureShortcut:
       Schema(
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionS.configurationText,
         example: "control+option+s",
-        description: "截图翻译的快捷键，写法同 shortcut，三个快捷键不能相同")
+        description: "截图翻译的快捷键，写法同 shortcut（none 表示不设置），三个快捷键不能相同")
     case .layerShortcut:
       Schema(
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionD.configurationText,
         example: "control+option+d",
-        description: "原处翻译的快捷键：把指针下这一段换成译文、再按换回；加 shift 翻译整个窗口。写法同 shortcut，不能带 shift，三个快捷键（含加 shift 的这个）不能相同")
+        description: "原处翻译的快捷键：把指针下这一段换成译文、再按换回；加 shift 翻译整个窗口。写法同 shortcut（none 表示不设置），不能带 shift，三个快捷键（含加 shift 的这个）不能相同")
     case .launchAtLogin:
       Schema(
         type: "boolean", values: ["true", "false"], defaultValue: "false", example: "true",
@@ -199,10 +199,14 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         settings.improvementPrompt = value
       }
     case .shortcut, .captureShortcut, .layerShortcut:
-      guard let shortcut = GlobalShortcut(configurationText: value) else {
-        throw invalid("写成修饰键加一个键，至少带 control、option 或 command，例如 \(schema.example)")
+      if value.lowercased() == GlobalShortcut.noneConfigurationText {
+        settings.setShortcut(nil, for: shortcutAction!)
+      } else if let shortcut = GlobalShortcut(configurationText: value) {
+        settings.setShortcut(shortcut, for: shortcutAction!)
+      } else {
+        throw invalid(
+          "写成修饰键加一个键，至少带 control、option 或 command，例如 \(schema.example)；不设置写 none")
       }
-      settings.setShortcut(shortcut, for: shortcutAction!)
     case .launchAtLogin, .automaticUpdates:
       guard let enabled = ["true": true, "false": false][value] else {
         throw invalid("只能是 true 或 false")
@@ -245,18 +249,23 @@ enum ConfigurationField: String, CaseIterable, Sendable {
   /// Rules that span fields; checked after every change in a command is applied.
   static func validate(_ configuration: EditableConfiguration) throws(InvalidValue) {
     let settings = configuration.settings
-    if settings.layerShortcut.modifiers.contains(.shift) {
+    if settings.layerShortcut?.modifiers.contains(.shift) == true {
       throw InvalidValue(field: "layer-shortcut", message: "layer-shortcut 不能带 shift：加 shift 是翻译整个窗口")
     }
     for field in [ConfigurationField.shortcut, .captureShortcut]
-    where settings.shortcut(for: field.shortcutAction!) == settings.layerShortcut.addingShift {
+    where settings.layerShortcut != nil
+      && settings.shortcut(for: field.shortcutAction!) == settings.layerShortcut?.addingShift
+    {
       throw InvalidValue(
         field: field.rawValue, message: "\(field.rawValue) 不能与 layer-shortcut 加 shift 相同（翻译整个窗口）")
     }
     let fields: [ConfigurationField] = [.shortcut, .captureShortcut, .layerShortcut]
     for (index, field) in fields.enumerated() {
+      // Two actions without a shortcut do not share one.
       for earlier in fields[..<index]
-      where settings.shortcut(for: field.shortcutAction!) == settings.shortcut(for: earlier.shortcutAction!) {
+      where settings.shortcut(for: field.shortcutAction!) != nil
+        && settings.shortcut(for: field.shortcutAction!) == settings.shortcut(for: earlier.shortcutAction!)
+      {
         throw InvalidValue(
           field: field.rawValue, message: "\(field.rawValue) 不能与 \(earlier.rawValue) 相同")
       }
@@ -335,9 +344,10 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .foreignLanguage: return .string(settings.foreignLanguage)
     case .translationPrompt: return .string(settings.translationPrompt)
     case .improvementPrompt: return .string(settings.improvementPrompt)
-    case .shortcut: return .string(settings.shortcut.configurationText)
-    case .captureShortcut: return .string(settings.captureShortcut.configurationText)
-    case .layerShortcut: return .string(settings.layerShortcut.configurationText)
+    case .shortcut, .captureShortcut, .layerShortcut:
+      return .string(
+        settings.shortcut(for: shortcutAction!)?.configurationText
+          ?? GlobalShortcut.noneConfigurationText)
     case .launchAtLogin: return .bool(configuration.launchAtLogin)
     case .automaticUpdates: return .bool(configuration.automaticUpdates)
     }

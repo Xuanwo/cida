@@ -434,6 +434,19 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     reset.click()
     XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌥ A", in: chip, timeout: 3))
     XCTAssertTrue(reset.waitForNonExistence(timeout: 3), "The default has nothing to restore")
+
+    // ⌫ while recording leaves the action without a shortcut.
+    chip.click()
+    XCTAssertTrue(driver.waitForLabel("按下新的显示辞达快捷键", in: chip, timeout: 3))
+    driver.app.typeKey(XCUIKeyboardKey.delete, modifierFlags: [])
+    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 未设置", in: chip, timeout: 3), "⌫ clears it")
+    XCTAssertTrue(reset.waitForExistence(timeout: 3), "未设置 goes back to the default in one click")
+    // A registered hot key answers while Settings is in front too, so this shows it is gone.
+    driver.app.typeKey("a", modifierFlags: .option)
+    XCTAssertFalse(
+      driver.waitForExistence(of: driver.panel, timeout: 1), "Without a shortcut ⌥A does nothing")
+    reset.click()
+    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌥ A", in: chip, timeout: 3))
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))
     driver.showPanel()

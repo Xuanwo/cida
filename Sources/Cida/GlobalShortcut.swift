@@ -243,6 +243,9 @@ extension GlobalShortcut {
     self.init(keyCode: keyCode, modifiers: modifiers)
   }
 
+  /// What an action without a shortcut is written as.
+  static let noneConfigurationText = "none"
+
   var configurationText: String {
     var parts: [String] = []
     if modifiers.contains(.control) { parts.append("control") }

@@ -535,10 +535,15 @@ private struct WelcomePane: View {
     .accessibilityIdentifier("welcome-pane")
   }
 
+  /// Names only the shortcuts that are set; the menu bar item is always there.
   private var shortcutsLine: String {
     let settings = model.settings
-    return "\(settings.shortcut.displayText) 随时唤起 · \(settings.captureShortcut.displayText) 截图翻译 · "
-      + "\(settings.layerShortcut.displayText) 原处翻译 · 辞达住在菜单栏"
+    let shortcuts: [(GlobalShortcut?, String)] = [
+      (settings.shortcut, "随时唤起"), (settings.captureShortcut, "截图翻译"),
+      (settings.layerShortcut, "原处翻译"),
+    ]
+    return (shortcuts.compactMap { shortcut, action in shortcut.map { "\($0.displayText) \(action)" } }
+      + ["辞达住在菜单栏"]).joined(separator: " · ")
   }
 }
 
