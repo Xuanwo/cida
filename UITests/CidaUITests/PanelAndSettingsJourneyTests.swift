@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
-  func testPanelHidesOnEscapeReturnsOnOptionSpaceAndKeepsItsState() throws {
+  func testPanelHidesOnEscapeReturnsOnOptionAAndKeepsItsState() throws {
     driver.launch()
     let frame = driver.panel.frame
     XCTAssertEqual(frame.width, 800, accuracy: 1)
@@ -68,7 +68,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     addTeardownBlock { [source] in source.app.terminate() }
 
     source.select("  CIDA_E2E_SELECTION_A ")
-    source.press(.space, modifierFlags: .option)
+    source.press("a", modifierFlags: .option)
     XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
     XCTAssertTrue(
       driver.waitForTextValue("CIDA_E2E_SELECTION_A", in: driver.composer, timeout: 3),
@@ -81,7 +81,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     driver.composer.typeText("CIDA_E2E_EDITED")
     driver.hidePanel()
-    source.press(.space, modifierFlags: .option)
+    source.press("a", modifierFlags: .option)
     XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
     XCTAssertEqual(
       driver.textValue(in: driver.composer), "CIDA_E2E_EDITED",
@@ -93,13 +93,13 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     driver.hidePanel()
     source.clearSelection()
-    source.press(.space, modifierFlags: .option)
+    source.press("a", modifierFlags: .option)
     XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
     XCTAssertEqual(driver.textValue(in: driver.composer), "CIDA_E2E_EDITED", "No selection")
 
     driver.hidePanel()
     source.select("CIDA_E2E_SELECTION_GATED")
-    source.press(.space, modifierFlags: .option)
+    source.press("a", modifierFlags: .option)
     XCTAssertTrue(
       driver.waitForTextValue("CIDA_E2E_SELECTION_GATED", in: driver.composer, timeout: 5))
     XCTAssertNotNil(
@@ -108,7 +108,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     driver.hidePanel()
     source.select("CIDA_E2E_SELECTION_B")
-    source.press(.space, modifierFlags: .option)
+    source.press("a", modifierFlags: .option)
     XCTAssertTrue(
       driver.waitForTextValue("CIDA_E2E_SELECTION_B", in: driver.composer, timeout: 5),
       "A new selection replaces a running request")
@@ -387,7 +387,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.showSettingsTab("shortcuts", title: "快捷键")
     let chip = driver.app.buttons["settings-shortcut"]
     XCTAssertTrue(chip.waitForExistence(timeout: 3))
-    XCTAssertEqual(chip.label, "显示辞达快捷键 ⌥ Space")
+    XCTAssertEqual(chip.label, "显示辞达快捷键 ⌥ A")
     XCTAssertFalse(
       driver.app.buttons["settings-shortcut-reset"].exists, "The default has nothing to restore")
     let captureChip = driver.app.buttons["settings-capture-shortcut"]
@@ -410,7 +410,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))
-    driver.app.typeKey(.space, modifierFlags: .option)
+    driver.app.typeKey("a", modifierFlags: .option)
     XCTAssertFalse(
       driver.waitForExistence(of: driver.panel, timeout: 1),
       "The previous combination no longer shows the panel")
@@ -421,7 +421,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.openSettings()
     XCTAssertTrue(reset.waitForExistence(timeout: 3))
     reset.click()
-    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌥ Space", in: chip, timeout: 3))
+    XCTAssertTrue(driver.waitForLabel("显示辞达快捷键 ⌥ A", in: chip, timeout: 3))
     XCTAssertTrue(reset.waitForNonExistence(timeout: 3), "The default has nothing to restore")
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))

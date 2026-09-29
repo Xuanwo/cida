@@ -11,7 +11,7 @@ again.
 The current core experience contract (`Design/spec/panel.md`) includes:
 
 1. A menu-bar application whose main interface is one borderless, non-activating floating panel:
-   the global shortcut (`Option-Space` unless another one was recorded in Settings) shows or hides it without taking focus from the application the user came from,
+   the global shortcut (`Option-A` unless another one was recorded in Settings) shows or hides it without taking focus from the application the user came from,
    Escape and clicking outside hide it, and hiding never loses the source, the result, or a running
    request.
 2. Real native typing, selection, paste, multiline growth, deletion-driven shrink, and Return

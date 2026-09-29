@@ -505,18 +505,21 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(shortcut.displayText, "⌃ ⌥ T")
     XCTAssertEqual(shortcut.menuKeyEquivalent, "t")
     XCTAssertEqual(shortcut.menuModifierMask, [.control, .option])
-    XCTAssertEqual(GlobalShortcut.optionSpace.displayText, "⌥ Space")
-    XCTAssertEqual(GlobalShortcut.optionSpace.menuKeyEquivalent, " ")
+    XCTAssertEqual(GlobalShortcut.optionA.displayText, "⌥ A")
+    XCTAssertEqual(GlobalShortcut.optionA.menuKeyEquivalent, "a")
+    let optionSpace = GlobalShortcut(keyCode: UInt16(kVK_Space), modifiers: .option)
+    XCTAssertEqual(optionSpace.displayText, "⌥ Space")
+    XCTAssertEqual(optionSpace.menuKeyEquivalent, " ")
     XCTAssertEqual(
       GlobalShortcut(keyCode: UInt16(kVK_Return), modifiers: [.shift, .command]).displayText,
       "⇧ ⌘ ↩")
   }
 
-  func testSettingsWithoutAShortcutDecodeToOptionSpaceAndACustomOneRoundTrips() throws {
+  func testSettingsWithoutAShortcutDecodeToTheDefaultAndACustomOneRoundTrips() throws {
     let legacy = Data(
       #"{"apiKey":"","model":"deepseek-chat","translationPrompt":"translate","improvementPrompt":"improve","launchAtLogin":false}"#
         .utf8)
-    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: legacy).shortcut, .optionSpace)
+    XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: legacy).shortcut, .optionA)
 
     var settings = CidaSettings()
     settings.shortcut = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
@@ -529,7 +532,7 @@ final class AppModelTests: XCTestCase {
     let model = AppModel(saveSettings: { _ in }, applyGlobalShortcut: { shortcut, _ in shortcut != refused })
 
     XCTAssertFalse(model.setShortcut(refused))
-    XCTAssertEqual(model.settings.shortcut, .optionSpace)
+    XCTAssertEqual(model.settings.shortcut, .optionA)
 
     let accepted = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
     XCTAssertTrue(model.setShortcut(accepted))

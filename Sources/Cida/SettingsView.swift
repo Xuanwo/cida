@@ -845,7 +845,7 @@ private struct ShortcutChip: View {
 
 // MARK: - 权限
 
-/// Accessibility lets Option-Space bring in the frontmost application's selection and lets the
+/// Accessibility lets the panel's shortcut bring in the frontmost application's selection and lets the
 /// translation layer read other applications' text (`Design/spec/settings.md` §五). There is no
 /// switch: granting turns both on, revoking in System Settings turns them off.
 private struct AccessibilityPermissionRow: View {

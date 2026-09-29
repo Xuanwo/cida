@@ -114,7 +114,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         description: "改进的提示词，与设置里的相同；长文本可用 --file 或 --stdin")
     case .shortcut:
       Schema(
-        type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionSpace.configurationText,
+        type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionA.configurationText,
         example: "control+option+t",
         description:
           "显示辞达的全局快捷键，与设置里的相同：修饰键（control、option、shift、command）加一个键，用 + 连接，至少带 control、option、command 之一")

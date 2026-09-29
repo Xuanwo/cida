@@ -11,13 +11,13 @@
 
 ## How it works
 
-- **Select text and press <kbd>⌥</kbd> <kbd>Space</kbd>.** The panel appears with your selection and the translation starts streaming in. Text in your language goes into your usual foreign language and anything else comes into yours; they default to Simplified Chinese and English, and Settings takes any language, dialect or register, such as Cantonese or British English.
+- **Select text and press <kbd>⌥</kbd> <kbd>A</kbd>.** The panel appears with your selection and the translation starts streaming in. Text in your language goes into your usual foreign language and anything else comes into yours; they default to Simplified Chinese and English, and Settings takes any language, dialect or register, such as Cantonese or British English.
 
-  <img src="docs/images/demo-translate.gif" width="720" alt="Selecting a paragraph in Chrome and pressing Option-Space streams its Chinese translation into the panel">
+  <img src="docs/images/demo-translate.gif" width="720" alt="Selecting a paragraph in Chrome and pressing Option-A streams its Chinese translation into the panel">
 
 - **Press <kbd>Tab</kbd>, then <kbd>Return</kbd>, to improve the writing instead.** The improved text stays in its own language.
 
-  <img src="docs/images/demo-improve.gif" width="720" alt="Selecting an English reply in a comment box, pressing Option-Space, then Tab and Return, gives the improved English">
+  <img src="docs/images/demo-improve.gif" width="720" alt="Selecting an English reply in a comment box, pressing Option-A, then Tab and Return, gives the improved English">
 
 - **For text on the screen, press <kbd>⌥</kbd> <kbd>S</kbd>.** Frame what you want translated; Cida recognizes it on your Mac and translates it.
 
@@ -49,7 +49,7 @@ Two permissions are optional. Turn them on with 去授权 on the 快捷键 tab o
 
 | Permission | With it | Without it |
 | --- | --- | --- |
-| Accessibility | <kbd>⌥</kbd> <kbd>Space</kbd> brings in the selected text; <kbd>⌥</kbd> <kbd>D</kbd> translates in place | Copy with <kbd>⌘</kbd> <kbd>C</kbd>, then paste into the panel; no in-place translation |
+| Accessibility | <kbd>⌥</kbd> <kbd>A</kbd> brings in the selected text; <kbd>⌥</kbd> <kbd>D</kbd> translates in place | Copy with <kbd>⌘</kbd> <kbd>C</kbd>, then paste into the panel; no in-place translation |
 | Screen Recording | <kbd>⌥</kbd> <kbd>S</kbd> translates text on screen | Screenshot translation is unavailable |
 
 ## Privacy
@@ -62,7 +62,7 @@ Two permissions are optional. Turn them on with 去授权 on the 快捷键 tab o
 
 | Key | Action |
 | --- | --- |
-| <kbd>⌥</kbd> <kbd>Space</kbd> | Show or hide the panel |
+| <kbd>⌥</kbd> <kbd>A</kbd> | Show or hide the panel |
 | <kbd>⌥</kbd> <kbd>S</kbd> | Translate text on screen |
 | <kbd>⌥</kbd> <kbd>D</kbd> | Translate in place: the paragraph under the pointer, again to turn it back; with <kbd>⇧</kbd>, the whole window |
 | <kbd>Tab</kbd> | Switch between translate and improve |

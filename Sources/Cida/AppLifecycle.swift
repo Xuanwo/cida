@@ -40,7 +40,7 @@ struct CidaApplication: App {
 }
 
 /// Cida is a menu-bar application: no Dock icon, one floating panel shown by
-/// Option-Space, and a standard Settings window (`Design/spec/panel.md`).
+/// Option-A, and a standard Settings window (`Design/spec/panel.md`).
 @MainActor
 final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private let launchOptions = LaunchOptions(arguments: ProcessInfo.processInfo.arguments)
@@ -343,7 +343,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
     // The request may need the Keychain key, which the first show recovers.
     recoverAPIKeyIfNeeded()
-    // The welcome says what to do, as it does for ⌥Space and ⌥S (`spec/lifecycle.md` §三).
+    // The welcome says what to do, as it does for ⌥A and ⌥S (`spec/lifecycle.md` §三).
     guard !model.needsModelConfiguration else {
       lifecycleLog?.record("layer-needs-configuration")
       showPanel()

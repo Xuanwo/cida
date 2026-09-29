@@ -60,7 +60,7 @@ struct GlobalShortcut: Equatable, Hashable, Sendable {
   let keyCode: UInt16
   let modifiers: Modifiers
 
-  static let optionSpace = GlobalShortcut(keyCode: UInt16(kVK_Space), modifiers: .option)
+  static let optionA = GlobalShortcut(keyCode: UInt16(kVK_ANSI_A), modifiers: .option)
   static let optionS = GlobalShortcut(keyCode: UInt16(kVK_ANSI_S), modifiers: .option)
   static let optionD = GlobalShortcut(keyCode: UInt16(kVK_ANSI_D), modifiers: .option)
 
@@ -212,7 +212,7 @@ enum GlobalShortcutAction: CaseIterable, Sendable {
 
   var defaultShortcut: GlobalShortcut {
     switch self {
-    case .showPanel: .optionSpace
+    case .showPanel: .optionA
     case .captureText: .optionS
     case .translationLayer: .optionD
     }
@@ -222,7 +222,7 @@ enum GlobalShortcutAction: CaseIterable, Sendable {
 // MARK: - Text form
 
 /// The command line's spelling of a combination (`Design/spec/configuration.md` §三):
-/// lowercase modifiers joined by `+` in the order ⌃ ⌥ ⇧ ⌘, then the key, as in `option+space`
+/// lowercase modifiers joined by `+` in the order ⌃ ⌥ ⇧ ⌘, then the key, as in `option+a`
 /// or `control+option+t`. Keys are named by their position on a US keyboard, so the text means
 /// the same key whatever layout is active.
 extension GlobalShortcut {
