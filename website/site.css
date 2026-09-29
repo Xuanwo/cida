@@ -99,10 +99,18 @@ body.site {
 .hero .actions small { font-size: 13px; color: var(--text-tertiary); text-wrap: balance; }
 .hero .stage { display: flex; align-items: flex-start; justify-content: center; margin-top: 72px; text-align: left; }
 /* The hero's motion (site.js), with the app's streaming tokens (spec/streaming-motion.md §二). */
-.hero .result .text,
-.hero .source { transition: opacity 300ms ease-out; }
-.hero .result .text.leaving,
-.hero .source.leaving { opacity: 0; }
+.hero .source,
+.hero .result {
+  overflow: hidden;
+  transition: height calc(var(--motion-height-ms) * 1ms) var(--motion-ease-height);
+}
+.hero .source > span { display: block; transition: opacity 180ms ease-out; }
+.hero .source.changing > span { opacity: 0; }
+.hero .result .text {
+  transition: color calc(var(--motion-height-ms) * 1ms) ease-out,
+    opacity calc(var(--motion-height-ms) * 1ms) ease-out;
+}
+.hero .result .text.clearing { opacity: 0; }
 /* The app eases each glyph in with a cubic ease-out (StreamGlyphFadeAnimation), which shows a
  * new character sooner than CSS's ease-out would. */
 .hero .result .arrive {

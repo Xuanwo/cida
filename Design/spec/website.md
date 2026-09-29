@@ -31,7 +31,7 @@ cida.xuanwo.io，面向不看 GitHub 的 Mac 用户。页面就是仓库里的 [
 ## 三、首屏面板
 
 - 原文用讲文字本身的公版英文段落，与「辞达而已矣」同义：William Strunk Jr.《The Elements of Style》（1918）的「Vigorous writing is concise…」，以及梭罗《瓦尔登湖》（1854）的「I went to the woods because I wished to live deliberately…」。译文由我们自己写定，不现场请求模型。
-- 面板循环演示翻译（`website/site.js`）：原文出现，结果栏先是呼吸光标，再按应用的流式节奏（`spec/streaming-motion.md` §一）逐字显示，完成后光标淡出、停止换成「复制结果」，停留 4 秒，原文与译文 300ms 淡出，换下一段。这是页面唯一不由访客触发的动画。面板照应用的样子向下生长，舞台先留出最长一段写完时的高度，下面的内容不跟着移动。英文页原文与译文对调。
+- 面板循环演示翻译（`website/site.js`），换段照应用处理一次新选区的顺序（`spec/panel.md` §一、`spec/streaming-motion.md` §二）：写完后停留 3.5 秒；新原文 180ms 淡入替换，旧译文变为已过时（`text-secondary`）停 0.9 秒；随后提交，停止与复制按钮 150ms（`motion-icon-swap-ms`）交叉淡化，旧译文 150ms 淡去，结果栏以 `motion-height-ms` 收到一行等待光标；新译文按应用的流式节奏逐字流出，原文栏与结果栏的高度都以 `motion-height-ms` 过渡，不跳变。这是页面唯一不由访客触发的动画。舞台先留出最长一段写完时的高度，下面的内容不跟着移动。英文页原文与译文对调。
 - 渐隐是辞达最有辨识度的动效，首屏要让人看清：每个字在光标后按 `motion-char-in-ms` 从 opacity 0、blur `motion-blur-char-px` 淡入，曲线与应用的 `StreamGlyphFadeAnimation` 相同，是三次 ease-out，所以书写头后面总有几个字处在不同的淡入阶段。设计稿画的是其中一帧：最后七个字从几乎透明、带模糊，到接近全墨。
 - 页面里写好的是第一段写到一半的一帧，首次绘制就是它；动画从这一帧接着写，正在淡入的字补完淡入，不清空重来。没有 JavaScript 时停在这一帧；开启「减弱动态效果」时只显示完成的译文。
 - 首次绘制就是最终样子：三种字体在 `<head>` 预加载并以 `font-display: block` 显示，不先用系统字体再替换；面板的控制条由 `components.js` 在 `<head>` 同步生成，不在加载后才出现。
