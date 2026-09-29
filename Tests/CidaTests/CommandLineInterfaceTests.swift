@@ -164,12 +164,9 @@ final class CommandLineInterfaceTests: XCTestCase {
     XCTAssertNil(store.settings.modelService.auth)
     XCTAssertNil(store.apiKey)
 
-    await expect(0, ["config", "set", "automatic-updates=false"], in: store)
-    XCTAssertFalse(store.automaticUpdates)
     await expect(0, ["config", "reset"], in: store)
     XCTAssertEqual(store.output, "已恢复全部默认")
     XCTAssertTrue(store.settings.modelService.isUnset)
-    XCTAssertTrue(store.automaticUpdates)
     XCTAssertFalse(store.launchAtLogin)
   }
 

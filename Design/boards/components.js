@@ -109,8 +109,9 @@ class CidaSettings extends HTMLElement {
       granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
     const launch = row("开机启动", "", `<span class="toggle${is("launch", "on") ? " on" : ""}"></span>`, "end");
     const updates = is("update", "available")
-      ? row("自动检查更新", "新版本 1.1.0 可以安装", `<span class="button">安装…</span><span class="toggle on"></span>`, "end spaced")
-      : row("自动检查更新", "每天检查一次", `<span class="button">检查更新</span><span class="toggle on"></span>`, "end spaced");
+      ? row("更新", "新版本 1.1.0 可以安装", `<span class="button">安装…</span>`, "end")
+      : row("更新", "每天自动检查", `<span class="button">检查更新</span>`, "end");
+    const feedback = row("反馈", "报告问题或提建议", `<span class="button">去反馈</span>`, "end");
 
     // The agent-configured model group (spec/configuration.md §四):
     // config="unset|unset-copied|ready|updated|checking|failed".
@@ -169,7 +170,7 @@ class CidaSettings extends HTMLElement {
         <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}</div>
         <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图翻译")}</div>`,
       general: `
-        <div class="group">${launch}${updates}</div>
+        <div class="group">${launch}${updates}${feedback}</div>
         <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>`,
     }[tab];
 
@@ -214,22 +215,19 @@ class CidaFrozenScreen extends HTMLElement {
 
 customElements.define("cida-frozen-screen", CidaFrozenScreen);
 
-// The menu bar item's menu (spec/updates.md §三): <cida-status-menu update="available">,
-// <cida-status-menu build="dev">, a development build that names itself and has no updates, or
-// <cida-status-menu shortcuts="capture-only">, where 显示辞达 has no shortcut and shows no key.
+// The menu bar item's menu (spec/brand.md §三): <cida-status-menu build="dev"> is a development
+// build that names itself first; <cida-status-menu shortcuts="capture-only"> has no shortcut for
+// 显示辞达 and shows no key.
 class CidaStatusMenu extends HTMLElement {
   connectedCallback() {
-    const available = this.getAttribute("update") === "available";
     const development = this.getAttribute("build") === "dev";
     const item = (title, key = "") => `<span class="item"><b>${title}</b><kbd>${key}</kbd></span>`;
-    const updates = development ? "" : available ? item("安装新版本 1.1.0…") : item("检查更新…");
     this.outerHTML = `
       <section class="status-menu-scene" data-state="${this.getAttribute("state")}">
         <div class="menubar"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
         <div class="status-menu">
           ${development ? `<span class="item disabled"><b>开发版 1.2.0 (170) · c243eb7</b></span><i class="separator"></i>` : ""}
           ${item("显示辞达", this.getAttribute("shortcuts") === "capture-only" ? "" : "⌥ 空格键")}${item("截图翻译", "⌥ S")}${item("设置…", "⌘,")}
-          ${updates}
           <i class="separator"></i>
           ${item("退出辞达", "⌘Q")}
         </div>

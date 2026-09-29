@@ -231,7 +231,7 @@ final class ModelConfigurationTests: XCTestCase {
   // MARK: - Fields (spec §三)
 
   private func configuration() -> EditableConfiguration {
-    EditableConfiguration(settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
+    EditableConfiguration(settings: CidaSettings(), launchAtLogin: false)
   }
 
   private func message(
@@ -274,7 +274,6 @@ final class ModelConfigurationTests: XCTestCase {
     try ConfigurationField.body.apply(#"{"max_tokens": 1024}"#, to: &configuration)
     try ConfigurationField.headers.apply(#"{"anthropic-beta": "x"}"#, to: &configuration)
     try ConfigurationField.shortcut.apply("ctrl+opt+T", to: &configuration)
-    try ConfigurationField.automaticUpdates.apply("false", to: &configuration)
     try ConfigurationField.launchAtLogin.apply("true", to: &configuration)
 
     let service = configuration.settings.modelService
@@ -285,7 +284,6 @@ final class ModelConfigurationTests: XCTestCase {
     XCTAssertEqual(
       configuration.settings.shortcut,
       GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option]))
-    XCTAssertFalse(configuration.automaticUpdates)
     XCTAssertTrue(configuration.launchAtLogin)
 
     XCTAssertEqual(

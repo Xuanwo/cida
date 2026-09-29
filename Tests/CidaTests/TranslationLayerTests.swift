@@ -734,7 +734,7 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertFalse(model.setShortcut(GlobalShortcut(keyCode: UInt16(kVK_ANSI_L), modifiers: [.option, .shift]), for: .translationLayer))
     XCTAssertFalse(model.setShortcut(.optionD.addingShift, for: .captureText), "⌥⇧D is the whole window")
 
-    var configuration = EditableConfiguration(settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
+    var configuration = EditableConfiguration(settings: CidaSettings(), launchAtLogin: false)
     try ConfigurationField.layerShortcut.apply("option+shift+l", to: &configuration)
     XCTAssertThrowsError(try ConfigurationField.validate(configuration))
     ConfigurationField.layerShortcut.reset(in: &configuration)
@@ -751,7 +751,7 @@ final class TranslationLayerTests: XCTestCase {
   }
 
   func testTheCommandLineSetsTheLayerShortcutAndRefusesADuplicate() throws {
-    var configuration = EditableConfiguration(settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
+    var configuration = EditableConfiguration(settings: CidaSettings(), launchAtLogin: false)
     XCTAssertEqual(ConfigurationField.layerShortcut.jsonValue(in: configuration, hasAPIKey: false), .string("option+d"))
     try ConfigurationField.layerShortcut.apply("control+option+l", to: &configuration)
     XCTAssertEqual(configuration.settings.layerShortcut?.configurationText, "control+option+l")

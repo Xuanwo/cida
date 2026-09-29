@@ -10,7 +10,6 @@ enum SettingsStore {
   private static let defaultsKey = "cida.settings.v1"
   private static let lastCheckKey = "cida.model-service.last-check"
   /// Sparkle's own preference for daily checks, in the application's domain.
-  private static let automaticUpdatesKey = "SUEnableAutomaticChecks"
   private static let productionNamespace = "com.xuanwo.Cida"
   static let automationNamespacePrefix = "com.xuanwo.Cida.Automation."
 
@@ -113,15 +112,6 @@ enum SettingsStore {
     }
   }
 
-  /// Whether Sparkle checks daily; Info.plist turns it on until the user says otherwise.
-  static func automaticUpdatesEnabled(namespace: String = storageNamespace) -> Bool {
-    userDefaults(for: namespace).object(forKey: automaticUpdatesKey) as? Bool ?? true
-  }
-
-  static func setAutomaticUpdatesEnabled(_ enabled: Bool, namespace: String = storageNamespace) {
-    userDefaults(for: namespace).set(enabled, forKey: automaticUpdatesKey)
-  }
-
   /// Hands this process's writes to the preferences daemon and drops what it cached. Another
   /// process wrote or will read the settings: the command line calls this before it announces a
   /// change, and a running Cida before it reloads, since each process caches its preferences.
@@ -201,8 +191,6 @@ struct ConfigurationStore: Sendable {
   var clearAPIKey: @Sendable () -> Void
   var loadLastCheck: @Sendable () -> ModelServiceCheckRecord?
   var saveLastCheck: @Sendable (ModelServiceCheckRecord?) -> Void
-  var automaticUpdates: @Sendable () -> Bool
-  var setAutomaticUpdates: @Sendable (Bool) -> Void
   /// The login item's state; outside an app bundle, the stored preference.
   var launchAtLogin: @Sendable (CidaSettings) -> Bool
   var setLaunchAtLogin: @Sendable (Bool) throws -> Void
@@ -223,8 +211,6 @@ struct ConfigurationStore: Sendable {
       clearAPIKey: { SettingsStore.clearAPIKey(namespace: namespace) },
       loadLastCheck: { SettingsStore.loadLastCheck(namespace: namespace) },
       saveLastCheck: { SettingsStore.saveLastCheck($0, namespace: namespace) },
-      automaticUpdates: { SettingsStore.automaticUpdatesEnabled(namespace: namespace) },
-      setAutomaticUpdates: { SettingsStore.setAutomaticUpdatesEnabled($0, namespace: namespace) },
       launchAtLogin: { settings in
         managesLoginItem ? SMAppService.mainApp.status == .enabled : settings.launchAtLogin
       },

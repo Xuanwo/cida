@@ -1,35 +1,26 @@
 import AppKit
 import Sparkle
 
-/// What Settings and the menu bar show about updates (`Design/spec/updates.md`).
+/// What Settings shows about updates (`Design/spec/updates.md`).
 @MainActor
 @Observable
 final class UpdateState {
-  /// Whether Cida checks the feed once a day on its own.
-  private(set) var automaticallyChecks: Bool
-  /// A newer version a scheduled check found while the user was elsewhere; the menu bar item and
-  /// Settings offer to install it instead of interrupting with the panel.
+  /// A newer version a scheduled check found while the user was elsewhere; Settings offers to
+  /// install it instead of interrupting with the panel.
   var availableVersion: String?
-  /// Whether this build updates itself. A development build has no feed, so the menu and Settings
-  /// offer no update controls.
+  /// Whether this build updates itself. A development build has no feed, so Settings offers no
+  /// update controls.
   var isAvailable = true
 
   @ObservationIgnored var performCheck: @MainActor () -> Void = {}
-  @ObservationIgnored var applyAutomaticChecks: @MainActor (Bool) -> Void = { _ in }
 
-  init(automaticallyChecks: Bool = true, availableVersion: String? = nil) {
-    self.automaticallyChecks = automaticallyChecks
+  init(availableVersion: String? = nil) {
     self.availableVersion = availableVersion
   }
 
   /// Checks now, or shows the update a scheduled check found, in the panel.
   func checkForUpdates() {
     performCheck()
-  }
-
-  func setAutomaticallyChecks(_ enabled: Bool) {
-    automaticallyChecks = enabled
-    applyAutomaticChecks(enabled)
   }
 
   /// A scheduled check found `version` while the user was elsewhere.
@@ -87,7 +78,8 @@ final class CidaUpdater: NSObject, SPUUpdaterDelegate {
       && !((bundle.object(forInfoDictionaryKey: "SUPublicEDKey") as? String) ?? "").isEmpty
   }
 
-  /// Starts Sparkle; `state` then follows the preference Sparkle keeps.
+  /// Starts Sparkle, checking the feed every day: Cida has no setting to turn that off
+  /// (`Design/spec/updates.md` §一), so an earlier copy's choice to turn it off is overridden.
   func start(presenter: UpdatePresenter) {
     let driver = CidaUpdateDriver(state: state, presenter: presenter)
     let updater = SPUUpdater(
@@ -95,17 +87,14 @@ final class CidaUpdater: NSObject, SPUUpdaterDelegate {
     driver.checkForUpdates = { [weak updater] in updater?.checkForUpdates() }
     self.driver = driver
     self.updater = updater
+    updater.automaticallyChecksForUpdates = true
     do {
       try updater.start()
     } catch {
       NSLog("Cida could not start updates: %@", error.localizedDescription)
       return
     }
-    state.setAutomaticallyChecks(updater.automaticallyChecksForUpdates)
     state.performCheck = { [weak updater] in updater?.checkForUpdates() }
-    state.applyAutomaticChecks = { [weak updater] enabled in
-      updater?.automaticallyChecksForUpdates = enabled
-    }
   }
 
   /// Sparkle channels beyond the default one that this build accepts.
@@ -126,7 +115,7 @@ final class CidaUpdater: NSObject, SPUUpdaterDelegate {
 
 /// Sparkle's user driver, drawn as panel messages (`Design/spec/lifecycle.md` §五). The session
 /// the user is watching follows every step in the panel; hiding the panel answers 稍后 and the
-/// session carries on quietly, reachable again from the menu bar item.
+/// session carries on quietly, reachable again from Settings.
 @MainActor
 final class CidaUpdateDriver: NSObject, SPUUserDriver {
   private enum Phase {
@@ -151,7 +140,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
   private var receivedLength: UInt64 = 0
   /// The panel is showing this session; later steps replace the message on screen.
   private var isWatched = false
-  /// The latest step, shown again when the user asks for the update from the menu bar.
+  /// The latest step, shown again when the user asks for the update from Settings.
   private var latest: (message: PanelMessage, handler: PanelMessageHandler)?
   private var cancelWork: (() -> Void)?
 
@@ -280,7 +269,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     presenter?.finishUpdateMessage()
   }
 
-  /// Hiding the panel mid-session keeps the session; the menu bar item brings it back.
+  /// Hiding the panel mid-session keeps the session; Settings brings it back.
   private func stopWatching() {
     isWatched = false
     if !version.isEmpty, phase == .found || phase == .ready {
@@ -367,7 +356,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
           }
         },
         dismiss: { [weak self] in
-          // 稍后: the session stays open so the menu bar can offer the update again.
+          // 稍后: the session stays open so Settings can offer the update again.
           self?.stopWatching()
         }))
     if !bringsUp { state.remindLater(of: version) }

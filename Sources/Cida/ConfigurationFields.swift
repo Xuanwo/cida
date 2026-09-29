@@ -1,11 +1,10 @@
 import Foundation
 
 /// Everything the command line can read and write, as one value: the settings (without the
-/// key) and the two preferences kept outside them. Commands change a copy and store it only
+/// key) and the login item kept outside them. Commands change a copy and store it only
 /// when every change is valid (`Design/spec/configuration.md` §二).
 struct EditableConfiguration: Equatable {
   var settings: CidaSettings
-  var automaticUpdates: Bool
   var launchAtLogin: Bool
 }
 
@@ -28,7 +27,6 @@ enum ConfigurationField: String, CaseIterable, Sendable {
   case captureShortcut = "capture-shortcut"
   case layerShortcut = "layer-shortcut"
   case launchAtLogin = "launch-at-login"
-  case automaticUpdates = "automatic-updates"
 
   /// The fields that describe the model service; `show` always lists these.
   static let modelServiceFields: [ConfigurationField] = [
@@ -132,10 +130,6 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       Schema(
         type: "boolean", values: ["true", "false"], defaultValue: "false", example: "true",
         description: "开机启动，与设置里的开关相同")
-    case .automaticUpdates:
-      Schema(
-        type: "boolean", values: ["true", "false"], defaultValue: "true", example: "false",
-        description: "每天自动检查更新，与设置里的开关相同")
     }
   }
 
@@ -207,16 +201,12 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         throw invalid(
           "写成修饰键加一个键，至少带 control、option 或 command，例如 \(schema.example)；不设置写 none")
       }
-    case .launchAtLogin, .automaticUpdates:
+    case .launchAtLogin:
       guard let enabled = ["true": true, "false": false][value] else {
         throw invalid("只能是 true 或 false")
       }
-      if self == .launchAtLogin {
-        configuration.launchAtLogin = enabled
-        settings.launchAtLogin = enabled
-      } else {
-        configuration.automaticUpdates = enabled
-      }
+      configuration.launchAtLogin = enabled
+      settings.launchAtLogin = enabled
     }
     configuration.settings = settings
   }
@@ -242,7 +232,6 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .launchAtLogin:
       configuration.launchAtLogin = false
       configuration.settings.launchAtLogin = false
-    case .automaticUpdates: configuration.automaticUpdates = true
     }
   }
 
@@ -316,7 +305,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
 
   func isDefault(in configuration: EditableConfiguration, hasAPIKey: Bool) -> Bool {
     let defaults = EditableConfiguration(
-      settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
+      settings: CidaSettings(), launchAtLogin: false)
     switch self {
     case .apiKey: return !hasAPIKey
     default:
@@ -349,7 +338,6 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         settings.shortcut(for: shortcutAction!)?.configurationText
           ?? GlobalShortcut.noneConfigurationText)
     case .launchAtLogin: return .bool(configuration.launchAtLogin)
-    case .automaticUpdates: return .bool(configuration.automaticUpdates)
     }
   }
 
@@ -375,7 +363,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       let line = prompt.replacingOccurrences(of: "\n", with: " ")
       return line.count > 60 ? String(line.prefix(60)) + "…" : line
     case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .layerShortcut,
-      .launchAtLogin, .automaticUpdates:
+      .launchAtLogin:
       let value = jsonValue(in: configuration, hasAPIKey: hasAPIKey)
       return value.stringValue ?? value.compactText
     }

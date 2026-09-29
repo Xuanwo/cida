@@ -34,7 +34,7 @@
 | `my-language` / `foreign-language` | 文本，如 `简体中文`、`English`、`粤语` | 与设置「翻译」页的「语言」相同，任意写法（`spec/settings.md` §三） |
 | `translation-prompt` / `improvement-prompt` | 文本，可 `--file` / `--stdin` | 与设置里的提示词相同 |
 | `shortcut` / `capture-shortcut` / `layer-shortcut` | 如 `option+a`，`none` 为不设置 | 与设置里的快捷键相同；三个不能相同（`none` 除外），`layer-shortcut` 不能带 shift（加 shift 是翻译整个窗口，也不能与另外两个相同） |
-| `launch-at-login` / `automatic-updates` | `true` / `false` | 与设置里的开关相同 |
+| `launch-at-login` | `true` / `false` | 与设置里的开关相同 |
 
 请求体里辞达自己带的参数：Anthropic Messages 的 `max_tokens` 为 8192；Responses 带 `"store": false`（辞达不留请求记录，也请服务不留）。`body` 逐层合并进请求体，值为 `null` 的键会被去掉，所以这些都可以改或去掉。
 
