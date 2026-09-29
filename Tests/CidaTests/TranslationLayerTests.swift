@@ -757,8 +757,7 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(panelTop, 945 - 189)
 
     let size = CGSize(width: 380, height: 112)
-    let layerPill = LayerHintPanel.frame(fitting: size, in: visible)
-      .insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
+    let layerPill = CidaHintPill.pill(in: LayerHintPanel.frame(fitting: size, in: visible))
     XCTAssertEqual(layerPill.maxY, panelTop, accuracy: 1)
     XCTAssertEqual(layerPill.midX, visible.midX, accuracy: 1)
 
@@ -771,9 +770,24 @@ final class TranslationLayerTests: XCTestCase {
     overlay.hintAnchor = CidaDesign.Panel.topCenter(in: visible)
     overlay.layoutSubtreeIfNeeded()
     let hosting = try XCTUnwrap(overlay.subviews.first { $0 is NSHostingView<CaptureHint> })
-    let capturePill = hosting.frame.insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
+    let capturePill = CidaHintPill.pill(in: hosting.frame)
     XCTAssertEqual(capturePill.maxY, panelTop, accuracy: 1)
     XCTAssertEqual(capturePill.midX, visible.midX, accuracy: 1)
+  }
+
+  /// The hosting view holds the whole shadow: a cut-off shadow shows as a grey rectangle
+  /// around the pill (2026-09-30, the ⌥D hint over a white page on the user's Mac).
+  @MainActor
+  func testTheHintPillsShadowFitsInsideItsHostingView() throws {
+    let renderer = ImageRenderer(content: CidaHintPill(text: "这一段已经是简体中文"))
+    renderer.scale = 1
+    let image = try XCTUnwrap(renderer.cgImage)
+    let bitmap = NSBitmapImageRep(cgImage: image)
+    let edges = (0..<bitmap.pixelsWide).flatMap { [(x: $0, y: 0), (x: $0, y: bitmap.pixelsHigh - 1)] }
+      + (0..<bitmap.pixelsHigh).flatMap { [(x: 0, y: $0), (x: bitmap.pixelsWide - 1, y: $0)] }
+    let strongest = edges.map { bitmap.colorAt(x: $0.x, y: $0.y)?.alphaComponent ?? 0 }.max() ?? 0
+    // The blur's last 1/255 of opacity is invisible on any background.
+    XCTAssertLessThanOrEqual(strongest, 1.0 / 255, "The shadow reaches the edge of the view and is cut off there")
   }
 
   /// Stage Manager keeps a window in the window list while it shows it as a thumbnail in the

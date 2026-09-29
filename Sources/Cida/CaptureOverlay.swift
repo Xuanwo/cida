@@ -248,7 +248,7 @@ final class CaptureOverlayView: NSView {
     let anchor = hintAnchor ?? CidaDesign.Panel.topCenter(in: bounds)
     hint.frame = NSRect(
       x: floor(anchor.x - size.width / 2),
-      y: floor(anchor.y + CaptureHint.shadowMargin - size.height),
+      y: floor(anchor.y + CidaHintPill.shadowInsets.top - size.height),
       width: size.width, height: size.height)
     updateLayers()
   }
@@ -297,7 +297,7 @@ final class CaptureOverlayView: NSView {
   /// The hint never covers the sheet: it fades out while the frame reaches
   /// it and back when the frame moves away.
   private func updateHintVisibility() {
-    let pill = hint.frame.insetBy(dx: CaptureHint.shadowMargin, dy: CaptureHint.shadowMargin)
+    let pill = CidaHintPill.pill(in: hint.frame)
     let isCovering = selection.map { $0.intersects(pill) } ?? false
     let targetAlpha: CGFloat = isCovering ? 0 : 1
     guard hintAlphaTarget != targetAlpha else { return }
@@ -365,8 +365,6 @@ extension CaptureGeometry {
 
 /// The capture's words in the hint pill.
 struct CaptureHint: View {
-  static let shadowMargin = CidaHintPill.shadowMargin
-
   var body: some View {
     CidaHintPill(text: "拖动框选要翻译的文字 · Esc 取消")
       .accessibilityIdentifier("capture-overlay-hint")
