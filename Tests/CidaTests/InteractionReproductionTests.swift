@@ -375,27 +375,44 @@ final class InteractionReproductionTests: XCTestCase {
     let modelFrame = window.frame
     XCTAssertEqual(modelFrame.height, 250, accuracy: 4, "The board's 模型 is 252 pt tall")
     XCTAssertEqual(window.title, "模型")
+    let contentView = try XCTUnwrap(window.contentView)
+    let content = try XCTUnwrap(
+      ([contentView] + contentView.subviews).first { $0.accessibilityLabel() == "设置窗口内容" })
+    /// Waits for a move to end, checking on every turn of the run loop that the content's top
+    /// stays on the window's top edge while the frame moves.
+    func settle(_ move: String) {
+      let end = Date().addingTimeInterval(0.4)
+      var drift: [String] = []
+      while Date() < end {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.004))
+        let top = content.convert(content.bounds, to: nil).maxY
+        if abs(top - window.frame.height) > 0.5 {
+          drift.append(String(format: "%.0f in %.0f", top, window.frame.height))
+        }
+      }
+      XCTAssertEqual(drift, [], "\(move): the tabs stay under the title while the window moves")
+    }
 
     // The window follows over motion-height-ms; wait for each move to end.
     model.settingsTab = .shortcuts
-    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    settle("模型 → 快捷键")
     XCTAssertEqual(window.frame.height, 470, accuracy: 4, "The board's 快捷键 is 471 pt tall")
     XCTAssertEqual(window.frame.maxY, modelFrame.maxY, accuracy: 0.5, "The top edge stays put")
     XCTAssertEqual(window.title, "快捷键", "The title names the tab")
 
     model.settingsTab = .translation
-    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    settle("快捷键 → 翻译")
     let collapsedFrame = window.frame
     XCTAssertEqual(collapsedFrame.height, 364, accuracy: 4, "The board's 翻译 is 365 pt tall")
 
     model.editingPrompt = .improve
-    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    settle("展开提示词")
     let expandedFrame = window.frame
     XCTAssertGreaterThan(expandedFrame.height, collapsedFrame.height + 80, "The prompt sheet grows the window")
     XCTAssertEqual(expandedFrame.maxY, modelFrame.maxY, accuracy: 0.5, "The top edge stays put")
 
     model.editingPrompt = nil
-    RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    settle("收起提示词")
     XCTAssertEqual(window.frame.height, collapsedFrame.height, accuracy: 0.5)
     assertTestProcessIsNotFrontmost()
   }
