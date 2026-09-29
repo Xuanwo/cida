@@ -614,6 +614,7 @@ body {
   color: var(--text-secondary);
   white-space: nowrap;
 }
+.chip.unset { color: var(--text-tertiary); }
 .chip.recording {
   padding: 2.5px 7.5px;
   border: 1.5px solid var(--accent);

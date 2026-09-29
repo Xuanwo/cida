@@ -128,14 +128,14 @@ final class CaptureTranslationTests: XCTestCase {
   // MARK: - Shortcuts
 
   func testTheTwoGlobalShortcutsCannotShareACombination() {
-    var applied: [(GlobalShortcut, GlobalShortcutAction)] = []
+    var applied: [(GlobalShortcut?, GlobalShortcutAction)] = []
     let model = AppModel(
       saveSettings: { _ in },
       applyGlobalShortcut: { shortcut, action in
         applied.append((shortcut, action))
         return true
       })
-    XCTAssertEqual(model.settings.captureShortcut, .optionS)
+    XCTAssertEqual(model.settings.captureShortcut, GlobalShortcut.optionS)
 
     XCTAssertFalse(model.setShortcut(.optionA, for: .captureText))
     XCTAssertFalse(model.setShortcut(.optionS, for: .showPanel))
@@ -144,8 +144,54 @@ final class CaptureTranslationTests: XCTestCase {
     let recorded = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
     XCTAssertTrue(model.setShortcut(recorded, for: .captureText))
     XCTAssertEqual(model.settings.captureShortcut, recorded)
-    XCTAssertEqual(model.settings.shortcut, .optionA)
+    XCTAssertEqual(model.settings.shortcut, GlobalShortcut.optionA)
     XCTAssertEqual(applied.map(\.1), [.captureText])
+  }
+
+  /// Someone who only captures text clears the other two (`Design/spec/settings.md` §四).
+  func testAShortcutCanBeLeftUnsetAndFreesItsCombination() throws {
+    var applied: [(GlobalShortcut?, GlobalShortcutAction)] = []
+    let model = AppModel(
+      saveSettings: { _ in },
+      applyGlobalShortcut: { shortcut, action in
+        applied.append((shortcut, action))
+        return true
+      })
+    XCTAssertTrue(model.setShortcut(nil, for: .showPanel))
+    XCTAssertTrue(model.setShortcut(nil, for: .translationLayer), "Two unset shortcuts share nothing")
+    XCTAssertNil(model.settings.shortcut)
+    XCTAssertNil(model.settings.layerShortcut)
+    XCTAssertEqual(applied.map(\.1), [.showPanel, .translationLayer])
+    XCTAssertTrue(applied.allSatisfy { $0.0 == nil }, "Clearing releases the hot key")
+    XCTAssertTrue(model.setShortcut(.optionA, for: .captureText), "⌥A is free once cleared")
+
+    // null is a cleared shortcut; a missing key is still the default.
+    let data = try JSONEncoder().encode(model.settings)
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    XCTAssertTrue(json["shortcut"] is NSNull)
+    let decoded = try JSONDecoder().decode(CidaSettings.self, from: data)
+    XCTAssertNil(decoded.shortcut)
+    XCTAssertEqual(decoded.captureShortcut, GlobalShortcut.optionA)
+    XCTAssertNil(decoded.layerShortcut)
+    XCTAssertEqual(
+      try JSONDecoder().decode(CidaSettings.self, from: Data("{}".utf8)).shortcut,
+      GlobalShortcut.optionA)
+  }
+
+  func testTheCommandLineWritesNoneForAnUnsetShortcut() throws {
+    var configuration = EditableConfiguration(
+      settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
+    try ConfigurationField.shortcut.apply("none", to: &configuration)
+    try ConfigurationField.layerShortcut.apply("NONE", to: &configuration)
+    XCTAssertNil(configuration.settings.shortcut)
+    XCTAssertNil(configuration.settings.layerShortcut)
+    XCTAssertNoThrow(try ConfigurationField.validate(configuration))
+    XCTAssertEqual(
+      ConfigurationField.shortcut.jsonValue(in: configuration, hasAPIKey: false), .string("none"))
+    XCTAssertEqual(
+      ConfigurationField.layerShortcut.displayValue(in: configuration, hasAPIKey: false), "none")
+    ConfigurationField.shortcut.reset(in: &configuration)
+    XCTAssertEqual(configuration.settings.shortcut, GlobalShortcut.optionA)
   }
 
   func testRecordingEitherShortcutSuspendsBothUntilItEnds() {
@@ -162,7 +208,7 @@ final class CaptureTranslationTests: XCTestCase {
   func testSettingsWithoutACaptureShortcutDecodeToOptionSAndACustomOneRoundTrips() throws {
     let legacy = try JSONDecoder().decode(
       CidaSettings.self, from: Data(#"{"shortcut":{"keyCode":49,"modifiers":2}}"#.utf8))
-    XCTAssertEqual(legacy.captureShortcut, .optionS)
+    XCTAssertEqual(legacy.captureShortcut, GlobalShortcut.optionS)
 
     var settings = CidaSettings()
     settings.captureShortcut = GlobalShortcut(

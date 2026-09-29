@@ -5,18 +5,19 @@ import Foundation
 /// press to this process whichever application is active. `update(to:)`
 /// swaps the combination; a combination the system, another application or
 /// another of Cida's hot keys already holds is refused and the old one stays.
-/// Each instance answers only presses of its own registration, so several
-/// can live side by side.
+/// Without a combination (nil) nothing is registered. Each instance answers
+/// only presses of its own registration, so several can live side by side.
 final class GlobalHotKey: @unchecked Sendable {
-  private(set) var shortcut: GlobalShortcut
+  private(set) var shortcut: GlobalShortcut?
   private let identifier: UInt32
   private var hotKeyReference: EventHotKeyRef?
   private var eventHandlerReference: EventHandlerRef?
   private let action: @MainActor @Sendable () -> Void
+  private var isSuspended = false
 
   nonisolated(unsafe) private static var nextIdentifier: UInt32 = 1
 
-  init?(shortcut: GlobalShortcut, action: @escaping @MainActor @Sendable () -> Void) {
+  init?(shortcut: GlobalShortcut?, action: @escaping @MainActor @Sendable () -> Void) {
     self.shortcut = shortcut
     self.action = action
     identifier = Self.nextIdentifier
@@ -37,6 +38,7 @@ final class GlobalHotKey: @unchecked Sendable {
     )
     guard handlerStatus == noErr else { return nil }
 
+    guard let shortcut else { return }
     guard let reference = Self.register(shortcut, identifier: identifier) else {
       if let eventHandlerReference {
         RemoveEventHandler(eventHandlerReference)
@@ -55,14 +57,20 @@ final class GlobalHotKey: @unchecked Sendable {
     }
   }
 
-  /// Re-registers the hot key for a new combination. Returns false, with the
-  /// previous combination still active, when the system refuses the new one.
-  func update(to newShortcut: GlobalShortcut) -> Bool {
+  /// Re-registers the hot key for a new combination, or releases it for nil.
+  /// Returns false, with the previous combination still active, when the
+  /// system refuses the new one. While suspended the new combination is only
+  /// checked; it registers when the suspension ends.
+  func update(to newShortcut: GlobalShortcut?) -> Bool {
     guard newShortcut != shortcut else { return true }
-    let wasRegistered = hotKeyReference != nil
+    let isActive = !isSuspended
     unregister()
+    guard let newShortcut else {
+      shortcut = nil
+      return true
+    }
     if let reference = Self.register(newShortcut, identifier: identifier) {
-      if wasRegistered {
+      if isActive {
         hotKeyReference = reference
       } else {
         UnregisterEventHotKey(reference)
@@ -70,7 +78,7 @@ final class GlobalHotKey: @unchecked Sendable {
       shortcut = newShortcut
       return true
     }
-    if wasRegistered {
+    if isActive, let shortcut {
       hotKeyReference = Self.register(shortcut, identifier: identifier)
     }
     return false
@@ -79,9 +87,10 @@ final class GlobalHotKey: @unchecked Sendable {
   /// While suspended the combination reaches the active application like any
   /// other key press, e.g. the Settings recorder.
   func setSuspended(_ isSuspended: Bool) {
+    self.isSuspended = isSuspended
     if isSuspended {
       unregister()
-    } else if hotKeyReference == nil {
+    } else if hotKeyReference == nil, let shortcut {
       hotKeyReference = Self.register(shortcut, identifier: identifier)
     }
   }

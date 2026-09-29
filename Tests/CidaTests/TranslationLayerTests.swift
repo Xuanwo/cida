@@ -718,7 +718,7 @@ final class TranslationLayerTests: XCTestCase {
       return true
     })
     XCTAssertEqual(model.settings.layerShortcut, GlobalShortcut(keyCode: UInt16(kVK_ANSI_D), modifiers: .option))
-    XCTAssertEqual(GlobalShortcutAction.translationLayer.defaultShortcut, .optionD)
+    XCTAssertEqual(GlobalShortcutAction.translationLayer.defaultShortcut, GlobalShortcut.optionD)
     XCTAssertFalse(model.setShortcut(.optionS, for: .translationLayer))
     XCTAssertFalse(model.setShortcut(.optionD, for: .captureText))
     XCTAssertTrue(applied.isEmpty)
@@ -730,7 +730,7 @@ final class TranslationLayerTests: XCTestCase {
 
   func testTheLayerShortcutLeavesShiftToTheWholeWindow() throws {
     let model = AppModel(saveSettings: { _ in }, applyGlobalShortcut: { _, _ in true })
-    XCTAssertEqual(model.settings.layerShortcut.addingShift.displayText, "⌥ ⇧ D")
+    XCTAssertEqual(model.settings.layerShortcut?.addingShift.displayText, "⌥ ⇧ D")
     XCTAssertFalse(model.setShortcut(GlobalShortcut(keyCode: UInt16(kVK_ANSI_L), modifiers: [.option, .shift]), for: .translationLayer))
     XCTAssertFalse(model.setShortcut(.optionD.addingShift, for: .captureText), "⌥⇧D is the whole window")
 
@@ -744,7 +744,7 @@ final class TranslationLayerTests: XCTestCase {
 
   func testOlderSettingsDecodeWithOptionDAndACustomLayerShortcutRoundTrips() throws {
     let legacy = try JSONDecoder().decode(CidaSettings.self, from: Data(#"{"captureShortcut":{"keyCode":1,"modifiers":2}}"#.utf8))
-    XCTAssertEqual(legacy.layerShortcut, .optionD)
+    XCTAssertEqual(legacy.layerShortcut, GlobalShortcut.optionD)
     var settings = CidaSettings()
     settings.layerShortcut = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.command, .shift])
     XCTAssertEqual(try JSONDecoder().decode(CidaSettings.self, from: JSONEncoder().encode(settings)).layerShortcut, settings.layerShortcut)
@@ -754,7 +754,7 @@ final class TranslationLayerTests: XCTestCase {
     var configuration = EditableConfiguration(settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
     XCTAssertEqual(ConfigurationField.layerShortcut.jsonValue(in: configuration, hasAPIKey: false), .string("option+d"))
     try ConfigurationField.layerShortcut.apply("control+option+l", to: &configuration)
-    XCTAssertEqual(configuration.settings.layerShortcut.configurationText, "control+option+l")
+    XCTAssertEqual(configuration.settings.layerShortcut?.configurationText, "control+option+l")
     XCTAssertNoThrow(try ConfigurationField.validate(configuration))
     try ConfigurationField.layerShortcut.apply("option+s", to: &configuration)
     XCTAssertThrowsError(try ConfigurationField.validate(configuration))

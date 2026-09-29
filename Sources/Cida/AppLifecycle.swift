@@ -149,10 +149,10 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       layerHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut) { [weak self] in
         self?.handleLayerShortcut(wholeWindow: false)
       }
-      layerWindowHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut.addingShift) { [weak self] in
+      layerWindowHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut?.addingShift) { [weak self] in
         self?.handleLayerShortcut(wholeWindow: true)
       }
-      startTranslationLayer()
+      updateTranslationLayer(for: model.settings.layerShortcut)
       warmUpTextRecognition()
     }
     // Only a user's own launch talks to the update feed; automation and E2E never do.
@@ -218,7 +218,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// setting is accepted as is. The menu bar items show the combinations
   /// that work.
   private func applyGlobalShortcut(
-    _ shortcut: GlobalShortcut,
+    _ shortcut: GlobalShortcut?,
     for action: GlobalShortcutAction
   ) -> Bool {
     let hotKey =
@@ -233,16 +233,18 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
     // The layer's ⇧ variant moves with it; both register or neither changes.
     if action == .translationLayer, let windowHotKey = layerWindowHotKey,
-      !windowHotKey.update(to: shortcut.addingShift)
+      !windowHotKey.update(to: shortcut?.addingShift)
     {
       if let previous { _ = hotKey?.update(to: previous) }
       return false
     }
     updateMenuItem(for: action, shortcut: shortcut)
+    if action == .translationLayer { updateTranslationLayer(for: shortcut) }
     return true
   }
 
-  private func updateMenuItem(for action: GlobalShortcutAction, shortcut: GlobalShortcut) {
+  /// An item whose action has no shortcut shows no key.
+  private func updateMenuItem(for action: GlobalShortcutAction, shortcut: GlobalShortcut?) {
     // The layer acts on what is under the pointer, so it has no menu item.
     let item =
       switch action {
@@ -250,8 +252,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       case .captureText: captureMenuItem
       case .translationLayer: nil as NSMenuItem?
       }
-    item?.keyEquivalent = shortcut.menuKeyEquivalent
-    item?.keyEquivalentModifierMask = shortcut.menuModifierMask
+    item?.keyEquivalent = shortcut?.menuKeyEquivalent ?? ""
+    item?.keyEquivalentModifierMask = shortcut?.menuModifierMask ?? []
   }
 
   /// The global shortcut hides a visible panel. Otherwise it first reads the
@@ -323,6 +325,18 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     lifecycleLog?.record(text == nil ? "capture-unrecognized" : "capture-imported")
     await panelController?.layOutHiddenContent()
     showPanel()
+  }
+
+  /// The layer runs only while it has a shortcut: without one nothing could turn off a
+  /// window translated whole (`Design/spec/translation-layer.md` §二).
+  private func updateTranslationLayer(for shortcut: GlobalShortcut?) {
+    if shortcut == nil {
+      translationLayer?.stop()
+      translationLayer = nil
+    } else if translationLayer == nil, statusItem != nil {
+      // Automation without the menu bar item and hot keys has no layer either.
+      startTranslationLayer()
+    }
   }
 
   private func startTranslationLayer() {
@@ -782,6 +796,7 @@ private enum DesignState: String {
   case settingsPromptEditing = "settings-prompt-editing"
   case settingsShortcuts = "settings-shortcuts"
   case settingsShortcutsCustom = "settings-shortcuts-custom"
+  case settingsShortcutsUnset = "settings-shortcuts-unset"
   case settingsRecording = "settings-recording"
   case settingsGeneral = "settings-general"
   case settingsUpdateAvailable = "settings-update-available"
@@ -815,7 +830,8 @@ private enum DesignState: String {
       .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed:
       .model
     case .settingsTranslation, .settingsLanguageEditing, .settingsPromptEditing: .translation
-    case .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording: .shortcuts
+    case .settingsShortcuts, .settingsShortcutsCustom, .settingsShortcutsUnset, .settingsRecording:
+      .shortcuts
     case .settingsGeneral, .settingsUpdateAvailable: .general
     default: nil
     }
@@ -889,6 +905,11 @@ private struct LaunchOptions {
         settings.shortcut = GlobalShortcut(
           keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
       }
+      if usesDesignFixtures, designState == .settingsShortcutsUnset {
+        // Someone who only captures text.
+        settings.shortcut = nil
+        settings.layerShortcut = nil
+      }
     #endif
     return applyingEndpointOverride(to: settings)
   }
@@ -955,8 +976,9 @@ private struct LaunchOptions {
       case .long:
         return ResultRecord.designLong()
       case .empty, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
-        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording,
-        .settingsGeneral, .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied,
+        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
+        .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
+        .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
         .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted,
         .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
@@ -984,8 +1006,9 @@ private struct LaunchOptions {
       case .lifecycleWelcomeSubmitted:
         "Consistency is the last refuge of the unimaginative."
       case .empty, .settings, .settingsTranslation, .settingsLanguageEditing,
-        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom, .settingsRecording,
-        .settingsGeneral, .settingsUpdateAvailable, .settingsConfigUnset, .settingsConfigCopied,
+        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
+        .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
+        .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
         .settingsConfigFailed, .lifecycleWelcome, .lifecycleUpdateChecking, .lifecycleUpdateFound,
         .lifecycleUpdateDownloading, .lifecycleUpdateReady, .lifecycleUpdateCurrent,

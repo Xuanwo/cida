@@ -60,7 +60,7 @@ customElements.define("cida-motion-note", CidaMotionNote);
 // The Settings window (spec/settings.md). tab="model|translation|shortcuts|general"
 // picks the tab (model by default); the other attributes name what a state
 // changes: config (see below), language="editing", editing="improve",
-// shortcut="custom|recording", grants="all", launch="on", update="available".
+// shortcut="custom|unset|recording", grants="all", launch="on", update="available".
 class CidaSettings extends HTMLElement {
   connectedCallback() {
     const is = (name, value) => this.getAttribute(name) === value;
@@ -90,14 +90,20 @@ class CidaSettings extends HTMLElement {
          </div>`
       : prompt("改进", "You are a writing assistant. Improve the user-provided text…");
 
-    // spec/settings.md §四: three recordable shortcuts.
+    // spec/settings.md §四: three recordable shortcuts; shortcut="unset" is someone who only
+    // captures text, with 显示辞达 and 原处翻译 cleared.
+    const unset = `<span class="link">恢复默认</span><span class="chip unset">未设置</span>`;
     const shortcut = is("shortcut", "recording")
-      ? row("显示辞达", "Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
+      ? row("显示辞达", "⌫ 不设置 · Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
       : is("shortcut", "custom")
         ? row("显示辞达", "在任何应用里唤起", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
-        : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ A</span>`, "end");
+        : is("shortcut", "unset")
+          ? row("显示辞达", "在任何应用里唤起", unset, "end spaced")
+          : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ A</span>`, "end");
     const capture = row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end");
-    const layerShortcut = row("原处翻译", "加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
+    const layerShortcut = is("shortcut", "unset")
+      ? row("原处翻译", "加 ⇧ 翻译整个窗口", unset, "end spaced")
+      : row("原处翻译", "加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
     // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
     const permission = (title, caption) => row(title, caption,
       granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
@@ -208,8 +214,9 @@ class CidaFrozenScreen extends HTMLElement {
 
 customElements.define("cida-frozen-screen", CidaFrozenScreen);
 
-// The menu bar item's menu (spec/updates.md §三): <cida-status-menu update="available"> or
-// <cida-status-menu build="dev">, a development build that names itself and has no updates.
+// The menu bar item's menu (spec/updates.md §三): <cida-status-menu update="available">,
+// <cida-status-menu build="dev">, a development build that names itself and has no updates, or
+// <cida-status-menu shortcuts="capture-only">, where 显示辞达 has no shortcut and shows no key.
 class CidaStatusMenu extends HTMLElement {
   connectedCallback() {
     const available = this.getAttribute("update") === "available";
@@ -221,7 +228,7 @@ class CidaStatusMenu extends HTMLElement {
         <div class="menubar"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
         <div class="status-menu">
           ${development ? `<span class="item disabled"><b>开发版 1.2.0 (170) · c243eb7</b></span><i class="separator"></i>` : ""}
-          ${item("显示辞达", "⌥ 空格键")}${item("截图翻译", "⌥ S")}${item("设置…", "⌘,")}
+          ${item("显示辞达", this.getAttribute("shortcuts") === "capture-only" ? "" : "⌥ 空格键")}${item("截图翻译", "⌥ S")}${item("设置…", "⌘,")}
           ${updates}
           <i class="separator"></i>
           ${item("退出辞达", "⌘Q")}

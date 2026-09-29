@@ -20,6 +20,7 @@ final class TranslationLayerController {
   private var tickCount = 0
   private var windows: [LayerWindowInfo] = []
   private var monitors: [Any] = []
+  private var activationObserver: NSObjectProtocol?
   private var discovering = false
   private var enabledTrees: Set<pid_t> = []
   /// Everything the layer says (§五 提示胶囊).
@@ -48,11 +49,12 @@ final class TranslationLayerController {
     }
     RunLoop.main.add(timer, forMode: .common)
     tick = timer
-    monitors.append(
-      NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
-        MainActor.assumeIsolated { self?.noteScroll() }
-      } as Any)
-    NSWorkspace.shared.notificationCenter.addObserver(
+    if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] _ in
+      MainActor.assumeIsolated { self?.noteScroll() }
+    }) {
+      monitors.append(monitor)
+    }
+    activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
     ) { [weak self] notification in
       let running = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
@@ -64,6 +66,23 @@ final class TranslationLayerController {
         self?.discover()
       }
     }
+  }
+
+  /// Takes every translation off the screen and stops following windows. Without its
+  /// shortcut nothing could turn the layer off again, so clearing the shortcut stops it
+  /// (`Design/spec/translation-layer.md` §二); windows translated whole stay remembered.
+  func stop() {
+    tick?.invalidate()
+    tick = nil
+    monitors.forEach(NSEvent.removeMonitor)
+    monitors = []
+    if let activationObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+    }
+    activationObserver = nil
+    for session in sessions { session.close() }
+    sessions = []
+    hints.hide()
   }
 
   // MARK: ⌥D: this paragraph
@@ -101,7 +120,8 @@ final class TranslationLayerController {
       hint(
         readsText
           ? "这里没有可以翻译的文字"
-          : "\(application.name) 里读不到文字，可以用截图翻译 \(settings().captureShortcut.displayText)")
+          : "\(application.name) 里读不到文字，可以用"
+            + (settings().captureShortcut.map { "截图翻译 \($0.displayText)" } ?? "菜单栏里的截图翻译"))
       log("layer-paragraph-none app=\(application.bundleIdentifier)")
       return
     }
@@ -162,7 +182,8 @@ final class TranslationLayerController {
     windowRules.append(rule)
     saveWindowRules()
     outline.flash(around: frame)
-    let stop = settings().layerShortcut.addingShift.displayText
+    // Only the layer's shortcut reaches here, so it is set.
+    let stop = settings().layerShortcut?.addingShift.displayText ?? ""
     hints.show("翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止", for: LayerHintPanel.instructiveSeconds)
     logHint()
     log("layer-window-on app=\(application.bundleIdentifier)")

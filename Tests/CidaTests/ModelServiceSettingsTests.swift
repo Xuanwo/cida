@@ -122,7 +122,7 @@ final class ModelServiceSettingsTests: XCTestCase {
     model.applyExternalSettings(external, lastCheck: nil)
 
     XCTAssertEqual(model.settings.shortcut, accepted)
-    XCTAssertEqual(model.settings.captureShortcut, .optionS)
+    XCTAssertEqual(model.settings.captureShortcut, GlobalShortcut.optionS)
     XCTAssertEqual(model.settings.translationPrompt, "From the command line.")
     XCTAssertEqual(saved.last?.captureShortcut, .optionS, "The stored setting follows what works")
   }

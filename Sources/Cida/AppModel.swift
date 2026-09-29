@@ -143,7 +143,7 @@ final class AppModel {
   private let service: any TextProcessingService
   private let streamPresentationPolicy: StreamPresentationPolicy
   private let saveSettings: @MainActor (CidaSettings) -> Void
-  private let applyGlobalShortcut: @MainActor (GlobalShortcut, GlobalShortcutAction) -> Bool
+  private let applyGlobalShortcut: @MainActor (GlobalShortcut?, GlobalShortcutAction) -> Bool
   private let suspendGlobalShortcuts: @MainActor (Bool) -> Void
   /// The Settings chip waiting for the next key press. While one records,
   /// every global shortcut is suspended so any combination reaches it.
@@ -197,7 +197,7 @@ final class AppModel {
     saveSettings: @escaping @MainActor (CidaSettings) -> Void = { settings in
       SettingsStore.saveApplicationSettings(settings)
     },
-    applyGlobalShortcut: @escaping @MainActor (GlobalShortcut, GlobalShortcutAction) -> Bool = {
+    applyGlobalShortcut: @escaping @MainActor (GlobalShortcut?, GlobalShortcutAction) -> Bool = {
       _, _ in true
     },
     suspendGlobalShortcuts: @escaping @MainActor (Bool) -> Void = { _ in },
@@ -644,9 +644,10 @@ final class AppModel {
   /// The combination is registered system-wide before it becomes the
   /// setting, so a combination the system, another application or the other
   /// global shortcut holds is refused and the current one keeps working.
+  /// nil leaves the action without a shortcut and always succeeds.
   @discardableResult
   func setShortcut(
-    _ shortcut: GlobalShortcut,
+    _ shortcut: GlobalShortcut?,
     for action: GlobalShortcutAction = .showPanel
   ) -> Bool {
     guard shortcut != settings.shortcut(for: action) else { return true }
