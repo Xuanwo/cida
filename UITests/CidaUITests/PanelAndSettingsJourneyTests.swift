@@ -416,6 +416,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let launchAtLogin = driver.element(identifier: "settings-launch-at-login-toggle")
     XCTAssertTrue(launchAtLogin.waitForExistence(timeout: 3))
     XCTAssertEqual(launchAtLogin.elementType, .checkBox)
+    let feedback = driver.app.buttons["settings-feedback"]
+    XCTAssertTrue(feedback.exists, "反馈 lives in Settings, not in the menu bar menu")
+    XCTAssertEqual(feedback.label, "去反馈")
   }
 
   func testGlobalShortcutIsRecordedInSettingsAndSummonsThePanel() {

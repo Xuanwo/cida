@@ -9,7 +9,6 @@ final class InMemoryConfigurationStore: @unchecked Sendable {
   private var storedSettings = CidaSettings()
   private var storedAPIKey: String?
   private var storedLastCheck: ModelServiceCheckRecord?
-  private var storedAutomaticUpdates = true
   private var storedLaunchAtLogin = false
   private var notifications = 0
   private var outputLines: [String] = []
@@ -34,7 +33,6 @@ final class InMemoryConfigurationStore: @unchecked Sendable {
   var settings: CidaSettings { locked { storedSettings } }
   var apiKey: String? { locked { storedAPIKey } }
   var lastCheck: ModelServiceCheckRecord? { locked { storedLastCheck } }
-  var automaticUpdates: Bool { locked { storedAutomaticUpdates } }
   var launchAtLogin: Bool { locked { storedLaunchAtLogin } }
   var notificationCount: Int { locked { notifications } }
   var output: String { locked { outputLines.joined(separator: "\n") } }
@@ -70,8 +68,6 @@ final class InMemoryConfigurationStore: @unchecked Sendable {
       clearAPIKey: { self.locked { self.storedAPIKey = nil } },
       loadLastCheck: { self.lastCheck },
       saveLastCheck: { record in self.locked { self.storedLastCheck = record } },
-      automaticUpdates: { self.automaticUpdates },
-      setAutomaticUpdates: { enabled in self.locked { self.storedAutomaticUpdates = enabled } },
       launchAtLogin: { _ in self.launchAtLogin },
       setLaunchAtLogin: { enabled in self.locked { self.storedLaunchAtLogin = enabled } },
       notifyChange: { self.locked { self.notifications += 1 } }

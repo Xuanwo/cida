@@ -1,0 +1,27 @@
+# Opened from Settings › 通用 › 反馈 (Design/spec/settings.md §六). The app prefills the
+# environment fields by their ids (Sources/Cida/FeedbackForm.swift); keep them in step.
+name: 反馈 Feedback
+description: 报告问题或提建议 · Report a problem or suggest a change
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 发生了什么 / 想要什么 (What happened / what you want)
+      description: 问题请写怎么操作、看到了什么、本来期望什么；截图或录屏可以直接拖进来。For a problem, say what you did, what you saw and what you expected.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 辞达版本 (Cida version)
+      placeholder: 1.2.1 (171)
+  - type: input
+    id: macos
+    attributes:
+      label: macOS 版本 (macOS version)
+      placeholder: 26.4 (25E246)
+  - type: input
+    id: arch
+    attributes:
+      label: 芯片架构 (Architecture)
+      placeholder: arm64

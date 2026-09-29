@@ -180,7 +180,7 @@ final class CaptureTranslationTests: XCTestCase {
 
   func testTheCommandLineWritesNoneForAnUnsetShortcut() throws {
     var configuration = EditableConfiguration(
-      settings: CidaSettings(), automaticUpdates: true, launchAtLogin: false)
+      settings: CidaSettings(), launchAtLogin: false)
     try ConfigurationField.shortcut.apply("none", to: &configuration)
     try ConfigurationField.layerShortcut.apply("NONE", to: &configuration)
     XCTAssertNil(configuration.settings.shortcut)

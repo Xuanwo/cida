@@ -81,7 +81,6 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var settingsWindowController: NSWindowController?
   private var statusItem: NSStatusItem?
   private var statusItemMark: StatusItemMark?
-  private var checkForUpdatesMenuItem: NSMenuItem?
   private let updater = CidaUpdater()
   private var showPanelMenuItem: NSMenuItem?
   private var captureMenuItem: NSMenuItem?
@@ -433,10 +432,6 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       model.applyExternalSettings(
         settings, lastCheck: SettingsStore.loadLastCheck(namespace: namespace))
       model.refreshLaunchAtLoginStatus()
-      let automaticUpdates = SettingsStore.automaticUpdatesEnabled(namespace: namespace)
-      if updater.state.automaticallyChecks != automaticUpdates {
-        updater.state.setAutomaticallyChecks(automaticUpdates)
-      }
       lifecycleLog?.record(
         "configuration-reloaded model=\(model.settings.modelService.model)"
           + " host=\(model.settings.modelService.host ?? "none")"
@@ -497,37 +492,12 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)
-    if updater.state.isAvailable {
-      let checkForUpdates = NSMenuItem(
-        title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
-      checkForUpdates.target = self
-      checkForUpdates.setAccessibilityIdentifier("status-menu-check-for-updates")
-      menu.addItem(checkForUpdates)
-      checkForUpdatesMenuItem = checkForUpdates
-      observeAvailableUpdateForMenu()
-    }
     menu.addItem(.separator())
     let quit = NSMenuItem(title: "退出辞达", action: #selector(quit), keyEquivalent: "q")
     quit.target = self
     menu.addItem(quit)
     item.menu = menu
     statusItem = item
-  }
-
-  @objc
-  func checkForUpdates() {
-    updater.state.checkForUpdates()
-  }
-
-  /// A version found by a scheduled check turns 检查更新… into its install item
-  /// (`Design/spec/updates.md` §二).
-  private func observeAvailableUpdateForMenu() {
-    let version = withObservationTracking {
-      updater.state.availableVersion
-    } onChange: { [weak self] in
-      Task { @MainActor in self?.observeAvailableUpdateForMenu() }
-    }
-    checkForUpdatesMenuItem?.title = version.map { "安装新版本 \($0)…" } ?? "检查更新…"
   }
 
   /// The menu bar caret breathes while a request runs behind a hidden panel

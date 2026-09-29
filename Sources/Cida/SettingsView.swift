@@ -342,8 +342,9 @@ private struct SettingsBody: View {
         SettingsGroup(isFirst: true) {
           LaunchAtLoginRow(model: model)
           if updates.isAvailable {
-            AutomaticUpdatesRow(updates: updates)
+            UpdatesRow(updates: updates)
           }
+          FeedbackRow()
         }
         AboutFooter()
       }
@@ -1072,34 +1073,31 @@ private struct LaunchAtLoginRow: View {
   }
 }
 
-/// One row (`Design/spec/settings.md` §六): checking daily is a switch, checking now or
-/// installing what a scheduled check found is the button beside it.
-private struct AutomaticUpdatesRow: View {
+/// Cida checks the feed every day on its own (`Design/spec/updates.md` §一); the button checks
+/// now, or installs what a scheduled check found (`Design/spec/settings.md` §六).
+private struct UpdatesRow: View {
   let updates: UpdateState
 
   var body: some View {
     SettingsRow(
-      title: "自动检查更新",
-      caption: updates.availableVersion.map { "新版本 \($0) 可以安装" } ?? "每天检查一次",
+      title: "更新",
+      caption: updates.availableVersion.map { "新版本 \($0) 可以安装" } ?? "每天自动检查",
       alignment: .trailing
     ) {
-      HStack(spacing: 12) {
-        Button(updates.availableVersion == nil ? "检查更新" : "安装…", action: updates.checkForUpdates)
-          .buttonStyle(SettingsBorderedButtonStyle())
-          .accessibilityIdentifier("settings-check-for-updates")
-        Toggle(
-          "",
-          isOn: Binding(
-            get: { updates.automaticallyChecks },
-            set: { updates.setAutomaticallyChecks($0) }
-          )
-        )
-        .labelsHidden()
-        .toggleStyle(.switch)
-        .tint(CidaDesign.accent)
-        .controlSize(.small)
-        .accessibilityIdentifier("settings-automatic-updates-toggle")
-      }
+      Button(updates.availableVersion == nil ? "检查更新" : "安装…", action: updates.checkForUpdates)
+        .buttonStyle(SettingsBorderedButtonStyle())
+        .accessibilityIdentifier("settings-check-for-updates")
+    }
+  }
+}
+
+/// Opens the feedback form on GitHub in the default browser (`Design/spec/settings.md` §六).
+private struct FeedbackRow: View {
+  var body: some View {
+    SettingsRow(title: "反馈", caption: "报告问题或提建议", alignment: .trailing) {
+      Button("去反馈") { NSWorkspace.shared.open(FeedbackForm.url()) }
+        .buttonStyle(SettingsBorderedButtonStyle())
+        .accessibilityIdentifier("settings-feedback")
     }
   }
 }

@@ -448,9 +448,6 @@ private struct Command {
         return storageFailed("无法更新开机启动：\(error.localizedDescription)")
       }
     }
-    if configuration.automaticUpdates != original.automaticUpdates {
-      store.setAutomaticUpdates(configuration.automaticUpdates)
-    }
     store.saveSettings(configuration.settings)
     store.notifyChange()
     return nil
@@ -460,7 +457,6 @@ private struct Command {
     let settings = store.loadSettings()
     var configuration = EditableConfiguration(
       settings: settings,
-      automaticUpdates: store.automaticUpdates(),
       launchAtLogin: store.launchAtLogin(settings)
     )
     configuration.settings.launchAtLogin = configuration.launchAtLogin

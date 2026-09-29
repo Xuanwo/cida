@@ -13,8 +13,8 @@ one HTML board per topic under `Design/boards`, drawn from the shared `tokens.cs
 | Streaming buffer and motion, keyframes T0–T4 | `spec/streaming-motion.md` | `boards/streaming-motion.html` |
 | Settings | `spec/settings.md` | `boards/settings-states.html` |
 | Model service configuration: the command line, Settings' 模型 group, the prompt | `spec/configuration.md` | `boards/configuration.html` |
-| Brand: mark, app icon, menu bar image, wordmark | `spec/brand.md` | `boards/brand.html` |
-| Updates: checks, channels, update reminders, menu bar menu | `spec/updates.md` | `boards/updates.html` |
+| Brand: mark, app icon, menu bar image and menu, wordmark | `spec/brand.md` | `boards/brand.html` |
+| Updates: checks, channels, update reminders, the development build | `spec/updates.md` | `boards/lifecycle.html`, `boards/settings-states.html` |
 
 Each state carries a `data-state` name; the ones the app can render with `--design-state` are
 compared natively:
@@ -49,7 +49,7 @@ compared natively:
 | 配置 · 检查中 | `settings-config-checking` | `settings-config-checking` |
 | 配置 · 检查失败 | `settings-config-failed` | `settings-config-failed` |
 | 配置 · 提示词全文 / 助手的一次配置 / 助手自己闭环 | `configuration-prompt` / `configuration-agent-session` / `configuration-agent-errors` | (text and command-line output; `ModelConfigurationTests` and `CommandLineInterfaceTests` pin the strings) |
-| 菜单栏菜单 · 平时 / 发现新版本 | `status-menu` / `status-menu-update-available` | (native menu, no fixture) |
+| 菜单栏菜单 · 平时 / 开发版 / 显示辞达未设置快捷键 | `status-menu` / `status-menu-dev` / `status-menu-shortcut-unset` | (native menu, no fixture) |
 | 截图框选 · 拖动前 / 框选中 / 暗屏 | `capture-veiled` / `capture-lifted` / `capture-lifted-dark` | (overlay; XCUI attaches `capture-overlay-veiled`) |
 | DMG 窗口 / 背景图 | `dmg-window` / `dmg-background` | (Finder; the background ships in the DMG) |
 | 第一次使用 · 欢迎 / 没配置就回车 | `lifecycle-welcome` / `lifecycle-welcome-submitted` | same |
