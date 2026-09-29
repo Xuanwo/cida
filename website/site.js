@@ -24,7 +24,8 @@ function playHero() {
   const bar = panel.querySelector(".bar");
   const action = bar.querySelector(".bar-action");
   const segmenter = new Intl.Segmenter(document.documentElement.lang, { granularity: "grapheme" });
-  const cursor = document.createElement("span");
+  const graphemes = string => [...segmenter.segment(string)].map(part => part.segment);
+  const cursor = text.querySelector(".cursor") ?? document.createElement("span");
 
   const setProcessing = processing => {
     bar.classList.toggle("processing", processing);
@@ -63,18 +64,26 @@ function playHero() {
 
   // One passage: a simulated network hands over chunks of a few characters, and the renderer
   // drains that buffer at the app's rate (§一), each character fading in behind the head (§二).
-  const stream = async passage => {
-    const characters = [...segmenter.segment(passage.result)].map(part => part.segment);
-    source.textContent = passage.source;
-    text.classList.toggle("cjk", passage.cjk);
-    text.replaceChildren(cursor);
-    cursor.className = "cursor breathing";
-    setProcessing(true);
-    source.classList.remove("leaving");
-    text.classList.remove("leaving");
+  // With `resuming`, the page's still frame is the first part of the passage: its characters stay
+  // where they are and the fading ones finish their fade, so the first paint is never replaced.
+  const stream = async (passage, resuming = false) => {
+    const characters = graphemes(passage.result);
+    let shown = 0;
+    if (resuming) {
+      shown = graphemes(text.textContent).length;
+      for (const fading of text.querySelectorAll(".char-in")) fading.classList.add("settled");
+    } else {
+      source.textContent = passage.source;
+      text.classList.toggle("cjk", passage.cjk);
+      text.replaceChildren(cursor);
+      cursor.className = "cursor breathing";
+      setProcessing(true);
+      source.classList.remove("leaving");
+      text.classList.remove("leaving");
+    }
 
     const arrivals = [];
-    for (let time = 900, count = 0; count < characters.length; time += 60 + Math.random() * 100) {
+    for (let time = resuming ? 0 : 900, count = shown; count < characters.length; time += 60 + Math.random() * 100) {
       count = Math.min(characters.length, count + 3 + Math.floor(Math.random() * 5));
       arrivals.push({ time, count });
     }
@@ -84,11 +93,10 @@ function playHero() {
     let previous = start;
     let rate = minimum;
     let budget = 0;
-    let shown = 0;
     while (shown < characters.length) {
       const now = await nextFrame();
       const elapsed = now - start;
-      const arrived = arrivals.findLast(arrival => arrival.time <= elapsed)?.count ?? 0;
+      const arrived = arrivals.findLast(arrival => arrival.time <= elapsed)?.count ?? shown;
       const buffered = arrived - shown;
       const target = Math.min(maximum, Math.max(minimum, buffered / (catchup / 1000)));
       rate += alpha * (target - rate);
@@ -106,9 +114,11 @@ function playHero() {
     setProcessing(false);
   };
 
+  let resuming = text.textContent !== "" && passages[0].result.startsWith(text.textContent);
   (async () => {
     for (let index = 0; ; index = (index + 1) % passages.length) {
-      await stream(passages[index]);
+      await stream(passages[index], resuming);
+      resuming = false;
       await wait(4000);
       source.classList.add("leaving");
       text.classList.add("leaving");

@@ -129,7 +129,8 @@ def publish_shared_paths(page, page_path):
 
 
 def publish_tokens(output):
-    """tokens.css with each used font pointing at its subset."""
+    """tokens.css with each used font pointing at its subset. The pages preload the fonts, so
+    `block` shows the text once, in its own face, instead of swapping it in after a fallback."""
     tokens = (PROJECT_ROOT / "Design/boards/tokens.css").read_text(encoding="utf-8")
 
     def face(match):
@@ -138,7 +139,7 @@ def publish_tokens(output):
         if source not in FONTS:
             return ""
         return re.sub(r'src: url\("[^"]+"\) format\("truetype"\);',
-                      f'src: url("/assets/fonts/{FONTS[source]}") format("woff2");\n  font-display: swap;',
+                      f'src: url("/assets/fonts/{FONTS[source]}") format("woff2");\n  font-display: block;',
                       match.group(0))
 
     (output / "assets/tokens.css").write_text(

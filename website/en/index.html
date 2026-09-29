@@ -13,10 +13,14 @@
   <meta property="og:url" content="https://cida.xuanwo.io/en/">
   <link rel="icon" href="../../Design/rendered/states/brand-icon.png">
   <link rel="apple-touch-icon" href="../../Design/rendered/states/brand-icon.png">
+  <link rel="preload" href="../assets/fonts/noto-serif-sc.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../assets/fonts/source-serif-4.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../../Design/boards/tokens.css">
   <link rel="stylesheet" href="../../Design/boards/components.css">
   <link rel="stylesheet" href="../site.css">
-  <script src="../../Design/boards/components.js" defer></script>
+  <!-- Not deferred: the panel's control bar is a custom element and must be there on first paint. -->
+  <script src="../../Design/boards/components.js"></script>
   <script src="../site.js" defer></script>
 </head>
 <body class="site">
