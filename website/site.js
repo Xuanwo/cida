@@ -1,10 +1,8 @@
 // The page's motion (Design/spec/website.md §三): the hero panel translates its passages the way
 // the app streams a result (Design/spec/streaming-motion.md), and each usage clip plays only
-// while it is on screen. Without JavaScript, or with ?still in the address (the design board
-// uses it), the page keeps the still frame it was drawn with.
+// while it is on screen. Without JavaScript the page keeps the still frame it was drawn with.
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const still = new URLSearchParams(location.search).has("still");
 
 // The panel's right-hand slot, as components.js draws it.
 const stopAction = `<i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span>`;
@@ -134,7 +132,5 @@ function playClips() {
   clips.forEach(clip => observer.observe(clip));
 }
 
-if (!still) {
-  playHero();
-  playClips();
-}
+playHero();
+playClips();

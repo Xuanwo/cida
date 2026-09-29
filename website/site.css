@@ -155,7 +155,7 @@ body.site {
   display: block;
   background: var(--surface-dim);
   width: 100%;
-  aspect-ratio: 880 / 565;
+  aspect-ratio: 2544 / 1632;
   border-radius: 12px;
   box-shadow: 0 0 0 1px var(--border), 0 18px 48px #1A1A1812;
   object-fit: cover;
@@ -218,6 +218,13 @@ body.site {
 .site footer a { text-underline-offset: 0.2em; }
 .site footer a:hover { color: var(--text-ink); text-decoration: underline; }
 
+/* ---- Medium screens: a clip or a panel next to its text needs 1100 px ----- */
+
+@media (max-width: 1100px) {
+  .use, .updates { grid-template-columns: 1fr; gap: 28px; }
+  .updates .panel { width: 100%; }
+}
+
 /* ---- Narrow screens ------------------------------------------------------ */
 
 @media (max-width: 720px) {
@@ -232,14 +239,12 @@ body.site {
   .hero .stage .panel { width: 100%; }
   .site section.block { padding: 72px 0; }
   .site h2 { font-size: 26px; margin-bottom: 36px; }
-  .use, .updates { grid-template-columns: 1fr; gap: 24px; }
   .use h3 { font-size: 22px; }
   .site .section-note { margin: -24px 0 36px; }
   .steps { grid-template-columns: 1fr; gap: 36px; }
   .permissions .row { grid-template-columns: 1fr; gap: 4px; }
   .permissions .head { display: none; }
   .privacy li { font-size: 18px; }
-  .updates .panel { width: 100%; }
   .site footer .wrap { grid-template-columns: auto 1fr; }
   .site footer nav { grid-column: 2; }
   .releases-page h1 { margin-top: 32px; font-size: 32px; }

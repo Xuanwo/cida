@@ -46,7 +46,7 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 `scripts/capture-design-states.sh` captures every panel and Settings state from an isolated, non-activating build into `Design/ImplementationCurrent` and compares each with its board.
 
-The README's demos (`docs/images/demo-*.gif`, one per way of translating) are screen recordings of the signed Release app driven by an XCUI journey in a Tart guest, on a blog post served locally and read in Chrome: a selection translated with ⌥Space, a reply improved with Tab, a chart framed with ⌥S, a paragraph turned with ⌥D, and the whole page with ⌥⇧D. The runner records the display with ScreenCaptureKit; the model's replies came from the loopback scenario server, and system banners and desktop widgets were cleared from the guest first. The Chrome window is 1180 × 760 pt in the middle of the 1512 × 982 pt display, and each clip is cropped to the window with a margin of wallpaper, idle stretches shortened. That recording journey is not part of the regression suite; when the panel's look or a flow changes, record the affected clip again the same way.
+The README's demos (`docs/images/demo-*.gif`, one per way of translating) are screen recordings of the signed Release app driven by an XCUI journey in a Tart guest, on a blog post served locally and read in Chrome: a selection translated with ⌥Space, a reply improved with Tab, a chart framed with ⌥S, a paragraph turned with ⌥D, and the whole page with ⌥⇧D. The runner records the display with ScreenCaptureKit; the model's replies came from the loopback scenario server, and system banners and desktop widgets were cleared from the guest first. The Chrome window is 1180 × 760 pt in the middle of the 1512 × 982 pt display, and each clip is cropped to the window with a margin of wallpaper, idle stretches shortened. That recording journey is not part of the regression suite; when the panel's look or a flow changes, record the affected clip again the same way. `scripts/make-demo-media.py <recordings>` turns the exported recordings (`translate.mov`, `improve.mov`, …) into the READMEs' GIFs, 1440 px wide for their 720 px column on a Retina display, and the website's clips, 760 and 1520 px H.264 with a poster frame; keep the recordings, since every output is cut from them.
 
 ## Verification
 
@@ -103,6 +103,8 @@ The strict performance gates require a detected 120 Hz-capable display, at least
 
 Pushing a tag `vX.Y.Z` on a commit of `main` publishes a release through `.github/workflows/release.yml`; `vX.Y.Z-rc.N` publishes a prerelease. On a `macos-26` runner the workflow reads the update notes, runs `swift test`, builds with the tag's version and the commit count as the build number, signs with the Developer ID identity, notarizes the app, builds, notarizes and staples `Cida-<version>-<build>.dmg` (`scripts/build-dmg.sh`), attaches the DMG and its SHA-256 to a GitHub release whose notes are the update notes, and publishes the zip as an update and the DMG as the download (`scripts/ci/publish-update.sh`). The zip is only Sparkle's archive and is not attached to the GitHub release.
 
+After the release is published, run the Website workflow (`gh workflow run Website --repo Xuanwo/cida`) so cida.xuanwo.io shows the new version and its notes.
+
 Every version needs update notes before it is tagged: `docs/releases/<X.Y.Z>.md`, written by hand in Chinese for users, one item per line starting with `- ` (`Design/spec/lifecycle.md` §六). A candidate `vX.Y.Z-rc.N` uses the notes of `X.Y.Z`. The workflow stops before building when the file is missing or has a line that is not an item (`scripts/ci/release-notes.py`); the notes go into the feed as plain text, one item per line, and Cida shows them in its panel.
 
 Updates follow `Design/spec/updates.md`. The R2 bucket `cida-releases`, served at `https://cida-releases.xuanwo.io` with a Cloudflare cache rule that honours each object's `Cache-Control`, holds:
@@ -141,17 +143,16 @@ The workflow reads these repository secrets:
 
 ## Website
 
-`website/` holds cida.xuanwo.io (`Design/spec/website.md`): the Chinese page, `en/`, `releases/`, and the layout and motion in `site.css` and `site.js`. The pages load the design tokens and components straight from `Design/boards`, so `swift scripts/render-design.swift website.html` renders them unbuilt. To build and look at the published site:
+`website/` holds cida.xuanwo.io (`Design/spec/website.md`): the Chinese page, `en/`, `releases/`, the layout and motion in `site.css` and `site.js`, and the prepared fonts and clips in `assets/`. The pages load the design tokens, components and brand files from `Design/boards` and `Resources` rather than copies, so the site keeps the app's look. To build and look at it (needs the release tags, `git fetch --tags`):
 
 ```sh
-pip install fonttools brotli            # plus ffmpeg, and the release tags (git fetch --tags)
 scripts/build-website.py                # writes build/website
 python3 -m http.server --directory build/website
 ```
 
-The build maps every local path to `/assets` and fails on one it does not know, fills the version and update notes from the newest `vX.Y.Z` tag, turns the GIF demos into MP4 with a poster frame, and subsets the fonts to the characters the site uses.
+The build copies `website/`, maps each path outside it to `/assets`, and fills the version and update notes from the newest `vX.Y.Z` tag. It fails when a page uses a character the committed font subsets do not cover; `scripts/build-website.py --subset-fonts` (with `pip install fonttools brotli`) makes them again. The clips come from `scripts/make-demo-media.py` (below).
 
-`.github/workflows/website.yml` builds on pull requests that touch the site and deploys from `main` with `wrangler deploy --config website/wrangler.jsonc`: after a push that changes it, and after every successful Release run, so the version on the page is one whose DMG is already published. The Worker `cida-website` only serves static assets, on the custom domain `cida.xuanwo.io`. The deploy reads the repository secret `CLOUDFLARE_API_TOKEN`: an account-owned API token of the Xuanwo account with the Workers Editor role on `cida-website` and Zone > Workers Routes > Write on `xuanwo.io`, which every deploy needs because it restates the custom domain.
+`.github/workflows/website.yml` builds on pull requests that touch the site and deploys from `main` after a push that changes it, with `wrangler deploy --config website/wrangler.jsonc`. A release does not redeploy it; after a release run `gh workflow run Website --repo Xuanwo/cida` so the page shows the new version and notes. The Worker `cida-website` only serves static assets, on the custom domain `cida.xuanwo.io`. The deploy reads the repository secret `CLOUDFLARE_API_TOKEN`: an account API token of the Xuanwo account with Workers Scripts Edit and Workers Routes Edit on the zone `xuanwo.io`, which every deploy needs because it restates the custom domain.
 
 ## Architecture
 
