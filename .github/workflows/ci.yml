@@ -1,5 +1,7 @@
-# Builds with warnings as errors and runs the Swift tests on every pull request and push to
-# main. The Tart journeys and gates run locally; see AGENTS.md.
+# Builds with warnings as errors, runs the Swift tests and builds cida.xuanwo.io on every pull
+# request and push to main. The site is built here rather than behind a path filter, because the
+# pages load the app's board files and a change there can break it; a required check must also
+# report on every pull request. The Tart journeys and gates run locally; see AGENTS.md.
 name: CI
 
 on:
@@ -31,3 +33,15 @@ jobs:
 
       - name: Test
         run: swift test
+
+  website:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The page shows the newest release tag and its notes.
+          fetch-depth: 0
+
+      - name: Build the website
+        run: python3 scripts/build-website.py

@@ -35,7 +35,7 @@ A pull request that changes the UI without screenshots is not ready for review.
 
 ## Verify
 
-- `swift build -Xswiftc -warnings-as-errors` and `swift test` must pass for every change; the CI workflow runs both on each pull request.
+- `swift build -Xswiftc -warnings-as-errors`, `swift test` and `scripts/build-website.py` must pass for every change; the CI workflow runs all three on each pull request, and `main` requires its `test` and `website` checks. The website build fails when a page, `Design/boards/components.js` included, uses a character the committed font subsets lack; run `scripts/build-website.py --subset-fonts` then.
 - Changes to the panel, Settings, shortcuts, selection import, capture or streaming run the affected XCUI journey in Tart: `CIDA_TART_DIAGNOSTIC_MODE=1 CIDA_UI_TEST_ONLY_TESTING=<Suite/test> scripts/test-ui-in-tart.sh`.
 - Release decisions use the gates, from a clean committed checkout: `scripts/e2e/run-pr-gate.sh`, `run-nightly-gate.sh`, `run-release-gate.sh`.
 - Never drive the host's screen for testing: no synthetic mouse or keyboard events, no screen recording of the live desktop, no test instance that activates windows. Use the offscreen captures or Tart.
