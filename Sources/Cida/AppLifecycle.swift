@@ -75,6 +75,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   }()
   private var configurationChangeObserver: NSObjectProtocol?
   private let selectedTextSource = AccessibilitySelectedTextSource()
+  private let selectionCopier = PasteboardSelectionCopier()
   private let screenCaptureSource = SystemScreenCaptureSource()
 
   private var panelController: PanelController?
@@ -269,7 +270,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     isReadingSelection = true
     Task { @MainActor [weak self] in
       guard let self else { return }
-      let selection = await SelectedText.read(from: selectedTextSource)
+      let selection = await SelectedText.read(
+        from: selectedTextSource, copyingWith: selectionCopier
+      ) { [weak self] event in self?.lifecycleLog?.record(event) }
       isReadingSelection = false
       guard !panelController.isVisible else { return }
       // The request may need the Keychain key, which the first show recovers.

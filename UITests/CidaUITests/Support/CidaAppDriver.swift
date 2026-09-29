@@ -437,6 +437,14 @@ final class SourceApplication {
 
   var editor: XCUIElement { app.textViews.firstMatch }
   var captureText: XCUIElement { app.staticTexts["source-capture-text"] }
+  /// Custom-drawn text that Accessibility cannot read; ⌘C copies it.
+  var drawnText: XCUIElement {
+    app.descendants(matching: .any).matching(identifier: "source-drawn-text").firstMatch
+  }
+  /// Tells Accessibility nothing is selected, yet ⌘C copies its whole line.
+  var lineCopyField: XCUIElement {
+    app.descendants(matching: .any).matching(identifier: "source-line-copy").firstMatch
+  }
   var blankArea: XCUIElement {
     app.descendants(matching: .any).matching(identifier: "source-blank").firstMatch
   }

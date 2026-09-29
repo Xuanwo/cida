@@ -117,11 +117,21 @@ final class TranslationLayerController {
   private func applyFoundParagraph(_ found: LayerParagraphFinder.Result, application: LayerApplication, at point: CGPoint) {
     guard case .paragraph(let block, let node, let pane, let window, let site) = found else {
       let readsText = if case .nothing(let readsText) = found { readsText } else { true }
-      hint(
-        readsText
-          ? "这里没有可以翻译的文字"
-          : "\(application.name) 里读不到文字，可以用"
-            + (settings().captureShortcut.map { "截图翻译 \($0.displayText)" } ?? "菜单栏里的截图翻译"))
+      if readsText {
+        hint("这里没有可以翻译的文字")
+      } else {
+        let settings = settings()
+        let capture = settings.captureShortcut.map { "截图翻译 \($0.displayText)" } ?? "菜单栏里的截图翻译"
+        if let shortcut = settings.shortcut {
+          // It also says what to press, so it stays as long as the other instructions (§五).
+          hints.show(
+            "\(application.name) 里读不到文字，选中后按 \(shortcut.displayText) 翻译，或用\(capture)",
+            for: LayerHintPanel.instructiveSeconds)
+          logHint()
+        } else {
+          hint("\(application.name) 里读不到文字，可以用\(capture)")
+        }
+      }
       log("layer-paragraph-none app=\(application.bundleIdentifier)")
       return
     }

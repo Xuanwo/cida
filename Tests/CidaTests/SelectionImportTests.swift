@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import XCTest
 
 @testable import Cida
@@ -97,12 +97,138 @@ final class SelectionImportTests: XCTestCase {
   func testSelectionReadGivesUpAtTheSourceDeadline() async {
     let clock = ContinuousClock()
     let startedAt = clock.now
-    let selection = await SelectedText.read(from: FixedSelectedTextSource(delay: .seconds(2)))
+    let copier = RecordingCopier()
+    let selection = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .unreadable(.attributeUnsupported), delay: .seconds(2)), copyingWith: copier)
     XCTAssertNil(selection)
     XCTAssertLessThan(startedAt.duration(to: clock.now), .seconds(1))
+    XCTAssertEqual(copier.copies, 0, "An application too slow to answer is not asked to copy")
 
-    let answered = await SelectedText.read(from: FixedSelectedTextSource(delay: .zero))
+    let answered = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .selection("selected")), copyingWith: copier)
     XCTAssertEqual(answered, "selected")
+  }
+
+  /// §一 复制兜底: only an application that cannot answer is asked to copy;
+  /// one that answers "nothing selected" may copy its whole line on ⌘C.
+  func testOnlyAnUnreadableSelectionIsCopied() async {
+    let copier = RecordingCopier()
+    let empty = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .selection(nil)), copyingWith: copier)
+    XCTAssertNil(empty)
+    XCTAssertEqual(copier.copies, 0)
+
+    let read = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .selection("read")), copyingWith: copier)
+    XCTAssertEqual(read, "read")
+    XCTAssertEqual(copier.copies, 0)
+
+    let copied = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .unreadable(.attributeUnsupported)), copyingWith: copier)
+    XCTAssertEqual(copied, "copied")
+    XCTAssertEqual(copier.copies, 1)
+  }
+
+  func testCopiedSelectionIsTakenAndThePasteboardPutBack() async throws {
+    let pasteboard = privatePasteboard()
+    let custom = NSPasteboard.PasteboardType("io.xuanwo.cida.test.custom")
+    let first = NSPasteboardItem()
+    first.setString("what the user copied", forType: .string)
+    first.setData(Data([1, 2, 3]), forType: custom)
+    let second = NSPasteboardItem()
+    second.setString("second item", forType: .string)
+    pasteboard.clearContents()
+    pasteboard.writeObjects([first, second])
+
+    let copier = PasteboardSelectionCopier(pasteboardName: pasteboard.name) {
+      pasteboard.clearContents()
+      pasteboard.setString("  the selection \n", forType: .string)
+      return true
+    }
+    let copied = await copier.copySelection()
+
+    XCTAssertEqual(copied, "the selection")
+    let items = try XCTUnwrap(pasteboard.pasteboardItems)
+    XCTAssertEqual(items.count, 2)
+    XCTAssertEqual(items[0].string(forType: .string), "what the user copied")
+    XCTAssertEqual(items[0].data(forType: custom), Data([1, 2, 3]))
+    XCTAssertEqual(items[1].string(forType: .string), "second item")
+    XCTAssertTrue(
+      pasteboard.types?.contains(PasteboardSnapshot.transientType) ?? false,
+      "Clipboard managers are told not to record the contents again")
+  }
+
+  func testNothingCopiedLeavesThePasteboardUntouched() async {
+    let pasteboard = privatePasteboard()
+    pasteboard.clearContents()
+    pasteboard.setString("what the user copied", forType: .string)
+    let changeCount = pasteboard.changeCount
+
+    let copier = PasteboardSelectionCopier(
+      copyDeadline: .milliseconds(50), pasteboardName: pasteboard.name
+    ) { true }
+    let copied = await copier.copySelection()
+
+    XCTAssertNil(copied)
+    XCTAssertEqual(pasteboard.changeCount, changeCount)
+    XCTAssertEqual(pasteboard.string(forType: .string), "what the user copied")
+  }
+
+  func testCopiedFilesAreNoSelectionAndAnEmptyPasteboardStaysEmpty() async {
+    let pasteboard = privatePasteboard()
+    pasteboard.clearContents()
+
+    let copier = PasteboardSelectionCopier(pasteboardName: pasteboard.name) {
+      pasteboard.clearContents()
+      pasteboard.writeObjects([URL(fileURLWithPath: "/tmp/report.txt") as NSURL])
+      return true
+    }
+    let copied = await copier.copySelection()
+
+    XCTAssertNil(copied, "Files copied in Finder are not text to translate")
+    XCTAssertEqual(pasteboard.pasteboardItems?.count ?? 0, 0)
+  }
+
+  func testACopyAfterTheDeadlineIsStillPutBack() async throws {
+    let pasteboard = privatePasteboard()
+    pasteboard.clearContents()
+    pasteboard.setString("what the user copied", forType: .string)
+
+    let copier = PasteboardSelectionCopier(
+      copyDeadline: .milliseconds(30), lateCopyWindow: .seconds(1), pasteboardName: pasteboard.name
+    ) {
+      Task { @MainActor in
+        try? await Task.sleep(for: .milliseconds(120))
+        pasteboard.clearContents()
+        pasteboard.setString("late selection", forType: .string)
+      }
+      return true
+    }
+    let copied = await copier.copySelection()
+    XCTAssertNil(copied, "A copy after the deadline is not waited for")
+
+    try await waitUntil {
+      pasteboard.string(forType: .string) == "what the user copied"
+    }
+  }
+
+  func testNoCommandSentLeavesThePasteboardUntouched() async {
+    let pasteboard = privatePasteboard()
+    pasteboard.clearContents()
+    pasteboard.setString("what the user copied", forType: .string)
+    let changeCount = pasteboard.changeCount
+
+    let copier = PasteboardSelectionCopier(pasteboardName: pasteboard.name) { false }
+    let copied = await copier.copySelection()
+
+    XCTAssertNil(copied, "Secure input is on")
+    XCTAssertEqual(pasteboard.changeCount, changeCount)
+  }
+
+  private func privatePasteboard() -> NSPasteboard {
+    let pasteboard = NSPasteboard(name: .init("io.xuanwo.cida.tests.\(UUID().uuidString)"))
+    addTeardownBlock { @MainActor in pasteboard.releaseGlobally() }
+    return pasteboard
   }
 
   private func waitUntil(
@@ -122,12 +248,23 @@ final class SelectionImportTests: XCTestCase {
 }
 
 private struct FixedSelectedTextSource: SelectedTextSource {
-  let delay: Duration
+  let answer: SelectionAnswer
+  var delay: Duration = .zero
   var readDeadline: Duration { .milliseconds(100) }
 
-  func currentSelection() async -> String? {
+  func currentSelection() async -> SelectionAnswer {
     try? await Task.sleep(for: delay)
-    return "selected"
+    return answer
+  }
+}
+
+@MainActor
+private final class RecordingCopier: SelectionCopier {
+  private(set) var copies = 0
+
+  func copySelection() async -> String? {
+    copies += 1
+    return "copied"
   }
 }
 

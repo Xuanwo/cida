@@ -123,6 +123,53 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse((completed.value as? String)?.contains("SELECTION_GATED") ?? true)
   }
 
+  /// `Design/spec/panel.md` §一 复制兜底: an application Accessibility cannot
+  /// read is sent ⌘C, and the clipboard the user had is put back. One that
+  /// answers "nothing selected" is never sent ⌘C, because it would copy its
+  /// whole line.
+  func testShortcutCopiesASelectionAccessibilityCannotReadAndPutsTheClipboardBack() throws {
+    driver.launch()
+    driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    let pasteboard = NSPasteboard.general
+    let custom = NSPasteboard.PasteboardType("io.xuanwo.cida.e2e.clipboard")
+    let clipboard = NSPasteboardItem()
+    clipboard.setString("CIDA_E2E_CLIPBOARD", forType: .string)
+    clipboard.setData(Data([7, 7, 7]), forType: custom)
+    pasteboard.clearContents()
+    pasteboard.writeObjects([clipboard])
+
+    source.drawnText.click()
+    source.press("a", modifierFlags: .option)
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
+    let broughtIn = driver.waitForTextValue(
+      "CIDA_E2E_SELECTION_DRAWN", in: driver.composer, timeout: 3)
+    let translated = driver.result(containing: "CIDA_E2E_SELECTION_DRAWN_COMPLETE")
+      .waitForExistence(timeout: 8)
+    // Taken before the assertions, so a run without the fallback shows its empty panel too.
+    let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+    shot.name = "Copied selection of a custom-drawn view"
+    shot.lifetime = .keepAlways
+    add(shot)
+    XCTAssertTrue(broughtIn, "The copied selection replaces the source")
+    XCTAssertTrue(translated, "and is translated without ⏎")
+    XCTAssertEqual(pasteboard.string(forType: .string), "CIDA_E2E_CLIPBOARD")
+    XCTAssertEqual(pasteboard.data(forType: custom), Data([7, 7, 7]), "Every type is put back")
+    driver.waitForCompletion()
+
+    driver.hidePanel()
+    let changeCount = pasteboard.changeCount
+    source.lineCopyField.click()
+    source.press("a", modifierFlags: .option)
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
+    XCTAssertFalse(
+      driver.textValue(in: driver.composer).contains("CIDA_E2E_WHOLE_LINE"),
+      "An application that answers no selection is not asked to copy")
+    XCTAssertEqual(pasteboard.changeCount, changeCount, "The clipboard is not touched")
+  }
+
   /// `Design/spec/panel.md` §一 截图翻译, through the real ScreenCaptureKit
   /// path: the guest grants Cida Screen Recording, the capture shortcut
   /// freezes the guest's display, and Vision reads the source application's
