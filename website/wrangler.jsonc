@@ -1,12 +1,13 @@
 // cida.xuanwo.io: a Worker that only serves the static site scripts/build-website.py writes.
 // Deployed by .github/workflows/website.yml; see "Website" in docs/development.md.
+// The custom domain cida.xuanwo.io is attached to the Worker in Cloudflare and deliberately not
+// listed here: a deploy that leaves it alone needs only the Editor role on this one Worker.
 {
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   "name": "cida-website",
   "account_id": "d100c32126daec20555857d36239c412",
   "compatibility_date": "2026-09-01",
   "assets": { "directory": "../build/website" },
-  "routes": [{ "pattern": "cida.xuanwo.io", "custom_domain": true }],
   // No cida-website.<account>.workers.dev URL; preview URLs follow this setting.
   "workers_dev": false
 }

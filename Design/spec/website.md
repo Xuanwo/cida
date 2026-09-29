@@ -40,4 +40,4 @@ cida.xuanwo.io，面向不看 GitHub 的 Mac 用户。页面就是仓库里的 [
 
 - 静态文件，不用框架。`scripts/build-website.py` 复制 `website/`，把指向仓库其他位置的路径换成 `/assets` 下的文件，并按 release tag（不含 rc）写入最新版本号、上一个版本号和更新说明，生成更新记录。版本号取自 tag 而不是 `docs/releases`：说明在打 tag 前就合入，页面只显示已经能下载的版本。
 - 字体子集与演示视频提前做好并提交，构建不再处理：字体只含站点用到的字，页面出现未覆盖的字时构建失败，提示重新子集；视频有 760 与 1520 两种宽度，按屏幕倍率选择，外加首帧海报。
-- 部署在 Cloudflare Workers 的静态资源（`website/wrangler.jsonc`，Worker `cida-website`，自定义域名 cida.xuanwo.io）。`.github/workflows/website.yml` 在 main 上相关文件变化后部署；发版不自动部署，发版后手动运行一次这个工作流。
+- 部署在 Cloudflare Workers 的静态资源（`website/wrangler.jsonc`，Worker `cida-website`）。自定义域名 cida.xuanwo.io 在 Cloudflare 上绑定一次，不写进配置，部署不碰它，所以部署令牌只需要这一个 Worker 的 Editor 权限。`.github/workflows/website.yml` 在 main 上相关文件变化后部署；发版不自动部署，发版后手动运行一次这个工作流。
