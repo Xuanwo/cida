@@ -65,10 +65,11 @@ enum CaptureGeometry {
   }
 }
 
-/// What the frozen screen is veiled with: the result pane's paper over a
-/// light screen, ink over a dark one, where a paper wash would turn the
-/// whole screen milky. On ink the panel's shadows vanish, so the sheet's
-/// edge is a light hairline instead of a dark one.
+/// What the frozen screen is veiled with: the result pane's light paper over a
+/// light screen, its dark paper over a dark one, where a light wash would turn
+/// the whole screen milky. The veil follows the frozen screen, not Cida's
+/// appearance. On ink the panel's shadows vanish, so the sheet's edge is a
+/// light hairline instead of a dark one.
 enum CaptureVeil: Equatable {
   case paper
   case ink
@@ -83,8 +84,8 @@ enum CaptureVeil: Equatable {
 
   var color: CGColor {
     switch self {
-    case .paper: CidaDesign.Palette.surfacePaper.appKit.withAlphaComponent(0.72).cgColor
-    case .ink: CidaDesign.Palette.textInk.appKit.withAlphaComponent(0.45).cgColor
+    case .paper: CidaDesign.Palette.surfacePaper.appKit(dark: false).withAlphaComponent(0.72).cgColor
+    case .ink: CidaDesign.Palette.surfacePaper.appKit(dark: true).withAlphaComponent(0.45).cgColor
     }
   }
 
@@ -187,10 +188,10 @@ final class CaptureOverlayView: NSView {
     for (shadowLayer, opacity, offset, radius) in shadows {
       // An opaque body the sheet covers exactly: a layer casts its shadow
       // from what it draws, so an empty one may cast none.
-      shadowLayer.backgroundColor = CidaDesign.Palette.surface.appKit.cgColor
+      shadowLayer.backgroundColor = CidaDesign.Palette.surface.appKit(dark: false).cgColor
       shadowLayer.cornerRadius = CidaDesign.Radius.card
       shadowLayer.cornerCurve = .continuous
-      shadowLayer.shadowColor = CidaDesign.Palette.textPrimary.appKit.cgColor
+      shadowLayer.shadowColor = CidaDesign.Palette.textPrimary.appKit(dark: false).cgColor
       shadowLayer.shadowOpacity = opacity
       shadowLayer.shadowOffset = CGSize(width: 0, height: offset)
       shadowLayer.shadowRadius = radius

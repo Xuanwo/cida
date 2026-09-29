@@ -352,9 +352,18 @@ final class PanelContentView: NSView {
     layer?.cornerRadius = CidaDesign.Radius.panel
     layer?.cornerCurve = .continuous
     layer?.masksToBounds = true
-    layer?.backgroundColor = CidaDesign.Palette.surface.appKit.cgColor
     layer?.borderWidth = 1
-    layer?.borderColor = NSColor.black.withAlphaComponent(0.07).cgColor
+    applyAppearance()
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    applyAppearance()
+  }
+
+  private func applyAppearance() {
+    layer?.backgroundColor = CidaDesign.Palette.surface.cgColor(in: effectiveAppearance)
+    layer?.borderColor = CidaDesign.Palette.panelEdge.cgColor(in: effectiveAppearance)
   }
 
   @available(*, unavailable)

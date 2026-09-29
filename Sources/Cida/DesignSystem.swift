@@ -3,47 +3,80 @@ import CoreText
 import QuartzCore
 import SwiftUI
 
+/// A design color in both appearances (`Design/spec/appearance.md`): `hex`/`alpha` are the
+/// light value, `darkHex`/`darkAlpha` the dark one, as `tokens.css` writes them under `:root`
+/// and `[data-appearance="dark"]`.
 struct CidaColorToken: Sendable {
   let hex: UInt32
   let alpha: CGFloat
+  let darkHex: UInt32
+  let darkAlpha: CGFloat
 
-  init(_ hex: UInt32, alpha: CGFloat = 1) {
+  init(_ hex: UInt32, alpha: CGFloat = 1, dark darkHex: UInt32, darkAlpha: CGFloat? = nil) {
     self.hex = hex
     self.alpha = alpha
+    self.darkHex = darkHex
+    self.darkAlpha = darkAlpha ?? alpha
   }
 
+  /// Follows the appearance of whatever draws it: SwiftUI's environment, a view's
+  /// `effectiveAppearance` while it draws text, `NSAppearance.current` everywhere else.
   var swiftUI: Color {
-    Color(hex: hex, alpha: Double(alpha))
+    Color(nsColor: appKit)
   }
 
+  /// A dynamic color that resolves at draw time. A `CGColor` taken from it is fixed to the
+  /// appearance current at that moment, so layers use `cgColor(in:)` and set it again when
+  /// their view's appearance changes.
   var appKit: NSColor {
-    NSColor(
+    NSColor(name: nil) { appearance in
+      appKit(dark: appearance.isDark)
+    }
+  }
+
+  func appKit(dark: Bool) -> NSColor {
+    let (hex, alpha) = dark ? (darkHex, darkAlpha) : (hex, alpha)
+    return NSColor(
       srgbRed: CGFloat((hex >> 16) & 0xff) / 255,
       green: CGFloat((hex >> 8) & 0xff) / 255,
       blue: CGFloat(hex & 0xff) / 255,
       alpha: alpha
     )
   }
+
+  func cgColor(in appearance: NSAppearance) -> CGColor {
+    appKit(dark: appearance.isDark).cgColor
+  }
+}
+
+extension NSAppearance {
+  var isDark: Bool {
+    bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+  }
 }
 
 enum CidaDesign {
   enum Palette {
-    static let background = CidaColorToken(0xFAFAF8)
-    static let surface = CidaColorToken(0xFFFFFF)
-    static let surfaceDim = CidaColorToken(0xF4F4F1)
-    static let surfacePaper = CidaColorToken(0xF7F6F1)
-    static let border = CidaColorToken(0xE8E8E3)
-    static let textPrimary = CidaColorToken(0x1A1A18)
-    static let textSecondary = CidaColorToken(0x8A8A83)
-    static let textTertiary = CidaColorToken(0xB5B5AE)
-    static let textInk = CidaColorToken(0x161614)
-    static let textControl = CidaColorToken(0x4E4E49)
-    static let hint = CidaColorToken(0xC4C4BD)
-    static let accent = CidaColorToken(0x2E6B4F)
-    static let accentSoft = CidaColorToken(0xEAF2EE)
-    static let accentForeground = CidaColorToken(0xFFFFFF)
-    static let toggleOff = CidaColorToken(0xDBDBD5)
-    static let placeholder = CidaColorToken(0xB5B7B0, alpha: 0.22)
+    static let background = CidaColorToken(0xFAFAF8, dark: 0x1E1E1C)
+    static let surface = CidaColorToken(0xFFFFFF, dark: 0x262624)
+    static let surfaceDim = CidaColorToken(0xF4F4F1, dark: 0x31312E)
+    static let surfacePaper = CidaColorToken(0xF7F6F1, dark: 0x1B1A17)
+    static let border = CidaColorToken(0xE8E8E3, dark: 0x383835)
+    static let textPrimary = CidaColorToken(0x1A1A18, dark: 0xEDEDE9)
+    static let textSecondary = CidaColorToken(0x8A8A83, dark: 0x8A8A83)
+    static let textTertiary = CidaColorToken(0xB5B5AE, dark: 0x5E5E58)
+    static let textInk = CidaColorToken(0x161614, dark: 0xE9E6DD)
+    static let textControl = CidaColorToken(0x4E4E49, dark: 0xC2C2BA)
+    static let hint = CidaColorToken(0xC4C4BD, dark: 0x4C4C47)
+    static let accent = CidaColorToken(0x2E6B4F, dark: 0x5E9C7C)
+    static let accentSoft = CidaColorToken(0xEAF2EE, dark: 0x233129)
+    static let accentForeground = CidaColorToken(0xFFFFFF, dark: 0xFFFFFF)
+    static let toggleOff = CidaColorToken(0xDBDBD5, dark: 0x45453F)
+    /// `panel-edge`: the hairline around the panel and the hint pills.
+    static let panelEdge = CidaColorToken(0x000000, alpha: 0x12 / 255, dark: 0xFFFFFF, darkAlpha: 0x1F / 255)
+    /// `panel-shadow`'s two layers: a tight contact shadow and a wide ambient one.
+    static let contactShadow = CidaColorToken(0x000000, alpha: 0x14 / 255, dark: 0x000000, darkAlpha: 0x40 / 255)
+    static let ambientShadow = CidaColorToken(0x1A1A18, alpha: 0x30 / 255, dark: 0x000000, darkAlpha: 0x73 / 255)
   }
 
   static let background = Palette.background.swiftUI
@@ -307,18 +340,6 @@ enum CidaMotion {
   }
 }
 
-extension Color {
-  init(hex: UInt32, alpha: Double = 1) {
-    self.init(
-      .sRGB,
-      red: Double((hex >> 16) & 0xff) / 255,
-      green: Double((hex >> 8) & 0xff) / 255,
-      blue: Double(hex & 0xff) / 255,
-      opacity: alpha
-    )
-  }
-}
-
 enum FontRegistrar {
   private static let fontFiles = [
     "Inter[opsz,wght]",
@@ -389,10 +410,10 @@ struct CidaHintPill: View {
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
     .background(CidaDesign.surface, in: Capsule())
-    .overlay { Capsule().strokeBorder(Color.black.opacity(0x12 / 255), lineWidth: 1) }
-    .shadow(color: CidaDesign.textPrimary.opacity(0x14 / 255), radius: 3, y: 2)
+    .overlay { Capsule().strokeBorder(CidaDesign.Palette.panelEdge.swiftUI, lineWidth: 1) }
+    .shadow(color: CidaDesign.Palette.contactShadow.swiftUI, radius: 3, y: 2)
     .shadow(
-      color: CidaDesign.textPrimary.opacity(0x30 / 255), radius: Self.ambientShadowRadius,
+      color: CidaDesign.Palette.ambientShadow.swiftUI, radius: Self.ambientShadowRadius,
       y: Self.ambientShadowOffset)
     .contentShape(Capsule())
     .padding(Self.shadowInsets)

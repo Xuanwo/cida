@@ -710,7 +710,8 @@ body {
 .screen.dark .frozen-window p { color: #B8B8B0; }
 
 .veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--surface-paper) 72%, transparent); }
-.screen.dark .veil { background: color-mix(in srgb, var(--text-ink) 45%, transparent); }
+/* A dark screen is veiled with the dark appearance's paper, whatever Cida's own appearance is. */
+.screen.dark .veil { background: color-mix(in srgb, var(--surface-paper) 45%, transparent); }
 
 /* The lifted sheet shows the frozen screen through a window of its own. */
 .lifted {
@@ -958,3 +959,23 @@ body {
   height: 22px;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 22'><path d='M1 1v17l4.5-4.2 3 6.7 2.6-1.1-3-6.6H14z' fill='black' stroke='white' stroke-width='1.3' stroke-linejoin='round'/></svg>") no-repeat;
 }
+
+/* ---- Appearance (spec/appearance.md) ------------------------------------
+ * A light state and its dark counterpart side by side; the dark stage stands in for a dark
+ * desktop, the light one for the board itself. */
+
+.appearance-pair { display: flex; gap: 24px; align-items: stretch; }
+.appearance-stage { display: flex; flex-direction: column; gap: 24px; padding: 28px; border-radius: 12px; }
+.appearance-pair > .panel { align-self: center; margin: 28px; }
+.appearance-stage[data-appearance="dark"] { background: #141413; }
+/* Inherited text colour is resolved where it is declared (body), so a dark scope sets its own. */
+[data-appearance="dark"] { color: var(--text-primary); }
+.appearance-stage.light { padding: 28px; }
+.settings-pair { flex-direction: column; }
+.settings-pair .appearance-stage { flex-direction: row; align-items: flex-start; }
+.settings-pair .window { width: 560px; }
+.appearance-stage.pills { width: 856px; align-items: center; justify-content: center; }
+.appearance-stage.pills > .capture-hint { box-shadow: 0 0 0 1px var(--panel-edge), var(--panel-shadow); border: 0; }
+.layer-demo { margin: 8px 0 0; font-size: 15px; line-height: 22px; }
+.layer-demo .layer-sheet { display: inline-block; }
+.layer-demo .link { color: var(--accent); }

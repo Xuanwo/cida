@@ -2,6 +2,8 @@
  * Cida design tokens. The implementation mirrors every value in
  * Sources/Cida/DesignSystem.swift (CidaDesign, CidaMotion);
  * DesignTokenTests reads this file and fails when the two drift apart.
+ * Colors come in two appearances (spec/appearance.md): :root holds the light
+ * ones, [data-appearance="dark"] redefines the same names for the dark one.
  * Settings uses a few literal sizes (10.5 / 12 / 12.5 / 13.5) that are not
  * tokens.
  */
@@ -28,7 +30,7 @@
 }
 
 :root {
-  /* Colors (light only) */
+  /* Colors, light appearance */
   --bg: #FAFAF8;
   --surface: #FFFFFF;
   --surface-dim: #F4F4F1;
@@ -106,4 +108,26 @@
   --motion-ease-height: ease-out;
   --motion-ease-cursor-out: ease-out;
   --motion-ease-breathe: ease-in-out;
+}
+
+/* Colors, dark appearance (spec/appearance.md): the same paper and ink at night. */
+[data-appearance="dark"] {
+  --bg: #1E1E1C;
+  --surface: #262624;
+  --surface-dim: #31312E;
+  --surface-paper: #1B1A17;
+  --border: #383835;
+  --text-primary: #EDEDE9;
+  --text-secondary: #8A8A83;
+  --text-tertiary: #5E5E58;
+  --text-ink: #E9E6DD;
+  --text-control: #C2C2BA;
+  --hint: #4C4C47;
+  --accent: #5E9C7C;
+  --accent-soft: #233129;
+  --accent-foreground: #FFFFFF;
+  --toggle-off: #45453F;
+  --panel-shadow: 0 2px 6px #00000040, 0 28px 72px #00000073;
+  --panel-edge: #FFFFFF1F;
+  color-scheme: dark;
 }

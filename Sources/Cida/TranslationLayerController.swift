@@ -522,6 +522,7 @@ final class LayerPaneSession {
     self.window = window
     self.pane = pane
     self.owner = owner
+    overlay.overlayView.onAppearanceChange = { [weak self] in self?.redraw() }
   }
 
   /// Tries the paragraphs whose request failed again (§二 失败).
@@ -836,8 +837,7 @@ final class LayerPaneSession {
   private func redraw() {
     guard !isFinished else { return }
     let scale = overlay.backingScaleFactor
-    let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-    let style = LayerTextStyle.paper(darkAppearance: dark)
+    let style = LayerTextStyle.paper(darkAppearance: overlay.overlayView.effectiveAppearance.isDark)
     let origin = CGPoint(x: -paneFrame.minX, y: -paneFrame.minY)
     var drawn: [CGRect] = []
     let settings = owner.currentSettings

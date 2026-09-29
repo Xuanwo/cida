@@ -3,15 +3,17 @@ import QuartzCore
 import SwiftUI
 
 /// How a translation is painted (`Design/spec/translation-layer.md` §五): always on Cida's paper in
-/// Cida's ink, whatever the app looks like; paper and ink trade places in a dark appearance.
+/// Cida's ink, whatever the app looks like, in the colors of Cida's own appearance.
 struct LayerTextStyle: Equatable {
   let background: NSColor
   let foreground: NSColor
+  let link: NSColor
 
-  static func paper(darkAppearance: Bool) -> LayerTextStyle {
-    darkAppearance
-      ? LayerTextStyle(background: CidaDesign.Palette.textInk.appKit, foreground: CidaDesign.Palette.surfacePaper.appKit)
-      : LayerTextStyle(background: CidaDesign.Palette.surfacePaper.appKit, foreground: CidaDesign.Palette.textInk.appKit)
+  static func paper(darkAppearance dark: Bool) -> LayerTextStyle {
+    LayerTextStyle(
+      background: CidaDesign.Palette.surfacePaper.appKit(dark: dark),
+      foreground: CidaDesign.Palette.textInk.appKit(dark: dark),
+      link: CidaDesign.Palette.accent.appKit(dark: dark))
   }
 }
 
@@ -128,7 +130,7 @@ struct LayerTypeset {
       attributes: [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): style.foreground.cgColor])
     for link in links where NSMaxRange(link) <= colored.length {
       colored.addAttribute(
-        NSAttributedString.Key(kCTForegroundColorAttributeName as String), value: CidaDesign.Palette.accent.appKit.cgColor,
+        NSAttributedString.Key(kCTForegroundColorAttributeName as String), value: style.link.cgColor,
         range: link)
     }
     // The same lines, in colour: breaks and positions come from the plain layout.
@@ -181,6 +183,8 @@ final class LayerOverlayView: NSView {
   private(set) var pendingFrames: [CGRect] = []
   private let occlusionMask = CAShapeLayer()
   private(set) var drawings: [LayerDrawing] = []
+  /// Paints the paragraphs again in the new appearance's paper and ink.
+  var onAppearanceChange: (() -> Void)?
 
   override init(frame: NSRect) {
     super.init(frame: frame)
@@ -200,6 +204,13 @@ final class LayerOverlayView: NSView {
   }
 
   override var isFlipped: Bool { true }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    let accent = CidaDesign.Palette.accent.cgColor(in: effectiveAppearance)
+    pendingLayer.sublayers?.forEach { $0.backgroundColor = accent }
+    onAppearanceChange?()
+  }
 
   override func layout() {
     super.layout()
@@ -223,7 +234,7 @@ final class LayerOverlayView: NSView {
       let caret = CALayer()
       caret.frame = frame
       caret.cornerRadius = CidaMotion.cursorWidth / 2
-      caret.backgroundColor = CidaDesign.Palette.accent.appKit.cgColor
+      caret.backgroundColor = CidaDesign.Palette.accent.cgColor(in: effectiveAppearance)
       if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
         let breathe = CABasicAnimation(keyPath: "opacity")
         breathe.fromValue = 1
@@ -443,7 +454,6 @@ final class LayerOutlinePanel: NSPanel {
     view.wantsLayer = true
     view.layer?.addSublayer(outline)
     contentView = view
-    outline.borderColor = CidaDesign.Palette.accent.appKit.cgColor
     outline.borderWidth = Self.lineWidth
     outline.cornerRadius = Self.windowCornerRadius + Self.gap
     outline.cornerCurve = .continuous
@@ -459,6 +469,7 @@ final class LayerOutlinePanel: NSPanel {
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     outline.frame = CGRect(origin: .zero, size: frame.size)
+    outline.borderColor = CidaDesign.Palette.accent.cgColor(in: effectiveAppearance)
     CATransaction.commit()
     alphaValue = 1
     orderFrontRegardless()

@@ -4,7 +4,8 @@ set -euo pipefail
 # Renders every design board (Design/boards) and every panel and Settings
 # state with an isolated, non-activating Debug build, then places each native
 # capture next to the board's render of the same state for review. The state
-# names are the boards' data-state values (Design/README.md).
+# names are the boards' data-state values (Design/README.md); dark-<state> is
+# <state> in the dark appearance.
 
 script_dir=${0:A:h}
 project_dir=${script_dir:h}
@@ -28,16 +29,20 @@ for state in empty translate improve stale stopped failed long \
   settings-config-checking settings-config-failed \
   lifecycle-welcome lifecycle-welcome-submitted lifecycle-update-checking lifecycle-update-found \
   lifecycle-update-downloading lifecycle-update-ready lifecycle-update-current \
-  lifecycle-update-failed lifecycle-update-read-only; do
+  lifecycle-update-failed lifecycle-update-read-only \
+  dark-empty dark-improve dark-stale dark-lifecycle-welcome \
+  dark-settings-prompt-editing dark-settings-recording dark-settings-general; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
     --snapshot-output "$implementation_dir/$state.png"
 done
 
-"$automation_runner" "$binary" \
-  --design-state streaming \
-  --snapshot-delay-ms 800 \
-  --snapshot-output "$implementation_dir/streaming.png"
+for state in streaming dark-streaming; do
+  "$automation_runner" "$binary" \
+    --design-state "$state" \
+    --snapshot-delay-ms 800 \
+    --snapshot-output "$implementation_dir/$state.png"
+done
 
 # Logical-size copies for the visual baseline manifest and side-by-side review.
 for image in "$implementation_dir"/*.png; do

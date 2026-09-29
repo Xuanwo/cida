@@ -168,7 +168,7 @@ class CidaSettings extends HTMLElement {
     }[tab];
 
     this.outerHTML = `
-      <section class="window" style="position: relative" data-state="${this.getAttribute("state")}">
+      <section class="window" style="position: relative"${this.hasAttribute("state") ? ` data-state="${this.getAttribute("state")}"` : ""}>
         <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">${tabs.find(([key]) => key === tab)[1]}</div></div>
         ${tabBar}
         <div class="settings">${content}</div>
@@ -199,7 +199,7 @@ class CidaFrozenScreen extends HTMLElement {
     this.outerHTML = `
       <section class="screen${this.hasAttribute("dark") ? " dark" : ""}" data-state="${this.getAttribute("state")}">
         ${window()}
-        <div class="veil"></div>
+        <div class="veil"${this.hasAttribute("dark") ? ' data-appearance="dark"' : ""}></div>
         ${lifted}
         <div class="capture-hint"><span class="wordmark">辞达</span><span>拖动框选要翻译的文字 · Esc 取消</span></div>
       </section>`;
