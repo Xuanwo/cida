@@ -183,31 +183,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let source = SourceApplication()
     source.launch()
     addTeardownBlock { [source] in source.app.terminate() }
-    let overlays = driver.app.descendants(matching: .any).matching(identifier: "translation-layer-content")
-    func paragraph(_ number: Int) -> XCUIElement {
-      source.app.staticTexts.matching(
-        NSPredicate(format: "value BEGINSWITH %@ OR label BEGINSWITH %@",
-          "CIDA LAYER PARAGRAPH \(number).", "CIDA LAYER PARAGRAPH \(number).")
-      ).firstMatch
-    }
-    /// Everything the layer draws now, across its panes.
-    func shown() -> String {
-      overlays.allElementsBoundByIndex.compactMap { $0.value as? String }.joined(separator: "\n")
-    }
-    func wait(timeout: TimeInterval, until condition: (String) -> Bool) -> String? {
-      let deadline = Date().addingTimeInterval(timeout)
-      repeat {
-        let text = shown()
-        if condition(text) { return text }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-      } while Date() < deadline
-      return nil
-    }
-    func press(on number: Int, wholeWindow: Bool = false) {
-      paragraph(number).coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).hover()
-      RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-      source.press("d", modifierFlags: wholeWindow ? [.option, .shift] : .option)
-    }
+    let layer = TranslationLayerProbe(cida: driver.app, source: source)
     func attach(_ name: String) {
       // Out of the way of the paragraphs, so the shot shows them whole.
       source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
@@ -217,40 +193,40 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       shot.lifetime = .keepAlways
       add(shot)
     }
-    XCTAssertTrue(paragraph(2).waitForExistence(timeout: 5), "The source shows its article")
+    XCTAssertTrue(layer.paragraph(2).waitForExistence(timeout: 5), "The source shows its article")
 
     // ⌥D: this paragraph, then another; the rest stay original.
-    press(on: 2)
-    let one = try XCTUnwrap(wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") }, "⌥D translates it in place")
+    layer.press(on: 2)
+    let one = try XCTUnwrap(layer.wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") }, "⌥D translates it in place")
     XCTAssertFalse(one.contains("CIDA_LAYER_TRANSLATED_3"), "Only that paragraph")
     attach("layer-one-paragraph")
-    press(on: 3)
+    layer.press(on: 3)
     XCTAssertNotNil(
-      wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
+      layer.wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
       "A second paragraph joins the first")
     attach("layer-two-paragraphs")
 
     // ⌥D on a translation turns it back.
-    press(on: 2)
+    layer.press(on: 2)
     XCTAssertNotNil(
-      wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
+      layer.wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
       "Only the paragraph pressed on turns back")
 
     // ⌥D on a paragraph in my language translates it into the foreign one, as ⌥A would.
-    press(on: 17)
+    layer.press(on: 17)
     let foreign = try XCTUnwrap(
-      wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_17") }, "⌥D translates my language too")
+      layer.wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_17") }, "⌥D translates my language too")
     XCTAssertTrue(foreign.contains("Paragraph 17 in English"), foreign)
     attach("layer-into-foreign-language")
-    press(on: 17)
+    layer.press(on: 17)
     XCTAssertNotNil(
-      wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_17") }, "and turns it back")
+      layer.wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_17") }, "and turns it back")
 
     // ⌥⇧D: the whole window. (Its hint lasts 2 s, shorter than a synthesized key press takes
     // to return here while the host's caret blinks; TranslationLayerTests places the pill.)
-    press(on: 2, wholeWindow: true)
+    layer.press(on: 2, wholeWindow: true)
     let whole = try XCTUnwrap(
-      wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_1") && $0.contains("CIDA_LAYER_TRANSLATED_2") },
+      layer.wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_1") && $0.contains("CIDA_LAYER_TRANSLATED_2") },
       "Every paragraph of the window")
     XCTAssertFalse(whole.contains("CIDA_LAYER_TRANSLATED_17"), "but the one already in my language")
     attach("layer-whole-window")
@@ -259,10 +235,10 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     // A wheel scrolls what is under the pointer.
     article.hover()
     // New paragraphs scrolled into view are translated too.
-    let firstTop = paragraph(1).frame.minY
+    let firstTop = layer.paragraph(1).frame.minY
     article.scroll(byDeltaX: 0, deltaY: -600)
-    if abs(paragraph(1).frame.minY - firstTop) < 1 { article.scroll(byDeltaX: 0, deltaY: 600) }
-    XCTAssertNotNil(wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_12") }, "Scrolled-in paragraphs follow")
+    if abs(layer.paragraph(1).frame.minY - firstTop) < 1 { article.scroll(byDeltaX: 0, deltaY: 600) }
+    XCTAssertNotNil(layer.wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_12") }, "Scrolled-in paragraphs follow")
     attach("layer-after-scroll")
 
     // The window is remembered, and a second ⌥⇧D stops it.
@@ -271,10 +247,61 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.hidePanel()
     source.app.activate()
     XCTAssertNotNil(
-      wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_") }, "The whole window comes back after a relaunch")
+      layer.wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_") }, "The whole window comes back after a relaunch")
     source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
     source.press("d", modifierFlags: [.option, .shift])
-    XCTAssertNotNil(wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_") }, "⌥⇧D again stops it")
+    XCTAssertNotNil(layer.wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_") }, "⌥⇧D again stops it")
+  }
+
+  /// `Design/spec/translation-layer.md` §二: clearing 原处翻译's shortcut turns the layer off,
+  /// since nothing else could stop a window translated whole; the remembered window comes back
+  /// once a shortcut is set again.
+  func testClearingTheLayerShortcutStopsTheLayerUntilItIsSetAgain() throws {
+    driver.launch()
+    driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    let layer = TranslationLayerProbe(cida: driver.app, source: source)
+    XCTAssertTrue(layer.paragraph(2).waitForExistence(timeout: 5), "The source shows its article")
+    layer.press(on: 2, wholeWindow: true)
+    XCTAssertNotNil(
+      layer.wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_2") }, "⌥⇧D translates the window")
+
+    driver.showPanel()
+    driver.openSettings()
+    driver.showSettingsTab("shortcuts", title: "快捷键")
+    let chip = driver.app.buttons["settings-layer-shortcut"]
+    XCTAssertTrue(chip.waitForExistence(timeout: 3))
+    chip.click()
+    XCTAssertTrue(driver.waitForLabel("按下新的原处翻译快捷键", in: chip, timeout: 3))
+    driver.app.typeKey(XCUIKeyboardKey.delete, modifierFlags: [])
+    XCTAssertTrue(driver.waitForLabel("原处翻译快捷键 未设置", in: chip, timeout: 3))
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))
+    // A running layer draws the window again within a second of it coming back to the front.
+    source.app.activate()
+    XCTAssertNil(
+      layer.wait(timeout: 5) { $0.contains("CIDA_LAYER_TRANSLATED_") },
+      "With the source in front again, no translation comes back")
+
+    // 恢复默认 brings the shortcut and the remembered window back.
+    driver.showPanel()
+    driver.openSettings()
+    let reset = driver.app.buttons["settings-layer-shortcut-reset"]
+    XCTAssertTrue(reset.waitForExistence(timeout: 3))
+    reset.click()
+    XCTAssertTrue(driver.waitForLabel("原处翻译快捷键 ⌥ D", in: chip, timeout: 3))
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    XCTAssertTrue(driver.settingsWindow.waitForNonExistence(timeout: 3))
+    source.app.activate()
+    XCTAssertNotNil(
+      layer.wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_2") },
+      "The window translated whole is still remembered")
+    source.captureText.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+    source.press("d", modifierFlags: [.option, .shift])
+    XCTAssertNotNil(
+      layer.wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_") }, "and ⌥⇧D stops it again")
   }
 
   /// `Design/spec/configuration.md` §四: Settings starts with the onboarding card, copies the
@@ -485,5 +512,43 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let show = try secondDriver.runCommandLine(["config", "show", "--json"])
     XCTAssertTrue(show.output.contains(#""api-key": "unset""#), show.output)
     XCTAssertFalse(show.output.contains("first-instance-model"))
+  }
+}
+
+/// The translation layer as the journeys see it: the source's article paragraphs, and what Cida
+/// draws over them, read from its overlays.
+@MainActor
+private struct TranslationLayerProbe {
+  let cida: XCUIApplication
+  let source: SourceApplication
+
+  func paragraph(_ number: Int) -> XCUIElement {
+    source.app.staticTexts.matching(
+      NSPredicate(format: "value BEGINSWITH %@ OR label BEGINSWITH %@",
+        "CIDA LAYER PARAGRAPH \(number).", "CIDA LAYER PARAGRAPH \(number).")
+    ).firstMatch
+  }
+
+  /// Everything the layer draws now, across its panes.
+  func shown() -> String {
+    cida.descendants(matching: .any).matching(identifier: "translation-layer-content")
+      .allElementsBoundByIndex.compactMap { $0.value as? String }.joined(separator: "\n")
+  }
+
+  func wait(timeout: TimeInterval, until condition: (String) -> Bool) -> String? {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      let text = shown()
+      if condition(text) { return text }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+    return nil
+  }
+
+  /// ⌥D, or ⌥⇧D, with the pointer on a paragraph.
+  func press(on number: Int, wholeWindow: Bool = false) {
+    paragraph(number).coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).hover()
+    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    source.press("d", modifierFlags: wholeWindow ? [.option, .shift] : .option)
   }
 }
