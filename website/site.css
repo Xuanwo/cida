@@ -125,6 +125,13 @@ body.site {
 /* A character behind the writing head, --o of the way through its fade in
  * (spec/streaming-motion.md §二.2): opacity 0 → 1 and blur motion-blur-char-px → 0. */
 .char-in { opacity: var(--o); }
+/* site.js lets the still frame's fading characters finish, on the same curve as a new one. */
+.hero .result .char-in.settled {
+  opacity: 1;
+  filter: none;
+  transition: opacity calc(var(--motion-char-in-ms) * 1ms) cubic-bezier(0.33, 1, 0.68, 1),
+    filter calc(var(--motion-char-in-ms) * 1ms) cubic-bezier(0.33, 1, 0.68, 1);
+}
 /* WebKit rasterizes a filtered inline box at 1x, so only the clearly blurred characters
  * carry the filter; below ~0.6 px the blur cannot be seen anyway. */
 .char-in.blurred { filter: blur(calc((1 - var(--o)) * var(--motion-blur-char-px) * 1px)); }
