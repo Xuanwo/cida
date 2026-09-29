@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Design/rendered/states/brand-icon.png" width="112" alt="Cida's icon: 辞 followed by a caret">
+  <img src="docs/images/icon.png" width="128" alt="Cida's icon: 辞 followed by a caret">
 </p>
 
 <h1 align="center">Cida · 辞达</h1>

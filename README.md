@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Design/rendered/states/brand-icon.png" width="112" alt="辞达的图标：「辞」后跟一枚光标">
+  <img src="docs/images/icon.png" width="128" alt="辞达的图标：「辞」后跟一枚光标">
 </p>
 
 <h1 align="center">辞达</h1>
