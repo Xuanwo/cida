@@ -14,6 +14,16 @@ struct CidaUITestHost: App {
 }
 
 private struct SourceView: View {
+  /// English paragraphs, and one in the user's own language after the third, which ⌥D turns
+  /// into the foreign language.
+  static let layerParagraphs: [String] = {
+    let english = (1...16).map { number in
+      "CIDA LAYER PARAGRAPH \(number). The storage engine keeps every write in an append-only log and compacts it in the background."
+    }
+    return Array(english[..<3]) + ["CIDA LAYER PARAGRAPH 17. 存储引擎把每次写入都追加到只追加的日志里，并在后台压缩它。"]
+      + Array(english[3...])
+  }()
+
   @State private var text = ""
 
   var body: some View {
@@ -32,16 +42,14 @@ private struct SourceView: View {
         .frame(height: 180)
         .accessibilityElement()
         .accessibilityIdentifier("source-blank")
-      // The translation layer's journey: a pane of English paragraphs that scrolls.
+      // The translation layer's journey: a pane of paragraphs that scrolls.
       ScrollView {
         VStack(alignment: .leading, spacing: 18) {
-          ForEach(1...16, id: \.self) { number in
-            Text(
-              "CIDA LAYER PARAGRAPH \(number). The storage engine keeps every write in an append-only log and compacts it in the background."
-            )
-            .font(.system(size: 15))
-            .foregroundStyle(.black)
-            .frame(maxWidth: .infinity, alignment: .leading)
+          ForEach(Self.layerParagraphs, id: \.self) { paragraph in
+            Text(paragraph)
+              .font(.system(size: 15))
+              .foregroundStyle(.black)
+              .frame(maxWidth: .infinity, alignment: .leading)
           }
         }
         .padding(.vertical, 8)

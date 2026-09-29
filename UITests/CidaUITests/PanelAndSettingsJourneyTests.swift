@@ -236,12 +236,23 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_2") && $0.contains("CIDA_LAYER_TRANSLATED_3") },
       "Only the paragraph pressed on turns back")
 
+    // ⌥D on a paragraph in my language translates it into the foreign one, as ⌥A would.
+    press(on: 17)
+    let foreign = try XCTUnwrap(
+      wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_17") }, "⌥D translates my language too")
+    XCTAssertTrue(foreign.contains("Paragraph 17 in English"), foreign)
+    attach("layer-into-foreign-language")
+    press(on: 17)
+    XCTAssertNotNil(
+      wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_17") }, "and turns it back")
+
     // ⌥⇧D: the whole window. (Its hint lasts 2 s, shorter than a synthesized key press takes
     // to return here while the host's caret blinks; TranslationLayerTests places the pill.)
     press(on: 2, wholeWindow: true)
-    XCTAssertNotNil(
+    let whole = try XCTUnwrap(
       wait(timeout: 25) { $0.contains("CIDA_LAYER_TRANSLATED_1") && $0.contains("CIDA_LAYER_TRANSLATED_2") },
       "Every paragraph of the window")
+    XCTAssertFalse(whole.contains("CIDA_LAYER_TRANSLATED_17"), "but the one already in my language")
     attach("layer-whole-window")
 
     let article = source.app.descendants(matching: .any).matching(identifier: "source-article").firstMatch
