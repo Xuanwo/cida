@@ -522,6 +522,14 @@ private struct ModelServiceRow: View {
     model.isModelServiceRecentlyUpdated ? "\(status.caption) · 刚刚更新" : status.caption
   }
 
+  /// The model name, followed by the reasoning level `body` sets, in a quieter tone.
+  private var modelTitle: Text {
+    let service = model.settings.modelService
+    let name = Text(service.model).foregroundStyle(CidaDesign.textPrimary)
+    guard let reasoning = service.reasoning else { return name }
+    return name + Text(" " + reasoning).foregroundStyle(CidaDesign.textSecondary)
+  }
+
   var body: some View {
     HStack(alignment: .center, spacing: 24) {
       VStack(alignment: .leading, spacing: 3) {
@@ -546,13 +554,12 @@ private struct ModelServiceRow: View {
 
       HStack(spacing: 8) {
         VStack(alignment: .leading, spacing: 3) {
-          Text(model.settings.modelService.model)
+          modelTitle
             .font(CidaDesign.ui(13.5))
-            .foregroundStyle(CidaDesign.textPrimary)
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(height: 20)
-          Text(model.settings.modelService.hostAndFormat)
+          Text(model.settings.modelService.hostTitle)
             .font(CidaDesign.ui(11.5))
             .foregroundStyle(CidaDesign.textTertiary)
             .lineLimit(1)

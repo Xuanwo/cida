@@ -120,7 +120,9 @@ class CidaSettings extends HTMLElement {
       <div class="row">
         <div class="labels"><b>模型服务</b><small>${statusCaption}</small></div>
         <div class="controls">
-          <div class="stack summary"><b>deepseek-chat</b><small>api.deepseek.com · Chat Completions</small></div>
+          ${config === "updated"
+            ? `<div class="stack summary"><b>gpt-5 <span class="reasoning">minimal</span></b><small>api.openai.com</small></div>`
+            : `<div class="stack summary"><b>deepseek-chat</b><small>api.deepseek.com</small></div>`}
           <span class="button push">${config === "checking" ? "检查中…" : "检查"}</span>
         </div>
       </div>`;

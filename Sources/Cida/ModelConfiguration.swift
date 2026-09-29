@@ -121,15 +121,42 @@ struct ModelConfiguration: Equatable, Sendable {
     missingFields(hasAPIKey: hasAPIKey).isEmpty
   }
 
-  /// `api.deepseek.com · Chat Completions`: where requests go and in which shape.
-  var hostAndFormat: String {
-    "\(host ?? "未设置端点") · \(format.displayName)"
+  /// `api.deepseek.com`: where requests go, as Settings shows it.
+  var hostTitle: String {
+    host ?? "未设置端点"
   }
 
-  /// `deepseek-chat · api.deepseek.com · Chat Completions`.
+  /// `gpt-5 minimal · api.openai.com · Responses`: the model with its reasoning level, where
+  /// requests go and in which shape.
   var summary: String {
     let modelName = model.trimmingCharacters(in: .whitespacesAndNewlines)
-    return "\(modelName.isEmpty ? "未设置模型" : modelName) · \(hostAndFormat)"
+    let modelTitle = [modelName.isEmpty ? "未设置模型" : modelName, reasoning]
+      .compactMap { $0 }.joined(separator: " ")
+    return "\(modelTitle) · \(hostTitle) · \(format.displayName)"
+  }
+
+  /// The reasoning level `body` asks for, spelled as the service spells it (`minimal`, `low`,
+  /// `thinking 4096`), so it can be matched against the configuration and the service's docs.
+  /// Nil when reasoning is off or left to the service's default: Cida translates and rewrites,
+  /// where the lowest level a model allows is the expected setting, so only a level is worth
+  /// showing. Services name it differently: `reasoning.effort` (Responses, OpenRouter),
+  /// `reasoning_effort` (Chat Completions), `output_config.effort` (Anthropic), `thinking`
+  /// (Anthropic, DeepSeek, Zhipu, Moonshot) and `enable_thinking` (Qwen).
+  var reasoning: String? {
+    let efforts = [
+      body["reasoning"]?["effort"], body["reasoning_effort"], body["output_config"]?["effort"],
+    ]
+    if let effort = efforts.lazy.compactMap({ $0?.stringValue }).first(where: { !$0.isEmpty }) {
+      return effort == "none" ? nil : effort
+    }
+    if let thinking = body["thinking"]?["type"]?.stringValue {
+      guard thinking != "disabled" else { return nil }
+      return body["thinking"]?["budget_tokens"]?.intValue.map { "thinking \($0)" } ?? "thinking"
+    }
+    if case .bool(true) = body["enable_thinking"] {
+      return "thinking"
+    }
+    return nil
   }
 
   /// Identifies what a check tested: the service, the request shape and the key. A recorded
