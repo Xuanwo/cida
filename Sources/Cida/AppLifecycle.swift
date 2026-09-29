@@ -456,6 +456,13 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     }
     observeGenerationForStatusItem()
     let menu = NSMenu()
+    if let label = CidaBuild.current.developmentLabel {
+      // A development build says so first; it runs beside the released Cida's settings.
+      let development = NSMenuItem(title: label, action: nil, keyEquivalent: "")
+      development.isEnabled = false
+      menu.addItem(development)
+      menu.addItem(.separator())
+    }
     let show = NSMenuItem(title: "显示辞达", action: #selector(showPanel), keyEquivalent: "")
     show.target = self
     menu.addItem(show)
@@ -470,13 +477,15 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
     settings.target = self
     menu.addItem(settings)
-    let checkForUpdates = NSMenuItem(
-      title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
-    checkForUpdates.target = self
-    checkForUpdates.setAccessibilityIdentifier("status-menu-check-for-updates")
-    menu.addItem(checkForUpdates)
-    checkForUpdatesMenuItem = checkForUpdates
-    observeAvailableUpdateForMenu()
+    if updater.state.isAvailable {
+      let checkForUpdates = NSMenuItem(
+        title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+      checkForUpdates.target = self
+      checkForUpdates.setAccessibilityIdentifier("status-menu-check-for-updates")
+      menu.addItem(checkForUpdates)
+      checkForUpdatesMenuItem = checkForUpdates
+      observeAvailableUpdateForMenu()
+    }
     menu.addItem(.separator())
     let quit = NSMenuItem(title: "退出辞达", action: #selector(quit), keyEquivalent: "q")
     quit.target = self

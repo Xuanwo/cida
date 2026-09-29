@@ -206,17 +206,21 @@ class CidaFrozenScreen extends HTMLElement {
 
 customElements.define("cida-frozen-screen", CidaFrozenScreen);
 
-// The menu bar item's menu (spec/updates.md §二): <cida-status-menu update="available">.
+// The menu bar item's menu (spec/updates.md §三): <cida-status-menu update="available"> or
+// <cida-status-menu build="dev">, a development build that names itself and has no updates.
 class CidaStatusMenu extends HTMLElement {
   connectedCallback() {
     const available = this.getAttribute("update") === "available";
+    const development = this.getAttribute("build") === "dev";
     const item = (title, key = "") => `<span class="item"><b>${title}</b><kbd>${key}</kbd></span>`;
+    const updates = development ? "" : available ? item("安装新版本 1.1.0…") : item("检查更新…");
     this.outerHTML = `
       <section class="status-menu-scene" data-state="${this.getAttribute("state")}">
         <div class="menubar"><span class="status-mark"><img src="../../Sources/Cida/Resources/Brand/status-item-glyph.svg" alt="辞达"><img src="../../Sources/Cida/Resources/Brand/status-item-caret.svg" alt=""></span><span>周四 14:40</span></div>
         <div class="status-menu">
+          ${development ? `<span class="item disabled"><b>开发版 1.2.0 (170) · c243eb7</b></span><i class="separator"></i>` : ""}
           ${item("显示辞达", "⌥ 空格键")}${item("截图翻译", "⌥ S")}${item("设置…", "⌘,")}
-          ${available ? item("安装新版本 1.1.0…") : item("检查更新…")}
+          ${updates}
           <i class="separator"></i>
           ${item("退出辞达", "⌘Q")}
         </div>

@@ -763,6 +763,7 @@ body {
 .status-menu .item { display: flex; justify-content: space-between; padding: 3px 9px; border-radius: 5px; }
 .status-menu .item b { font-weight: 400; color: var(--text-primary); }
 .status-menu .item kbd { font-family: var(--font-ui); color: var(--text-secondary); }
+.status-menu .item.disabled b { color: var(--text-tertiary); white-space: nowrap; }
 .status-menu .separator { height: 1px; margin: 5px 9px; background: var(--border); }
 
 /* ---- Translation layer (spec/translation-layer.md) ---------------------

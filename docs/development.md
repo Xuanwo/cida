@@ -13,6 +13,15 @@ swift test
 
 `scripts/build-app.sh release` builds the Release app bundle at `build/Cida.app` without launching it. It signs with the first Developer ID Application identity in your keychain (or `CIDA_CODESIGN_IDENTITY`), because the Keychain item that holds the API key is bound to a stable signature. `CIDA_VERSION` and `CIDA_BUILD_NUMBER` set the bundle version; without them it keeps the one in `Resources/Cida-Info.plist`.
 
+To try a change on your own Mac next to the released Cida, run the development build:
+
+```sh
+scripts/run-dev.sh        # build 辞达 Dev, quit the released Cida, start the development build
+scripts/run-dev.sh stop   # quit the development build, start the released Cida again
+```
+
+`CIDA_VARIANT=dev scripts/build-app.sh release`, which the script runs, builds `build/Cida Dev.app`: bundle id `com.xuanwo.Cida.dev`, so its settings, API key and Accessibility and Screen Recording grants are its own and the released Cida keeps updating through Sparkle. It has no update feed, is versioned from the checkout (the latest release tag and the commit count, as a release is) and names itself in its menu and Settings (`Design/spec/updates.md` §三). Grant it the permissions once; they stay across rebuilds because the signature's designated requirement names only the bundle id and the team. Configure its model service once with its own command line, `"build/Cida Dev.app/Contents/MacOS/Cida" config …`. Both builds register the same global shortcuts, which is why only one runs at a time. Do not build the release bundle id with a made-up higher version to keep Sparkle away; that is what the development build replaces.
+
 To hand the app to another Mac, notarize it:
 
 ```sh
