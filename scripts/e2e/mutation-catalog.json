@@ -77,7 +77,7 @@
         "TranslationJourneyPropertyTests/testDeterministicCommandSequencesPreserveProductAndDurabilityInvariants"
       ],
       "releaseTests": [
-        "PanelAndSettingsJourneyTests/testPanelHidesOnEscapeReturnsOnOptionSpaceAndKeepsItsState"
+        "PanelAndSettingsJourneyTests/testPanelHidesOnEscapeReturnsOnOptionAAndKeepsItsState"
       ]
     },
     {

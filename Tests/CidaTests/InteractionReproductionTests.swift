@@ -224,7 +224,7 @@ final class InteractionReproductionTests: XCTestCase {
     // Shift alone is not a shortcut: the recorder keeps waiting.
     recorder.record(keyEvent(kVK_ANSI_T, "t", [.shift]))
     XCTAssertEqual(model.recordingShortcut, .showPanel)
-    XCTAssertEqual(model.settings.shortcut, .optionSpace)
+    XCTAssertEqual(model.settings.shortcut, .optionA)
 
     recorder.record(keyEvent(kVK_ANSI_T, "t", [.control, .option]))
     let recorded = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])

@@ -137,14 +137,14 @@ final class CaptureTranslationTests: XCTestCase {
       })
     XCTAssertEqual(model.settings.captureShortcut, .optionS)
 
-    XCTAssertFalse(model.setShortcut(.optionSpace, for: .captureText))
+    XCTAssertFalse(model.setShortcut(.optionA, for: .captureText))
     XCTAssertFalse(model.setShortcut(.optionS, for: .showPanel))
     XCTAssertTrue(applied.isEmpty, "A combination the other shortcut holds is never registered")
 
     let recorded = GlobalShortcut(keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
     XCTAssertTrue(model.setShortcut(recorded, for: .captureText))
     XCTAssertEqual(model.settings.captureShortcut, recorded)
-    XCTAssertEqual(model.settings.shortcut, .optionSpace)
+    XCTAssertEqual(model.settings.shortcut, .optionA)
     XCTAssertEqual(applied.map(\.1), [.captureText])
   }
 

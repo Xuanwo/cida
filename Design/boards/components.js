@@ -95,7 +95,7 @@ class CidaSettings extends HTMLElement {
       ? row("显示辞达", "Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
       : is("shortcut", "custom")
         ? row("显示辞达", "在任何应用里唤起", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
-        : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ Space</span>`, "end");
+        : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ A</span>`, "end");
     const capture = row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end");
     const layerShortcut = row("原处翻译", "加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
     // spec/settings.md §五: 已开启 once granted, otherwise 去授权.

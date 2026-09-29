@@ -144,8 +144,8 @@ final class CidaAppDriver {
   }
 
   func showPanel() {
-    app.typeKey(.space, modifierFlags: .option)
-    XCTAssertTrue(panel.waitForExistence(timeout: 5), "Option-Space shows the panel")
+    app.typeKey("a", modifierFlags: .option)
+    XCTAssertTrue(panel.waitForExistence(timeout: 5), "Option-A shows the panel")
     XCTAssertTrue(composer.waitForExistence(timeout: 3))
   }
 

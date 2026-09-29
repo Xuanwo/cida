@@ -11,13 +11,13 @@
 
 ## 怎么用
 
-- **选中文字，按 <kbd>⌥</kbd> <kbd>Space</kbd>。** 面板带着选中的文字出现，译文随即开始流出。你的语言译成常用外语，其他语言都译成你的语言；两者默认是简体中文和英文，可以在设置里写成任何语言、方言或文体，比如粤语、英式英语。
+- **选中文字，按 <kbd>⌥</kbd> <kbd>A</kbd>。** 面板带着选中的文字出现，译文随即开始流出。你的语言译成常用外语，其他语言都译成你的语言；两者默认是简体中文和英文，可以在设置里写成任何语言、方言或文体，比如粤语、英式英语。
 
-  <img src="docs/images/demo-translate.gif" width="720" alt="在 Chrome 里选中一段英文，按 ⌥Space，面板里流出中文译文">
+  <img src="docs/images/demo-translate.gif" width="720" alt="在 Chrome 里选中一段英文，按 ⌥A，面板里流出中文译文">
 
 - **按 <kbd>Tab</kbd> 再按 <kbd>Return</kbd>，改成润色。** 润色后的文字保持原来的语言。
 
-  <img src="docs/images/demo-improve.gif" width="720" alt="选中评论框里的英文回复，按 ⌥Space 后按 Tab 和 Return，得到润色后的英文">
+  <img src="docs/images/demo-improve.gif" width="720" alt="选中评论框里的英文回复，按 ⌥A 后按 Tab 和 Return，得到润色后的英文">
 
 - **屏幕上的文字，按 <kbd>⌥</kbd> <kbd>S</kbd>。** 框出要翻译的部分，辞达在本机识别后翻译。
 
@@ -47,7 +47,7 @@ API Key 不经过助手：它会请你复制 Key 后运行一条命令，Key 直
 
 | 权限 | 开启后 | 不开启时 |
 | --- | --- | --- |
-| 辅助功能 | 按 <kbd>⌥</kbd> <kbd>Space</kbd> 时自动带入选中的文字；<kbd>⌥</kbd> <kbd>D</kbd> 原处翻译 | 先 <kbd>⌘</kbd> <kbd>C</kbd>，再在面板里 <kbd>⌘</kbd> <kbd>V</kbd>；原处翻译不可用 |
+| 辅助功能 | 按 <kbd>⌥</kbd> <kbd>A</kbd> 时自动带入选中的文字；<kbd>⌥</kbd> <kbd>D</kbd> 原处翻译 | 先 <kbd>⌘</kbd> <kbd>C</kbd>，再在面板里 <kbd>⌘</kbd> <kbd>V</kbd>；原处翻译不可用 |
 | 屏幕录制 | 用 <kbd>⌥</kbd> <kbd>S</kbd> 截图翻译 | 截图翻译不可用 |
 
 ## 隐私
@@ -60,7 +60,7 @@ API Key 不经过助手：它会请你复制 Key 后运行一条命令，Key 直
 
 | 按键 | 作用 |
 | --- | --- |
-| <kbd>⌥</kbd> <kbd>Space</kbd> | 显示或隐藏面板 |
+| <kbd>⌥</kbd> <kbd>A</kbd> | 显示或隐藏面板 |
 | <kbd>⌥</kbd> <kbd>S</kbd> | 截图翻译 |
 | <kbd>⌥</kbd> <kbd>D</kbd> | 原处翻译：指针下这一段换成译文，再按换回；加 <kbd>⇧</kbd> 翻译整个窗口 |
 | <kbd>Tab</kbd> | 在翻译和改进之间切换 |

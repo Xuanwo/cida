@@ -37,7 +37,9 @@ final class ModelConfigurationTests: XCTestCase {
       XCTAssertEqual(settings.translationPrompt, "Translate carefully.")
       XCTAssertEqual(settings.improvementPrompt, "Improve carefully.")
       XCTAssertTrue(settings.launchAtLogin)
-      XCTAssertEqual(settings.shortcut, .optionSpace)
+      XCTAssertEqual(
+        settings.shortcut, GlobalShortcut(keyCode: UInt16(kVK_Space), modifiers: .option),
+        "A stored ⌥Space stays after the default moved to ⌥A")
       XCTAssertEqual(settings.captureShortcut, .optionS)
 
       var withKey = settings
@@ -275,12 +277,12 @@ final class ModelConfigurationTests: XCTestCase {
     ConfigurationField.shortcut.reset(in: &configuration)
     XCTAssertNil(configuration.settings.modelService.auth)
     XCTAssertTrue(configuration.settings.modelService.body.isEmpty)
-    XCTAssertEqual(configuration.settings.shortcut, .optionSpace)
+    XCTAssertEqual(configuration.settings.shortcut, .optionA)
   }
 
   func testTheTwoShortcutsMustDiffer() throws {
     var configuration = configuration()
-    try ConfigurationField.captureShortcut.apply("option+space", to: &configuration)
+    try ConfigurationField.captureShortcut.apply("option+a", to: &configuration)
     XCTAssertThrowsError(try ConfigurationField.validate(configuration))
   }
 
@@ -292,7 +294,10 @@ final class ModelConfigurationTests: XCTestCase {
       let shortcut = try XCTUnwrap(GlobalShortcut(configurationText: text), text)
       XCTAssertEqual(shortcut.configurationText, text)
     }
-    XCTAssertEqual(GlobalShortcut(configurationText: "⌥+Space"), .optionSpace)
+    XCTAssertEqual(
+      GlobalShortcut(configurationText: "⌥+Space"),
+      GlobalShortcut(keyCode: UInt16(kVK_Space), modifiers: .option))
+    XCTAssertEqual(GlobalShortcut(configurationText: "option+A"), .optionA)
     XCTAssertEqual(GlobalShortcut(configurationText: "alt+esc")?.configurationText, "option+escape")
   }
 

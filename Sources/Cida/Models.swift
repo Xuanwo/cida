@@ -213,7 +213,7 @@ struct CidaSettings: Equatable, Sendable {
   var foreignLanguage = defaultLanguages().foreign
   var launchAtLogin = false
   /// The combination that shows the panel from any application.
-  var shortcut = GlobalShortcut.optionSpace
+  var shortcut = GlobalShortcut.optionA
   /// The combination that captures text on screen and translates it.
   var captureShortcut = GlobalShortcut.optionS
   /// The combination that opens the translation layer's configuration.
@@ -364,7 +364,7 @@ extension CidaSettings: Codable {
       try container.decodeIfPresent(String.self, forKey: .foreignLanguage) ?? defaults.foreign
     launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
     shortcut =
-      try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionSpace
+      try container.decodeIfPresent(GlobalShortcut.self, forKey: .shortcut) ?? .optionA
     captureShortcut =
       try container.decodeIfPresent(GlobalShortcut.self, forKey: .captureShortcut) ?? .optionS
     layerShortcut =
