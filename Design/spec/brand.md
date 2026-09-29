@@ -14,6 +14,7 @@
 - `Resources/AppIcon.icon`（Icon Composer 格式）：1024 画布，墨迹高 560；底色 `surface-paper`，字形 `text-ink`，光标 `accent`。两层都关掉 Liquid Glass，保持纸上墨字的平面感；只有图标外形由系统加玻璃边。
 - 暗色外观：底 `text-ink`，字 `surface-paper`，光标 #5E9C7C（`accent` 在深底上对比不足，提亮到同色相）。着色外观由系统从图层生成。
 - 构建脚本用 `scripts/compile-app-icon.sh` 把它编译进应用包：macOS 26 起读 `Assets.car`，macOS 15 读 `AppIcon.icns`；`Cida-Info.plist` 的 `CFBundleIconName` / `CFBundleIconFile` 都是 `AppIcon`。
+- README 顶部用系统画出的图标（`docs/images/icon.png`，带系统的留白、玻璃边和阴影，四角透明），不用设计稿的平面渲染；改了图标后在 macOS 26 上运行 `swift scripts/render-app-icon.swift` 重新生成。
 - 辞达不进 Dock，图标出现在 Finder、授权弹窗、「隐私与安全性」的辅助功能与屏幕录制列表、登录项、钥匙串提示里。
 
 ## 三、菜单栏
