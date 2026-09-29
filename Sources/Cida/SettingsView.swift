@@ -38,6 +38,8 @@ struct SettingsWindowView: View {
   @State private var maxContentHeight: CGFloat
   /// The tab's natural height, measured on every layout.
   @State private var bodyHeight: CGFloat?
+  /// Told the height the whole window content wants; the window follows it.
+  var onHeightChange: @MainActor (CGFloat) -> Void = { _ in }
 
   init(
     model: AppModel, updates: UpdateState,
@@ -67,6 +69,7 @@ struct SettingsWindowView: View {
     }
     .frame(width: SettingsWindowFactory.width)
     .fixedSize(horizontal: false, vertical: true)
+    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onHeightChange($0) }
     // While the window animates to a new height the content stays put at the top; the window
     // reveals or covers its bottom.
     .frame(maxHeight: .infinity, alignment: .top)
@@ -78,11 +81,11 @@ struct SettingsWindowView: View {
   }
 }
 
-/// Builds the Settings window around a hosting controller whose preferred content size drives
-/// the window height, so switching tabs or expanding a prompt resizes the window instead of
-/// scrolling it, up to the screen's visible height (minus the menu bar and the Dock); a smaller
-/// screen scrolls the tab instead. The window follows over `motion-height-ms` with its top edge
-/// fixed (`CidaWindow.animatesHeightChanges`, `Design/spec/settings.md` §一).
+/// Builds the Settings window around its content, whose height drives the window height, so
+/// switching tabs or expanding a prompt resizes the window instead of scrolling it, up to the
+/// screen's visible height (minus the menu bar and the Dock); a smaller screen scrolls the tab
+/// instead. The window follows over `motion-height-ms` with its top edge fixed
+/// (`SettingsContentController`, `Design/spec/settings.md` §一).
 @MainActor
 enum SettingsWindowFactory {
   static let width: CGFloat = 560
@@ -103,30 +106,20 @@ enum SettingsWindowFactory {
     model: AppModel, updates: UpdateState,
     maxContentHeight: CGFloat = screenContentHeight()
   ) -> NSWindowController {
-    let hostingController = NSHostingController(
+    let content = SettingsContentController(
       rootView: SettingsWindowView(
         model: model, updates: updates, maxContentHeight: maxContentHeight))
-    hostingController.sizingOptions = [.preferredContentSize]
-    // The titlebar is drawn by `SettingsTitlebar` inside the content; without
-    // this SwiftUI would add the system titlebar's safe area to the height.
-    hostingController.safeAreaRegions = []
-    // The first pass measures the tab; the second sizes the window from it.
-    hostingController.view.layoutSubtreeIfNeeded()
-    hostingController.view.layoutSubtreeIfNeeded()
-    let initialHeight = hostingController.view.fittingSize.height
     let window = CidaWindowFactory.makeWindow(
-      size: CGSize(width: width, height: initialHeight),
+      size: CGSize(width: width, height: content.contentHeight),
       minimumSize: CGSize(width: width, height: 200),
       title: model.settingsTab.title
     )
     window.styleMask.remove(.resizable)
-    window.contentViewController = hostingController
+    window.contentViewController = content
     // The title names the tab, so the window is found by this instead.
     window.setAccessibilityIdentifier("settings-window")
-    hostingController.view.setAccessibilityLabel("设置窗口内容")
-    window.setContentSize(CGSize(width: width, height: initialHeight))
+    window.setContentSize(CGSize(width: width, height: content.contentHeight))
     window.center()
-    window.animatesHeightChanges = true
     followTabTitle(of: model, in: window)
     return NSWindowController(window: window)
   }
@@ -142,6 +135,125 @@ enum SettingsWindowFactory {
       }
     }
   }
+}
+
+/// Keeps the Settings content at its own height at the top of the window and moves the window to
+/// the height the content asks for, over `motion-height-ms` with the top edge fixed (at once under
+/// Reduce Motion or while the window is hidden).
+///
+/// The hosting view sits in a flipped container instead of being the window's content view: as
+/// the content view AppKit sizes it to the new height at once, on the window's bottom edge, while
+/// the frame is still animating, so the tabs jumped past the top edge and slid back on every
+/// switch. Here only the window's frame moves. The host is never shorter than the window: it grows
+/// at once, and while the window shrinks it keeps its height until the window has caught up.
+@MainActor
+final class SettingsContentController: NSViewController {
+  private let hostingController: NSHostingController<SettingsWindowView>
+  /// The height the content last asked for.
+  private(set) var contentHeight: CGFloat
+  /// Counts moves, so a superseded move's end cannot shrink the host under a newer one.
+  private var heightMoveCount = 0
+
+  init(rootView: SettingsWindowView) {
+    hostingController = NSHostingController(rootView: rootView)
+    // Only the first measurement reads it: `fittingSize` below follows the preferred size.
+    hostingController.sizingOptions = [.preferredContentSize]
+    // The titlebar is drawn by `SettingsTitlebar` inside the content; without
+    // this SwiftUI would add the system titlebar's safe area to the height.
+    hostingController.safeAreaRegions = []
+    hostingController.view.setAccessibilityLabel("设置窗口内容")
+    // The first pass measures the tab; the second sizes the content from it.
+    hostingController.view.layoutSubtreeIfNeeded()
+    hostingController.view.layoutSubtreeIfNeeded()
+    contentHeight = ceil(hostingController.view.fittingSize.height)
+    super.init(nibName: nil, bundle: nil)
+    hostingController.rootView.onHeightChange = { [weak self] height in
+      self?.contentDidAsk(forHeight: height)
+    }
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func loadView() {
+    let container = SettingsContainerView(
+      frame: NSRect(x: 0, y: 0, width: SettingsWindowFactory.width, height: contentHeight))
+    addChild(hostingController)
+    let host = hostingController.view
+    host.autoresizingMask = [.width]
+    host.frame = container.bounds
+    container.addSubview(host)
+    view = container
+  }
+
+  private func contentDidAsk(forHeight height: CGFloat) {
+    let height = ceil(height)
+    guard height > 0, abs(height - contentHeight) > 0.5 else { return }
+    contentHeight = height
+    moveWindow(toContentHeight: height)
+  }
+
+  private func moveWindow(toContentHeight height: CGFloat) {
+    heightMoveCount += 1
+    let move = heightMoveCount
+    guard isViewLoaded, let window = view.window else {
+      if isViewLoaded { setHostHeight(height) }
+      return
+    }
+    let frameHeight = window.frameRect(
+      forContentRect: NSRect(x: 0, y: 0, width: window.frame.width, height: height)
+    ).height
+    let target = NSRect(
+      x: window.frame.minX, y: window.frame.maxY - frameHeight, width: window.frame.width,
+      height: frameHeight)
+    if height > hostingController.view.frame.height { setHostHeight(height) }
+    let duration =
+      window.isVisible ? CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: window) : 0
+    guard duration > 0 else {
+      finishMove(move, of: window, at: target, contentHeight: height)
+      return
+    }
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = duration
+      context.timingFunction = CidaMotion.easeOut
+      window.animator().setFrame(target, display: true)
+    } completionHandler: { [weak self, weak window] in
+      MainActor.assumeIsolated {
+        guard let window else { return }
+        self?.finishMove(move, of: window, at: target, contentHeight: height)
+      }
+    }
+    // A window the system does not draw (hidden, or on a locked screen) never steps the
+    // animation or reports its end; a plain timer still lands it where its content asked.
+    DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) {
+      [weak self, weak window] in
+      MainActor.assumeIsolated {
+        guard let window else { return }
+        self?.finishMove(move, of: window, at: target, contentHeight: height)
+      }
+    }
+  }
+
+  private func finishMove(
+    _ move: Int, of window: NSWindow, at target: NSRect, contentHeight height: CGFloat
+  ) {
+    guard move == heightMoveCount else { return }
+    if window.frame != target { window.setFrame(target, display: true) }
+    setHostHeight(height)
+  }
+
+  private func setHostHeight(_ height: CGFloat) {
+    let host = hostingController.view
+    guard abs(host.frame.height - height) > 0.5 else { return }
+    host.setFrameSize(NSSize(width: host.frame.width, height: height))
+  }
+}
+
+/// Lays the host out from the top edge, where the window's frame stays put while it moves.
+private final class SettingsContainerView: NSView {
+  override var isFlipped: Bool { true }
 }
 
 private struct SettingsTitlebar: View {
