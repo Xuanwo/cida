@@ -1,0 +1,73 @@
+# Builds cida.xuanwo.io (scripts/build-website.py) on pull requests that touch it, and deploys it
+# from main: after a push that changes it, and after each successful release, so the page shows
+# the new version once its DMG is published. See "Website" in docs/development.md.
+name: Website
+
+on:
+  pull_request:
+    paths:
+      - website/**
+      - scripts/build-website.py
+      - scripts/ci/release-notes.py
+      - docs/releases/**
+      - docs/images/**
+      - Design/boards/tokens.css
+      - Design/boards/components.css
+      - Design/boards/components.js
+      - Design/rendered/states/brand-icon.png
+      - Resources/AppIcon.icon/Assets/**
+      - Sources/Cida/Resources/Fonts/**
+      - .github/workflows/website.yml
+  push:
+    branches: [main]
+    paths:
+      - website/**
+      - scripts/build-website.py
+      - scripts/ci/release-notes.py
+      - docs/releases/**
+      - docs/images/**
+      - Design/boards/tokens.css
+      - Design/boards/components.css
+      - Design/boards/components.js
+      - Design/rendered/states/brand-icon.png
+      - Resources/AppIcon.icon/Assets/**
+      - Sources/Cida/Resources/Fonts/**
+      - .github/workflows/website.yml
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  website:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The page shows the newest release tag and its notes.
+          fetch-depth: 0
+
+      - name: Install the build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install fonttools brotli
+
+      - name: Build
+        run: '"$RUNNER_TEMP/venv/bin/python" scripts/build-website.py'
+
+      - name: Deploy
+        if: github.event_name != 'pull_request'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4 deploy --config website/wrangler.jsonc

@@ -6,7 +6,7 @@
 
 <p align="center">
   用你选择的大模型，在 Mac 的任何地方翻译和润色文字。<br>
-  <a href="https://cida-releases.xuanwo.io/latest/Cida.dmg">下载</a> · <a href="README.en.md">English</a>
+  <a href="https://cida.xuanwo.io">官网</a> · <a href="https://cida-releases.xuanwo.io/latest/Cida.dmg">下载</a> · <a href="README.en.md">English</a>
 </p>
 
 ## 怎么用

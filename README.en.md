@@ -6,7 +6,7 @@
 
 <p align="center">
   Translate and polish text anywhere on your Mac, with the language model you choose.<br>
-  <a href="https://cida-releases.xuanwo.io/latest/Cida.dmg">Download</a> · <a href="README.md">简体中文</a>
+  <a href="https://cida.xuanwo.io/en/">Website</a> · <a href="https://cida-releases.xuanwo.io/latest/Cida.dmg">Download</a> · <a href="README.md">简体中文</a>
 </p>
 
 ## How it works

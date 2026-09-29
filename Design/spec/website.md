@@ -1,0 +1,43 @@
+# 官网
+
+cida.xuanwo.io，面向不看 GitHub 的 Mac 用户。页面就是仓库里的 [`website/`](../../website)：`index.html`、`en/index.html`、`releases/index.html`，直接引用 `Design/boards` 的令牌与组件；board [`boards/website.html`](../boards/website.html) 从源文件渲染首页的桌面与手机宽度和更新记录页。README 继续服务开发者；构建、命令行和设计稿只在官网链接到 GitHub。
+
+## 一、内容
+
+一页回答三件事，按这个顺序：辞达做什么、怎么装、文字去哪里。
+
+1. **首屏**：标题「辞达而已矣」，出自《论语·卫灵公》，后跟标志里的 accent 光标；说明两行：第一行解释标题（言辞能把意思表达清楚，就够了），第二行说辞达做什么，不写具体按键，怎么用交给下面的面板演示；「下载辞达」按钮（`https://cida-releases.xuanwo.io/latest/Cida.dmg`），下面一行写版本号、系统要求与计费方式。再往下是应用的面板，正在流出一段译文。
+2. **五种用法**：翻译选中的文字、润色、翻译屏幕上的文字、在原处读一段、翻译整个窗口。每行左边是动作名、默认快捷键和一句话，右边是 `docs/images` 里对应的演示片段。这五项不是先后步骤，不编号。全局快捷键可以重新录制，所以标题和正文只写动作，按键只作为默认值出现在动作名下面，节标题下写一次「快捷键都是默认值，可以在设置里重新录制」。
+3. **三步装好**：打开 DMG、让 AI 助手配置模型、把 API Key 存进钥匙串，是真实的先后顺序，编号。下面是两个可选权限，开启后与不开启时各一列。
+4. **隐私**：三句话，与 README 的隐私一节同义。
+5. **最近更新**：最新一版的 `docs/releases/<version>.md`，画成应用里的更新面板；旁边链接到全部更新记录 `/releases/`。
+6. **页脚**：左边是图标，右侧三行：「辞达」、名字的出处、作者署名（链接到 https://x.com/xuanwo；中文页「由 @xuanwo 用心制作」，英文页「Proudly brought to you by @xuanwo」）；最右是 GitHub、许可证、English，与第一行对齐。页脚只用一种声音，也只用页面自己的语言：14px 界面字、22px 行距，「辞达」与 @xuanwo 两个名字用墨色，其余是 `text-secondary`，链接悬停时变墨色并加下划线。标题的含义已在首屏解释，页脚不再重复。
+
+英文版在 `/en/`，结构相同，文字取自 `README.en.md`。
+
+分享卡片（`og:description`）只写标题「辞达而已矣」，英文页加一句英文解释；搜索摘要（`description`）是标题加两行说明。
+
+不放：博客、文档站、FAQ、定价、统计或任何埋点（与「不收集任何数据」冲突）、深色模式（应用只有浅色）、订阅表单。
+
+## 二、样式
+
+- 颜色、字体、圆角与面板全部取自 `tokens.css` 与 `components.css`，官网自己的样式只管版面和首屏动画（`website/site.css`）。
+- 整页的重点在首屏：大号衬线标题后跟一枚静止的 accent 光标（与标志同一元素），下面是正在流出译文的面板。其他地方不加粗色、不加斜体。
+- 按键画成键帽（白底、细边、底边加粗），只用在动作名下面和正文里，字号不超过动作名。
+- 标题用 `font-brand`（Noto Serif SC 600），正文用 `font-ui`。隐私一节放在 `surface-paper` 上、用结果栏的衬线字，因为那是辞达自己说的话。
+- `accent` 只用于首屏标题后的光标、下载按钮、安装步骤的序号、「全部更新记录」链接和面板里本来就有的三处。
+- 首屏居中，与面板在屏幕中央唤出一致；以下各节左对齐，内容宽 1152。窄于 720 时单栏，面板随屏幕宽度重排，不缩放成图片。
+
+## 三、首屏面板
+
+- 原文用讲文字本身的公版英文段落，与「辞达而已矣」同义：William Strunk Jr.《The Elements of Style》（1918）的「Vigorous writing is concise…」，以及梭罗《瓦尔登湖》（1854）的「I went to the woods because I wished to live deliberately…」。译文由我们自己写定，不现场请求模型。
+- 面板循环演示翻译（`website/site.js`）：原文出现，结果栏先是呼吸光标，再按应用的流式节奏（`spec/streaming-motion.md` §一）逐字显示，完成后光标淡出、停止换成「复制结果」，停留 4 秒，原文与译文 300ms 淡出，换下一段。这是页面唯一不由访客触发的动画。面板照应用的样子向下生长，舞台先留出最长一段写完时的高度，下面的内容不跟着移动。英文页原文与译文对调。
+- 渐隐是辞达最有辨识度的动效，首屏要让人看清：每个字在光标后按 `motion-char-in-ms` 从 opacity 0、blur `motion-blur-char-px` 淡入，曲线与应用的 `StreamGlyphFadeAnimation` 相同，是三次 ease-out，所以书写头后面总有几个字处在不同的淡入阶段。设计稿画的是其中一帧：最后七个字从几乎透明、带模糊，到接近全墨。
+- 开启「减弱动态效果」时只显示完成的译文；没有 JavaScript 时停在设计稿这一帧。
+- 五个演示片段只在滚到屏幕上时播放，离开就暂停；减弱动态效果时不自动播放，给出播放控件。
+
+## 四、发布
+
+- 静态文件，不用框架。`scripts/build-website.py` 把页面里的本地路径换成 `/assets` 下的文件；按 release tag（不含 rc）写入最新版本号、上一个版本号和更新说明，生成更新记录；把演示 GIF 转成 MP4 和首帧海报；按站点实际用到的字给三种字体做 WOFF2 子集。
+- 版本号取自 tag 而不是 `docs/releases`：说明在打 tag 前就合入，页面只显示已经能下载的版本。
+- 部署在 Cloudflare Workers 的静态资源（`website/wrangler.jsonc`，Worker `cida-website`，自定义域名 cida.xuanwo.io）。`.github/workflows/website.yml` 在 main 上相关文件变化后部署，并在 Release 工作流成功后再部署一次。

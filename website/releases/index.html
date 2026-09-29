@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>更新记录 · 辞达</title>
+  <meta name="description" content="辞达每个版本改了什么。">
+  <link rel="canonical" href="https://cida.xuanwo.io/releases/">
+  <meta property="og:title" content="更新记录 · 辞达">
+  <meta property="og:description" content="辞达每个版本改了什么。">
+  <meta property="og:url" content="https://cida.xuanwo.io/releases/">
+  <link rel="icon" href="../../Design/rendered/states/brand-icon.png">
+  <link rel="apple-touch-icon" href="../../Design/rendered/states/brand-icon.png">
+  <link rel="stylesheet" href="../../Design/boards/tokens.css">
+  <link rel="stylesheet" href="../../Design/boards/components.css">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body class="site">
+<!-- Rules: Design/spec/website.md §一.5. scripts/build-website.py publishes this file: it maps the
+     local paths, fills the data-site values and the site: blocks from the release tags and notes,
+     and turns the clips into videos. The hero panel is a still frame that site.js animates. -->
+
+<header class="wrap site-nav">
+  <a class="brand" href="/">
+    <span class="app-icon"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+    <span>辞达</span>
+  </a>
+  <nav><a href="/en/">English</a><a href="https://github.com/Xuanwo/cida">GitHub</a></nav>
+</header>
+
+<main class="wrap releases-page">
+  <h1>更新记录</h1>
+  <p class="intro">辞达每天检查一次更新，有新版本时在面板里给出这些说明。</p>
+  <!-- site:releases -->
+  <article class="release">
+    <div><h2>辞达 1.2.0</h2><time datetime="2026-09-28">2026 年 9 月 28 日</time></div>
+    <ul>
+      <li>新增原处翻译：指着一段外文按 ⌥D，这一段就地换成译文，前后的内容还是原文，带着上下文读；再按一次换回。</li>
+      <li>按 ⌥⇧D 翻译整个窗口，比如 Slack 的频道或网页里的一篇长文：新内容出现就翻译，再按一次停止。按应用或网站记住，重启后仍然生效。</li>
+    </ul>
+  </article>
+  <article class="release">
+    <div><h2>辞达 1.1.1</h2><time datetime="2026-09-27">2026 年 9 月 27 日</time></div>
+    <ul>
+      <li>中文结果里相邻的标点不再留出双倍空隙。</li>
+    </ul>
+  </article>
+  <!-- /site:releases -->
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="app-icon"><img src="../../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+    <div class="credits">
+      <b>辞达</b>
+      <p>名字取自《论语·卫灵公》。</p>
+      <p>由 <a href="https://x.com/xuanwo">@xuanwo</a> 用心制作</p>
+    </div>
+    <nav><a href="https://github.com/Xuanwo/cida">GitHub</a><a href="https://github.com/Xuanwo/cida/blob/main/LICENSE">Apache-2.0</a><a href="/en/">English</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>
