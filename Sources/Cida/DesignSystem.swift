@@ -379,8 +379,25 @@ struct WindowSurface<Content: View>: View {
 /// whose top edge sits where the panel's does (`Design/spec/panel.md` §一 截图翻译,
 /// `Design/spec/translation-layer.md` §五 提示胶囊).
 struct CidaHintPill: View {
-  /// Room around the pill for its shadow inside the hosting view.
-  static let shadowMargin: CGFloat = 40
+  /// The panel's ambient shadow (`panel-shadow`: 28 pt down, 72 pt blur).
+  private static let ambientShadowRadius: CGFloat = 36
+  private static let ambientShadowOffset: CGFloat = 28
+  /// How far SwiftUI's blur of that radius reaches past the pill (measured: 55 pt).
+  private static let ambientShadowReach: CGFloat = 56
+  /// Room around the pill inside its hosting view, so the window never cuts the shadow off
+  /// into a visible rectangle: more below than above, since the shadow falls.
+  static let shadowInsets = EdgeInsets(
+    top: ambientShadowReach - ambientShadowOffset, leading: ambientShadowReach,
+    bottom: ambientShadowReach + ambientShadowOffset, trailing: ambientShadowReach)
+
+  /// The pill itself inside a hosting view's frame in AppKit's bottom-up coordinates.
+  static func pill(in hostingFrame: CGRect) -> CGRect {
+    CGRect(
+      x: hostingFrame.minX + shadowInsets.leading, y: hostingFrame.minY + shadowInsets.bottom,
+      width: hostingFrame.width - shadowInsets.leading - shadowInsets.trailing,
+      height: hostingFrame.height - shadowInsets.top - shadowInsets.bottom)
+  }
+
   let text: String
 
   var body: some View {
@@ -395,9 +412,11 @@ struct CidaHintPill: View {
     .background(CidaDesign.surface, in: Capsule())
     .overlay { Capsule().strokeBorder(CidaDesign.Palette.panelEdge.swiftUI, lineWidth: 1) }
     .shadow(color: CidaDesign.Palette.contactShadow.swiftUI, radius: 3, y: 2)
-    .shadow(color: CidaDesign.Palette.ambientShadow.swiftUI, radius: 36, y: 28)
+    .shadow(
+      color: CidaDesign.Palette.ambientShadow.swiftUI, radius: Self.ambientShadowRadius,
+      y: Self.ambientShadowOffset)
     .contentShape(Capsule())
-    .padding(Self.shadowMargin)
+    .padding(Self.shadowInsets)
     .accessibilityElement(children: .combine)
   }
 }

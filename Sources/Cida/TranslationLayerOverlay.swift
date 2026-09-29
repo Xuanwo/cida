@@ -350,7 +350,7 @@ final class LayerHintPanel: NSPanel {
   static func frame(fitting size: CGSize, in visibleFrame: CGRect) -> CGRect {
     let anchor = CidaDesign.Panel.topCenter(in: visibleFrame)
     return CGRect(
-      x: floor(anchor.x - size.width / 2), y: floor(anchor.y + CidaHintPill.shadowMargin - size.height),
+      x: floor(anchor.x - size.width / 2), y: floor(anchor.y + CidaHintPill.shadowInsets.top - size.height),
       width: size.width, height: size.height)
   }
 

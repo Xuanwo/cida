@@ -216,9 +216,14 @@ def plan_for(submitted_text):
     if isinstance(layer_blocks, list) and layer_blocks and all(
         isinstance(block, dict) and "id" in block and "text" in block for block in layer_blocks
     ):
+        # A paragraph already in my language goes into the foreign one; the rest into mine.
+        into_foreign = any(re.search(r"[\u4e00-\u9fff]", block["text"]) for block in layer_blocks)
+
         def translated(text):
             match = re.search(r"PARAGRAPH (\d+)", text)
             number = match.group(1) if match else "?"
+            if into_foreign:
+                return f"Paragraph {number} in English CIDA_LAYER_TRANSLATED_{number}"
             return f"第 {number} 段译文 CIDA_LAYER_TRANSLATED_{number}"
         reply = json.dumps(
             [{"id": block["id"], "text": translated(block["text"])} for block in layer_blocks],
@@ -226,7 +231,10 @@ def plan_for(submitted_text):
         )
         return {
             "chunks": [reply[: len(reply) // 2], reply[len(reply) // 2 :]],
-            "requiredSystemFragments": ["Keep every ⟦n⟧ placeholder exactly as written"],
+            "requiredSystemFragments": [
+                "Keep every ⟦n⟧ placeholder exactly as written",
+                '"target_language":"English"' if into_foreign else '"target_language":"简体中文"',
+            ],
         }
     if submitted_text == "CIDA CAPTURE SCENARIO":
         # What Vision reads from the source application's line of text.

@@ -1,25 +1,42 @@
 import Foundation
 import NaturalLanguage
 
-/// Which paragraphs the layer sends: only those not already in the user's own language
-/// (`Design/spec/translation-layer.md` §一). The language is free text in Settings, so it is
-/// matched against language names; when nothing matches, the model decides and a block that
-/// comes back unchanged is simply not drawn.
+/// Which language a paragraph goes into (`Design/spec/translation-layer.md` §一). Translating
+/// a whole window brings only other languages into mine. A paragraph ⌥D points at follows the
+/// panel's rule instead: one already in my language goes into my foreign language. The
+/// languages are free text in Settings, so they are matched against language names; when my
+/// language matches nothing, every paragraph goes into it and the model returns those already
+/// in it unchanged, which are simply not drawn.
 struct LayerLanguageFilter: Sendable {
+  let myLanguageName: String
+  let foreignLanguageName: String
   let myLanguage: NLLanguage?
+  let foreignLanguage: NLLanguage?
 
-  init(myLanguage text: String) {
-    myLanguage = Self.language(named: text)
+  init(languages: (my: String, foreign: String)) {
+    myLanguageName = languages.my
+    foreignLanguageName = languages.foreign
+    myLanguage = Self.language(named: languages.my)
+    foreignLanguage = Self.language(named: languages.foreign)
   }
 
-  /// Whether `text` needs translating: it has letters and is not written in my language.
-  func needsTranslation(_ text: String) -> Bool {
-    guard text.contains(where: { $0.isLetter }) else { return false }
-    guard let myLanguage else { return true }
+  /// The language `text` is translated into, or nil when it stays as it is: it has no
+  /// letters, or it is already in my language and ⌥D did not point at it.
+  func target(for text: String, pointedAt: Bool) -> String? {
+    guard text.contains(where: { $0.isLetter }) else { return nil }
+    guard isInMyLanguage(text) else { return myLanguageName }
+    // Both settings may name one language (Simplified and Traditional Chinese count as one);
+    // then a paragraph in it has nothing to go into.
+    guard pointedAt, foreignLanguage.map(Self.family) != myLanguage.map(Self.family) else { return nil }
+    return foreignLanguageName
+  }
+
+  private func isInMyLanguage(_ text: String) -> Bool {
+    guard let myLanguage else { return false }
     let recognizer = NLLanguageRecognizer()
     recognizer.processString(String(text.prefix(1_000)))
-    guard let dominant = recognizer.dominantLanguage else { return true }
-    return Self.family(dominant) != Self.family(myLanguage)
+    guard let dominant = recognizer.dominantLanguage else { return false }
+    return Self.family(dominant) == Self.family(myLanguage)
   }
 
   /// Chinese scripts count as one language: a Simplified Chinese reader needs no layer over
@@ -83,13 +100,13 @@ enum LayerTranslationRequest {
   static let maximumItems = 40
   static let maximumCharacters = 12_000
 
-  static func request(texts: [String], settings: CidaSettings) throws -> ProcessingRequest {
+  static func request(texts: [String], into target: String, settings: CidaSettings) throws -> ProcessingRequest {
     let items = texts.enumerated().map { Item(id: $0.offset, text: $0.element) }
     let data = try JSONEncoder().encode(items)
     let languages = settings.requestLanguages
     return ProcessingRequest(
       text: String(decoding: data, as: UTF8.self), mode: .translate,
-      myLanguage: languages.my, foreignLanguage: languages.foreign, translatesLayerBlocks: true)
+      myLanguage: languages.my, foreignLanguage: languages.foreign, layerTargetLanguage: target)
   }
 
   /// The reply as translations in request order. Models sometimes wrap JSON in a Markdown
@@ -139,10 +156,10 @@ enum LayerTranslationRequest {
   }
 
   static func translate(
-    _ texts: [String], settings: CidaSettings, service: any TextProcessingService
+    _ texts: [String], into target: String, settings: CidaSettings, service: any TextProcessingService
   ) async throws -> [String] {
     guard service.isConfigured(by: settings) else { throw LayerTranslationError.notConfigured }
-    let request = try request(texts: texts, settings: settings)
+    let request = try request(texts: texts, into: target, settings: settings)
     var reply = ""
     for try await chunk in service.stream(request, settings: settings) {
       try Task.checkCancellation()
@@ -153,18 +170,18 @@ enum LayerTranslationRequest {
   }
 }
 
-/// The settings besides the paragraph itself that decide its translation: the model service
-/// (endpoint, request shape and key), the translation prompt and my language. The rest of the
-/// system message is fixed for the life of the process, and so is this in-memory cache.
+/// What besides the paragraph itself decides its translation: the model service (endpoint,
+/// request shape and key), the translation prompt and the language it goes into. The rest of
+/// the system message is fixed for the life of the process, and so is this in-memory cache.
 struct LayerTranslationContext: Hashable, Sendable {
   let modelService: String
   let prompt: String
-  let myLanguage: String
+  let targetLanguage: String
 
-  init(settings: CidaSettings) {
+  init(settings: CidaSettings, target: String) {
     modelService = settings.modelServiceFingerprint
     prompt = settings.translationPrompt
-    myLanguage = settings.requestLanguages.my
+    targetLanguage = target
   }
 }
 

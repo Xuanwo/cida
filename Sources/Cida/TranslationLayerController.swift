@@ -342,10 +342,9 @@ final class TranslationLayerController {
     lifecycleLog?(event)
   }
 
-  /// A paragraph ⌥D asked for is already in the user's own language.
-  fileprivate func noteAlreadyMine(at frame: CGRect) {
-    let language = settings().requestLanguages.my
-    hint("这一段已经是\(language)")
+  /// A paragraph ⌥D asked for has nothing to translate.
+  fileprivate func noteNothingToTranslate() {
+    hint("这里没有可以翻译的文字")
   }
 }
 
@@ -500,7 +499,8 @@ final class LayerPaneSession {
   private var windowFrame: CGRect?
   private var windowNumber: CGWindowID?
   private(set) var isOnScreen = false
-  private var blocks: [LayerBlock] = []
+  /// The paragraphs that show a translation or wait for one, each with the language it goes into.
+  private var blocks: [(block: LayerBlock, target: String)] = []
   private var anchors: [AccessibilityLayerNode] = []
   private var anchorFrames: [CGRect?] = []
   private var lastMotion: Date?
@@ -560,7 +560,7 @@ final class LayerPaneSession {
     guard let index = LayerBlockExtractor.paragraphIndex(at: point, in: readBlocks) else { return nil }
     let block = readBlocks[index]
     let node = readNodes[index]
-    let isShown = blocks.contains { $0 == block }
+    let isShown = blocks.contains { $0.block == block }
     if isShown {
       picked.removeAll { $0.matches(block, node: node) }
       if translatesAll { restored.append(LayerParagraphMark(element: node, text: block.text)) }
@@ -765,42 +765,51 @@ final class LayerPaneSession {
   /// What shows, from the last read: the whole window's paragraphs but those turned back, and
   /// those ⌥D asked for.
   private func showChosenParagraphs() {
-    let shown = readBlocks.indices.filter { index in
+    let filter = LayerLanguageFilter(languages: owner.currentSettings.requestLanguages)
+    blocks = readBlocks.indices.compactMap { index in
       let block = readBlocks[index], node = readNodes[index]
-      if picked.contains(where: { $0.matches(block, node: node) }) { return true }
-      return readAutomatic.contains(index) && !restored.contains(where: { $0.matches(block, node: node) })
+      let pointedAt = picked.contains { $0.matches(block, node: node) }
+      guard pointedAt || readAutomatic.contains(index) && !restored.contains(where: { $0.matches(block, node: node) })
+      else {
+        return nil
+      }
+      guard let target = filter.target(for: block.text, pointedAt: pointedAt) else {
+        if pointedAt {
+          picked.removeAll { $0.matches(block, node: node) }
+          owner.noteNothingToTranslate()
+        }
+        return nil
+      }
+      return (block, target)
     }
-    // ⌥D on a paragraph already in the user's own language has nothing to show.
-    let filter = LayerLanguageFilter(myLanguage: owner.currentSettings.requestLanguages.my)
-    for index in shown where !filter.needsTranslation(readBlocks[index].text) {
-      let block = readBlocks[index], node = readNodes[index]
-      guard picked.contains(where: { $0.matches(block, node: node) }) else { continue }
-      picked.removeAll { $0.matches(block, node: node) }
-      owner.noteAlreadyMine(at: block.frame)
-    }
-    blocks = shown.map { readBlocks[$0] }
   }
 
-  private var pendingBlocks: [LayerBlock] {
+  private var pendingBlocks: [(block: LayerBlock, target: String)] {
     let settings = owner.currentSettings
-    let context = LayerTranslationContext(settings: settings)
-    let filter = LayerLanguageFilter(myLanguage: settings.requestLanguages.my)
     return blocks.filter {
-      owner.translations.translation(for: $0.maskedText, in: context) == nil && filter.needsTranslation($0.text)
+      owner.translations.translation(
+        for: $0.block.maskedText, in: LayerTranslationContext(settings: settings, target: $0.target)) == nil
     }
   }
 
   private func translatePending() {
     guard translating == nil, failure == nil else { return }
-    let texts = Array(Set(pendingBlocks.map(\.maskedText)))
-    guard !texts.isEmpty else { return }
+    // One request per language the paragraphs go into.
+    let textsByTarget = Dictionary(grouping: pendingBlocks, by: \.target)
+      .mapValues { Array(Set($0.map(\.block.maskedText))) }
+      .sorted { $0.key < $1.key }
+    guard !textsByTarget.isEmpty else { return }
     let settings = owner.currentSettings
-    let context = LayerTranslationContext(settings: settings)
     let service = owner.translationService
+    let batches = textsByTarget.flatMap { target, texts in
+      LayerTranslationRequest.batches(of: texts).map { (target: target, texts: $0) }
+    }
     translating = Task { [weak self] in
-      for batch in LayerTranslationRequest.batches(of: texts) {
+      for (target, batch) in batches {
+        let context = LayerTranslationContext(settings: settings, target: target)
         do {
-          let translated = try await LayerTranslationRequest.translate(batch, settings: settings, service: service)
+          let translated = try await LayerTranslationRequest.translate(
+            batch, into: target, settings: settings, service: service)
           guard let self, !Task.isCancelled else { return }
           for (source, translation) in zip(batch, translated) {
             owner.translations.store(translation, for: source, in: context)
@@ -831,8 +840,9 @@ final class LayerPaneSession {
     let style = LayerTextStyle.paper(darkAppearance: overlay.overlayView.effectiveAppearance.isDark)
     let origin = CGPoint(x: -paneFrame.minX, y: -paneFrame.minY)
     var drawn: [CGRect] = []
-    let context = LayerTranslationContext(settings: owner.currentSettings)
-    let drawings: [LayerDrawing] = blocks.compactMap { block in
+    let settings = owner.currentSettings
+    let drawings: [LayerDrawing] = blocks.compactMap { block, target in
+      let context = LayerTranslationContext(settings: settings, target: target)
       guard let translation = owner.translations.translation(for: block.maskedText, in: context) else { return nil }
       let (text, links) = block.restoring(in: translation)
       guard text != block.text else { return nil }
@@ -846,7 +856,7 @@ final class LayerPaneSession {
     let sheets = drawings.sharingSheets(around: untouched)
     overlay.overlayView.show(sheets, scale: scale)
     // A caret breathes after every paragraph waiting for its translation (§二 等待, §五 等待).
-    let waiting = failure == nil ? pendingBlocks : []
+    let waiting = failure == nil ? pendingBlocks.map(\.block) : []
     overlay.overlayView.setPending(waiting.map { block in
       let end = block.endOfText
       let height = LayerTypeset.fontSize(forLineHeight: block.lineHeight)

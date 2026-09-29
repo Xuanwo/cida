@@ -493,35 +493,46 @@ final class TranslationLayerTests: XCTestCase {
 
   // MARK: - Language
 
-  func testOnlyTextOutsideMyLanguageIsSent() {
-    let chinese = LayerLanguageFilter(myLanguage: "简体中文")
+  func testTheWholeWindowGoesIntoMyLanguageAndAPointedParagraphFollowsThePanel() {
+    let chinese = LayerLanguageFilter(languages: (my: "简体中文", foreign: "English"))
     XCTAssertEqual(chinese.myLanguage, .simplifiedChinese)
-    XCTAssertTrue(chinese.needsTranslation("Could it be the new prefetch default?"))
-    XCTAssertFalse(chinese.needsTranslation("会不会是新的预取默认值导致的？"))
-    XCTAssertFalse(chinese.needsTranslation("會不會是新的預取預設值導致的？"), "Either Chinese script reads")
-    XCTAssertFalse(chinese.needsTranslation("12:04 · 3"), "No letters, nothing to translate")
+    XCTAssertEqual(chinese.target(for: "Could it be the new prefetch default?", pointedAt: false), "简体中文")
+    XCTAssertEqual(chinese.target(for: "Could it be the new prefetch default?", pointedAt: true), "简体中文")
+    XCTAssertNil(chinese.target(for: "会不会是新的预取默认值导致的？", pointedAt: false), "The whole window skips my language")
+    XCTAssertNil(chinese.target(for: "會不會是新的預取預設值導致的？", pointedAt: false), "Either Chinese script reads")
+    XCTAssertEqual(
+      chinese.target(for: "会不会是新的预取默认值导致的？", pointedAt: true), "English",
+      "⌥D on my language goes into my foreign language, like ⌥A")
+    XCTAssertNil(chinese.target(for: "12:04 · 3", pointedAt: true), "No letters, nothing to translate")
+    XCTAssertNil(
+      LayerLanguageFilter(languages: (my: "简体中文", foreign: "繁體中文")).target(for: "你好，世界", pointedAt: true),
+      "Two names for one language leave nothing to go into")
 
-    XCTAssertEqual(LayerLanguageFilter(myLanguage: "English").myLanguage, .english)
-    XCTAssertEqual(LayerLanguageFilter(myLanguage: "英式英语").myLanguage, .english)
-    XCTAssertEqual(LayerLanguageFilter(myLanguage: "繁體中文（台灣）").myLanguage, .traditionalChinese)
-    XCTAssertEqual(LayerLanguageFilter(myLanguage: "日本語").myLanguage, .japanese)
-    // Unknown wording: send everything and let the model return unchanged text.
-    XCTAssertTrue(LayerLanguageFilter(myLanguage: "克林贡语").needsTranslation("你好 world"))
+    XCTAssertEqual(LayerLanguageFilter(languages: (my: "English", foreign: "中文")).myLanguage, .english)
+    XCTAssertEqual(LayerLanguageFilter(languages: (my: "英式英语", foreign: "中文")).myLanguage, .english)
+    XCTAssertEqual(LayerLanguageFilter(languages: (my: "繁體中文（台灣）", foreign: "English")).myLanguage, .traditionalChinese)
+    XCTAssertEqual(LayerLanguageFilter(languages: (my: "日本語", foreign: "English")).myLanguage, .japanese)
+    // Unknown wording: send everything into it and let the model return unchanged text.
+    XCTAssertEqual(
+      LayerLanguageFilter(languages: (my: "克林贡语", foreign: "English")).target(for: "你好 world", pointedAt: true), "克林贡语")
   }
 
   // MARK: - Request
 
-  func testTheRequestIsNumberedJSONIntoMyLanguageWithPlaceholdersKept() throws {
+  func testTheRequestIsNumberedJSONIntoItsTargetWithPlaceholdersKept() throws {
     var settings = CidaSettings()
     settings.myLanguage = "简体中文"
-    let request = try LayerTranslationRequest.request(texts: ["Hi ⟦0⟧", "Bye"], settings: settings)
-    XCTAssertTrue(request.translatesLayerBlocks)
+    let request = try LayerTranslationRequest.request(texts: ["Hi ⟦0⟧", "Bye"], into: "简体中文", settings: settings)
+    XCTAssertEqual(request.layerTargetLanguage, "简体中文")
     XCTAssertEqual(
       try JSONDecoder().decode([LayerTranslationRequest.Item].self, from: Data(request.text.utf8)),
       [.init(id: 0, text: "Hi ⟦0⟧"), .init(id: 1, text: "Bye")])
     let prompt = try ModelPromptBuilder.build(request: request, settings: settings)
     XCTAssertEqual(prompt.parameters.languageBehavior, .translateInto)
+    XCTAssertEqual(prompt.parameters.targetLanguage, "简体中文")
+    XCTAssertNil(prompt.parameters.myLanguage)
     XCTAssertNil(prompt.parameters.foreignLanguage)
+    XCTAssertTrue(prompt.systemMessage.contains(#""target_language":"简体中文""#))
     XCTAssertTrue(prompt.systemMessage.contains("Keep every ⟦n⟧ placeholder exactly as written"))
     XCTAssertFalse(prompt.systemMessage.contains("Hi ⟦0⟧"), "Source text stays out of the instructions")
 
@@ -563,10 +574,10 @@ final class TranslationLayerTests: XCTestCase {
         }
       }
     }
-    let result = try await LayerTranslationRequest.translate(["a", "b"], settings: CidaSettings(), service: Echo(configured: true))
+    let result = try await LayerTranslationRequest.translate(["a", "b"], into: "简体中文", settings: CidaSettings(), service: Echo(configured: true))
     XCTAssertEqual(result, ["译:a", "译:b"])
     do {
-      _ = try await LayerTranslationRequest.translate(["a"], settings: CidaSettings(), service: Echo(configured: false))
+      _ = try await LayerTranslationRequest.translate(["a"], into: "简体中文", settings: CidaSettings(), service: Echo(configured: false))
       XCTFail("A service without configuration must not be asked")
     } catch {
       XCTAssertEqual(error as? LayerTranslationError, .notConfigured)
@@ -577,31 +588,35 @@ final class TranslationLayerTests: XCTestCase {
     let cache = LayerTranslationCache()
     var settings = CidaSettings()
     settings.modelService.model = "model-a"
-    let original = LayerTranslationContext(settings: settings)
+    let original = LayerTranslationContext(settings: settings, target: "简体中文")
     cache.store("你好", for: "Hello", in: original)
-    XCTAssertEqual(cache.translation(for: "Hello", in: LayerTranslationContext(settings: settings)), "你好")
+    XCTAssertEqual(cache.translation(for: "Hello", in: LayerTranslationContext(settings: settings, target: "简体中文")), "你好")
+    XCTAssertNil(
+      cache.translation(for: "Hello", in: LayerTranslationContext(settings: settings, target: "日本語")),
+      "Another language asks again")
 
     var changes: [(String, (inout CidaSettings) -> Void)] = [
       ("model", { $0.modelService.model = "model-b" }),
       ("request body", { $0.modelService.body = ["temperature": .number(0)] }),
       ("key", { $0.apiKey = "another key" }),
       ("translation prompt", { $0.translationPrompt = "Translate formally." }),
-      ("my language", { $0.myLanguage = "日本語" }),
     ]
     for (name, change) in changes {
       var changed = settings
       change(&changed)
-      XCTAssertNil(cache.translation(for: "Hello", in: LayerTranslationContext(settings: changed)), "A new \(name) asks again")
+      XCTAssertNil(
+        cache.translation(for: "Hello", in: LayerTranslationContext(settings: changed, target: "简体中文")),
+        "A new \(name) asks again")
     }
     changes = [
-      ("foreign language", { $0.foreignLanguage = "Français" }),
       ("improvement prompt", { $0.improvementPrompt = "Polish it." }),
     ]
     for (name, change) in changes {
       var changed = settings
       change(&changed)
       XCTAssertEqual(
-        cache.translation(for: "Hello", in: LayerTranslationContext(settings: changed)), "你好", "The layer never sends the \(name)")
+        cache.translation(for: "Hello", in: LayerTranslationContext(settings: changed, target: "简体中文")), "你好",
+        "The layer never sends the \(name)")
     }
   }
 
@@ -609,7 +624,7 @@ final class TranslationLayerTests: XCTestCase {
     // Each pair below is 4 bytes of source and 3 of translation (one CJK character in UTF-8).
     let pair = 7 + LayerTranslationCache.entryOverhead
     let cache = LayerTranslationCache(byteLimit: 3 * pair)
-    let context = LayerTranslationContext(settings: CidaSettings())
+    let context = LayerTranslationContext(settings: CidaSettings(), target: "简体中文")
     cache.store("一", for: "aaaa", in: context)
     cache.store("二", for: "bbbb", in: context)
     cache.store("三", for: "cccc", in: context)
@@ -757,8 +772,7 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(panelTop, 945 - 189)
 
     let size = CGSize(width: 380, height: 112)
-    let layerPill = LayerHintPanel.frame(fitting: size, in: visible)
-      .insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
+    let layerPill = CidaHintPill.pill(in: LayerHintPanel.frame(fitting: size, in: visible))
     XCTAssertEqual(layerPill.maxY, panelTop, accuracy: 1)
     XCTAssertEqual(layerPill.midX, visible.midX, accuracy: 1)
 
@@ -771,9 +785,24 @@ final class TranslationLayerTests: XCTestCase {
     overlay.hintAnchor = CidaDesign.Panel.topCenter(in: visible)
     overlay.layoutSubtreeIfNeeded()
     let hosting = try XCTUnwrap(overlay.subviews.first { $0 is NSHostingView<CaptureHint> })
-    let capturePill = hosting.frame.insetBy(dx: CidaHintPill.shadowMargin, dy: CidaHintPill.shadowMargin)
+    let capturePill = CidaHintPill.pill(in: hosting.frame)
     XCTAssertEqual(capturePill.maxY, panelTop, accuracy: 1)
     XCTAssertEqual(capturePill.midX, visible.midX, accuracy: 1)
+  }
+
+  /// The hosting view holds the whole shadow: a cut-off shadow shows as a grey rectangle
+  /// around the pill (2026-09-30, the ⌥D hint over a white page on the user's Mac).
+  @MainActor
+  func testTheHintPillsShadowFitsInsideItsHostingView() throws {
+    let renderer = ImageRenderer(content: CidaHintPill(text: "这一段已经是简体中文"))
+    renderer.scale = 1
+    let image = try XCTUnwrap(renderer.cgImage)
+    let bitmap = NSBitmapImageRep(cgImage: image)
+    let edges = (0..<bitmap.pixelsWide).flatMap { [(x: $0, y: 0), (x: $0, y: bitmap.pixelsHigh - 1)] }
+      + (0..<bitmap.pixelsHigh).flatMap { [(x: 0, y: $0), (x: bitmap.pixelsWide - 1, y: $0)] }
+    let strongest = edges.map { bitmap.colorAt(x: $0.x, y: $0.y)?.alphaComponent ?? 0 }.max() ?? 0
+    // The blur's last 1/255 of opacity is invisible on any background.
+    XCTAssertLessThanOrEqual(strongest, 1.0 / 255, "The shadow reaches the edge of the view and is cut off there")
   }
 
   /// Stage Manager keeps a window in the window list while it shows it as a thumbnail in the

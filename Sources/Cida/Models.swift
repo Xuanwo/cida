@@ -42,9 +42,9 @@ struct ProcessingRequest: Equatable, Sendable {
   /// decides which one a translation goes into.
   let myLanguage: String
   let foreignLanguage: String
-  /// The translation layer's request (`Design/spec/translation-layer.md`): the text is a JSON
-  /// array of numbered paragraphs, each translated into `myLanguage` only.
-  var translatesLayerBlocks = false
+  /// Set for the translation layer's request (`Design/spec/translation-layer.md`): the text is
+  /// a JSON array of numbered paragraphs, each translated into this language only.
+  var layerTargetLanguage: String?
 }
 
 /// The text of one result. The stream presenter appends to it on the main
