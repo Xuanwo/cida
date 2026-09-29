@@ -19,7 +19,10 @@ final class BoardRenderer: NSObject, WKNavigationDelegate {
     window = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
     window.alphaValue = 0
     window.ignoresMouseEvents = true
-    webView = WKWebView(frame: frame)
+    let configuration = WKWebViewConfiguration()
+    // Lets a board read the frames it embeds from the same checkout (website.html).
+    configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+    webView = WKWebView(frame: frame, configuration: configuration)
     super.init()
     webView.navigationDelegate = self
     window.contentView = webView
@@ -72,6 +75,8 @@ final class BoardRenderer: NSObject, WKNavigationDelegate {
   private func measure() async throws -> Layout {
     let script = """
       await document.fonts.ready;
+      // A board that lays itself out after load (website.html sizes its frames) sets this.
+      await window.boardReady;
       await new Promise(r => setTimeout(r, 50));
       const rect = (el, name) => {
         const r = el.getBoundingClientRect();

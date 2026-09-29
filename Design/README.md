@@ -15,6 +15,7 @@ a versioned copy.
 | Lifecycle: DMG, first run, launch behaviour, the update panel, uninstall | [`spec/lifecycle.md`](spec/lifecycle.md) | [`boards/lifecycle.html`](boards/lifecycle.html) |
 | Configuration: the command line, model fields, the agent prompt, Settings' model group | [`spec/configuration.md`](spec/configuration.md) | [`boards/configuration.html`](boards/configuration.html) |
 | Translation layer: Option-D, one paragraph once or a pane kept, translations over the original, following scroll | [`spec/translation-layer.md`](spec/translation-layer.md) | [`boards/translation-layer.html`](boards/translation-layer.html) |
+| Website: cida.xuanwo.io, its sections, styling, hero motion and publishing | [`spec/website.md`](spec/website.md) | [`boards/website.html`](boards/website.html), which renders the pages in [`../website`](../website) |
 
 ## Boards
 

@@ -139,6 +139,20 @@ The workflow reads these repository secrets:
 
 `scripts/ci/import-signing-identity.sh` imports the identity into a keychain of the job's own, which the workflow deletes when it ends.
 
+## Website
+
+`website/` holds cida.xuanwo.io (`Design/spec/website.md`): the Chinese page, `en/`, `releases/`, and the layout and motion in `site.css` and `site.js`. The pages load the design tokens and components straight from `Design/boards`, so `swift scripts/render-design.swift website.html` renders them unbuilt. To build and look at the published site:
+
+```sh
+pip install fonttools brotli            # plus ffmpeg, and the release tags (git fetch --tags)
+scripts/build-website.py                # writes build/website
+python3 -m http.server --directory build/website
+```
+
+The build maps every local path to `/assets` and fails on one it does not know, fills the version and update notes from the newest `vX.Y.Z` tag, turns the GIF demos into MP4 with a poster frame, and subsets the fonts to the characters the site uses.
+
+`.github/workflows/website.yml` builds on pull requests that touch the site and deploys from `main` with `wrangler deploy --config website/wrangler.jsonc`: after a push that changes it, and after every successful Release run, so the version on the page is one whose DMG is already published. The Worker `cida-website` only serves static assets, on the custom domain `cida.xuanwo.io`. The deploy reads the repository secret `CLOUDFLARE_API_TOKEN`: an account-owned API token of the Xuanwo account with the Workers Editor role on `cida-website` and Zone > Workers Routes > Write on `xuanwo.io`, which every deploy needs because it restates the custom domain.
+
 ## Architecture
 
 - SwiftUI owns the panel composition and observable application state. AppKit owns the non-activating floating panel, the global shortcut, the menu-bar item, native text controls, keyboard routing, result rendering, snapshots, and performance instrumentation. `PanelController` sizes the panel from the height its content reports and keeps the top edge fixed, so the panel only ever grows downward over the design's 150 ms height transition. `AppModel` holds one `ResultRecord`: the source and action it was made from, its streamed text, and its phase (streaming, completed, stopped, failed). Both frameworks derive colors and typography from one semantic `CidaDesign` token set: Inter for the source, Source Serif 4 and Noto Serif SC for the result, accent only on the selected action, the caret, and the copied feedback.

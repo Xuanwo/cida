@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>辞达：在 Mac 的任何地方翻译和润色文字</title>
+  <meta name="description" content="辞达而已矣：言辞能把意思表达清楚，就够了。辞达用你选择的大模型，在 Mac 的任何地方翻译和润色文字。">
+  <link rel="canonical" href="https://cida.xuanwo.io/">
+  <link rel="alternate" hreflang="zh-Hans" href="https://cida.xuanwo.io/">
+  <link rel="alternate" hreflang="en" href="https://cida.xuanwo.io/en/">
+  <meta property="og:title" content="辞达">
+  <meta property="og:description" content="辞达而已矣">
+  <meta property="og:url" content="https://cida.xuanwo.io/">
+  <link rel="icon" href="../Design/rendered/states/brand-icon.png">
+  <link rel="apple-touch-icon" href="../Design/rendered/states/brand-icon.png">
+  <link rel="stylesheet" href="../Design/boards/tokens.css">
+  <link rel="stylesheet" href="../Design/boards/components.css">
+  <link rel="stylesheet" href="site.css">
+  <script src="../Design/boards/components.js" defer></script>
+  <script src="site.js" defer></script>
+</head>
+<body class="site">
+<!-- Rules: Design/spec/website.md. scripts/build-website.py publishes this file: it maps the
+     local paths, fills the data-site values and the site: blocks from the release tags and notes,
+     and turns the clips into videos. The hero panel is a still frame that site.js animates. -->
+
+<header class="wrap site-nav">
+  <a class="brand" href="/">
+    <span class="app-icon"><img src="../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+    <span>辞达</span>
+  </a>
+  <nav><a href="/en/">English</a><a href="https://github.com/Xuanwo/cida">GitHub</a></nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <h1>辞达而已矣</h1>
+      <p class="lede">言辞能把意思表达清楚，就够了。<br>辞达用你选择的大模型，在 Mac 的任何地方翻译和润色文字。</p>
+      <div class="actions">
+        <a class="download" href="https://cida-releases.xuanwo.io/latest/Cida.dmg">下载辞达</a>
+        <small><span data-site="version">1.2.0</span> 版，需要 macOS 15 或更新版本。辞达免费，模型调用按服务商的价格计费。</small>
+      </div>
+      <div class="stage">
+        <section class="panel">
+          <div class="source">Vigorous writing is concise. A sentence should contain no unnecessary words, a paragraph no unnecessary sentences, for the same reason that a drawing should have no unnecessary lines and a machine no unnecessary parts.</div>
+          <cida-bar processing action="stop"></cida-bar>
+          <div class="result"><div class="text cjk">有力的文字是简洁的。一句话不该有多余的词，一段话不该有多余的句子，正如一幅画不该有多余的<span class="char-in" style="--o: 0.9">线</span><span class="char-in" style="--o: 0.76">条</span><span class="char-in blurred" style="--o: 0.62">，</span><span class="char-in blurred" style="--o: 0.48">一</span><span class="char-in blurred" style="--o: 0.34">台</span><span class="char-in blurred" style="--o: 0.2">机</span><span class="char-in blurred" style="--o: 0.08">器</span><span class="cursor"></span></div></div>
+        </section>
+      </div>
+      <script type="application/json" id="hero-passages">[
+        {"source": "Vigorous writing is concise. A sentence should contain no unnecessary words, a paragraph no unnecessary sentences, for the same reason that a drawing should have no unnecessary lines and a machine no unnecessary parts.",
+         "result": "有力的文字是简洁的。一句话不该有多余的词，一段话不该有多余的句子，正如一幅画不该有多余的线条，一台机器不该有多余的零件。", "cjk": true},
+        {"source": "I went to the woods because I wished to live deliberately, to front only the essential facts of life, and see if I could not learn what it had to teach, and not, when I came to die, discover that I had not lived.",
+         "result": "我到林中去，因为我希望从容地生活，只面对生活中最本质的事实，看看能否学到它要教给我的东西，免得到了临死的时候，才发现自己从来没有活过。", "cjk": true}
+      ]</script>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <h2>五种用法</h2>
+      <p class="section-note">快捷键都是默认值，可以在设置里重新录制。</p>
+      <div class="uses">
+        <article class="use">
+          <div>
+            <h3>翻译选中的文字</h3>
+            <div class="keys"><kbd>⌥</kbd> <kbd>A</kbd></div>
+            <p>面板带着选中的文字出现，译文随即流出。你的语言译成常用外语，其他语言都译成你的语言；两者默认是简体中文和英文，可以写成任何语言、方言或文体。</p>
+          </div>
+          <img class="clip" src="../docs/images/demo-translate.gif" alt="在 Chrome 里选中一段英文，按 ⌥A，面板里流出中文译文">
+        </article>
+        <article class="use">
+          <div>
+            <h3>润色</h3>
+            <div class="keys"><kbd>Tab</kbd> <kbd>⏎</kbd></div>
+            <p>在面板里按 Tab 切到「改进」，再按 Return。润色后的文字保持原来的语言，复制回去就能用。</p>
+          </div>
+          <img class="clip" src="../docs/images/demo-improve.gif" alt="选中评论框里的英文回复，按 ⌥A 后按 Tab 和 Return，得到润色后的英文">
+        </article>
+        <article class="use">
+          <div>
+            <h3>翻译屏幕上的文字</h3>
+            <div class="keys"><kbd>⌥</kbd> <kbd>S</kbd></div>
+            <p>图片、视频和选不中的界面，框出要翻译的部分。辞达在本机识别文字，再交给模型翻译。</p>
+          </div>
+          <img class="clip" src="../docs/images/demo-capture.gif" alt="按 ⌥S 框选文章里的图表，辞达识别图里的文字并翻译">
+        </article>
+        <article class="use">
+          <div>
+            <h3>在原处读一段</h3>
+            <div class="keys"><kbd>⌥</kbd> <kbd>D</kbd></div>
+            <p>指着一段外文按下快捷键，这一段就地换成译文，前后还是原文，带着上下文读；再按一次换回。</p>
+          </div>
+          <img class="clip" src="../docs/images/demo-paragraph.gif" alt="指着一段按 ⌥D，这一段就地换成译文；再按一次换回原文">
+        </article>
+        <article class="use">
+          <div>
+            <h3>翻译整个窗口</h3>
+            <div class="keys"><kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd></div>
+            <p>连续读 Slack 频道或一篇长文时用。新内容出现就翻译，再按一次停止；代码保持原样，点击和滚动照常落到原来的应用。</p>
+          </div>
+          <img class="clip" src="../docs/images/demo-window.gif" alt="按 ⌥⇧D 整页换成译文；滚动时译文隐去，停下后接着翻译">
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <h2>三步装好</h2>
+      <ol class="steps">
+        <li>
+          <h3>打开 Cida.dmg</h3>
+          <p>把辞达拖进「应用程序」再打开。安装包经过 Developer ID 签名和 Apple 公证；辞达只在菜单栏显示图标，不占用 Dock。</p>
+        </li>
+        <li>
+          <h3>让 AI 助手配置模型</h3>
+          <p>按 <kbd>⌘</kbd> <kbd>,</kbd> 打开设置，点「复制配置提示词」，交给 Claude Code、Codex 等助手。它会问你用哪家服务，写好配置后自己检查一遍。</p>
+        </li>
+        <li>
+          <h3>把 API Key 存进钥匙串</h3>
+          <p>Key 不经过助手：它请你复制 Key 后运行一条命令，Key 直接存进钥匙串。在本机运行的模型不需要 Key。</p>
+        </li>
+      </ol>
+      <div class="permissions">
+        <div class="row head"><span>可选权限</span><span>开启后</span><span>不开启时</span></div>
+        <div class="row"><b>辅助功能</b><span>唤出面板时自动带入选中的文字；可以原处翻译</span><span class="muted">先 ⌘C，再在面板里 ⌘V；原处翻译不可用</span></div>
+        <div class="row"><b>屏幕录制</b><span>可以翻译屏幕上的文字</span><span class="muted">截图翻译不可用</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block privacy">
+    <div class="wrap">
+      <h2>文字只去你选的地方</h2>
+      <ul>
+        <li>API Key 只存在 macOS 的钥匙串里。</li>
+        <li>不保存历史记录，不收集任何数据；翻译和润色的请求只发往你选择的服务商。</li>
+        <li>截图在本机用 Apple 的 Vision 识别，图片不会离开你的 Mac。原处翻译只读取应用提供的文字，不截取屏幕画面。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap updates">
+      <div class="intro">
+        <h2>最近更新</h2>
+        <p>辞达每天检查一次更新。有新版本时，它在面板里告诉你改了什么，你确认后自己下载并安装。</p>
+        <a class="more" href="/releases/">全部更新记录</a>
+      </div>
+      <section class="panel">
+        <div class="source statement">辞达 <span data-site="version">1.2.0</span> 可以安装<span class="muted"> · 当前 <span data-site="previous-version">1.1.1</span></span></div>
+        <cida-bar options="安装并重启|稍后|跳过这个版本"></cida-bar>
+        <div class="result"><div class="aside">更新内容</div><div class="text cjk notes">
+          <!-- site:latest-notes -->
+          <p>新增原处翻译：指着一段外文按 ⌥D，这一段就地换成译文，前后的内容还是原文，带着上下文读；再按一次换回。</p>
+          <p>按 ⌥⇧D 翻译整个窗口，比如 Slack 的频道或网页里的一篇长文：新内容出现就翻译，再按一次停止。按应用或网站记住，重启后仍然生效。</p>
+          <p>原处的译文写在辞达的纸上，滚动时先隐去、停下后在新的位置出现；代码和链接保持原样，不会被翻译。</p>
+          <!-- /site:latest-notes -->
+        </div></div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="app-icon"><img src="../Resources/AppIcon.icon/Assets/glyph.svg" alt=""><img src="../Resources/AppIcon.icon/Assets/caret.svg" alt=""></span>
+    <div class="credits">
+      <b>辞达</b>
+      <p>名字取自《论语·卫灵公》。</p>
+      <p>由 <a href="https://x.com/xuanwo">@xuanwo</a> 用心制作</p>
+    </div>
+    <nav><a href="https://github.com/Xuanwo/cida">GitHub</a><a href="https://github.com/Xuanwo/cida/blob/main/LICENSE">Apache-2.0</a><a href="/en/">English</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>
