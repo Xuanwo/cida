@@ -143,9 +143,13 @@ final class PanelController {
       // The welcome may have been answered with ⏎ in an earlier appearance.
       model.clearConfigurationReminder()
     }
+    model.resetModeToDefault()
     if let screen = Self.activeScreen() {
       heightBudget = PanelHeightBudget(visibleScreenHeight: screen.visibleFrame.height)
       applyRootView()
+      // The height the content reports now lands before the panel is drawn; see
+      // `layOutHiddenContent()`.
+      hostingView.layoutSubtreeIfNeeded()
       let visible = screen.visibleFrame
       topEdge = CidaDesign.Panel.topEdge(in: visible)
       let origin = NSPoint(
@@ -154,7 +158,6 @@ final class PanelController {
       )
       panel.setFrameOrigin(origin)
     }
-    model.resetModeToDefault()
     // Appears at once, like Spotlight. A probe launch may have parked the
     // panel transparent (`prepareAutomationPanel`), so restore full opacity.
     panel.alphaValue = 1
@@ -162,6 +165,20 @@ final class PanelController {
     model.requestInputFocus()
     model.requestInputSelectAll()
     onVisibilityChange?(true)
+  }
+
+  /// Lays out what the model changed while the panel was hidden, such as an
+  /// imported selection or a capture's text, so the panel appears at that
+  /// content's height instead of its last one and does not animate from one to
+  /// the other as it appears. A hidden panel is never drawn, so its content
+  /// reports a new height only when asked to lay out; the source editor then
+  /// measures the new text and publishes its height one main-actor turn later,
+  /// which takes a second pass.
+  func layOutHiddenContent() async {
+    guard !panel.isVisible else { return }
+    hostingView.layoutSubtreeIfNeeded()
+    await Task.yield()
+    hostingView.layoutSubtreeIfNeeded()
   }
 
   /// Every way of hiding the panel answers a message on it with its last choice
