@@ -272,6 +272,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       recoverAPIKeyIfNeeded()
       let imported = model.importSelection(selection)
       lifecycleLog?.record(imported ? "selection-imported" : "selection-kept")
+      await panelController.layOutHiddenContent()
+      guard !panelController.isVisible else { return }
       showPanel()
     }
   }
@@ -316,6 +318,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     recoverAPIKeyIfNeeded()
     model.importCapturedText(text)
     lifecycleLog?.record(text == nil ? "capture-unrecognized" : "capture-imported")
+    await panelController?.layOutHiddenContent()
     showPanel()
   }
 

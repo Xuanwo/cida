@@ -87,6 +87,42 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
+  /// A selection or capture imported while the panel is hidden must not make the
+  /// panel appear at its previous, taller height and shrink from there.
+  func testPanelAppearsAtTheHeightOfContentImportedWhileHidden() async throws {
+    let model = AppModel(
+      inputText: ResultRecord.designLongInput,
+      service: DelayedStreamingService(chunks: ["译文"], delay: .seconds(2))
+    )
+    model.setResultForTesting(ResultRecord.designLong())
+    let controller = makeHiddenPanel(model: model)
+    let panel = controller.panel
+    panel.orderBack(nil)
+    let budget = controller.heightBudget.panelMaxHeight
+    try await waitUntil(timeout: .seconds(2)) {
+      panel.frame.height > budget - CidaDesign.Typography.resultLineHeight
+    }
+    let previousHeight = panel.frame.height
+
+    panel.orderOut(nil)
+    model.importCapturedText("Hello world")
+    await controller.layOutHiddenContent()
+    let importedHeight = panel.frame.height
+    XCTAssertLessThan(importedHeight, previousHeight - 200, "The short import fits a short panel")
+
+    panel.orderBack(nil)
+    var heights: [CGFloat] = []
+    let appeared = Date()
+    while Date().timeIntervalSince(appeared) < 0.4 {
+      try await Task.sleep(for: .milliseconds(8))
+      heights.append(panel.frame.height)
+    }
+    XCTAssertEqual(
+      heights.filter { abs($0 - importedHeight) > 0.5 }, [],
+      "The panel appears at the imported content's height and stays there")
+    assertTestProcessIsNotFrontmost()
+  }
+
   func testPanelNeverExceedsItsHeightBudgetAndScrollsTheResultInstead() async throws {
     let model = AppModel(inputText: ResultRecord.designLongInput)
     model.setResultForTesting(ResultRecord.designLong())
