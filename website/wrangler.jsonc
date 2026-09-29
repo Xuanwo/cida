@@ -5,12 +5,8 @@
   "name": "cida-website",
   "account_id": "d100c32126daec20555857d36239c412",
   "compatibility_date": "2026-09-01",
-  "assets": {
-    "directory": "../build/website",
-    "html_handling": "auto-trailing-slash",
-    "not_found_handling": "none"
-  },
+  "assets": { "directory": "../build/website" },
   "routes": [{ "pattern": "cida.xuanwo.io", "custom_domain": true }],
-  "workers_dev": false,
-  "preview_urls": false
+  // No cida-website.<account>.workers.dev URL; preview URLs follow this setting.
+  "workers_dev": false
 }
