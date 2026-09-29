@@ -781,9 +781,11 @@ final class LayerPaneSession {
   }
 
   private var pendingBlocks: [LayerBlock] {
-    let filter = LayerLanguageFilter(myLanguage: owner.currentSettings.requestLanguages.my)
+    let settings = owner.currentSettings
+    let context = LayerTranslationContext(settings: settings)
+    let filter = LayerLanguageFilter(myLanguage: settings.requestLanguages.my)
     return blocks.filter {
-      owner.translations[$0.maskedText] == nil && filter.needsTranslation($0.text)
+      owner.translations.translation(for: $0.maskedText, in: context) == nil && filter.needsTranslation($0.text)
     }
   }
 
@@ -792,6 +794,7 @@ final class LayerPaneSession {
     let texts = Array(Set(pendingBlocks.map(\.maskedText)))
     guard !texts.isEmpty else { return }
     let settings = owner.currentSettings
+    let context = LayerTranslationContext(settings: settings)
     let service = owner.translationService
     translating = Task { [weak self] in
       for batch in LayerTranslationRequest.batches(of: texts) {
@@ -799,7 +802,7 @@ final class LayerPaneSession {
           let translated = try await LayerTranslationRequest.translate(batch, settings: settings, service: service)
           guard let self, !Task.isCancelled else { return }
           for (source, translation) in zip(batch, translated) {
-            owner.translations.store(translation, for: source)
+            owner.translations.store(translation, for: source, in: context)
           }
           redraw()
           owner.log("layer-translated count=\(batch.count)")
@@ -828,8 +831,9 @@ final class LayerPaneSession {
     let style = LayerTextStyle.paper(darkAppearance: dark)
     let origin = CGPoint(x: -paneFrame.minX, y: -paneFrame.minY)
     var drawn: [CGRect] = []
+    let context = LayerTranslationContext(settings: owner.currentSettings)
     let drawings: [LayerDrawing] = blocks.compactMap { block in
-      guard let translation = owner.translations[block.maskedText] else { return nil }
+      guard let translation = owner.translations.translation(for: block.maskedText, in: context) else { return nil }
       let (text, links) = block.restoring(in: translation)
       guard text != block.text else { return nil }
       drawn.append(block.frame)

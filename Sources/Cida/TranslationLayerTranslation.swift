@@ -153,33 +153,113 @@ enum LayerTranslationRequest {
   }
 }
 
-/// Translations by masked source text, shared by every pane: a paragraph scrolled away and
-/// back, or shown in two windows, is requested once.
+/// The settings besides the paragraph itself that decide its translation: the model service
+/// (endpoint, request shape and key), the translation prompt and my language. The rest of the
+/// system message is fixed for the life of the process, and so is this in-memory cache.
+struct LayerTranslationContext: Hashable, Sendable {
+  let modelService: String
+  let prompt: String
+  let myLanguage: String
+
+  init(settings: CidaSettings) {
+    modelService = settings.modelServiceFingerprint
+    prompt = settings.translationPrompt
+    myLanguage = settings.requestLanguages.my
+  }
+}
+
+/// Translations by masked source text and the settings that produced them, shared by every
+/// pane: a paragraph scrolled away and back, or shown in two windows, is requested once; after
+/// a settings change it is requested again, and changing the settings back finds the earlier
+/// translation.
+///
+/// Past `byteLimit` bytes of memory, the paragraphs looked up longest ago go first. Every
+/// paragraph on screen is looked up on each read, so recency here means how recently the user
+/// saw it.
 @MainActor
 final class LayerTranslationCache {
-  private var translations: [String: String] = [:]
-  private var order: [String] = []
-  private let capacity: Int
-
-  init(capacity: Int = 4_000) {
-    self.capacity = capacity
+  private struct Key: Hashable {
+    let source: String
+    let context: LayerTranslationContext
   }
 
-  subscript(source: String) -> String? {
-    translations[source]
-  }
+  /// A link in the list from most to least recently used. The dictionary owns every entry, so
+  /// the links are weak.
+  private final class Entry {
+    let key: Key
+    var translation: String
+    var bytes: Int
+    weak var newer: Entry?
+    weak var older: Entry?
 
-  func store(_ translation: String, for source: String) {
-    if translations[source] == nil { order.append(source) }
-    translations[source] = translation
-    if order.count > capacity {
-      let evicted = order.removeFirst()
-      translations[evicted] = nil
+    init(key: Key, translation: String, bytes: Int) {
+      self.key = key
+      self.translation = translation
+      self.bytes = bytes
     }
   }
 
-  func removeAll() {
-    translations = [:]
-    order = []
+  private var entries: [Key: Entry] = [:]
+  private weak var newest: Entry?
+  private weak var oldest: Entry?
+  /// The memory the kept pairs take, estimated as their UTF-8 text (a native String's storage)
+  /// plus `entryOverhead` each.
+  private(set) var bytes = 0
+  let byteLimit: Int
+
+  /// What one kept pair costs beyond its text: the dictionary slot, the entry, the string
+  /// headers and allocation rounding. Measured at 340 to 460 bytes on arm64, for chat lines and
+  /// article paragraphs alike; without it, a cache of chat lines would take four times its limit.
+  static let entryOverhead = 400
+
+  init(byteLimit: Int = 10 * 1024 * 1024) {
+    self.byteLimit = byteLimit
+  }
+
+  /// The translation, if kept, now counted as the most recently used.
+  func translation(for source: String, in context: LayerTranslationContext) -> String? {
+    guard let entry = entries[Key(source: source, context: context)] else { return nil }
+    moveToNewest(entry)
+    return entry.translation
+  }
+
+  /// A pair larger than the whole limit is not kept, rather than emptying the cache for it.
+  func store(_ translation: String, for source: String, in context: LayerTranslationContext) {
+    let key = Key(source: source, context: context)
+    let size = source.utf8.count + translation.utf8.count + Self.entryOverhead
+    if let entry = entries[key] {
+      bytes += size - entry.bytes
+      entry.translation = translation
+      entry.bytes = size
+      moveToNewest(entry)
+    } else if size <= byteLimit {
+      let entry = Entry(key: key, translation: translation, bytes: size)
+      entries[key] = entry
+      bytes += size
+      moveToNewest(entry)
+    }
+    while bytes > byteLimit, let evicted = oldest {
+      unlink(evicted)
+      entries[evicted.key] = nil
+      bytes -= evicted.bytes
+    }
+  }
+
+  private func moveToNewest(_ entry: Entry) {
+    guard newest !== entry else { return }
+    unlink(entry)
+    entry.older = newest
+    newest?.newer = entry
+    newest = entry
+    if oldest == nil { oldest = entry }
+  }
+
+  private func unlink(_ entry: Entry) {
+    entry.newer?.older = entry.older
+    entry.older?.newer = entry.newer
+    if newest === entry { newest = entry.older }
+    if oldest === entry { oldest = entry.newer }
+    entry.newer = nil
+    entry.older = nil
   }
 }
