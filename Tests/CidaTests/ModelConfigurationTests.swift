@@ -141,11 +141,37 @@ final class ModelConfigurationTests: XCTestCase {
   func testSummaryNamesTheModelTheHostAndTheFormat() {
     let service = CidaSettings.designPreview.modelService
     XCTAssertEqual(service.summary, "deepseek-chat · api.deepseek.com · Chat Completions")
-    XCTAssertEqual(service.hostAndFormat, "api.deepseek.com · Chat Completions")
+    XCTAssertEqual(service.hostTitle, "api.deepseek.com")
     var responses = service
     responses.format = .responses
     responses.endpoint = "https://api.openai.com/v1/responses"
-    XCTAssertEqual(responses.hostAndFormat, "api.openai.com · Responses")
+    responses.model = "gpt-5"
+    responses.body = ["reasoning": .object(["effort": .string("minimal")])]
+    XCTAssertEqual(responses.summary, "gpt-5 minimal · api.openai.com · Responses")
+  }
+
+  func testReasoningReadsEachServicesSpellingOfTheSetting() {
+    func reasoning(_ body: String) -> String? {
+      var service = ModelConfiguration()
+      service.body = JSONValue.parse(body)!.objectValue!
+      return service.reasoning
+    }
+    XCTAssertNil(reasoning("{}"))
+    XCTAssertNil(reasoning(#"{"temperature": 0.2}"#))
+    XCTAssertNil(reasoning(#"{"reasoning": null}"#), "A null member is removed from the request")
+    XCTAssertEqual(reasoning(#"{"reasoning": {"effort": "xhigh"}}"#), "xhigh")
+    XCTAssertEqual(reasoning(#"{"reasoning_effort": "minimal"}"#), "minimal")
+    XCTAssertEqual(reasoning(#"{"output_config": {"effort": "medium"}}"#), "medium")
+    XCTAssertEqual(
+      reasoning(#"{"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}}"#), "low")
+    XCTAssertEqual(reasoning(#"{"thinking": {"type": "enabled"}}"#), "thinking")
+    XCTAssertEqual(
+      reasoning(#"{"thinking": {"type": "enabled", "budget_tokens": 4096}}"#), "thinking 4096")
+    XCTAssertEqual(reasoning(#"{"enable_thinking": true}"#), "thinking")
+    // Reasoning that is off is the expected setting for translation, so nothing is shown.
+    XCTAssertNil(reasoning(#"{"reasoning": {"effort": "none"}}"#))
+    XCTAssertNil(reasoning(#"{"thinking": {"type": "disabled"}}"#))
+    XCTAssertNil(reasoning(#"{"enable_thinking": false}"#))
   }
 
   func testFingerprintChangesWithTheServiceAndTheKeyButNotThePrompts() {
@@ -183,7 +209,7 @@ final class ModelConfigurationTests: XCTestCase {
 
       请这样做：
       1. 问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。
-      2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。
+      2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。辞达只用来翻译和改写，用不上思考：模型能关闭思考就在 `body` 里关掉，关不掉就设到它支持的最低档。
       3. 用 `Cida config set 字段=值 …` 一次写入。
       4. API Key 不要让我发给你，也不要打印或写进文件：请我先复制 Key，再运行 `pbpaste | Cida config set api-key --stdin`；Key 已经在环境变量或文件里时，用 `--env` 或 `--file`。
       5. 运行 `Cida check`；失败时用 `Cida check --verbose` 找原因、修改配置，直到通过。

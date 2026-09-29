@@ -310,7 +310,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(
       driver.waitForText(containing: "cida-ui-mock-model", in: driver.modelSummary, timeout: 1))
     XCTAssertTrue(
-      driver.waitForText(containing: "127.0.0.1 · Chat Completions", in: driver.modelSummary, timeout: 1))
+      driver.waitForText(containing: "127.0.0.1", in: driver.modelSummary, timeout: 1))
     XCTAssertTrue(
       driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 5), "刚刚更新 lasts 3 s")
 

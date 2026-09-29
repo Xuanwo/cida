@@ -29,7 +29,7 @@ enum ConfigurationPrompt {
 
     请这样做：
     1. 问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。
-    2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。
+    2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。辞达只用来翻译和改写，用不上思考：模型能关闭思考就在 `body` 里关掉，关不掉就设到它支持的最低档。
     3. 用 `Cida config set 字段=值 …` 一次写入。
     4. API Key 不要让我发给你，也不要打印或写进文件：请我先复制 Key，再运行 `pbpaste | Cida config set api-key --stdin`；Key 已经在环境变量或文件里时，用 `--env` 或 `--file`。
     5. 运行 `Cida check`；失败时用 `Cida check --verbose` 找原因、修改配置，直到通过。

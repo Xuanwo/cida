@@ -20,9 +20,9 @@
     {
       "name": "settings",
       "approvedImage": "Design/QACurrent/implementation-settings.png",
-      "approvedImageSHA256": "6aae1b80d850af69aed2f65e66a44d03058016748816d560364352abb9a9d8d4",
+      "approvedImageSHA256": "feb3903bfce98e4d94e769ff77f5c6781ce8d8e0b1cb976d35290a66aee0601b",
       "designReference": "Design/QACurrent/reference-settings.png",
-      "designReferenceSHA256": "4fa470125403ef0f8c32db90c7d086c089c72859e53def00b269fe68f6b888c3",
+      "designReferenceSHA256": "378cb2877805c16b428d2a19457513f344bc44f8cd3a7349024e29db336b0b05",
       "designDocument": "Design/boards/settings-states.html",
       "designDocumentSHA256": "102065651041b961fb90a6acd66854c02c714688ffdf683d1c990e1b23bf0ce6",
       "logicalWidth": 560,

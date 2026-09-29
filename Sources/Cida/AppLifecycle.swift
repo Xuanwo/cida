@@ -873,6 +873,13 @@ private struct LaunchOptions {
         settings.modelService = ModelConfiguration()
         settings.apiKey = ""
       }
+      if usesDesignFixtures, designState == .settingsConfigUpdated {
+        // The assistant has just moved to a model whose reasoning cannot be turned off and set
+        // it to the lowest level, which the row shows beside the name.
+        settings.modelService = ModelConfiguration(
+          endpoint: "https://api.openai.com/v1/responses", format: .responses, model: "gpt-5",
+          body: ["reasoning": .object(["effort": .string("minimal")])])
+      }
       if usesDesignFixtures, designState == .settingsShortcutsCustom {
         settings.shortcut = GlobalShortcut(
           keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
