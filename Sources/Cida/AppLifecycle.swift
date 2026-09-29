@@ -111,6 +111,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     FontRegistrar.registerBundledFonts()
     NSApp.setActivationPolicy(.accessory)
+    if launchOptions.isAutomation, let appearance = launchOptions.designAppearance {
+      NSApp.appearance = appearance
+    }
 
     let panelController = PanelController(
       model: model,
@@ -821,6 +824,8 @@ private enum DesignState: String {
 
 private struct LaunchOptions {
   let designState: DesignState
+  /// The appearance a design snapshot is drawn in; nil follows the system.
+  let designAppearance: NSAppearance?
   let snapshotOutputURL: URL?
   let inputInteractionOutputURL: URL?
   let performanceProbe: PerformanceProbeConfiguration?
@@ -1023,8 +1028,11 @@ private struct LaunchOptions {
     } else {
       automationSettingsNamespace = nil
     }
+    // `dark-<state>` is the state in the dark appearance (`Design/boards/appearance.html`).
+    let requestedState = arguments.value(after: "--design-state")
+    designAppearance = requestedState?.hasPrefix("dark-") == true ? NSAppearance(named: .darkAqua) : nil
     designState =
-      arguments.value(after: "--design-state")
+      requestedState.map { $0.hasPrefix("dark-") ? String($0.dropFirst("dark-".count)) : $0 }
       .flatMap(DesignState.init(rawValue:)) ?? .empty
 
     snapshotOutputURL = arguments.value(after: "--snapshot-output")

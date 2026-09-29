@@ -39,6 +39,8 @@ final class PanelGeometryTests: XCTestCase {
     let window = CidaWindow(
       contentRect: hostingView.frame, styleMask: [.borderless], backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
+    // Pixel assertions expect the light palette whatever the host's appearance is.
+    window.appearance = NSAppearance(named: .aqua)
     window.contentView = hostingView
     retainedWindows.append(window)
     hostingView.layoutSubtreeIfNeeded()
@@ -162,17 +164,53 @@ final class PanelGeometryTests: XCTestCase {
     try assertColor(at: NSPoint(x: 16, y: 590), in: empty, is: CidaDesign.Palette.surface)
   }
 
+  /// In the dark appearance the panes paint the dark palette (`Design/spec/appearance.md`), and a
+  /// panel already on screen follows the system when it switches.
+  func testThePanesFollowTheAppearance() throws {
+    let model = AppModel(inputText: "Source")
+    model.setResultForTesting(ResultRecord.designCompleted(mode: .translate))
+    let view = host(model, height: 600)
+    pump { !views(ResultScrollView.self, in: view).isEmpty }
+    try assertColor(at: NSPoint(x: 16, y: 590), in: view, is: CidaDesign.Palette.surfacePaper)
+
+    view.window?.appearance = NSAppearance(named: .darkAqua)
+    pump(until: { false }, timeout: 0.1)
+    try assertColor(at: NSPoint(x: 16, y: 590), in: view, is: CidaDesign.Palette.surfacePaper, dark: true)
+    try assertColor(at: NSPoint(x: 16, y: 8), in: view, is: CidaDesign.Palette.surface, dark: true)
+  }
+
+  /// The rounded surface behind the panes is a layer: its colors are fixed `CGColor`s that must be
+  /// set again when the appearance changes.
+  func testThePanelSurfaceLayerFollowsTheAppearance() throws {
+    let content = PanelContentView(frame: NSRect(x: 0, y: 0, width: 800, height: 100))
+    let window = CidaWindow(
+      contentRect: content.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.appearance = NSAppearance(named: .aqua)
+    window.contentView = content
+    retainedWindows.append(window)
+    let aqua = try XCTUnwrap(NSAppearance(named: .aqua))
+    let darkAqua = try XCTUnwrap(NSAppearance(named: .darkAqua))
+    XCTAssertEqual(content.layer?.backgroundColor, CidaDesign.Palette.surface.cgColor(in: aqua))
+    XCTAssertEqual(content.layer?.borderColor, CidaDesign.Palette.panelEdge.cgColor(in: aqua))
+
+    window.appearance = darkAqua
+    XCTAssertEqual(content.layer?.backgroundColor, CidaDesign.Palette.surface.cgColor(in: darkAqua))
+    XCTAssertEqual(content.layer?.borderColor, CidaDesign.Palette.panelEdge.cgColor(in: darkAqua))
+  }
+
   /// Within a few steps per channel: the cached bitmap is in the display's colour space.
   private func assertColor(
-    at point: NSPoint, in view: NSView, is token: CidaColorToken,
+    at point: NSPoint, in view: NSView, is token: CidaColorToken, dark: Bool = false,
     file: StaticString = #filePath, line: UInt = #line
   ) throws {
     let found = try color(at: point, in: view)
+    let expected = dark ? token.darkHex : token.hex
     for shift: UInt32 in [16, 8, 0] {
       let a = Int((found >> shift) & 0xff)
-      let b = Int((token.hex >> shift) & 0xff)
+      let b = Int((expected >> shift) & 0xff)
       XCTAssertLessThanOrEqual(
-        abs(a - b), 4, String(format: "#%06X vs #%06X", found, token.hex), file: file, line: line)
+        abs(a - b), 4, String(format: "#%06X vs #%06X", found, expected), file: file, line: line)
     }
   }
 
@@ -251,10 +289,11 @@ final class PanelGeometryTests: XCTestCase {
   private func color(at point: NSPoint, in view: NSView) throws -> UInt32 {
     let rep = try bitmap(of: view)
     let scale = CGFloat(rep.pixelsWide) / view.bounds.width
-    let color = try XCTUnwrap(
-      rep.colorAt(x: Int(point.x * scale), y: Int(point.y * scale))?.usingColorSpace(.sRGB))
-    func byte(_ value: CGFloat) -> UInt32 { UInt32((value * 255).rounded()) }
-    return byte(color.redComponent) << 16 | byte(color.greenComponent) << 8 | byte(color.blueComponent)
+    // The stored samples, which are the sRGB values drawn: converting the rep's colour through
+    // `usingColorSpace(.sRGB)` lifts dark values by up to 12 steps.
+    var pixel = [Int](repeating: 0, count: rep.samplesPerPixel)
+    rep.getPixel(&pixel, atX: Int(point.x * scale), y: Int(point.y * scale))
+    return UInt32(pixel[0]) << 16 | UInt32(pixel[1]) << 8 | UInt32(pixel[2])
   }
 
   /// The first and last rows (in points) with ink in the source pane's text column.

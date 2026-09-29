@@ -15,14 +15,17 @@ a versioned copy.
 | Lifecycle: DMG, first run, launch behaviour, the update panel, uninstall | [`spec/lifecycle.md`](spec/lifecycle.md) | [`boards/lifecycle.html`](boards/lifecycle.html) |
 | Configuration: the command line, model fields, the agent prompt, Settings' model group | [`spec/configuration.md`](spec/configuration.md) | [`boards/configuration.html`](boards/configuration.html) |
 | Translation layer: Option-D, one paragraph once or a pane kept, translations over the original, following scroll | [`spec/translation-layer.md`](spec/translation-layer.md) | [`boards/translation-layer.html`](boards/translation-layer.html) |
+| Appearance: following the system, the dark palette, what does not follow it | [`spec/appearance.md`](spec/appearance.md) | [`boards/appearance.html`](boards/appearance.html) |
 | Website: cida.xuanwo.io, its sections, styling, hero motion and publishing | [`spec/website.md`](spec/website.md) | none; the pages in [`../website`](../website) use the tokens and components directly |
 
 ## Boards
 
 Boards are plain HTML drawn from two shared files:
 
-- [`boards/tokens.css`](boards/tokens.css) holds every design token: colors (light only), type,
-  radii, spacing, panel ratios and the `motion-*` values. `CidaDesign` and `CidaMotion` in
+- [`boards/tokens.css`](boards/tokens.css) holds every design token: colors, type, radii, spacing,
+  panel ratios and the `motion-*` values. Colors are defined twice under the same names: `:root`
+  holds the light appearance and `[data-appearance="dark"]` the dark one; a board draws a state
+  in the dark appearance by putting it inside an element with that attribute. `CidaDesign` and `CidaMotion` in
   `Sources/Cida/DesignSystem.swift` mirror it one to one, and `DesignTokenTests` fails when they
   drift apart. Specs name tokens rather than repeating numbers; when the two disagree the token wins.
 - [`boards/components.css`](boards/components.css) and [`boards/components.js`](boards/components.js)
@@ -34,7 +37,8 @@ Boards load the fonts the app bundles (`Sources/Cida/Resources/Fonts`) and use t
 icons, so a board renders like the app without a network. Open one in a browser to look at it.
 
 Each state an implementation capture can be compared with carries `data-state="<name>"`, where the
-name is the app's `--design-state` value when one exists. Motion boards show one stable state per
+name is the app's `--design-state` value when one exists; `dark-<name>` is the same state in the
+dark appearance. Motion boards show one stable state per
 frame; the note under a frame is the transition to the next one, with its trigger, property and
 token.
 

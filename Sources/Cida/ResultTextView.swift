@@ -457,7 +457,7 @@ final class ResultTextContainer: NSView {
     setAccessibilityRole(.group)
     setAccessibilityLabel("处理结果区域")
 
-    caretLayer.backgroundColor = CidaDesign.Palette.accent.appKit.cgColor
+    caretLayer.backgroundColor = CidaDesign.Palette.accent.cgColor(in: effectiveAppearance)
     caretLayer.cornerRadius = 1
     caretLayer.opacity = 0
     renderingView.layer?.addSublayer(caretLayer)
@@ -824,6 +824,11 @@ final class ResultTextContainer: NSView {
     super.viewDidMoveToWindow()
     // A waiting caret made before the pane reached a window starts breathing now.
     updateCaretPulse()
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    caretLayer.backgroundColor = CidaDesign.Palette.accent.cgColor(in: effectiveAppearance)
   }
 
   private static let waitingPulseKey = "waiting-pulse"

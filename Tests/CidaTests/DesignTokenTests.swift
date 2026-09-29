@@ -9,6 +9,7 @@ final class DesignTokenTests: XCTestCase {
   /// implementation mirrors must match it.
   func testSwiftTokensMatchTheDesignTokenFile() throws {
     let tokens = try Self.designTokens()
+    let darkTokens = try Self.designTokens(in: .dark)
     let colors: [(String, CidaColorToken)] = [
       ("bg", CidaDesign.Palette.background), ("surface", CidaDesign.Palette.surface),
       ("surface-dim", CidaDesign.Palette.surfaceDim),
@@ -21,6 +22,22 @@ final class DesignTokenTests: XCTestCase {
       ("accent-foreground", CidaDesign.Palette.accentForeground),
       ("toggle-off", CidaDesign.Palette.toggleOff),
     ]
+    for (name, token) in colors {
+      XCTAssertEqual(try XCTUnwrap(darkTokens[name], "dark \(name)"), String(format: "#%06X", token.darkHex), "dark \(name)")
+    }
+    XCTAssertEqual(
+      Set(darkTokens.keys), Set(colors.map(\.0) + ["panel-edge", "panel-shadow"]),
+      "the dark appearance redefines exactly the colors")
+
+    // The panel's edge and its two shadow layers, as #RRGGBBAA.
+    for (appearance, values) in [(false, tokens), (true, darkTokens)] {
+      XCTAssertEqual(values["panel-edge"], Self.cssColor(CidaDesign.Palette.panelEdge, dark: appearance))
+      XCTAssertEqual(
+        values["panel-shadow"],
+        "0 2px 6px \(Self.cssColor(CidaDesign.Palette.contactShadow, dark: appearance)), "
+          + "0 28px 72px \(Self.cssColor(CidaDesign.Palette.ambientShadow, dark: appearance))")
+    }
+
     for (name, token) in colors {
       let value = try XCTUnwrap(tokens[name], name)
       XCTAssertEqual(value, String(format: "#%06X", token.hex), name)
@@ -103,14 +120,25 @@ final class DesignTokenTests: XCTestCase {
       .joined()
   }
 
-  /// `--name: value;` declarations of the design token file.
-  private static func designTokens() throws -> [String: String] {
+  private enum TokenScope {
+    case light, dark
+  }
+
+  /// `--name: value;` declarations of the design token file: `:root` for the light
+  /// appearance, `[data-appearance="dark"]` for the dark one.
+  private static func designTokens(in scope: TokenScope = .light) throws -> [String: String] {
     let url = projectRoot.appendingPathComponent("Design/boards/tokens.css")
     let css = try String(contentsOf: url, encoding: .utf8)
     var tokens: [String: String] = [:]
+    var current: TokenScope?
     for line in css.split(separator: "\n") {
       let trimmed = line.trimmingCharacters(in: .whitespaces)
-      guard trimmed.hasPrefix("--"), let colon = trimmed.firstIndex(of: ":") else { continue }
+      if trimmed.hasPrefix(":root") { current = .light }
+      if trimmed.hasPrefix("[data-appearance=\"dark\"]") { current = .dark }
+      if trimmed == "}" { current = nil }
+      guard current == scope, trimmed.hasPrefix("--"), let colon = trimmed.firstIndex(of: ":") else {
+        continue
+      }
       let name = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<colon])
       let value = trimmed[trimmed.index(after: colon)...]
         .trimmingCharacters(in: CharacterSet(charactersIn: " ;"))
@@ -119,29 +147,42 @@ final class DesignTokenTests: XCTestCase {
     return tokens
   }
 
+  private static func cssColor(_ token: CidaColorToken, dark: Bool) -> String {
+    let (hex, alpha) = dark ? (token.darkHex, token.darkAlpha) : (token.hex, token.alpha)
+    return String(format: "#%06X%02X", hex, Int((alpha * 255).rounded()))
+  }
+
   func testSemanticPaletteProducesExactAppKitColorsFromSharedTokens() throws {
-    let expectations: [(CidaColorToken, UInt32, CGFloat)] = [
-      (CidaDesign.Palette.background, 0xFAFAF8, 1),
-      (CidaDesign.Palette.surface, 0xFFFFFF, 1),
-      (CidaDesign.Palette.surfacePaper, 0xF7F6F1, 1),
-      (CidaDesign.Palette.border, 0xE8E8E3, 1),
-      (CidaDesign.Palette.textPrimary, 0x1A1A18, 1),
-      (CidaDesign.Palette.textSecondary, 0x8A8A83, 1),
-      (CidaDesign.Palette.textTertiary, 0xB5B5AE, 1),
-      (CidaDesign.Palette.textInk, 0x161614, 1),
-      (CidaDesign.Palette.textControl, 0x4E4E49, 1),
-      (CidaDesign.Palette.accent, 0x2E6B4F, 1),
-      (CidaDesign.Palette.placeholder, 0xB5B7B0, 0.22),
+    let expectations: [(CidaColorToken, UInt32, UInt32)] = [
+      (CidaDesign.Palette.background, 0xFAFAF8, 0x1E1E1C),
+      (CidaDesign.Palette.surface, 0xFFFFFF, 0x262624),
+      (CidaDesign.Palette.surfacePaper, 0xF7F6F1, 0x1B1A17),
+      (CidaDesign.Palette.border, 0xE8E8E3, 0x383835),
+      (CidaDesign.Palette.textPrimary, 0x1A1A18, 0xEDEDE9),
+      (CidaDesign.Palette.textSecondary, 0x8A8A83, 0x8A8A83),
+      (CidaDesign.Palette.textTertiary, 0xB5B5AE, 0x5E5E58),
+      (CidaDesign.Palette.textInk, 0x161614, 0xE9E6DD),
+      (CidaDesign.Palette.textControl, 0x4E4E49, 0xC2C2BA),
+      (CidaDesign.Palette.accent, 0x2E6B4F, 0x5E9C7C),
     ]
 
-    for (token, expectedHex, expectedAlpha) in expectations {
-      XCTAssertEqual(token.hex, expectedHex)
-      XCTAssertEqual(token.alpha, expectedAlpha, accuracy: 0.0001)
-      let color = try XCTUnwrap(token.appKit.usingColorSpace(.sRGB))
-      XCTAssertEqual(color.redComponent, component(expectedHex, shift: 16), accuracy: 0.0001)
-      XCTAssertEqual(color.greenComponent, component(expectedHex, shift: 8), accuracy: 0.0001)
-      XCTAssertEqual(color.blueComponent, component(expectedHex, shift: 0), accuracy: 0.0001)
-      XCTAssertEqual(color.alphaComponent, expectedAlpha, accuracy: 0.0001)
+    for (token, light, dark) in expectations {
+      for (appearanceName, expectedHex) in [(NSAppearance.Name.aqua, light), (.darkAqua, dark)] {
+        let appearance = try XCTUnwrap(NSAppearance(named: appearanceName))
+        var resolved: NSColor?
+        // The dynamic color resolves to the appearance it is drawn in.
+        appearance.performAsCurrentDrawingAppearance {
+          resolved = token.appKit.usingColorSpace(.sRGB)
+        }
+        let color = try XCTUnwrap(resolved)
+        XCTAssertEqual(color.redComponent, component(expectedHex, shift: 16), accuracy: 0.0001)
+        XCTAssertEqual(color.greenComponent, component(expectedHex, shift: 8), accuracy: 0.0001)
+        XCTAssertEqual(color.blueComponent, component(expectedHex, shift: 0), accuracy: 0.0001)
+        XCTAssertEqual(color.alphaComponent, 1, accuracy: 0.0001)
+        XCTAssertEqual(
+          token.cgColor(in: appearance).components?.first ?? -1, component(expectedHex, shift: 16),
+          accuracy: 0.0001)
+      }
       _ = token.swiftUI
     }
   }
