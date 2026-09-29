@@ -6,7 +6,7 @@ margin of wallpaper, with idle stretches shortened so it keeps moving, and with 
 held before it loops. From that one cut it writes:
 
 - docs/images/demo-<name>.gif for the READMEs, sized for their 720 px column on a Retina display;
-- website/assets/clips/<name>.mp4 and <name>@2x.mp4 for the website, 760 and 1520 px wide, and
+- website/assets/clips/<name>.mp4 and <name>-2x.mp4 for the website, 760 and 1520 px wide, and
   <name>.jpg, the first frame as the poster.
 
 The outputs are committed; run this again only when the recordings change. Needs ffmpeg.
@@ -90,12 +90,12 @@ def main():
         source = arguments.recordings / f"{name}.mov"
         cut = cut_filter(source, FPS)
         make_video(source, cut, 760, clips / f"{name}.mp4")
-        make_video(source, cut, 1520, clips / f"{name}@2x.mp4")
-        run("-i", str(clips / f"{name}@2x.mp4"), "-frames:v", "1", "-q:v", "3", str(clips / f"{name}.jpg"))
+        make_video(source, cut, 1520, clips / f"{name}-2x.mp4")
+        run("-i", str(clips / f"{name}-2x.mp4"), "-frames:v", "1", "-q:v", "3", str(clips / f"{name}.jpg"))
         gif = PROJECT_ROOT / f"docs/images/demo-{name}.gif"
         make_gif(source, name, arguments.gif_width, arguments.gif_fps, gif, scratch)
         sizes = ", ".join(f"{path.name} {path.stat().st_size / 1e6:.2f} MB" for path in
-                          [clips / f"{name}.mp4", clips / f"{name}@2x.mp4", gif])
+                          [clips / f"{name}.mp4", clips / f"{name}-2x.mp4", gif])
         print(f"{name}: {sizes}")
 
 
