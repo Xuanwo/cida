@@ -126,7 +126,10 @@ driver launches the app with `--automation-lifecycle-log`, so the log records th
 policy, app activation, and the panel's visibility, key status, alpha, and frame at launch, at every
 show, and at every key-window transition: XCUI cannot observe any of that for a non-activating
 panel, and the log is what separates "never shown" from "hid on resign key" or "shown transparent".
-The global shortcut adds `selection-imported` or `selection-kept` before each show it causes.
+The global shortcut adds `shortcut-pressed`, the selection read's `selection-answer` and
+`selection-copied` with their milliseconds, `selection-imported` or `selection-kept` before each show
+it causes, and `shortcut-panel-shown` with the milliseconds since the key press. Release builds
+write the same events to the unified log (`com.xuanwo.Cida`, category `shortcut`).
 
 Before the XCUI run the guest grants Cida Accessibility and Screen Recording by writing the system
 TCC database (the golden image has SIP disabled) and restarting `tccd`. Selection and capture

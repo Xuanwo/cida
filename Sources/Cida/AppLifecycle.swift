@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import QuartzCore
 import SwiftUI
+import os
 
 /// One executable, two ways in: with a command (`Cida config …`, `Cida check`, `Cida --help`)
 /// it runs the command line and exits before NSApplication starts
@@ -275,23 +276,40 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       panelController.hide()
       return
     }
-    guard !isReadingSelection else { return }
+    guard !isReadingSelection else {
+      logShortcut("shortcut-ignored reading-selection")
+      return
+    }
     isReadingSelection = true
+    let pressedAt = ContinuousClock.now
+    logShortcut(
+      "shortcut-pressed app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none")")
     Task { @MainActor [weak self] in
       guard let self else { return }
       let selection = await SelectedText.read(
         from: selectedTextSource, copyingWith: selectionCopier
-      ) { [weak self] event in self?.lifecycleLog?.record(event) }
+      ) { [weak self] event in self?.logShortcut(event) }
       isReadingSelection = false
       guard !panelController.isVisible else { return }
       // The request may need the Keychain key, which the first show recovers.
       recoverAPIKeyIfNeeded()
       let imported = model.importSelection(selection)
-      lifecycleLog?.record(imported ? "selection-imported" : "selection-kept")
+      logShortcut(imported ? "selection-imported" : "selection-kept")
       await panelController.layOutHiddenContent()
       guard !panelController.isVisible else { return }
       showPanel()
+      logShortcut("shortcut-panel-shown ms=\(pressedAt.duration(to: .now).milliseconds)")
     }
+  }
+
+  private static let shortcutLogger = Logger(subsystem: "com.xuanwo.Cida", category: "shortcut")
+
+  /// Records how the global shortcut spent its time in the unified log and, under automation,
+  /// the lifecycle log, so a slow ⌥A on someone's Mac shows which step was slow. Events carry
+  /// timings and the frontmost application's bundle identifier, never its text.
+  private func logShortcut(_ event: String) {
+    Self.shortcutLogger.notice("\(event, privacy: .public)")
+    lifecycleLog?.record(event)
   }
 
   /// The capture shortcut (`Design/spec/panel.md` §一 截图翻译): freezes

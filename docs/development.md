@@ -22,6 +22,15 @@ scripts/run-dev.sh stop   # quit the development build, start the released Cida 
 
 `CIDA_VARIANT=dev scripts/build-app.sh release`, which the script runs, builds `build/Cida Dev.app`: bundle id `com.xuanwo.Cida.dev`, so its settings, API key and Accessibility and Screen Recording grants are its own and the released Cida keeps updating through Sparkle. It has no update feed, is versioned from the checkout (the latest release tag and the commit count, as a release is) and names itself in its menu and Settings (`Design/spec/updates.md` §三). Grant it the permissions once; they stay across rebuilds because the signature's designated requirement names only the bundle id and the team. Configure its model service once with its own command line, `"build/Cida Dev.app/Contents/MacOS/Cida" config …`. Both builds register the same global shortcuts, which is why only one runs at a time. Do not build the release bundle id with a made-up higher version to keep Sparkle away; that is what the development build replaces.
 
+When the shortcuts feel slow on a Mac running a released build, its unified log says where the time went. Every ⌥A records the frontmost application, the Accessibility answer, the ⌘C fallback and the moment the panel showed, each with its milliseconds; ⌥D records the translation layer's lifecycle. Neither records any text:
+
+```sh
+/usr/bin/log show --last 1h --predicate 'subsystem == "com.xuanwo.Cida" AND category == "shortcut"'
+/usr/bin/log show --last 1h --predicate 'subsystem == "com.xuanwo.Cida" AND category == "translation-layer"'
+```
+
+Call `/usr/bin/log` by its path: in zsh, `log` is a builtin that prints nothing.
+
 To hand the app to another Mac, notarize it:
 
 ```sh
