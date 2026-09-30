@@ -248,6 +248,10 @@ enum CidaMotion {
   static let heightMilliseconds = 150
   static let cursorOutMilliseconds = 200
   static let copiedHoldMilliseconds = 800
+  /// ⇧ held alone this long turns 复制结果 into 复制图片 (`Design/spec/panel.md` §八):
+  /// longer than a ⇧ tap that switches an input method, and than the gap
+  /// between ⇧ and the letter it capitalises.
+  static let alternateDelayMilliseconds = 500
   static let breatheMilliseconds = 1_200
   static let catchUpMilliseconds = 400
 

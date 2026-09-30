@@ -49,7 +49,7 @@ enum CopyFeedback: Equatable, Sendable {
 }
 
 /// What the right-hand slot of the control bar shows. One slot, one button,
-/// three phases (`Design/spec/panel.md` §二); holding ⇧ turns 复制结果 into
+/// three phases (`Design/spec/panel.md` §二); ⇧ held alone turns 复制结果 into
 /// 复制图片 (§八).
 enum BarActionPresentation: Equatable, Sendable {
   case none
@@ -65,12 +65,12 @@ enum BarActionPresentation: Equatable, Sendable {
     isProcessing: Bool,
     canCopyResult: Bool,
     copyFeedback: CopyFeedback? = nil,
-    isShiftHeld: Bool = false,
+    offersImageCopy: Bool = false,
     showsWelcome: Bool = false
   ) -> BarActionPresentation {
     if isProcessing { return .stop }
     if let copyFeedback { return .copied(copyFeedback) }
-    if canCopyResult { return isShiftHeld ? .copyImage : .copy }
+    if canCopyResult { return offersImageCopy ? .copyImage : .copy }
     if showsWelcome { return .openSettings }
     return .none
   }

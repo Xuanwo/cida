@@ -131,9 +131,9 @@ final class AppModel {
   /// Bumped by every copy from the panel; `copyFeedback` says what the slot shows for it.
   private(set) var copyFeedbackRevision = 0
   private(set) var copyFeedback: CopyFeedback = .text
-  /// ⇧ is down while the panel is key: the copy button offers the share card
-  /// (`Design/spec/panel.md` §八). The panel controller sets it from key events.
-  var isShiftHeld = false
+  /// ⇧ has been held alone long enough: the copy button offers the share card
+  /// (`Design/spec/panel.md` §八). The panel controller sets it (`ShiftAlternate`).
+  var offersImageCopy = false
   /// What Cida is saying in the panel in place of the translation panes
   /// (`Design/spec/lifecycle.md` §一); the source, action and result wait underneath.
   private(set) var panelMessage: PanelMessage?

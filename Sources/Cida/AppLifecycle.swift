@@ -189,7 +189,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
     #if DEBUG
       if launchOptions.designState == .imageShift {
-        model.isShiftHeld = true
+        model.offersImageCopy = true
       }
     #endif
 

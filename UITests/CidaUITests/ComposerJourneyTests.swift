@@ -102,7 +102,8 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
   }
 
   /// ⇧⌘C and the ⇧ alternate of the copy button put the share card on the
-  /// pasteboard as an image and nothing else (`Design/spec/panel.md` §八).
+  /// pasteboard as an image and nothing else; ⇧ used to type never shows the
+  /// alternate (`Design/spec/panel.md` §八).
   func testShiftCommandCCopiesTheSourceAndResultAsAnImage() {
     driver.launch()
 
@@ -122,9 +123,18 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     XCTAssertNil(pasteboard.string(forType: .string), "Only the image")
     XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 3), "✓ 已复制图片 reverts")
 
+    XCUIElement.perform(withKeyModifiers: .shift) {
+      driver.composer.typeKey("x", modifierFlags: .shift)
+      XCTAssertFalse(
+        driver.waitForExistence(of: driver.copyImageButton, timeout: 1.5),
+        "⇧ used to type a capital keeps 复制结果")
+    }
+    driver.composer.typeKey(.delete, modifierFlags: [])
+
     pasteboard.clearContents()
     XCUIElement.perform(withKeyModifiers: .shift) {
-      XCTAssertTrue(driver.copyImageButton.waitForExistence(timeout: 2), "⇧ turns 复制结果 into 复制图片")
+      XCTAssertTrue(
+        driver.copyImageButton.waitForExistence(timeout: 2), "⇧ held alone turns 复制结果 into 复制图片")
       driver.copyImageButton.click()
     }
     XCTAssertTrue(driver.waitForExistence(of: driver.imageCopiedButton, timeout: 2))

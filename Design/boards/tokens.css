@@ -99,6 +99,7 @@
   --motion-height-ms: 150;
   --motion-cursor-out-ms: 200;
   --motion-copied-hold-ms: 800;
+  --motion-alternate-delay-ms: 500;
   --motion-breathe-ms: 1200;
   --motion-catchup-ms: 400;
   --motion-rate-min-cps: 30;

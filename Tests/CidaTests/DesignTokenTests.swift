@@ -66,6 +66,7 @@ final class DesignTokenTests: XCTestCase {
       ("motion-height-ms", Double(CidaMotion.heightMilliseconds)),
       ("motion-cursor-out-ms", Double(CidaMotion.cursorOutMilliseconds)),
       ("motion-copied-hold-ms", Double(CidaMotion.copiedHoldMilliseconds)),
+      ("motion-alternate-delay-ms", Double(CidaMotion.alternateDelayMilliseconds)),
       ("motion-breathe-ms", Double(CidaMotion.breatheMilliseconds)),
       ("motion-catchup-ms", Double(CidaMotion.catchUpMilliseconds)),
       ("motion-rate-min-cps", CidaMotion.minimumCharactersPerSecond),

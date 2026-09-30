@@ -156,7 +156,7 @@ struct PanelView: View {
       isProcessing: model.isProcessing,
       canCopyResult: model.canCopyResult,
       copyFeedback: shownCopyFeedback,
-      isShiftHeld: model.isShiftHeld,
+      offersImageCopy: model.offersImageCopy,
       showsWelcome: showsWelcome
     )
   }

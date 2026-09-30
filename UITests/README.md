@@ -44,8 +44,8 @@ The app is a menu-bar application whose main interface is a borderless floating 
 | translation layer painted translations / hint pill / whole-window outline | `translation-layer-content`, `translation-layer-hint`, `translation-layer-outline` |
 
 ⏎ submits, Tab switches the action, Escape hides, Option-A shows, ⌘, opens Settings, ⌘C copies
-the result when nothing is selected, ⇧⌘C copies the source and result as an image (holding ⇧
-turns 复制结果 into 复制图片), ⌘. stops. There is no send button and no title bar.
+the result when nothing is selected, ⇧⌘C copies the source and result as an image (⇧ held alone
+for 500 ms turns 复制结果 into 复制图片), ⌘. stops. There is no send button and no title bar.
 
 ## Journey ownership
 
