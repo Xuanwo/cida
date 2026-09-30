@@ -77,6 +77,8 @@ final class DesignTokenTests: XCTestCase {
       ("motion-rate-alpha", CidaMotion.smoothingAlphaPer120HzFrame),
       ("motion-blur-char-px", CidaMotion.characterBlurRadius),
       ("motion-cursor-opacity-min", Double(CidaMotion.cursorMinimumOpacity)),
+      ("motion-waiting-opacity-max", Double(CidaMotion.waitingMaximumOpacity)),
+      ("motion-waiting-opacity-min", Double(CidaMotion.waitingMinimumOpacity)),
       ("motion-cursor-w", CidaMotion.cursorWidth),
       ("motion-cursor-h", CidaMotion.cursorHeight),
     ]

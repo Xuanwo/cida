@@ -32,7 +32,9 @@ struct LayerDrawing: Equatable {
 
   /// The paper of a paragraph on its own: 8 pt wider than the original on each side, 3 pt
   /// taller, and never shorter than the lines set on it (§五).
-  var ownPaper: CGRect {
+  var ownPaper: CGRect { Self.paper(around: frame) }
+
+  static func paper(around frame: CGRect) -> CGRect {
     frame.insetBy(dx: -8, dy: -3).union(frame.insetBy(dx: 0, dy: -LayerTypeset.bleed))
   }
 }
@@ -178,7 +180,7 @@ final class LayerOverlayPanel: NSPanel {
 final class LayerOverlayView: NSView {
   private var blockLayers: [CALayer] = []
   private let blocksLayer = CALayer()
-  /// Carets breathing after the paragraphs whose translation is on the way.
+  /// Underlays breathing under the paragraphs whose translation is on the way.
   private let pendingLayer = CALayer()
   private(set) var pendingFrames: [CGRect] = []
   private let occlusionMask = CAShapeLayer()
@@ -207,8 +209,8 @@ final class LayerOverlayView: NSView {
 
   override func viewDidChangeEffectiveAppearance() {
     super.viewDidChangeEffectiveAppearance()
-    let accent = CidaDesign.Palette.accent.cgColor(in: effectiveAppearance)
-    pendingLayer.sublayers?.forEach { $0.backgroundColor = accent }
+    let waiting = Self.waitingColor(in: effectiveAppearance)
+    pendingLayer.sublayers?.forEach { $0.backgroundColor = waiting }
     onAppearanceChange?()
   }
 
@@ -221,34 +223,45 @@ final class LayerOverlayView: NSView {
     CATransaction.commit()
   }
 
-  /// The paragraphs waiting for their translation (§二 等待): Cida's caret after each one's
-  /// last line, breathing between full and `motion-cursor-opacity-min` over
-  /// `motion-breathe-ms`, as if Cida were writing. `carets` are in this view's coordinates.
-  func setPending(_ carets: [CGRect]) {
-    guard carets != pendingFrames else { return }
-    pendingFrames = carets
+  /// The paragraphs waiting for their translation (§二 等待): each breathes on an `accent`
+  /// underlay the shape of the paper it turns into, between `motion-waiting-opacity-max` and
+  /// `-min` over `motion-breathe-ms`. It is the only sign that the key was taken, so it has to
+  /// show at a glance in any app. `paragraphs` are the originals' frames in this view's
+  /// coordinates.
+  func setPending(_ paragraphs: [CGRect]) {
+    guard paragraphs != pendingFrames else { return }
+    pendingFrames = paragraphs
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     pendingLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
-    for frame in carets {
-      let caret = CALayer()
-      caret.frame = frame
-      caret.cornerRadius = CidaMotion.cursorWidth / 2
-      caret.backgroundColor = CidaDesign.Palette.accent.cgColor(in: effectiveAppearance)
+    for frame in paragraphs {
+      let underlay = CALayer()
+      underlay.frame = LayerDrawing.paper(around: frame)
+      underlay.cornerRadius = CidaDesign.Radius.chip
+      underlay.cornerCurve = .continuous
+      underlay.backgroundColor = Self.waitingColor(in: effectiveAppearance)
       if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
         let breathe = CABasicAnimation(keyPath: "opacity")
         breathe.fromValue = 1
-        breathe.toValue = CidaMotion.cursorMinimumOpacity
+        breathe.toValue = CidaMotion.waitingMinimumOpacity / CidaMotion.waitingMaximumOpacity
         breathe.duration = CidaMotion.breatheHalfCycleSeconds
         breathe.autoreverses = true
         breathe.repeatCount = .infinity
-        breathe.timingFunction = CidaMotion.Curve.easeInOut.timingFunction
-        caret.add(breathe, forKey: "breathe")
+        breathe.timingFunction = CidaMotion.breatheCurve.timingFunction
+        underlay.add(breathe, forKey: "breathe")
       }
-      pendingLayer.addSublayer(caret)
+      pendingLayer.addSublayer(underlay)
     }
     CATransaction.commit()
   }
+
+  private static func waitingColor(in appearance: NSAppearance) -> CGColor {
+    CidaDesign.Palette.accent.appKit(dark: appearance.isDark)
+      .withAlphaComponent(CGFloat(CidaMotion.waitingMaximumOpacity)).cgColor
+  }
+
+  /// Something to show: a translation, or a paragraph waiting for one.
+  var hasContent: Bool { !drawings.isEmpty || !pendingFrames.isEmpty }
 
   /// How many paragraphs are painted: a translation that does not fit leaves its original.
   var paintedCount: Int { blockLayers.count }

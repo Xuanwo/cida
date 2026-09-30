@@ -141,7 +141,7 @@ final class TranslationLayerController {
       sessions.append(session)
       return session
     }()
-    session.pick(block, element: node)
+    session.pick(block, element: node, windows: LayerWindowInfo.onScreen())
     log("layer-paragraph-translated app=\(application.bundleIdentifier)")
   }
 
@@ -575,12 +575,23 @@ final class LayerPaneSession {
 
   // MARK: ⌥D
 
-  /// Translates this paragraph from now on (§二).
-  func pick(_ block: LayerBlock, element: AccessibilityLayerNode) {
+  /// Translates this paragraph from now on (§二). It starts waiting at once, from the paragraph
+  /// just found, rather than after the pane's next read: the underlay is the only sign that
+  /// the key was taken.
+  func pick(_ block: LayerBlock, element: AccessibilityLayerNode, windows: [LayerWindowInfo]) {
     restored.removeAll { $0.matches(block, node: element) }
     if !picked.contains(where: { $0.matches(block, node: element) }) {
       picked.append(LayerParagraphMark(element: element, text: block.text))
     }
+    if !readBlocks.indices.contains(where: { readBlocks[$0] == block && readNodes[$0].isSameElement(as: element) }) {
+      readBlocks.append(block)
+      readNodes.append(element)
+    }
+    if paneFrame == .zero, let frame = pane.frame { place(frame) }
+    placeOverWindow(windows)
+    showChosenParagraphs()
+    redraw()
+    translatePending()
     needsRead = true
     read()
   }
@@ -692,7 +703,7 @@ final class LayerPaneSession {
       owner.log(
         "layer-occluded count=\(coveringPane.count) by=\(coveringPane.map { "\($0.ownerName) \(Int($0.bounds.width))x\(Int($0.bounds.height))" })")
     }
-    if !overlay.isVisible, !overlay.overlayView.drawings.isEmpty { overlay.orderFront(nil) }
+    if !overlay.isVisible, overlay.overlayView.hasContent { overlay.orderFront(nil) }
   }
 
   /// Fades the translations in over `motion-height-ms`.
@@ -886,20 +897,13 @@ final class LayerPaneSession {
       .map { $0.offsetBy(dx: origin.x, dy: origin.y) }
     let sheets = drawings.sharingSheets(around: untouched)
     overlay.overlayView.show(sheets, scale: scale)
-    // A caret breathes after every paragraph waiting for its translation (§二 等待, §五 等待).
+    // Every paragraph waiting for its translation breathes on its underlay (§二 等待, §五 等待).
     let waiting = failure == nil ? pendingBlocks.map(\.block) : []
-    overlay.overlayView.setPending(waiting.map { block in
-      let end = block.endOfText
-      let height = LayerTypeset.fontSize(forLineHeight: block.lineHeight)
-      return CGRect(
-        x: end.x + 3 - paneFrame.minX, y: end.y + (block.lineHeight - height) / 2 - paneFrame.minY,
-        width: CidaMotion.cursorWidth, height: height)
-    })
-    if isOnScreen, !waiting.isEmpty { overlay.orderFront(nil) }
+    overlay.overlayView.setPending(waiting.map { $0.frame.offsetBy(dx: origin.x, dy: origin.y) })
     let settled = isStill
     // A read landing while another app's windows animate in stays hidden with the rest.
     if settled, windowsSettle == nil { reveal() }
-    if isOnScreen, !drawings.isEmpty { overlay.orderFront(nil) }
+    if isOnScreen, overlay.overlayView.hasContent { overlay.orderFront(nil) }
     owner.log(
       "layer-drawn drawings=\(drawings.count) painted=\(overlay.overlayView.paintedCount) blocks=\(blocks.count) onScreen=\(isOnScreen)"
         + " visible=\(overlay.isVisible) alpha=\(overlay.alphaValue) settled=\(settled)"
