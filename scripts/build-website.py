@@ -7,8 +7,8 @@ checkout. Publishing them copies website/ as it is, maps each path outside it to
 <!-- site:name --> blocks from the newest release tag and docs/releases.
 
 The fonts and clips are prepared ahead and committed: website/assets/fonts holds WOFF2 subsets of
-the app's fonts, and the build fails when a page uses a character they do not cover. After
-changing the text, subset them again with --subset-fonts, which needs fontTools and brotli
+the app's fonts, and the build fails when a page or the update notes use a character they do
+not cover. After changing the text, subset them again with --subset-fonts, which needs fontTools and brotli
 (pip install fonttools brotli). The clips come from scripts/make-demo-media.py.
 
     scripts/build-website.py [--output build/website]
@@ -147,8 +147,9 @@ def publish_tokens(output):
 
 
 def site_text():
-    """Every character the pages and their scripts can show."""
+    """Every character the pages, their scripts and the update notes filled into them can show."""
     files = [SOURCE / name for name in PAGES] + [SOURCE / "site.js", PROJECT_ROOT / "Design/boards/components.js"]
+    files += sorted((PROJECT_ROOT / "docs/releases").glob("*.md"))
     text = "".join(path.read_text(encoding="utf-8") for path in files)
     return {character for character in text if character.isprintable() and not character.isspace()}
 
