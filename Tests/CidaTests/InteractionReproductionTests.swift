@@ -394,15 +394,27 @@ final class InteractionReproductionTests: XCTestCase {
     let content = try XCTUnwrap(
       ([contentView] + contentView.subviews).first { $0.accessibilityLabel() == "设置窗口内容" })
     /// Waits for a move to end, checking on every turn of the run loop that the content's top
-    /// stays on the window's top edge while the frame moves.
+    /// stays on the window's top edge while the frame moves. Every move changes the height, so
+    /// the move has ended once the height has left where it started and held for 0.2 s; a
+    /// loaded machine may start it late, so there is no fixed window.
     func settle(_ move: String) {
-      let end = Date().addingTimeInterval(0.4)
+      let startHeight = window.frame.height
+      let deadline = Date().addingTimeInterval(2)
+      var lastHeight = startHeight
+      var heldSince = Date()
       var drift: [String] = []
-      while Date() < end {
+      while Date() < deadline {
         RunLoop.current.run(until: Date().addingTimeInterval(0.004))
+        let height = window.frame.height
         let top = content.convert(content.bounds, to: nil).maxY
-        if abs(top - window.frame.height) > 0.5 {
-          drift.append(String(format: "%.0f in %.0f", top, window.frame.height))
+        if abs(top - height) > 0.5 {
+          drift.append(String(format: "%.0f in %.0f", top, height))
+        }
+        if abs(height - lastHeight) > 0.1 {
+          lastHeight = height
+          heldSince = Date()
+        } else if abs(height - startHeight) > 0.5, Date().timeIntervalSince(heldSince) >= 0.2 {
+          break
         }
       }
       XCTAssertEqual(drift, [], "\(move): the tabs stay under the title while the window moves")
