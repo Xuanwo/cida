@@ -17,7 +17,7 @@
 1. 提交瞬间：原文留在原文栏；新结果在显示它的同一次更新里排好并定高（不等合并间隔，不先滚动旧文档），结果栏以 150ms（`motion-height-ms`）过渡到新高度；等待行的行高取预期字体的行高（中文 31，拉丁文 29），第一个字到达时不再变高。结果栏只有一个 accent 色光标（2×20，`motion-cursor-w/h`），从 opacity 1 开始呼吸：1.0 ↔ 0.3（`motion-cursor-opacity-min`），周期 1.2s（`motion-breathe-ms`）ease-in-out（`motion-ease-breathe`）。光标在文字后 2pt、基线下 4pt，有字与无字时位置相同。
 2. 流式中：字符在光标后淡入，每字 120ms（`motion-char-in-ms`）ease-out（`motion-ease-char-in`），blur 2px（`motion-blur-char-px`）→ 0；第一个字到达时光标用 200ms（`motion-cursor-out-ms`，`motion-ease-cursor-out`）回到 opacity 1，之后随书写头前进，无呼吸（呼吸仅表示等待）。
 3. 高度增长：结果栏与面板高度过渡 150ms（`motion-height-ms`）ease-out（`motion-ease-height`），不逐 token 跳变；面板顶边固定，只向下生长。
-4. 滚动锚定：面板到上限（`panel-max-ratio`）后结果栏内部滚动并平滑贴尾；用户上滚立即解除锚定，生成继续；滚回底部自动恢复。
+4. 停在开头：面板到上限（`panel-max-ratio`）后结果栏停在开头，新文字在下方继续写、不自动滚动，底边渐隐；用户滚到正在写的最后一行时才跟随尾部，上滚立即解除（`spec/panel.md` §二「长结果」）。
 5. 完成：光标 200ms（`motion-cursor-out-ms`）ease-out（`motion-ease-cursor-out`）淡出；复制按钮 150ms（`motion-icon-swap-ms`）淡入，与停止按钮交叉淡化；动作选择恢复。
 6. 中断 / 出错：已输出文字保留；结果栏末尾展开一行说明「已停止」或「请求失败：…」；光标直接淡出；再次 ⏎ 重新生成。
 

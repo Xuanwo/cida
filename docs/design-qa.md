@@ -90,8 +90,8 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   panel itself appears and hides at once, like Spotlight.
 - Height budget: the source editor is capped at 30% of the visible screen height minus its insets,
   the panel at 70%; both panes scroll on their own past their caps with the system overlay scroll bar, which the static board states do not draw. A
-  completed result opens at its top; a streaming result keeps its tail in view until the user
-  scrolls away.
+  completed result opens at its top; a streaming result stays at its start and follows its tail
+  only after the user scrolls down to it; an edge with text beyond it fades (`result-fade`).
 - Typography: the source is Inter 16 / 26 pt lines; the result is Source Serif 4 17.5 / 29 pt
   lines for Latin output and Noto Serif SC 17 / 31 pt lines for Chinese output, in `text-ink` on
   `surface-paper`. Accent appears only on the selected action label, the streaming caret, and the

@@ -126,8 +126,6 @@ final class AppModel {
   /// Whether the Screen Recording permission lets the capture shortcut
   /// freeze the screen.
   private(set) var isCaptureAccessGranted: Bool
-  /// Bumped when the result pane should scroll to the tail of the result.
-  private(set) var resultFollowRevision = 0
   private(set) var copyFeedbackRevision = 0
   /// What Cida is saying in the panel in place of the translation panes
   /// (`Design/spec/lifecycle.md` §一); the source, action and result wait underneath.
@@ -183,7 +181,6 @@ final class AppModel {
   @ObservationIgnored private weak var displayLinkView: NSView?
   private var performanceProbeStep = 0
   private var performancePresenter: SmoothStreamPresenter?
-  private var lastResultFollowTimestamp = 0.0
   private(set) var streamPresentationUpdateCount = 0
   private(set) var maximumStreamPresentationCharacterCount = 0
 
@@ -728,7 +725,6 @@ final class AppModel {
     )
     generationState = .waiting(entryID: record.id)
     result = record
-    requestResultFollow()
     return record
   }
 
@@ -787,7 +783,6 @@ final class AppModel {
     guard result === record else { return }
     record.phase = phase
     settleTypography(of: record)
-    requestResultFollow(force: false, allowsThrottling: false)
   }
 
   private func makeStreamPresenter(for record: ResultRecord) -> SmoothStreamPresenter {
@@ -811,7 +806,6 @@ final class AppModel {
       maximumStreamPresentationCharacterCount,
       delta.count
     )
-    requestResultFollow(force: false)
   }
 
   /// Once a few characters of the result exist, its own script decides the typography; a switch
@@ -825,16 +819,6 @@ final class AppModel {
     {
       record.outputLanguage = typography
     }
-  }
-
-  /// Asks the result pane to keep the tail visible. Streaming updates are
-  /// throttled; submissions force the pane back to the tail even after the
-  /// user scrolled away.
-  func requestResultFollow(force: Bool = true, allowsThrottling: Bool = true) {
-    let now = ProcessInfo.processInfo.systemUptime
-    guard force || !allowsThrottling || now - lastResultFollowTimestamp >= 0.05 else { return }
-    lastResultFollowTimestamp = now
-    resultFollowRevision &+= 1
   }
 
   @discardableResult

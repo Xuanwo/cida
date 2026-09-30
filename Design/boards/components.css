@@ -241,6 +241,13 @@ body {
   line-height: 31px;
 }
 .result .text.stale { color: var(--text-secondary); }
+/* The visible window of a result taller than the pane. The edge with text
+   beyond it fades the ink into the paper; an edge at the start or end of the
+   result stays sharp. */
+.result .viewport { overflow: hidden; --fade-floor: rgba(0, 0, 0, var(--result-fade-floor)); }
+.result .viewport.more-below { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--result-fade)), var(--fade-floor)); }
+.result .viewport.more-above { -webkit-mask-image: linear-gradient(to top, #000 calc(100% - var(--result-fade)), var(--fade-floor)); }
+.result .viewport.more-above.more-below { -webkit-mask-image: linear-gradient(to bottom, var(--fade-floor), #000 var(--result-fade), #000 calc(100% - var(--result-fade)), var(--fade-floor)); }
 .result .fading { color: var(--text-tertiary); }
 .result .cursor {
   display: inline-block;
