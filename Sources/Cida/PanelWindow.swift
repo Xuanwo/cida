@@ -59,7 +59,6 @@ final class PanelController {
   private let model: AppModel
   private let hostingView: NSHostingView<PanelView>
   private var keyMonitor: Any?
-  private let shiftAlternate: ShiftAlternate
   private var resignObserver: NSObjectProtocol?
   private var contentHeight: CGFloat = 120
   /// Identifies the latest height change, so an interrupted animation's
@@ -80,7 +79,6 @@ final class PanelController {
     openSettings: @escaping @MainActor () -> Void
   ) {
     self.model = model
-    shiftAlternate = ShiftAlternate { [weak model] offers in model?.offersImageCopy = offers }
     self.hidesOnResignKey = hidesOnResignKey
     self.openSettings = openSettings
     panel = CidaPanel(width: CidaDesign.Panel.width)
@@ -112,8 +110,7 @@ final class PanelController {
     ) { [weak self] _ in
       MainActor.assumeIsolated {
         guard let self else { return }
-        // The panel no longer sees ⇧ come up once another window has the keyboard.
-        self.shiftAlternate.reset()
+        self.model.isCopyMenuOpen = false
         guard self.hidesOnResignKey, self.panel.isVisible else { return }
         self.hide()
       }
@@ -191,7 +188,7 @@ final class PanelController {
   func hide() {
     guard panel.isVisible else { return }
     panel.orderOut(nil)
-    shiftAlternate.reset()
+    model.isCopyMenuOpen = false
     model.dismissPanelMessage()
     onVisibilityChange?(false)
   }
@@ -271,17 +268,10 @@ final class PanelController {
   }
 
   /// Panel-level keys (`Design/spec/panel.md` §五). Text editing keys stay
-  /// with the editor; these only fire while the panel is key. Modifier changes
-  /// and every key only inform `ShiftAlternate` (§八) and still reach the
-  /// editor and the input method.
+  /// with the editor; these only fire while the panel is key.
   private func installKeyMonitor() {
-    keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+    keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
       guard let self, NSApp.keyWindow === self.panel else { return event }
-      if event.type == .flagsChanged {
-        self.shiftAlternate.modifiersChanged(event.modifierFlags)
-        return event
-      }
-      self.shiftAlternate.keyPressed()
       // Escape cancels a pinyin composition and Tab may pick a candidate; the
       // input method must see every key before the panel's shortcuts do.
       if InputMethodRouting.isComposing(in: self.panel) { return event }
@@ -305,6 +295,11 @@ final class PanelController {
       }
       if modifiers == .command, event.charactersIgnoringModifiers == "," {
         self.openSettings()
+        return nil
+      }
+
+      if self.model.isCopyMenuOpen, event.keyCode == 53, modifiers.isEmpty {
+        self.model.isCopyMenuOpen = false
         return nil
       }
 
@@ -345,62 +340,6 @@ final class PanelController {
       return underPointer
     }
     return NSScreen.main
-  }
-}
-
-/// Holding ⇧ turns 复制结果 into 复制图片 (`Design/spec/panel.md` §八), but ⇧ is
-/// also how people type capitals and, with many Chinese input methods, how
-/// they switch between Chinese and English. So the alternate appears only
-/// after ⇧ has been held alone for `motion-alternate-delay-ms` with no key
-/// pressed; a key pressed while ⇧ is down puts it away until ⇧ comes up.
-@MainActor
-final class ShiftAlternate {
-  private let delay: Duration
-  private let onChange: @MainActor (Bool) -> Void
-  private var pending: Task<Void, Never>?
-  private var isShown = false
-  /// ⇧ went down alone and no key has been pressed since.
-  private var isShiftAlone = false
-
-  init(
-    delay: Duration = .milliseconds(CidaMotion.alternateDelayMilliseconds),
-    onChange: @escaping @MainActor (Bool) -> Void
-  ) {
-    self.delay = delay
-    self.onChange = onChange
-  }
-
-  func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
-    let modifiers = flags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
-    let isAlone = modifiers == .shift
-    guard isAlone != isShiftAlone else { return }
-    reset()
-    guard isAlone else { return }
-    isShiftAlone = true
-    pending = Task { [weak self, delay] in
-      try? await Task.sleep(for: delay)
-      guard let self, !Task.isCancelled, self.isShiftAlone else { return }
-      self.show(true)
-    }
-  }
-
-  /// Any key while ⇧ is down: ⇧ is being used to type.
-  func keyPressed() {
-    guard isShiftAlone || isShown else { return }
-    reset()
-  }
-
-  func reset() {
-    pending?.cancel()
-    pending = nil
-    isShiftAlone = false
-    show(false)
-  }
-
-  private func show(_ shown: Bool) {
-    guard shown != isShown else { return }
-    isShown = shown
-    onChange(shown)
   }
 }
 

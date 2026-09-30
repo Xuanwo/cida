@@ -219,6 +219,53 @@ body {
   background: var(--text-secondary);
 }
 .bar-action.copied { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+
+/* 复制结果 and the segment that opens its menu: one pill, a short inset
+ * hairline between the two, a quiet chevron. */
+.copy-button {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text-control);
+}
+.copy-button .main { display: flex; align-items: center; gap: 8px; height: 100%; padding: 0 10px 0 12px; }
+.copy-button .label { font-size: var(--font-size-label); font-weight: 600; }
+.copy-button .key { font-size: var(--font-size-caption); color: var(--text-tertiary); }
+.copy-button .rule { width: 1px; height: 14px; background: var(--border); }
+.copy-button .more { display: flex; align-items: center; justify-content: center; width: 26px; height: 100%; }
+.copy-button .more .icon { width: 10px; height: 10px; color: var(--text-tertiary); }
+.copy-button.open .rule { opacity: 0; }
+.copy-button.open .more { background: var(--surface-dim); }
+.copy-button.open .more .icon { color: var(--text-control); }
+
+/* The copy menu, drawn by Cida on the hint pill's surface. Radius 14 around
+ * 6 of padding keeps the rows' radius 8 concentric with it. Its right edge is
+ * the button's, its top 6 below the button. */
+.bar { position: relative; }
+.copy-menu {
+  position: absolute;
+  z-index: 1;
+  top: 46px;
+  right: var(--space-window-x);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 184px;
+  padding: 6px;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--panel-edge), var(--panel-shadow);
+}
+.copy-menu .row { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 6px 0 10px; border-radius: var(--radius-card); color: var(--text-control); }
+.copy-menu .row .icon { width: 12px; height: 12px; }
+.copy-menu .row b { flex: 1; font-size: 12px; font-weight: 500; color: var(--text-primary); }
+.copy-menu .row kbd { display: flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--radius-seg-item); background: var(--surface-dim); font-family: var(--font-ui); font-size: var(--font-size-caption); font-weight: 500; letter-spacing: 0.4px; color: var(--text-secondary); }
+.copy-menu .row.on { background: var(--surface-dim); }
+.copy-menu .row.on kbd { background: var(--surface); box-shadow: 0 0 0 1px var(--border); }
 .bar-status { font-size: var(--font-size-label); color: var(--text-tertiary); }
 
 .result {

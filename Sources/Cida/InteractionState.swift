@@ -49,13 +49,12 @@ enum CopyFeedback: Equatable, Sendable {
 }
 
 /// What the right-hand slot of the control bar shows. One slot, one button,
-/// three phases (`Design/spec/panel.md` §二); ⇧ held alone turns 复制结果 into
-/// 复制图片 (§八).
+/// three phases (`Design/spec/panel.md` §二); 复制结果 carries the segment that
+/// opens the copy menu (§八).
 enum BarActionPresentation: Equatable, Sendable {
   case none
   case stop
   case copy
-  case copyImage
   case copied(CopyFeedback)
   /// 打开设置 ⌘, while the panel welcomes a user without a model service
   /// (`Design/spec/lifecycle.md` §三).
@@ -65,12 +64,11 @@ enum BarActionPresentation: Equatable, Sendable {
     isProcessing: Bool,
     canCopyResult: Bool,
     copyFeedback: CopyFeedback? = nil,
-    offersImageCopy: Bool = false,
     showsWelcome: Bool = false
   ) -> BarActionPresentation {
     if isProcessing { return .stop }
     if let copyFeedback { return .copied(copyFeedback) }
-    if canCopyResult { return offersImageCopy ? .copyImage : .copy }
+    if canCopyResult { return .copy }
     if showsWelcome { return .openSettings }
     return .none
   }

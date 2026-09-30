@@ -103,73 +103,37 @@ final class ShareCardTests: XCTestCase {
     XCTAssertEqual(pasteboard.changeCount, changeCount)
   }
 
-  func testTheAlternateTurnsTheCopyButtonIntoCopyImage() {
+  func testTheCopyFeedbackSaysWhatWasCopiedForItsOwnTime() {
     XCTAssertEqual(BarActionPresentation.resolve(isProcessing: false, canCopyResult: true), .copy)
     XCTAssertEqual(
-      BarActionPresentation.resolve(isProcessing: false, canCopyResult: true, offersImageCopy: true),
-      .copyImage)
-    XCTAssertEqual(
-      BarActionPresentation.resolve(isProcessing: true, canCopyResult: false, offersImageCopy: true),
-      .stop)
-    XCTAssertEqual(
-      BarActionPresentation.resolve(isProcessing: false, canCopyResult: false, offersImageCopy: true),
-      .none)
-    XCTAssertEqual(
-      BarActionPresentation.resolve(
-        isProcessing: false, canCopyResult: true, copyFeedback: .image, offersImageCopy: true),
+      BarActionPresentation.resolve(isProcessing: false, canCopyResult: true, copyFeedback: .image),
       .copied(.image))
+    XCTAssertEqual(
+      BarActionPresentation.resolve(isProcessing: true, canCopyResult: false, copyFeedback: .image),
+      .stop)
     XCTAssertEqual(CopyFeedback.imageTooLong.holdMilliseconds, 1_500)
     XCTAssertEqual(CopyFeedback.image.holdMilliseconds, CidaMotion.copiedHoldMilliseconds)
   }
 
-  // MARK: - ⇧ alone
+  /// The copy menu closes once either copy runs or a new request starts.
+  func testCopyingOrSubmittingClosesTheCopyMenu() {
+    let pasteboard = NSPasteboard(name: .init("io.xuanwo.cida.tests.\(UUID().uuidString)"))
+    defer { pasteboard.releaseGlobally() }
+    let model = AppModel(
+      inputText: source, result: ResultRecord.designCompleted(mode: .translate), pasteboard: pasteboard)
 
-  func testShiftHeldAloneOffersTheImageAfterTheDelay() async throws {
-    var offers: [Bool] = []
-    let alternate = ShiftAlternate(delay: .milliseconds(60)) { offers.append($0) }
+    model.isCopyMenuOpen = true
+    XCTAssertTrue(model.copyResultImage())
+    XCTAssertFalse(model.isCopyMenuOpen)
 
-    alternate.modifiersChanged(.shift)
-    XCTAssertEqual(offers, [], "Not at once")
-    try await Task.sleep(for: .milliseconds(200))
-    XCTAssertEqual(offers, [true])
+    model.isCopyMenuOpen = true
+    XCTAssertTrue(model.copyResult())
+    XCTAssertFalse(model.isCopyMenuOpen)
 
-    alternate.modifiersChanged([])
-    XCTAssertEqual(offers, [true, false], "Releasing ⇧ puts it away")
-  }
-
-  func testShiftUsedToTypeOrTappedNeverOffersTheImage() async throws {
-    var offers: [Bool] = []
-    let alternate = ShiftAlternate(delay: .milliseconds(60)) { offers.append($0) }
-
-    // A capital: ⇧ down, a key, then ⇧ still held past the delay.
-    alternate.modifiersChanged(.shift)
-    alternate.keyPressed()
-    try await Task.sleep(for: .milliseconds(200))
-    XCTAssertEqual(offers, [], "A key while ⇧ is down means typing")
-    alternate.modifiersChanged([])
-
-    // A tap that switches the input method between Chinese and English.
-    alternate.modifiersChanged(.shift)
-    alternate.modifiersChanged([])
-    try await Task.sleep(for: .milliseconds(200))
-    XCTAssertEqual(offers, [])
-
-    // ⇧ with another modifier, as in ⇧⌘C.
-    alternate.modifiersChanged([.shift, .command])
-    try await Task.sleep(for: .milliseconds(200))
-    XCTAssertEqual(offers, [])
-  }
-
-  func testTypingWhileTheImageIsOfferedPutsItAway() async throws {
-    var offers: [Bool] = []
-    let alternate = ShiftAlternate(delay: .milliseconds(60)) { offers.append($0) }
-    alternate.modifiersChanged([.shift, .capsLock])
-    try await Task.sleep(for: .milliseconds(200))
-    XCTAssertEqual(offers, [true], "Caps Lock does not count as another modifier")
-
-    alternate.keyPressed()
-    try await Task.sleep(for: .milliseconds(200))
-    XCTAssertEqual(offers, [true, false], "It stays away until ⇧ comes up")
+    model.isCopyMenuOpen = true
+    XCTAssertTrue(model.submit())
+    XCTAssertFalse(model.isCopyMenuOpen)
+    model.cancelProcessing()
   }
 
   // MARK: - Pixels

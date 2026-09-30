@@ -188,8 +188,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     #endif
 
     #if DEBUG
-      if launchOptions.designState == .imageShift {
-        model.offersImageCopy = true
+      if launchOptions.designState == .copyMenu {
+        model.isCopyMenuOpen = true
+        model.highlightsCopyImageForDesign = true
       }
     #endif
 
@@ -816,7 +817,7 @@ private enum DesignState: String {
   case lifecycleUpdateCurrent = "lifecycle-update-current"
   case lifecycleUpdateFailed = "lifecycle-update-failed"
   case lifecycleUpdateReadOnly = "lifecycle-update-read-only"
-  case imageShift = "image-shift"
+  case copyMenu = "copy-menu"
   case shareTranslate = "share-translate"
   case shareRead = "share-read"
   case shareImprove = "share-improve"
@@ -962,7 +963,7 @@ private struct LaunchOptions {
     guard usesDesignFixtures else { return nil }
     #if DEBUG
       switch designState {
-      case .translate, .imageShift, .shareTranslate:
+      case .translate, .copyMenu, .shareTranslate:
         return ResultRecord.designCompleted(mode: .translate)
       case .improve, .shareImprove:
         return ResultRecord.designCompleted(mode: .improve)
@@ -1008,7 +1009,7 @@ private struct LaunchOptions {
     guard usesDesignFixtures else { return "" }
     #if DEBUG
       return switch designState {
-      case .translate, .streaming, .stopped, .failed, .imageShift, .shareTranslate:
+      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate:
         ResultRecord.designTranslateSource
       case .improve, .shareImprove:
         ResultRecord.designImproveSource

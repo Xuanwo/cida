@@ -8,7 +8,7 @@
       "designReference": "Design/QACurrent/reference-empty.png",
       "designReferenceSHA256": "5ba369d1fa5d0d907fcd63f0fa51661d27fddd479bc29432617719702ed11eb0",
       "designDocument": "Design/boards/panel-states.html",
-      "designDocumentSHA256": "0ff7cc82465388079880e35264fd9bb61f3aa744fd025218ddff2e39db295138",
+      "designDocumentSHA256": "551eb8c8d29b7a60334b50de01559bbf8e3c7f225cb6e72c25769d1f652ce467",
       "logicalWidth": 800,
       "logicalHeight": 113,
       "blockSize": 8,
