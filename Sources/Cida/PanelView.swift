@@ -21,7 +21,7 @@ struct PanelView: View {
   @State private var composerMetrics: ComposerTextMetrics
   @State private var hasReportedHeight = false
   @State private var copiedFeedbackTask: Task<Void, Never>?
-  @State private var showsCopiedFeedback = false
+  @State private var shownCopyFeedback: CopyFeedback?
 
   init(
     model: AppModel,
@@ -53,7 +53,7 @@ struct PanelView: View {
     .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
     .background(surfaceBelowContent)
     .onChange(of: model.copyFeedbackRevision) { showCopiedFeedback() }
-    .onChange(of: model.result?.id) { showsCopiedFeedback = false }
+    .onChange(of: model.result?.id) { shownCopyFeedback = nil }
     // No identifier on this stack: SwiftUI would push it down onto the pane
     // containers and hide their own `source-pane` / `control-bar` /
     // `result-pane` identifiers from XCUI.
@@ -155,18 +155,20 @@ struct PanelView: View {
     .resolve(
       isProcessing: model.isProcessing,
       canCopyResult: model.canCopyResult,
-      showsCopiedFeedback: showsCopiedFeedback,
+      copyFeedback: shownCopyFeedback,
+      isShiftHeld: model.isShiftHeld,
       showsWelcome: showsWelcome
     )
   }
 
   private func showCopiedFeedback() {
     copiedFeedbackTask?.cancel()
-    showsCopiedFeedback = true
+    let feedback = model.copyFeedback
+    shownCopyFeedback = feedback
     copiedFeedbackTask = Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(CidaMotion.copiedHoldMilliseconds))
+      try? await Task.sleep(for: .milliseconds(feedback.holdMilliseconds))
       guard !Task.isCancelled else { return }
-      showsCopiedFeedback = false
+      shownCopyFeedback = nil
     }
   }
 }
@@ -350,7 +352,8 @@ private struct DimmedWhileWorking: ViewModifier {
 }
 
 /// One slot, one button, three phases: nothing while typing, 停止 while a
-/// request runs, 复制结果 once a result exists (`Design/spec/panel.md` §二).
+/// request runs, 复制结果 once a result exists (`Design/spec/panel.md` §二),
+/// 复制图片 in its place while ⇧ is down (§八).
 private struct BarActionButton: View {
   let model: AppModel
   let presentation: BarActionPresentation
@@ -375,9 +378,23 @@ private struct BarActionButton: View {
         } action: {
           _ = model.copyResult()
         }
-      case .copied:
+      case .copyImage:
+        pill(identifier: "bar-action-copy-image", label: "复制图片", key: "⇧⌘C", accent: false) {
+          LucideIcon(.image, size: 12).foregroundStyle(CidaDesign.textControl)
+        } action: {
+          _ = model.copyResultImage()
+        }
+      case .copied(.text):
         pill(identifier: "bar-action-copied", label: "已复制", key: nil, accent: true) {
           LucideIcon(.check, size: 12).foregroundStyle(CidaDesign.accent)
+        } action: {}
+      case .copied(.image):
+        pill(identifier: "bar-action-image-copied", label: "已复制图片", key: nil, accent: true) {
+          LucideIcon(.check, size: 12).foregroundStyle(CidaDesign.accent)
+        } action: {}
+      case .copied(.imageTooLong):
+        pill(identifier: "bar-action-image-too-long", label: "太长，复制不了图片", key: nil, accent: false) {
+          EmptyView()
         } action: {}
       case .openSettings:
         pill(identifier: "bar-action-open-settings", label: "打开设置", key: "⌘,", accent: false) {

@@ -406,6 +406,8 @@ extension InteractionReproductionTests {
     )
     XCTAssertTrue(CopyShortcutRouting.isResultShortcut(commandC))
     XCTAssertFalse(CopyShortcutRouting.isResultShortcut(commandShiftC))
+    XCTAssertTrue(CopyShortcutRouting.isImageShortcut(commandShiftC), "⇧⌘C copies the share card")
+    XCTAssertFalse(CopyShortcutRouting.isImageShortcut(commandC))
 
     let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 80))
     let window = CidaWindow(

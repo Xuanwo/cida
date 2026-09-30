@@ -100,4 +100,35 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     driver.copyButton.click()
     XCTAssertTrue(driver.waitForPasteboard(resultValue, timeout: 2))
   }
+
+  /// ⇧⌘C and the ⇧ alternate of the copy button put the share card on the
+  /// pasteboard as an image and nothing else (`Design/spec/panel.md` §八).
+  func testShiftCommandCCopiesTheSourceAndResultAsAnImage() {
+    driver.launch()
+
+    driver.submit("CIDA_E2E_POOL_COPY")
+    XCTAssertTrue(
+      driver.result(containing: "CIDA_E2E_POOL_COPY_COMPLETE").waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString("CIDA_E2E_BEFORE_IMAGE", forType: .string)
+    driver.composer.typeKey("c", modifierFlags: [.command, .shift])
+    XCTAssertTrue(
+      driver.waitForExistence(of: driver.imageCopiedButton, timeout: 2), "✓ 已复制图片 shows")
+    let image = pasteboard.data(forType: .png).flatMap(NSBitmapImageRep.init(data:))
+    XCTAssertEqual(image?.pixelsWide, 1_500, "The 500 pt card at 3x")
+    XCTAssertNil(pasteboard.string(forType: .string), "Only the image")
+    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 3), "✓ 已复制图片 reverts")
+
+    pasteboard.clearContents()
+    XCUIElement.perform(withKeyModifiers: .shift) {
+      XCTAssertTrue(driver.copyImageButton.waitForExistence(timeout: 2), "⇧ turns 复制结果 into 复制图片")
+      driver.copyImageButton.click()
+    }
+    XCTAssertTrue(driver.waitForExistence(of: driver.imageCopiedButton, timeout: 2))
+    XCTAssertNotNil(pasteboard.data(forType: .png))
+    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 3), "Releasing ⇧ brings 复制结果 back")
+  }
 }

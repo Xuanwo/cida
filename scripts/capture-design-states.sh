@@ -22,7 +22,9 @@ mkdir -p "$implementation_dir" "$qa_dir"
 swift build --package-path "$project_dir"
 
 # Panel states: the capture is the panel at its content height, 800 pt wide.
-for state in empty translate improve stale stopped failed long \
+# The share-* states capture the card ⇧⌘C copies instead of a window.
+for state in empty translate improve stale stopped failed long image-shift \
+  share-translate share-read share-improve \
   settings settings-translation settings-language-editing settings-prompt-editing \
   settings-shortcuts settings-shortcuts-custom settings-shortcuts-unset settings-recording settings-general settings-update-available \
   settings-config-unset settings-config-copied settings-config-ready settings-config-updated \

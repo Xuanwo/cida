@@ -101,11 +101,11 @@ final class LifecycleTests: XCTestCase {
   func testTheWelcomeOffersSettingsInTheActionSlot() {
     XCTAssertEqual(
       BarActionPresentation.resolve(
-        isProcessing: false, canCopyResult: false, showsCopiedFeedback: false, showsWelcome: true),
+        isProcessing: false, canCopyResult: false, showsWelcome: true),
       .openSettings)
     XCTAssertEqual(
       BarActionPresentation.resolve(
-        isProcessing: true, canCopyResult: false, showsCopiedFeedback: false, showsWelcome: true),
+        isProcessing: true, canCopyResult: false, showsWelcome: true),
       .stop)
   }
 

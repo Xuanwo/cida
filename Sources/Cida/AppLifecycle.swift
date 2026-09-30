@@ -187,7 +187,15 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       }
     #endif
 
-    if let outputURL = launchOptions.snapshotOutputURL {
+    #if DEBUG
+      if launchOptions.designState == .imageShift {
+        model.isShiftHeld = true
+      }
+    #endif
+
+    if let outputURL = launchOptions.snapshotOutputURL, launchOptions.designState.isShareCard {
+      writeShareCardSnapshot(to: outputURL)
+    } else if let outputURL = launchOptions.snapshotOutputURL {
       let targetWindow: NSWindow? =
         launchOptions.designState.isSettings
         ? settingsWindowController?.window
@@ -650,6 +658,26 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     performanceProbeView = probeView
   }
 
+  /// The card the model's result would copy, at the 2x the other state
+  /// captures use, so it compares with the board's render.
+  private func writeShareCardSnapshot(to outputURL: URL) {
+    Task { @MainActor in
+      if let result = model.result,
+        case .success(let card) = ShareCard.render(
+          source: result.source, result: result.result, language: result.outputLanguage, scale: 2)
+      {
+        do {
+          try card.png.write(to: outputURL, options: .atomic)
+        } catch {
+          fputs("Failed to write the share card: \(error)\n", stderr)
+        }
+      } else {
+        fputs("The design state has no share card to write.\n", stderr)
+      }
+      NSApp.terminate(nil)
+    }
+  }
+
   private func scheduleSnapshot(of window: NSWindow?, to outputURL: URL) {
     guard let window else { return }
 
@@ -788,6 +816,16 @@ private enum DesignState: String {
   case lifecycleUpdateCurrent = "lifecycle-update-current"
   case lifecycleUpdateFailed = "lifecycle-update-failed"
   case lifecycleUpdateReadOnly = "lifecycle-update-read-only"
+  case imageShift = "image-shift"
+  case shareTranslate = "share-translate"
+  case shareRead = "share-read"
+  case shareImprove = "share-improve"
+
+  /// The share card ⇧⌘C copies (`Design/boards/share-card.html`); the snapshot
+  /// is the card itself rather than a window.
+  var isShareCard: Bool {
+    self == .shareTranslate || self == .shareRead || self == .shareImprove
+  }
 
   /// The empty panel before a model service is configured.
   var isWelcome: Bool {
@@ -917,17 +955,19 @@ private struct LaunchOptions {
   }
 
   var initialMode: ProcessingMode {
-    designState == .improve ? .improve : .translate
+    designState == .improve || designState == .shareImprove ? .improve : .translate
   }
 
   var initialResult: ResultRecord? {
     guard usesDesignFixtures else { return nil }
     #if DEBUG
       switch designState {
-      case .translate:
+      case .translate, .imageShift, .shareTranslate:
         return ResultRecord.designCompleted(mode: .translate)
-      case .improve:
+      case .improve, .shareImprove:
         return ResultRecord.designCompleted(mode: .improve)
+      case .shareRead:
+        return ResultRecord.designRead()
       case .stale:
         return ResultRecord.designCompleted(mode: .translate)
       case .stopped:
@@ -968,10 +1008,12 @@ private struct LaunchOptions {
     guard usesDesignFixtures else { return "" }
     #if DEBUG
       return switch designState {
-      case .translate, .streaming, .stopped, .failed:
+      case .translate, .streaming, .stopped, .failed, .imageShift, .shareTranslate:
         ResultRecord.designTranslateSource
-      case .improve:
+      case .improve, .shareImprove:
         ResultRecord.designImproveSource
+      case .shareRead:
+        ResultRecord.designReadSource
       case .stale:
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:

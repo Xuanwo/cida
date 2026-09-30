@@ -409,6 +409,22 @@ extension CidaSettings: Codable {
     static let designImproveResult =
       "通过复用已有缓存结果，该功能可在大多数情况下显著加速整体处理流程。"
 
+    /// Someone reading a notice in a language they do not read well (`share-read`).
+    static let designReadSource =
+      "We are deprecating the v1 ingestion API on March 31. Existing tokens keep working until then, but new projects can no longer enable it. If you still send events through v1, switch to the batch endpoint, which accepts the same payload and retries on 429 for you."
+    static let designReadResult =
+      "v1 数据接入 API 将于 3 月 31 日停用。现有令牌在此之前仍可使用，但新项目已无法再启用它。如果你仍在通过 v1 发送事件，请改用批量接口，它接受相同的数据格式，并会在遇到 429 时自动为你重试。"
+
+    static func designRead() -> ResultRecord {
+      ResultRecord(
+        mode: .translate,
+        source: designReadSource,
+        outputLanguage: .chinese,
+        result: designReadResult,
+        phase: .completed
+      )
+    }
+
     static func designCompleted(mode: ProcessingMode) -> ResultRecord {
       switch mode {
       case .translate:

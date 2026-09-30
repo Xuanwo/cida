@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>States — 复制图片</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+</head>
+<body>
+<!-- Rules: ../spec/panel.md §八. Each data-state is rendered on its own. -->
+<main class="board" data-board="share-card">
+  <div class="board-title">复制图片 · ⇧⌘C 放进剪贴板的图(卡片宽 480pt,四周 10pt 透明边放阴影,图宽 500pt,按 3 倍像素输出 = 1500px;边缘同面板;总是浅色)</div>
+
+  <p class="caption">① 翻译 — 面板停下来的样子:上是白底原文(生成这段结果时的原文,即使原文栏之后改过),下是纸色结果,字、颜色、材质都与面板相同,宽收到 480;两栏之间只有面板原有的那条 1px border。没有控制条、说明行、字标或水印:认得出这是辞达,靠的是纸、墨和衬线。边缘同面板:圆角 14、1px panel-edge 描边、面板阴影的第一层(0/2/6 8%)</p>
+  <div data-state="share-translate" class="share-bitmap"><section class="share-card">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div>
+    </div>
+  </section></div>
+  <div class="divider"></div>
+
+  <p class="caption">② 外文译成中文 — 高度随全文,两栏都不设上限、不滚动、不裁字;宽 480 让中文一行约 24 字、英文约 60 字符</p>
+  <div data-state="share-read" class="share-bitmap"><section class="share-card">
+    <div class="source">We are deprecating the v1 ingestion API on March 31. Existing tokens keep working until then, but new projects can no longer enable it. If you still send events through v1, switch to the batch endpoint, which accepts the same payload and retries on 429 for you.</div>
+    <div class="result"><div class="text cjk">v1 数据接入 API 将于 3 月 31 日停用。现有令牌在此之前仍可使用，但新项目已无法再启用它。如果你仍在通过 v1 发送事件，请改用批量接口，它接受相同的数据格式，并会在遇到 429 时自动为你重试。</div>
+    </div>
+  </section></div>
+  <div class="divider"></div>
+
+  <p class="caption">③ 改进 — 同一张图:上是原文,下是改进后的文字</p>
+  <div data-state="share-improve" class="share-bitmap"><section class="share-card">
+    <div class="source">这个功能通过复用已有的缓存结果,使得整体的处理流程在大多数的情况下都能够得到比较明显的加速。</div>
+    <div class="result"><div class="text cjk">通过复用已有缓存结果，该功能可在大多数情况下显著加速整体处理流程。</div>
+    </div>
+  </section></div>
+  <div class="divider"></div>
+
+  <p class="caption">④ 对方在手机上点开 — 全屏查看时 500pt 缩到 390pt,结果约 13.6pt、原文约 12.5pt,不用放大就能读;面板 800pt 宽的截图在这里只剩约 8pt</p>
+  <div data-state="share-phone" class="phone">
+    <div class="share-bitmap"><section class="share-card">
+      <div class="source">We are deprecating the v1 ingestion API on March 31. Existing tokens keep working until then, but new projects can no longer enable it. If you still send events through v1, switch to the batch endpoint, which accepts the same payload and retries on 429 for you.</div>
+      <div class="result"><div class="text cjk">v1 数据接入 API 将于 3 月 31 日停用。现有令牌在此之前仍可使用，但新项目已无法再启用它。如果你仍在通过 v1 发送事件，请改用批量接口，它接受相同的数据格式，并会在遇到 429 时自动为你重试。</div>
+    </div>
+    </section></div>
+  </div>
+</main>
+</body>
+</html>

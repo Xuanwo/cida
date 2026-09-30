@@ -109,7 +109,10 @@ final class PanelController {
       queue: .main
     ) { [weak self] _ in
       MainActor.assumeIsolated {
-        guard let self, self.hidesOnResignKey, self.panel.isVisible else { return }
+        guard let self else { return }
+        // The panel no longer sees ⇧ come up once another window has the keyboard.
+        self.model.isShiftHeld = false
+        guard self.hidesOnResignKey, self.panel.isVisible else { return }
         self.hide()
       }
     }
@@ -186,6 +189,7 @@ final class PanelController {
   func hide() {
     guard panel.isVisible else { return }
     panel.orderOut(nil)
+    model.isShiftHeld = false
     model.dismissPanelMessage()
     onVisibilityChange?(false)
   }
@@ -265,10 +269,17 @@ final class PanelController {
   }
 
   /// Panel-level keys (`Design/spec/panel.md` §五). Text editing keys stay
-  /// with the editor; these only fire while the panel is key.
+  /// with the editor; these only fire while the panel is key. ⇧ alone only
+  /// changes what the copy button offers (§八) and still reaches the editor
+  /// and the input method.
   private func installKeyMonitor() {
-    keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+    keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
       guard let self, NSApp.keyWindow === self.panel else { return event }
+      if event.type == .flagsChanged {
+        let isShiftHeld = event.modifierFlags.contains(.shift)
+        if self.model.isShiftHeld != isShiftHeld { self.model.isShiftHeld = isShiftHeld }
+        return event
+      }
       // Escape cancels a pinyin composition and Tab may pick a candidate; the
       // input method must see every key before the panel's shortcuts do.
       if InputMethodRouting.isComposing(in: self.panel) { return event }
@@ -276,6 +287,9 @@ final class PanelController {
         .intersection(.deviceIndependentFlagsMask)
         .subtracting(.capsLock)
 
+      if CopyShortcutRouting.isImageShortcut(event) {
+        return self.model.copyResultImage() ? nil : event
+      }
       if CopyShortcutRouting.isResultShortcut(event) {
         if CopyShortcutRouting.nativeTextResponderOwnsCopy(window: self.panel) {
           return event
@@ -377,10 +391,20 @@ final class PanelContentView: NSView {
 @MainActor
 enum CopyShortcutRouting {
   static func isResultShortcut(_ event: NSEvent) -> Bool {
+    isCopyKey(event, modifiers: .command)
+  }
+
+  /// ⇧⌘C copies the share card whether or not a text view has a selection:
+  /// the card is always the whole source and result (`Design/spec/panel.md` §八).
+  static func isImageShortcut(_ event: NSEvent) -> Bool {
+    isCopyKey(event, modifiers: [.command, .shift])
+  }
+
+  private static func isCopyKey(_ event: NSEvent, modifiers expected: NSEvent.ModifierFlags) -> Bool {
     let modifiers = event.modifierFlags
       .intersection(.deviceIndependentFlagsMask)
       .subtracting(.capsLock)
-    guard modifiers == .command else { return false }
+    guard modifiers == expected else { return false }
     return event.keyCode == 8 || event.charactersIgnoringModifiers?.lowercased() == "c"
   }
 

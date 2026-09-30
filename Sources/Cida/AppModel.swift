@@ -128,7 +128,12 @@ final class AppModel {
   private(set) var isCaptureAccessGranted: Bool
   /// Bumped when the result pane should scroll to the tail of the result.
   private(set) var resultFollowRevision = 0
+  /// Bumped by every copy from the panel; `copyFeedback` says what the slot shows for it.
   private(set) var copyFeedbackRevision = 0
+  private(set) var copyFeedback: CopyFeedback = .text
+  /// ⇧ is down while the panel is key: the copy button offers the share card
+  /// (`Design/spec/panel.md` §八). The panel controller sets it from key events.
+  var isShiftHeld = false
   /// What Cida is saying in the panel in place of the translation panes
   /// (`Design/spec/lifecycle.md` §一); the source, action and result wait underneath.
   private(set) var panelMessage: PanelMessage?
@@ -499,8 +504,34 @@ final class AppModel {
   func copyResult() -> Bool {
     guard let result, result.isCopyable else { return false }
     copyToPasteboard(result.result)
-    copyFeedbackRevision &+= 1
+    showCopyFeedback(.text)
     return true
+  }
+
+  /// ⇧⌘C: the share card of the source the result was generated from and the
+  /// result (`Design/spec/panel.md` §八). The pasteboard gets only the image,
+  /// because apps given text as well paste the text.
+  @discardableResult
+  func copyResultImage() -> Bool {
+    guard let result, result.isCopyable else { return false }
+    switch ShareCard.render(source: result.source, result: result.result, language: result.outputLanguage) {
+    case .success(let card):
+      pasteboard.clearContents()
+      pasteboard.declareTypes([.png, .tiff], owner: nil)
+      pasteboard.setData(card.png, forType: .png)
+      pasteboard.setData(card.tiff, forType: .tiff)
+      showCopyFeedback(.image)
+    case .failure(.tooLong):
+      showCopyFeedback(.imageTooLong)
+    case .failure(.cannotRender):
+      return false
+    }
+    return true
+  }
+
+  private func showCopyFeedback(_ feedback: CopyFeedback) {
+    copyFeedback = feedback
+    copyFeedbackRevision &+= 1
   }
 
   private func copyToPasteboard(_ value: String) {

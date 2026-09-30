@@ -7,7 +7,7 @@ a versioned copy.
 
 | Topic | Rules | States |
 | --- | --- | --- |
-| Panel: shape, structure, actions, states, keys, selection import, capture | [`spec/panel.md`](spec/panel.md) | [`boards/panel-states.html`](boards/panel-states.html), [`boards/capture.html`](boards/capture.html) |
+| Panel: shape, structure, actions, states, keys, selection import, capture, the copied image | [`spec/panel.md`](spec/panel.md) | [`boards/panel-states.html`](boards/panel-states.html), [`boards/capture.html`](boards/capture.html), [`boards/share-card.html`](boards/share-card.html) |
 | Streaming: buffering rate, phase motion, constraints | [`spec/streaming-motion.md`](spec/streaming-motion.md) | [`boards/streaming-motion.html`](boards/streaming-motion.html) |
 | Settings: window, model status, prompts, shortcuts, permissions | [`spec/settings.md`](spec/settings.md) | [`boards/settings-states.html`](boards/settings-states.html) |
 | Brand: mark, app icon, menu bar image and menu, wordmark | [`spec/brand.md`](spec/brand.md) | [`boards/brand.html`](boards/brand.html) |

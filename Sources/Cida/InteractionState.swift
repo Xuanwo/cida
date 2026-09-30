@@ -31,13 +31,32 @@ enum ComposerPresentationState: Equatable, Sendable {
   case document
 }
 
+/// What the slot says right after a copy, and for how long.
+enum CopyFeedback: Equatable, Sendable {
+  /// ✓ 已复制 after the result's text went to the pasteboard.
+  case text
+  /// ✓ 已复制图片 after the share card did (`Design/spec/panel.md` §八).
+  case image
+  /// The share card would set taller than `ShareCard.maximumCardHeight`.
+  case imageTooLong
+
+  var holdMilliseconds: Int {
+    switch self {
+    case .text, .image: CidaMotion.copiedHoldMilliseconds
+    case .imageTooLong: ShareCard.tooLongHoldMilliseconds
+    }
+  }
+}
+
 /// What the right-hand slot of the control bar shows. One slot, one button,
-/// three phases (`Design/spec/panel.md` §二).
+/// three phases (`Design/spec/panel.md` §二); holding ⇧ turns 复制结果 into
+/// 复制图片 (§八).
 enum BarActionPresentation: Equatable, Sendable {
   case none
   case stop
   case copy
-  case copied
+  case copyImage
+  case copied(CopyFeedback)
   /// 打开设置 ⌘, while the panel welcomes a user without a model service
   /// (`Design/spec/lifecycle.md` §三).
   case openSettings
@@ -45,12 +64,13 @@ enum BarActionPresentation: Equatable, Sendable {
   static func resolve(
     isProcessing: Bool,
     canCopyResult: Bool,
-    showsCopiedFeedback: Bool,
+    copyFeedback: CopyFeedback? = nil,
+    isShiftHeld: Bool = false,
     showsWelcome: Bool = false
   ) -> BarActionPresentation {
     if isProcessing { return .stop }
-    if showsCopiedFeedback { return .copied }
-    if canCopyResult { return .copy }
+    if let copyFeedback { return .copied(copyFeedback) }
+    if canCopyResult { return isShiftHeld ? .copyImage : .copy }
     if showsWelcome { return .openSettings }
     return .none
   }

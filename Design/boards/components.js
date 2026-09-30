@@ -12,6 +12,8 @@ class CidaBar extends HTMLElement {
       stop: `<div class="bar-action"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
       copy: `<div class="bar-action"><i class="icon icon-copy"></i><span class="label">复制结果</span><span class="key">⌘C</span></div>`,
       copied: `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制</span></div>`,
+      image: `<div class="bar-action"><i class="icon icon-image"></i><span class="label">复制图片</span><span class="key">⇧⌘C</span></div>`,
+      "image-copied": `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制图片</span></div>`,
       settings: `<div class="bar-action"><span class="label">打开设置</span><span class="key">⌘,</span></div>`,
       status: `<span class="bar-status">${this.getAttribute("status") ?? ""}</span>`,
     };

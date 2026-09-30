@@ -135,6 +135,13 @@ enum CidaDesign {
     }
   }
 
+  /// `Design/spec/panel.md` §八: the card ⇧⌘C copies, narrower than the panel
+  /// so it reads on a phone, inside a transparent margin that holds its shadow.
+  enum ShareCard {
+    static let width: CGFloat = 480
+    static let margin: CGFloat = 10
+  }
+
   /// The design's result typography (`font-size-result*` × `line-height-result*`,
   /// rounded to whole points).
   enum Typography {

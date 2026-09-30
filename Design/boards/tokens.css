@@ -88,6 +88,10 @@
   --panel-shadow: 0 2px 6px #00000014, 0 28px 72px #1A1A1830;
   --panel-edge: #00000012;
 
+  /* Share card (see spec/panel.md §八) */
+  --share-card-width: 480px;
+  --share-card-margin: 10px;
+
   /* Motion (see spec/streaming-motion.md) */
   --motion-char-in-ms: 120;
   --motion-icon-in-ms: 120;

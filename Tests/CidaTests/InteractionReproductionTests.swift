@@ -201,7 +201,7 @@ final class InteractionReproductionTests: XCTestCase {
       .resolve(
         isProcessing: model.isProcessing,
         canCopyResult: model.canCopyResult,
-        showsCopiedFeedback: copied
+        copyFeedback: copied ? .text : nil
       )
     }
     XCTAssertEqual(slot(), .none)
@@ -213,7 +213,7 @@ final class InteractionReproductionTests: XCTestCase {
     try await waitUntil(timeout: .seconds(3)) { model.result?.phase == .completed }
     XCTAssertEqual(slot(), .copy)
     XCTAssertTrue(model.copyResult())
-    XCTAssertEqual(slot(copied: true), .copied)
+    XCTAssertEqual(slot(copied: true), .copied(.text))
 
     model.cancelProcessing()
     XCTAssertEqual(slot(), .copy, "Cancelling an idle model changes nothing")
