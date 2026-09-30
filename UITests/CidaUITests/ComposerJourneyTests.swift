@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -27,6 +28,50 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(chineseResult.waitForExistence(timeout: 8))
     driver.waitForCompletion()
     XCTAssertFalse(driver.resultNote("stale").exists)
+  }
+
+  /// `Design/spec/panel.md` §三: a source in my language writes the foreign language after
+  /// 翻译, ⌘L rewrites it in place, ⏎ keeps it and translates again, Esc drops an edit.
+  func testForeignLanguageIsRewrittenAfterTranslateAndTranslatesAgain() {
+    driver.launch()
+    let language = driver.element(identifier: "foreign-language")
+    let editor = driver.element(identifier: "foreign-language-editor")
+
+    driver.replaceSource(with: "The new storage engine keeps every write in a log.")
+    XCTAssertFalse(language.waitForExistence(timeout: 1), "Other languages only go into mine")
+
+    let source = "这是一段要译成日语的中文。CIDA_E2E_FOREIGN_JAPANESE"
+    driver.replaceSource(with: source)
+    XCTAssertTrue(language.waitForExistence(timeout: 3), "A pause writes the language in")
+    XCTAssertTrue(driver.waitForValue("English", in: language, timeout: 2))
+
+    driver.composer.typeKey("l", modifierFlags: .command)
+    XCTAssertTrue(editor.waitForExistence(timeout: 3), "⌘L turns the language into a field")
+    // ⌘L leaves the language selected, so pasting replaces it without a click.
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.setString("日本語", forType: .string))
+    editor.typeKey("v", modifierFlags: .command)
+    editor.typeKey(.return, modifierFlags: [])
+
+    XCTAssertTrue(
+      driver.result(containing: "CIDA_E2E_FOREIGN_JAPANESE_COMPLETE").waitForExistence(timeout: 8),
+      "The source is translated again into the new language")
+    driver.waitForCompletion()
+    XCTAssertTrue(driver.waitForValue("日本語", in: language, timeout: 2))
+    XCTAssertEqual(driver.textValue(in: driver.composer), source)
+
+    driver.composer.typeKey("l", modifierFlags: .command)
+    XCTAssertTrue(editor.waitForExistence(timeout: 3))
+    editor.typeText("x")
+    editor.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(editor.waitForNonExistence(timeout: 3), "Esc drops the edit")
+    XCTAssertTrue(driver.panel.exists, "Esc in the field does not hide the panel")
+    XCTAssertTrue(driver.waitForValue("日本語", in: language, timeout: 2))
+
+    driver.hidePanel()
+    driver.showPanel()
+    XCTAssertTrue(driver.waitForValue("日本語", in: language, timeout: 2), "The language is kept")
   }
 
   func testRealTypingPasteGrowthDeletionShrinkAndSubmission() {

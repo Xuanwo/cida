@@ -189,6 +189,17 @@ def plan_for(submitted_text):
                 '"foreign_language"',
             ],
         },
+        # The language written after 翻译 was rewritten to 日本語 in the panel.
+        "这是一段要译成日语的中文。CIDA_E2E_FOREIGN_JAPANESE": {
+            "chunks": [
+                "これは日本語に訳した文です。\n",
+                "CIDA_E2E_FOREIGN_JAPANESE_COMPLETE",
+            ],
+            "requiredSystemFragments": [
+                '"operation":"translate"',
+                '"foreign_language":"日本語"',
+            ],
+        },
         "这句话不太清楚也有一点啰嗦。CIDA_E2E_IMPROVE_CHINESE": {
             "chunks": [
                 "这句话更加清晰、简洁。\n",

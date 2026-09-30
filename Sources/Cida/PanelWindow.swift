@@ -190,6 +190,7 @@ final class PanelController {
     panel.orderOut(nil)
     model.isCopyMenuOpen = false
     model.dismissPanelMessage()
+    model.cancelForeignLanguageEditing()
     onVisibilityChange?(false)
   }
 
@@ -317,6 +318,24 @@ final class PanelController {
         default:
           return nil
         }
+      }
+
+      // The foreign language's field keeps ⏎ and typing; Esc drops the edit instead of hiding
+      // the panel, and Tab stays with the field (`Design/spec/panel.md` §三).
+      if self.model.isEditingForeignLanguage {
+        switch event.keyCode {
+        case 48 where modifiers.isEmpty:
+          return nil
+        case 53 where modifiers.isEmpty:
+          self.model.cancelForeignLanguageEditing()
+          return nil
+        default:
+          return event
+        }
+      }
+
+      if modifiers == .command, event.charactersIgnoringModifiers?.lowercased() == "l" {
+        return self.model.beginEditingForeignLanguage() ? nil : event
       }
 
       switch event.keyCode {

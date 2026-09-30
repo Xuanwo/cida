@@ -209,7 +209,8 @@ struct CidaSettings: Equatable, Sendable {
   var improvementPrompt = defaultImprovementPrompt
   /// What every other language is translated into; any wording, e.g. 粤语 or 英式英语.
   var myLanguage = defaultLanguages().my
-  /// What text in `myLanguage` is translated into.
+  /// What text in `myLanguage` is translated into: written after 翻译 in the panel and
+  /// rewritten there (`Design/spec/panel.md` §三), not in Settings.
   var foreignLanguage = defaultLanguages().foreign
   var launchAtLogin = false
   /// The combination that shows the panel from any application. Each of the three can be left
@@ -444,6 +445,20 @@ extension CidaSettings: Codable {
           phase: .completed
         )
       }
+    }
+
+    static let designIntoMineSource =
+      "The new storage engine keeps every write in an append-only log."
+    static let designIntoMineResult = "新的存储引擎把每一次写入都记在只追加的日志里。"
+
+    static func designIntoMine() -> ResultRecord {
+      ResultRecord(
+        mode: .translate,
+        source: designIntoMineSource,
+        outputLanguage: .chinese,
+        result: designIntoMineResult,
+        phase: .completed
+      )
     }
 
     static let designLongInput: String = {

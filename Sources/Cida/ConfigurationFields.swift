@@ -98,8 +98,8 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .foreignLanguage:
       Schema(
         type: "text", values: nil, defaultValue: CidaSettings.defaultLanguages().foreign,
-        example: "英式英语",
-        description: "常用外语，与设置里的相同：原文是我的语言时译成它；写法同 my-language")
+        example: "日本語",
+        description: "原文是我的语言时译成的外语，即面板「翻译」后面写着的那一门；写法同 my-language")
     case .translationPrompt:
       Schema(
         type: "text", values: nil, defaultValue: CidaSettings.defaultTranslationPrompt,

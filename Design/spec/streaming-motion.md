@@ -27,3 +27,14 @@
 - 面板的每一次高度变化都只动窗口外框：各栏立即排到最终布局、贴面板顶部，窗口外框 150ms（`motion-ease-height`）追上；追赶期间内容下方露出的是最底一栏自己的底色（最底是结果栏时为纸色），不露出其他颜色。面板唤起时的第一次布局与隐藏的面板直接定高。原文栏到上限前不滚动，面板为每一行生长；结果栏到上限时只显示整行。
 - 已修改：结果文字降到 0.55 的过程与说明行的展开同步，150ms（`motion-height-ms`）。
 - 所有时长基于 120fps；系统「减弱动态效果」开启时：去掉逐字淡入、呼吸与高度过渡，保留匀速上屏。
+
+## 四、外语写入「翻译」
+
+原文是我的语言时，外语写进「翻译」段（`spec/panel.md` §三）。它用译文的同一种笔触出现，让「要译成什么」读起来也是被写出来的。关键帧见 [`boards/streaming-motion.html`](../boards/streaming-motion.html) L0–L3。
+
+1. 判断时机：输入停顿 250ms（`motion-language-settle-ms`）后才用本机语言识别判断原文，连续输入中不判断；结果与上一次相同时什么也不做。所以写入与离开只在原文语言真的改变、且用户停下来时发生，段宽不随每个键跳动。
+2. 写入：「翻译」段在 150ms（`motion-height-ms`）ease-out（`motion-ease-height`）里一次变到最终宽度，「改进」与 Tab 提示跟着平移；同时外语按字素簇逐字写入，每字 120ms（`motion-char-in-ms`）ease-out（`motion-ease-char-in`）淡入、blur 2px（`motion-blur-char-px`）→ 0，相邻两字相隔 20ms（`motion-language-stagger-ms`）。段宽总是先到，字不被裁切。English 约 270ms 写完。
+3. 离开：整词一起 120ms（`motion-char-in-ms`）淡出，blur 0 → 2px；淡出过半时段在 150ms（`motion-height-ms`）ease-out 里收回到只有动词。离开比写入短，也不逐字。
+4. 改写（⌘L）：段宽跟着输入即时变化，不做过渡；Esc 复原时输入的文字淡出，原来的外语按第 2 条重新写入。
+5. 不播放：唤起面板、带入选区、截图识别到文字时，面板直接以最终布局出现（`spec/panel.md` §一），外语已经写好。
+6. 「减弱动态效果」开启时：段宽直接跳变，外语整体 150ms（`motion-icon-swap-ms`）淡入淡出，没有 blur 与逐字。

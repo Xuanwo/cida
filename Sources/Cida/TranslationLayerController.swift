@@ -807,7 +807,7 @@ final class LayerPaneSession {
   /// What shows, from the last read: the whole window's paragraphs but those turned back, and
   /// those ⌥D asked for.
   private func showChosenParagraphs() {
-    let filter = LayerLanguageFilter(languages: owner.currentSettings.requestLanguages)
+    let filter = MyLanguageFilter(languages: owner.currentSettings.requestLanguages)
     blocks = readBlocks.indices.compactMap { index in
       let block = readBlocks[index], node = readNodes[index]
       let pointedAt = picked.contains { $0.matches(block, node: node) }

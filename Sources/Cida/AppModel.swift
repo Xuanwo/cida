@@ -96,11 +96,34 @@ final class AppModel {
   /// The action the next ⏎ runs. It resets to `.translate` every time the
   /// panel is shown (see `PanelController`).
   var mode: ProcessingMode
-  var inputText: String
+  var inputText: String {
+    didSet {
+      if inputText != oldValue { scheduleSourceLanguageCheck() }
+    }
+  }
   /// The one result the panel shows. A new submission replaces it; hiding the
   /// panel keeps it.
   private(set) var result: ResultRecord?
-  var settings = CidaSettings()
+  var settings = CidaSettings() {
+    didSet {
+      if settings.requestLanguages != oldValue.requestLanguages { settleSourceLanguage(animated: false) }
+    }
+  }
+  /// Whether the source is in my language, as the panel last decided once typing paused
+  /// (`Design/spec/panel.md` §三). Only this decides whether 翻译 shows the foreign language;
+  /// the model still decides which way a request goes.
+  private(set) var isSourceInMyLanguage = false
+  /// Whether the last change of `showsForeignLanguage` should be written in or out
+  /// (`Design/spec/streaming-motion.md` §四); a change the panel appears with is not.
+  @ObservationIgnored private(set) var animatesForeignLanguageChange = false
+  /// ⌘L or a click on the foreign language turned it into a field.
+  private(set) var isEditingForeignLanguage = false
+  /// Bumped when an edit is abandoned: the language as it was is written in again.
+  private(set) var foreignLanguageRewriteRevision = 0
+  /// Tests set it to zero so the decision follows each change at once.
+  @ObservationIgnored var sourceLanguageSettleDelay = Duration.milliseconds(
+    CidaMotion.languageSettleMilliseconds)
+  @ObservationIgnored private var sourceLanguageTask: Task<Void, Never>?
   private(set) var generationState = GenerationPresentationState.idle
   var isProcessing: Bool {
     generationState.isActive
@@ -139,8 +162,8 @@ final class AppModel {
   /// ⏎ was pressed before a model service was configured (`Design/spec/lifecycle.md` §三).
   private(set) var showsConfigurationReminder = false
   #if DEBUG
-    /// The settings-language-editing design state shows 常用外语 focused.
-    @ObservationIgnored var focusesForeignLanguageForDesign = false
+    /// The settings-language-editing design state shows 我的语言 focused.
+    @ObservationIgnored var focusesMyLanguageForDesign = false
     /// The copy-menu design state shows 复制图片 under the pointer.
     @ObservationIgnored var highlightsCopyImageForDesign = false
   #endif
@@ -233,6 +256,7 @@ final class AppModel {
     self.pasteboard = pasteboard
     isSelectionAccessGranted = selectionAccess.isGranted()
     isCaptureAccessGranted = captureAccess.isGranted()
+    isSourceInMyLanguage = Self.isInMyLanguage(inputText, settings: settings)
   }
 
   /// No request can be sent until a model service is configured; the empty panel welcomes the
@@ -299,9 +323,12 @@ final class AppModel {
     handler.dismiss()
   }
 
-  func setMode(_ newMode: ProcessingMode) {
+  /// A change the user makes on the visible panel writes the foreign language in or out;
+  /// one made before the panel appears does not.
+  func setMode(_ newMode: ProcessingMode, animated: Bool = true) {
     isCopyMenuOpen = false
     guard mode != newMode else { return }
+    animatesForeignLanguageChange = animated
     mode = newMode
   }
 
@@ -314,7 +341,90 @@ final class AppModel {
 
   /// Every appearance of the panel starts from the default action.
   func resetModeToDefault() {
-    setMode(.translate)
+    setMode(.translate, animated: false)
+  }
+
+  // MARK: - Foreign language
+
+  /// 翻译 carries the foreign language when the source is in my language: the one
+  /// place it goes that differs from person to person (`Design/spec/panel.md` §三).
+  var showsForeignLanguage: Bool {
+    mode == .translate && isSourceInMyLanguage
+  }
+
+  /// The language a source in my language is translated into, as 翻译 writes it.
+  var foreignLanguage: String {
+    settings.requestLanguages.foreign
+  }
+
+  /// ⌘L or a click: the foreign language becomes a field. Nothing to rewrite while it is not
+  /// shown or a request runs.
+  @discardableResult
+  func beginEditingForeignLanguage() -> Bool {
+    guard showsForeignLanguage, !isProcessing, !isEditingForeignLanguage else { return false }
+    isEditingForeignLanguage = true
+    return true
+  }
+
+  /// ⏎ in the field. A new language is kept for every later translation and translates the
+  /// source again at once; blank text or the same language changes nothing.
+  func commitForeignLanguage(_ text: String) {
+    guard isEditingForeignLanguage else { return }
+    isEditingForeignLanguage = false
+    requestInputFocus()
+    let language = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !language.isEmpty else {
+      foreignLanguageRewriteRevision &+= 1
+      return
+    }
+    guard language != foreignLanguage else { return }
+    settings.foreignLanguage = language
+    scheduleSettingsPersistence()
+    if hasSubmittableInput, !isProcessing {
+      startGeneration()
+    }
+  }
+
+  /// Esc or a click elsewhere: the edit is dropped and the language written in again.
+  func cancelForeignLanguageEditing() {
+    guard isEditingForeignLanguage else { return }
+    isEditingForeignLanguage = false
+    foreignLanguageRewriteRevision &+= 1
+    requestInputFocus()
+  }
+
+  /// Typing is judged once it pauses, so 翻译 does not change width with every key.
+  private func scheduleSourceLanguageCheck() {
+    sourceLanguageTask?.cancel()
+    let delay = sourceLanguageSettleDelay
+    guard delay > .zero else {
+      settleSourceLanguage(animated: true)
+      return
+    }
+    sourceLanguageTask = Task { [weak self] in
+      try? await Task.sleep(for: delay)
+      guard !Task.isCancelled else { return }
+      self?.settleSourceLanguage(animated: true)
+    }
+  }
+
+  private func settleSourceLanguage(animated: Bool) {
+    sourceLanguageTask?.cancel()
+    let isMine =
+      hasSubmittableInput
+      && Self.isInMyLanguage(String(currentInputDocument.prefix(1_000)), settings: settings)
+    guard isMine != isSourceInMyLanguage else { return }
+    animatesForeignLanguageChange = animated
+    isSourceInMyLanguage = isMine
+  }
+
+  /// My language, recognized on this Mac; a wording it cannot recognize counts every source
+  /// as mine, so the foreign language stays reachable.
+  private static func isInMyLanguage(_ text: String, settings: CidaSettings) -> Bool {
+    guard text.contains(where: { !$0.isWhitespace }) else { return false }
+    let filter = MyLanguageFilter(languages: settings.requestLanguages)
+    guard filter.myLanguage != nil else { return true }
+    return filter.isInMyLanguage(text)
   }
 
   func requestInputFocus() {
@@ -351,6 +461,7 @@ final class AppModel {
         ?? (($0 as NSString).rangeOfCharacter(from: .whitespacesAndNewlines.inverted).location
           != NSNotFound)
     }
+    scheduleSourceLanguageCheck()
   }
 
   var inputDocumentUTF16Count: Int {
@@ -441,7 +552,8 @@ final class AppModel {
     inputText = text
     stageInputDocument(nil)
     inputReplacementRevision &+= 1
-    setMode(.translate)
+    setMode(.translate, animated: false)
+    settleSourceLanguage(animated: false)
   }
 
   func refreshSelectionAccess() {

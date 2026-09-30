@@ -60,6 +60,41 @@
   </section>
   <cida-motion-note>中断 / 出错:已输出文字保留;光标直接淡出;结果栏末尾以 150ms(motion-height-ms)展开一行说明;已停止显示「复制结果」,出错时右侧槽位淡出</cida-motion-note>
   <cida-motion-note>系统「减弱动态效果」开启时:去掉逐字淡入、呼吸与高度过渡,面板高度直接跳变;所有时长基于 120fps</cida-motion-note>
+
+  <div class="divider"></div>
+  <div class="board-title">外语写入「翻译」 · 过渡关键帧(spec/streaming-motion.md §四)</div>
+
+  <div class="state-label">L0 — 开始输入我的语言 · 「翻译」段只有动词</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的</div>
+    <cida-bar></cida-bar>
+  </section>
+  <cida-motion-note>输入停顿 250ms(motion-language-settle-ms)后本机识别原文;认出是我的语言,外语开始写入。连续输入中不判断,所以段宽不随每个键跳动</cida-motion-note>
+  <div class="divider"></div>
+
+  <div class="state-label">L1 — 写入中 · 段先让出位置,字随后写进来</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的存储引擎</div>
+    <cida-bar target="English" target-written="3"></cida-bar>
+  </section>
+  <cida-motion-note>「翻译」段在 150ms(motion-height-ms)ease-out(motion-ease-height)里一次变到最终宽度,「改进」与 Tab 提示一起平移;同时外语逐字写入,与译文同一种笔触:每字 120ms(motion-char-in-ms)ease-out(motion-ease-char-in)淡入,blur 2px(motion-blur-char-px)→ 0,相邻两字相隔 20ms(motion-language-stagger-ms)。段宽先到,字永远写在已经让出的位置里,不被裁切</cida-motion-note>
+  <div class="divider"></div>
+
+  <div class="state-label">L2 — 写完</div>
+  <section class="panel">
+    <div class="source">我们的系统采用了全新的存储引擎</div>
+    <cida-bar target="English"></cida-bar>
+  </section>
+  <cida-motion-note>English 共约 270ms 写完。原文变成其他语言时(换成粘贴的英文)反向离开,见 L3</cida-motion-note>
+  <div class="divider"></div>
+
+  <div class="state-label">L3 — 离开 · 字先淡去,段再收起</div>
+  <section class="panel">
+    <div class="source">The new storage engine keeps every write in an append-only log.</div>
+    <cida-bar target="English" target-leaving></cida-bar>
+  </section>
+  <cida-motion-note>整词一起 120ms(motion-char-in-ms)淡出,blur 0 → 2px,不逐字;淡出过半(60ms)时段在 150ms(motion-height-ms)里收回到只有动词,邻居平移回去。离开比写入短,退场不抢注意力</cida-motion-note>
+  <cida-motion-note>改写外语(⌘L)时段宽跟着输入即时变化,不做过渡;Esc 复原时输入的文字淡出,原来的外语按 L1 重新写入。唤起面板、带入选区或截图时直接排好,不播放写入。「减弱动态效果」开启时:段宽直接跳变,字整体 150ms(motion-icon-swap-ms)淡入淡出,没有 blur 与逐字</cida-motion-note>
 </main>
 </body>
 </html>

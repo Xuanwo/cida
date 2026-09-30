@@ -70,6 +70,8 @@ final class DesignTokenTests: XCTestCase {
       ("motion-copied-hold-ms", Double(CidaMotion.copiedHoldMilliseconds)),
       ("motion-breathe-ms", Double(CidaMotion.breatheMilliseconds)),
       ("motion-catchup-ms", Double(CidaMotion.catchUpMilliseconds)),
+      ("motion-language-settle-ms", Double(CidaMotion.languageSettleMilliseconds)),
+      ("motion-language-stagger-ms", Double(CidaMotion.languageStaggerMilliseconds)),
       ("motion-rate-min-cps", CidaMotion.minimumCharactersPerSecond),
       ("motion-rate-max-cps", CidaMotion.maximumCharactersPerSecond),
       ("motion-rate-alpha", CidaMotion.smoothingAlphaPer120HzFrame),

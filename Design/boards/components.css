@@ -199,6 +199,26 @@ body {
 
 .tab-hint { font-size: var(--font-size-caption); color: var(--hint); }
 
+/* spec/panel.md §三: 翻译's object, the foreign language, inside the selected segment. */
+.seg span.on .object {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.seg span.on .object.editing { box-shadow: 0 1px 0 var(--text-tertiary); color: var(--text-primary); }
+.seg span.on .object .fading,
+.seg span.on .object .pending { padding: 0; border: 0; }
+.seg span.on .object .fading { color: var(--text-tertiary); filter: blur(calc(var(--motion-blur-char-px) * 0.5px)); }
+.seg span.on .object .pending { visibility: hidden; }
+.seg span.on .object .selected { padding: 0; border: 0; border-radius: 0; background: var(--accent-soft); }
+.seg span.on .object.leaving { opacity: 0.4; filter: blur(calc(var(--motion-blur-char-px) * 0.5px)); }
+.seg span.on .object .caret { display: inline-block; width: 1px; height: 13px; margin-left: 1px; background: var(--text-primary); }
+
 .bar-action {
   display: flex;
   align-items: center;
@@ -275,6 +295,7 @@ body {
   padding: var(--space-result-y) var(--space-window-x);
   background: var(--surface-paper);
 }
+
 .result .text {
   font-family: var(--font-result);
   font-size: var(--font-size-result);
@@ -560,6 +581,7 @@ body {
 .field.placeholder { color: var(--text-tertiary); }
 .field.focused { border: 1.5px solid var(--accent); }
 .field.text { font-family: var(--font-ui); font-size: 12.5px; }
+.field.short { flex: 0 0 180px; }
 .row .controls .swap { flex: none; font-size: 13px; color: var(--text-tertiary); }
 .field .caret { display: inline-block; width: 1px; height: 14px; margin-left: 1px; background: var(--text-primary); vertical-align: -2px; }
 
