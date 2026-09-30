@@ -69,7 +69,7 @@
       "description": "Keep the previous action when the panel is shown again instead of returning to 翻译.",
       "contracts": ["PANEL-DEFAULT-ACTION"],
       "file": "Sources/Cida/AppModel.swift",
-      "before": "  func resetModeToDefault() {\n    setMode(.translate)\n  }",
+      "before": "  func resetModeToDefault() {\n    setMode(.translate, animated: false)\n  }",
       "after": "  func resetModeToDefault() {\n  }",
       "occurrences": 1,
       "unitTests": [
