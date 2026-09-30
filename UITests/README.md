@@ -37,14 +37,16 @@ The app is a menu-bar application whose main interface is a borderless floating 
 | --- | --- |
 | source editor | `composer-input` |
 | action segment / items | `action-segment`, `action-translate`, `action-improve` |
-| control bar slot | `bar-action-stop`, `bar-action-copy`, `bar-action-copied` |
+| control bar slot | `bar-action-stop`, `bar-action-copy`, `bar-action-copied`, `bar-action-copy-menu`, `bar-action-image-copied`, `bar-action-image-too-long` |
+| copy menu / items | `copy-menu`, `copy-menu-result`, `copy-menu-image` |
 | result pane / text | `result-pane`, `result-text` |
 | result notes | `result-note-stale`, `result-note-stopped`, `result-note-failed`, `result-note-unrecognized` |
 | capture overlay / canvas | `capture-overlay`, `capture-overlay-canvas` |
 | translation layer painted translations / hint pill / whole-window outline | `translation-layer-content`, `translation-layer-hint`, `translation-layer-outline` |
 
 ⏎ submits, Tab switches the action, Escape hides, Option-A shows, ⌘, opens Settings, ⌘C copies
-the result when nothing is selected, ⌘. stops. There is no send button and no title bar.
+the result when nothing is selected, ⇧⌘C copies the source and result as an image (so does 复制图片 in
+the menu the ⌄ beside 复制结果 opens), ⌘. stops. There is no send button and no title bar.
 
 ## Journey ownership
 

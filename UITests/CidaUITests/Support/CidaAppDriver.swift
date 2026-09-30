@@ -27,6 +27,10 @@ final class CidaAppDriver {
   var improveAction: XCUIElement { app.buttons["action-improve"] }
   var stopButton: XCUIElement { app.buttons["bar-action-stop"] }
   var copyButton: XCUIElement { app.buttons["bar-action-copy"] }
+  var copyMenuButton: XCUIElement { app.buttons["bar-action-copy-menu"] }
+  var copyMenuResultItem: XCUIElement { app.buttons["copy-menu-result"] }
+  var copyMenuImageItem: XCUIElement { app.buttons["copy-menu-image"] }
+  var imageCopiedButton: XCUIElement { app.buttons["bar-action-image-copied"] }
   var copiedButton: XCUIElement { app.buttons["bar-action-copied"] }
   var resultPane: XCUIElement { element(identifier: "result-pane") }
   /// The menu bar mark; XCUI may report it as a status item or as its button.

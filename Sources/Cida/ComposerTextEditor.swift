@@ -274,23 +274,28 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
   }
 
-  private func applyTypography(to textView: NSTextView) {
+  /// The source's typography: Inter 16 on 26 pt lines in `text-primary`. The
+  /// share card sets the source with the same attributes (`ShareCard`).
+  static var textAttributes: [NSAttributedString.Key: Any] {
     let lineHeight = CidaDesign.Panel.composerLineHeight
     let paragraphStyle = NSMutableParagraphStyle()
     paragraphStyle.minimumLineHeight = lineHeight
     paragraphStyle.maximumLineHeight = lineHeight
-
-    let font = CidaDesign.appKitBody(CidaDesign.Typography.bodySize)
-    let attributes: [NSAttributedString.Key: Any] = [
-      .font: font,
+    return [
+      .font: CidaDesign.appKitBody(CidaDesign.Typography.bodySize),
       .foregroundColor: CidaDesign.Palette.textPrimary.appKit,
       .paragraphStyle: paragraphStyle,
     ]
+  }
+
+  private func applyTypography(to textView: NSTextView) {
+    let attributes = Self.textAttributes
+    let font = attributes[.font] as! NSFont
     // Glyphs centred in their line, as CSS sets them and as the placeholder sits.
     (textView as? ComposerNativeTextView)?.glyphRaise = CidaDesign.halfLeading(
-      of: font, lineHeight: lineHeight)
+      of: font, lineHeight: CidaDesign.Panel.composerLineHeight)
 
-    textView.defaultParagraphStyle = paragraphStyle
+    textView.defaultParagraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
     textView.typingAttributes = attributes
     textView.textStorage?.setAttributes(
       attributes,

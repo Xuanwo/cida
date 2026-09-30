@@ -3,6 +3,19 @@
 
 // The panel's own actions by default; a lifecycle panel (spec/lifecycle.md §一) passes its
 // choices as options="移到「应用程序」|暂不" with selected="0", and a status text for the slot.
+// 复制结果 with its menu segment (spec/panel.md §二); open="true" while the menu shows.
+const copyButton = (open) => `
+  <div class="copy-button${open ? " open" : ""}">
+    <div class="main"><i class="icon icon-copy"></i><span class="label">复制结果</span><span class="key">⌘C</span></div>
+    <i class="rule"></i>
+    <div class="more"><i class="icon icon-chevron-down"></i></div>
+  </div>`;
+const copyMenu = `
+  <div class="copy-menu">
+    <div class="row"><i class="icon icon-copy"></i><b>复制结果</b><kbd>⌘C</kbd></div>
+    <div class="row on"><i class="icon icon-image"></i><b>复制图片</b><kbd>⇧⌘C</kbd></div>
+  </div>`;
+
 class CidaBar extends HTMLElement {
   connectedCallback() {
     const mode = this.getAttribute("mode") ?? "translate";
@@ -10,8 +23,10 @@ class CidaBar extends HTMLElement {
     const actions = {
       none: "",
       stop: `<div class="bar-action"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
-      copy: `<div class="bar-action"><i class="icon icon-copy"></i><span class="label">复制结果</span><span class="key">⌘C</span></div>`,
+      copy: copyButton(false),
+      "copy-menu": copyButton(true) + copyMenu,
       copied: `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制</span></div>`,
+      "image-copied": `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制图片</span></div>`,
       settings: `<div class="bar-action"><span class="label">打开设置</span><span class="key">⌘,</span></div>`,
       status: `<span class="bar-status">${this.getAttribute("status") ?? ""}</span>`,
     };

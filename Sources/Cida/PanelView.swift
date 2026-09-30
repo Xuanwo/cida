@@ -21,7 +21,7 @@ struct PanelView: View {
   @State private var composerMetrics: ComposerTextMetrics
   @State private var hasReportedHeight = false
   @State private var copiedFeedbackTask: Task<Void, Never>?
-  @State private var showsCopiedFeedback = false
+  @State private var shownCopyFeedback: CopyFeedback?
 
   init(
     model: AppModel,
@@ -53,7 +53,7 @@ struct PanelView: View {
     .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
     .background(surfaceBelowContent)
     .onChange(of: model.copyFeedbackRevision) { showCopiedFeedback() }
-    .onChange(of: model.result?.id) { showsCopiedFeedback = false }
+    .onChange(of: model.result?.id) { shownCopyFeedback = nil }
     // No identifier on this stack: SwiftUI would push it down onto the pane
     // containers and hide their own `source-pane` / `control-bar` /
     // `result-pane` identifiers from XCUI.
@@ -86,6 +86,42 @@ struct PanelView: View {
     }
     .frame(width: CidaDesign.Panel.width)
     .background(CidaDesign.surface)
+    .overlay(alignment: .topTrailing) {
+      if model.isCopyMenuOpen, barActionPresentation == .copy {
+        copyMenuLayer
+      }
+    }
+  }
+
+  /// The copy menu hangs from the copy button over the result pane; a click
+  /// above or below the control bar only closes it (`Design/spec/panel.md` §八).
+  /// The control bar stays uncovered: a layer that appears over ⌄ under a
+  /// resting pointer leaves ⌄ deaf to the next click once it goes, so ⌄ closes
+  /// the menu itself and the bar's other controls close it through the model.
+  private var copyMenuLayer: some View {
+    ZStack(alignment: .topTrailing) {
+      VStack(spacing: 0) {
+        closesCopyMenu.frame(height: sourcePaneHeight)
+        Color.clear
+          .frame(height: CidaDesign.Panel.controlBarHeight)
+          .allowsHitTesting(false)
+        closesCopyMenu
+      }
+      CopyMenu(model: model)
+        // 6 below the button, which sits in the middle of the control bar.
+        .padding(.top, sourcePaneHeight + CopyMenu.topInControlBar)
+        .padding(.trailing, CidaDesign.Spacing.windowHorizontal)
+    }
+  }
+
+  private var closesCopyMenu: some View {
+    Button {
+      model.isCopyMenuOpen = false
+    } label: {
+      Color.clear.contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityHidden(true)
   }
 
   /// The bottom pane's surface, which the panel shows below the content while
@@ -155,18 +191,19 @@ struct PanelView: View {
     .resolve(
       isProcessing: model.isProcessing,
       canCopyResult: model.canCopyResult,
-      showsCopiedFeedback: showsCopiedFeedback,
+      copyFeedback: shownCopyFeedback,
       showsWelcome: showsWelcome
     )
   }
 
   private func showCopiedFeedback() {
     copiedFeedbackTask?.cancel()
-    showsCopiedFeedback = true
+    let feedback = model.copyFeedback
+    shownCopyFeedback = feedback
     copiedFeedbackTask = Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(CidaMotion.copiedHoldMilliseconds))
+      try? await Task.sleep(for: .milliseconds(feedback.holdMilliseconds))
       guard !Task.isCancelled else { return }
-      showsCopiedFeedback = false
+      shownCopyFeedback = nil
     }
   }
 }
@@ -350,7 +387,8 @@ private struct DimmedWhileWorking: ViewModifier {
 }
 
 /// One slot, one button, three phases: nothing while typing, 停止 while a
-/// request runs, 复制结果 once a result exists (`Design/spec/panel.md` §二).
+/// request runs, 复制结果 once a result exists (`Design/spec/panel.md` §二),
+/// with the segment that opens the copy menu (§八).
 private struct BarActionButton: View {
   let model: AppModel
   let presentation: BarActionPresentation
@@ -370,14 +408,19 @@ private struct BarActionButton: View {
           model.cancelProcessing()
         }
       case .copy:
-        pill(identifier: "bar-action-copy", label: "复制结果", key: "⌘C", accent: false) {
-          LucideIcon(.copy, size: 12).foregroundStyle(CidaDesign.textControl)
-        } action: {
-          _ = model.copyResult()
-        }
-      case .copied:
+        CopyButton(model: model)
+          .transition(.opacity.animation(.easeOut(duration: CidaMotion.iconSwapSeconds)))
+      case .copied(.text):
         pill(identifier: "bar-action-copied", label: "已复制", key: nil, accent: true) {
           LucideIcon(.check, size: 12).foregroundStyle(CidaDesign.accent)
+        } action: {}
+      case .copied(.image):
+        pill(identifier: "bar-action-image-copied", label: "已复制图片", key: nil, accent: true) {
+          LucideIcon(.check, size: 12).foregroundStyle(CidaDesign.accent)
+        } action: {}
+      case .copied(.imageTooLong):
+        pill(identifier: "bar-action-image-too-long", label: "太长，复制不了图片", key: nil, accent: false) {
+          EmptyView()
         } action: {}
       case .openSettings:
         pill(identifier: "bar-action-open-settings", label: "打开设置", key: "⌘,", accent: false) {
@@ -429,6 +472,172 @@ private struct BarActionButton: View {
     // The pills cross-fade (`motion-icon-swap-ms`) and appear where the bar puts
     // them: the animation belongs to the transition, not to the slot's layout.
     .transition(.opacity.animation(.easeOut(duration: CidaMotion.iconSwapSeconds)))
+  }
+}
+
+// MARK: - Copy button and menu
+
+/// 复制结果 and the segment that opens the copy menu: one pill, a short inset
+/// hairline between the two, a quiet chevron (`Design/spec/panel.md` §二, §八).
+private struct CopyButton: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    let isOpen = model.isCopyMenuOpen
+    HStack(spacing: 0) {
+      Button {
+        _ = model.copyResult()
+      } label: {
+        HStack(spacing: 8) {
+          LucideIcon(.copy, size: 12).foregroundStyle(CidaDesign.textControl)
+          Text("复制结果")
+            .font(CidaDesign.mainUI(11.5, weight: .semibold))
+            .foregroundStyle(CidaDesign.textControl)
+          Text("⌘C")
+            .font(CidaDesign.mainUI(11))
+            .foregroundStyle(CidaDesign.textTertiary)
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 10)
+        .frame(maxHeight: .infinity)
+      }
+      .buttonStyle(HoverFadeButtonStyle())
+      .accessibilityLabel("复制结果")
+      .accessibilityIdentifier("bar-action-copy")
+
+      Rectangle()
+        .fill(CidaDesign.border)
+        .frame(width: 1, height: 14)
+        .opacity(isOpen ? 0 : 1)
+
+      Button {
+        model.isCopyMenuOpen.toggle()
+      } label: {
+        LucideIcon(.chevronDown, size: 10)
+          .foregroundStyle(isOpen ? CidaDesign.textControl : CidaDesign.textTertiary)
+          .frame(width: 26)
+          .frame(maxHeight: .infinity)
+          .background(isOpen ? CidaDesign.surfaceDim : .clear)
+      }
+      .buttonStyle(HoverFadeButtonStyle())
+      .accessibilityLabel("更多复制方式")
+      .accessibilityIdentifier("bar-action-copy-menu")
+    }
+    .frame(height: 30)
+    .background(CidaDesign.surface)
+    .clipShape(RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+        .strokeBorder(CidaDesign.border, lineWidth: 1)
+    }
+  }
+}
+
+/// The copy menu: both ways to copy with their keys, drawn on the hint pill's
+/// surface. Radius 14 around 6 of padding keeps the rows' radius 8 concentric
+/// with it (`Design/spec/panel.md` §八).
+private struct CopyMenu: View {
+  /// From the control bar's top edge: the button's 10 of inset and 30 of
+  /// height, then 6 of gap.
+  static let topInControlBar: CGFloat = 46
+
+  let model: AppModel
+  @State private var hovered: Item?
+  /// The menu fades in (`motion-icon-in-ms`) and goes at once.
+  @State private var isShown = false
+
+  private enum Item {
+    case result
+    case image
+  }
+
+  var body: some View {
+    VStack(spacing: 2) {
+      row(.result, icon: .copy, title: "复制结果", key: "⌘C", identifier: "copy-menu-result") {
+        model.copyResult()
+      }
+      row(.image, icon: .image, title: "复制图片", key: "⇧⌘C", identifier: "copy-menu-image") {
+        model.copyResultImage()
+      }
+    }
+    .padding(6)
+    .frame(width: 184)
+    .background {
+      RoundedRectangle(cornerRadius: CidaDesign.Radius.panel, style: .continuous)
+        .fill(CidaDesign.surface)
+        .shadow(color: CidaDesign.Palette.contactShadow.swiftUI, radius: 3, y: 2)
+        .shadow(color: CidaDesign.Palette.ambientShadow.swiftUI, radius: 36, y: 28)
+    }
+    .overlay {
+      RoundedRectangle(cornerRadius: CidaDesign.Radius.panel, style: .continuous)
+        .strokeBorder(CidaDesign.Palette.panelEdge.swiftUI, lineWidth: 1)
+    }
+    .opacity(isShown ? 1 : 0)
+    .onAppear {
+      withAnimation(CidaMotion.reducesMotion ? nil : .easeOut(duration: CidaMotion.iconInSeconds)) {
+        isShown = true
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("copy-menu")
+  }
+
+  private func row(
+    _ item: Item,
+    icon: LucideIconName,
+    title: String,
+    key: String,
+    identifier: String,
+    action: @escaping () -> Bool
+  ) -> some View {
+    let isHovered = hovered == item || (item == .image && isImageHighlightedForDesign)
+    return Button {
+      _ = action()
+    } label: {
+      HStack(spacing: 10) {
+        LucideIcon(icon, size: 12).foregroundStyle(CidaDesign.textControl)
+        Text(title)
+          .font(CidaDesign.mainUI(12, weight: .medium))
+          .foregroundStyle(CidaDesign.textPrimary)
+        Spacer(minLength: 8)
+        Text(key)
+          .font(CidaDesign.mainUI(11, weight: .medium))
+          .tracking(0.4)
+          .foregroundStyle(CidaDesign.textSecondary)
+          .padding(.horizontal, 6)
+          .frame(height: 18)
+          .background {
+            RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
+              .fill(isHovered ? CidaDesign.surface : CidaDesign.surfaceDim)
+              .overlay {
+                if isHovered {
+                  RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
+                    .strokeBorder(CidaDesign.border, lineWidth: 1)
+                }
+              }
+          }
+      }
+      .padding(.leading, 10)
+      .padding(.trailing, 6)
+      .frame(height: 30)
+      .background {
+        RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+          .fill(isHovered ? CidaDesign.surfaceDim : .clear)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .onHover { hovered = $0 ? item : (hovered == item ? nil : hovered) }
+    .accessibilityLabel(title)
+    .accessibilityIdentifier(identifier)
+  }
+
+  private var isImageHighlightedForDesign: Bool {
+    #if DEBUG
+      model.highlightsCopyImageForDesign
+    #else
+      false
+    #endif
   }
 }
 

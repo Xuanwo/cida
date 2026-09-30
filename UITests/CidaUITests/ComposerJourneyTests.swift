@@ -100,4 +100,59 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     driver.copyButton.click()
     XCTAssertTrue(driver.waitForPasteboard(resultValue, timeout: 2))
   }
+
+  /// ⇧⌘C and the copy menu put the share card on the pasteboard as an image
+  /// and nothing else. ⌄ opens and closes the menu on every click, and a click
+  /// elsewhere or Escape closes only the menu (`Design/spec/panel.md` §八).
+  func testShiftCommandCCopiesTheSourceAndResultAsAnImage() {
+    driver.launch()
+
+    driver.submit("CIDA_E2E_POOL_COPY")
+    let completed = driver.result(containing: "CIDA_E2E_POOL_COPY_COMPLETE")
+    XCTAssertTrue(completed.waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+    let resultValue = completed.value as? String ?? ""
+
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString("CIDA_E2E_BEFORE_IMAGE", forType: .string)
+    driver.composer.typeKey("c", modifierFlags: [.command, .shift])
+    XCTAssertTrue(
+      driver.waitForExistence(of: driver.imageCopiedButton, timeout: 2), "✓ 已复制图片 shows")
+    let image = pasteboard.data(forType: .png).flatMap(NSBitmapImageRep.init(data:))
+    XCTAssertEqual(image?.pixelsWide, 1_500, "The 500 pt card at 3x")
+    XCTAssertNil(pasteboard.string(forType: .string), "Only the image")
+    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 3), "✓ 已复制图片 reverts")
+
+    driver.copyMenuButton.click()
+    XCTAssertTrue(driver.copyMenuImageItem.waitForExistence(timeout: 2), "⌄ opens the copy menu")
+    driver.copyMenuButton.click()
+    XCTAssertTrue(driver.copyMenuImageItem.waitForNonExistence(timeout: 2), "⌄ closes it again")
+
+    driver.copyMenuButton.click()
+    XCTAssertTrue(driver.copyMenuImageItem.waitForExistence(timeout: 2), "⌄ answers every click")
+    driver.composer.click()
+    XCTAssertTrue(driver.copyMenuImageItem.waitForNonExistence(timeout: 2), "A click elsewhere closes it")
+
+    driver.copyMenuButton.click()
+    XCTAssertTrue(driver.copyMenuImageItem.waitForExistence(timeout: 2))
+    driver.composer.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(driver.copyMenuImageItem.waitForNonExistence(timeout: 2), "Escape closes it")
+    XCTAssertTrue(driver.panel.exists, "Escape closes only the menu")
+
+    pasteboard.clearContents()
+    driver.copyMenuButton.click()
+    XCTAssertTrue(driver.copyMenuImageItem.waitForExistence(timeout: 2))
+    driver.copyMenuImageItem.click()
+    XCTAssertTrue(driver.waitForExistence(of: driver.imageCopiedButton, timeout: 2))
+    XCTAssertNotNil(pasteboard.data(forType: .png))
+    XCTAssertFalse(driver.copyMenuImageItem.exists, "Choosing closes the menu")
+
+    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 3))
+    pasteboard.clearContents()
+    driver.copyMenuButton.click()
+    XCTAssertTrue(driver.copyMenuResultItem.waitForExistence(timeout: 2))
+    driver.copyMenuResultItem.click()
+    XCTAssertTrue(driver.waitForPasteboard(resultValue, timeout: 2), "复制结果 in the menu copies the text")
+  }
 }

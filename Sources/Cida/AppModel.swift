@@ -126,7 +126,12 @@ final class AppModel {
   /// Whether the Screen Recording permission lets the capture shortcut
   /// freeze the screen.
   private(set) var isCaptureAccessGranted: Bool
+  /// Bumped by every copy from the panel; `copyFeedback` says what the slot shows for it.
   private(set) var copyFeedbackRevision = 0
+  private(set) var copyFeedback: CopyFeedback = .text
+  /// The copy button's menu is open (`Design/spec/panel.md` §二, §八): 复制结果
+  /// and 复制图片 with their keys. Esc closes it before it would hide the panel.
+  var isCopyMenuOpen = false
   /// What Cida is saying in the panel in place of the translation panes
   /// (`Design/spec/lifecycle.md` §一); the source, action and result wait underneath.
   private(set) var panelMessage: PanelMessage?
@@ -136,6 +141,8 @@ final class AppModel {
   #if DEBUG
     /// The settings-language-editing design state shows 常用外语 focused.
     @ObservationIgnored var focusesForeignLanguageForDesign = false
+    /// The copy-menu design state shows 复制图片 under the pointer.
+    @ObservationIgnored var highlightsCopyImageForDesign = false
   #endif
 
   private let service: any TextProcessingService
@@ -293,6 +300,7 @@ final class AppModel {
   }
 
   func setMode(_ newMode: ProcessingMode) {
+    isCopyMenuOpen = false
     guard mode != newMode else { return }
     mode = newMode
   }
@@ -464,6 +472,7 @@ final class AppModel {
   /// still running; its record is no longer the result, so it finishes
   /// without touching the panel.
   private func startGeneration() {
+    isCopyMenuOpen = false
     guard !needsModelConfiguration else {
       processingTask?.cancel()
       showsConfigurationReminder = true
@@ -495,9 +504,37 @@ final class AppModel {
   @discardableResult
   func copyResult() -> Bool {
     guard let result, result.isCopyable else { return false }
+    isCopyMenuOpen = false
     copyToPasteboard(result.result)
-    copyFeedbackRevision &+= 1
+    showCopyFeedback(.text)
     return true
+  }
+
+  /// ⇧⌘C: the share card of the source the result was generated from and the
+  /// result (`Design/spec/panel.md` §八). The pasteboard gets only the image,
+  /// because apps given text as well paste the text.
+  @discardableResult
+  func copyResultImage() -> Bool {
+    guard let result, result.isCopyable else { return false }
+    isCopyMenuOpen = false
+    switch ShareCard.render(source: result.source, result: result.result, language: result.outputLanguage) {
+    case .success(let card):
+      pasteboard.clearContents()
+      pasteboard.declareTypes([.png, .tiff], owner: nil)
+      pasteboard.setData(card.png, forType: .png)
+      pasteboard.setData(card.tiff, forType: .tiff)
+      showCopyFeedback(.image)
+    case .failure(.tooLong):
+      showCopyFeedback(.imageTooLong)
+    case .failure(.cannotRender):
+      return false
+    }
+    return true
+  }
+
+  private func showCopyFeedback(_ feedback: CopyFeedback) {
+    copyFeedback = feedback
+    copyFeedbackRevision &+= 1
   }
 
   private func copyToPasteboard(_ value: String) {

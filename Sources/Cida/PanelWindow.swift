@@ -109,7 +109,9 @@ final class PanelController {
       queue: .main
     ) { [weak self] _ in
       MainActor.assumeIsolated {
-        guard let self, self.hidesOnResignKey, self.panel.isVisible else { return }
+        guard let self else { return }
+        self.model.isCopyMenuOpen = false
+        guard self.hidesOnResignKey, self.panel.isVisible else { return }
         self.hide()
       }
     }
@@ -186,6 +188,7 @@ final class PanelController {
   func hide() {
     guard panel.isVisible else { return }
     panel.orderOut(nil)
+    model.isCopyMenuOpen = false
     model.dismissPanelMessage()
     onVisibilityChange?(false)
   }
@@ -276,6 +279,9 @@ final class PanelController {
         .intersection(.deviceIndependentFlagsMask)
         .subtracting(.capsLock)
 
+      if CopyShortcutRouting.isImageShortcut(event) {
+        return self.model.copyResultImage() ? nil : event
+      }
       if CopyShortcutRouting.isResultShortcut(event) {
         if CopyShortcutRouting.nativeTextResponderOwnsCopy(window: self.panel) {
           return event
@@ -289,6 +295,11 @@ final class PanelController {
       }
       if modifiers == .command, event.charactersIgnoringModifiers == "," {
         self.openSettings()
+        return nil
+      }
+
+      if self.model.isCopyMenuOpen, event.keyCode == 53, modifiers.isEmpty {
+        self.model.isCopyMenuOpen = false
         return nil
       }
 
@@ -377,10 +388,20 @@ final class PanelContentView: NSView {
 @MainActor
 enum CopyShortcutRouting {
   static func isResultShortcut(_ event: NSEvent) -> Bool {
+    isCopyKey(event, modifiers: .command)
+  }
+
+  /// ⇧⌘C copies the share card whether or not a text view has a selection:
+  /// the card is always the whole source and result (`Design/spec/panel.md` §八).
+  static func isImageShortcut(_ event: NSEvent) -> Bool {
+    isCopyKey(event, modifiers: [.command, .shift])
+  }
+
+  private static func isCopyKey(_ event: NSEvent, modifiers expected: NSEvent.ModifierFlags) -> Bool {
     let modifiers = event.modifierFlags
       .intersection(.deviceIndependentFlagsMask)
       .subtracting(.capsLock)
-    guard modifiers == .command else { return false }
+    guard modifiers == expected else { return false }
     return event.keyCode == 8 || event.charactersIgnoringModifiers?.lowercased() == "c"
   }
 

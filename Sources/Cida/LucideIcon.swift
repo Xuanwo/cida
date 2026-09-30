@@ -6,6 +6,8 @@ enum LucideIconName: String, CaseIterable {
   case sparkles
   case scanText = "scan-text"
   case copy
+  case image
+  case chevronDown = "chevron-down"
   case check
   case info
   case circleStop = "circle-stop"

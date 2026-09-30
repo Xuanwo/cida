@@ -48,6 +48,8 @@ final class DesignTokenTests: XCTestCase {
       ("source-max-ratio", CidaDesign.Panel.sourceMaxRatio),
       ("panel-max-ratio", CidaDesign.Panel.maxRatio),
       ("control-bar-height", CidaDesign.Panel.controlBarHeight),
+      ("share-card-width", CidaDesign.ShareCard.width),
+      ("share-card-margin", CidaDesign.ShareCard.margin),
       ("radius-window", CidaDesign.Radius.window), ("radius-panel", CidaDesign.Radius.panel),
       ("radius-card", CidaDesign.Radius.card), ("radius-seg", CidaDesign.Radius.segment),
       ("radius-chip", CidaDesign.Radius.chip), ("radius-seg-item", CidaDesign.Radius.segmentItem),

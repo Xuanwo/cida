@@ -40,7 +40,7 @@
   </section>
   <div class="divider"></div>
 
-  <p class="caption">④ 完成 — 光标 200ms(motion-cursor-out-ms)淡出;右侧槽位由「停止」交叉淡化为「复制结果 ⌘C」;焦点仍在原文:⏎ 重新生成,Tab 换动作后 ⏎ 用另一动作处理同一段原文</p>
+  <p class="caption">④ 完成 — 光标 200ms(motion-cursor-out-ms)淡出;右侧槽位由「停止」交叉淡化为「复制结果 ⌘C」(右侧 ⌄ 打开复制菜单,见 ⑤′);焦点仍在原文:⏎ 重新生成,Tab 换动作后 ⏎ 用另一动作处理同一段原文</p>
   <section class="panel" data-state="translate">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar action="copy"></cida-bar>
@@ -52,6 +52,19 @@
   <section class="panel" data-state="copied">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar action="copied"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <div class="divider"></div>
+
+  <p class="caption">⑤′ 复制菜单 — 「复制结果 ⌘C」右侧的 ⌄ 段打开菜单:复制结果 ⌘C · 复制图片 ⇧⌘C。菜单右缘对齐按钮、顶边在按钮下 6,120ms(motion-icon-in-ms)淡入;悬停的行铺 surface-dim,键帽变白底描边。选一项、Esc、点菜单外都立即收起,Esc 只收起菜单。复制图片把生成这段结果的原文与结果排成一张图放进剪贴板(见 share-card.html),按钮变「✓ 已复制图片」800ms 后复原,面板不隐藏</p>
+  <section class="panel" data-state="copy-menu">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar action="copy-menu"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <section class="panel" data-state="image-copied">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar action="image-copied"></cida-bar>
     <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>
