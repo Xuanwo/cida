@@ -264,8 +264,7 @@ struct LayerBlock: Equatable, Sendable {
     let text: String
     /// Link or code text: sent to the model as ⟦n⟧ and put back unchanged.
     let isVerbatim: Bool
-    /// Where it is on screen: runs continuing a line are joined by it, and the caret that
-    /// breathes while the translation is on the way sits after the last one.
+    /// Where it is on screen: runs continuing a line are joined by it.
     var frame: CGRect? = nil
     /// A link, drawn in accent in the translation (§五).
     var isLink: Bool = false
@@ -347,18 +346,6 @@ struct LayerBlock: Equatable, Sendable {
       rest = rest[match.range.upperBound...]
     }
     return (text + rest, links)
-  }
-
-  /// Where the original's last line ends: the top-left of the caret that breathes after it while
-  /// its translation is on the way (§二 等待).
-  var endOfText: CGPoint {
-    guard let last = pieces.last(where: { $0.frame != nil })?.frame else {
-      return CGPoint(x: frame.maxX, y: frame.maxY - lineHeight)
-    }
-    // A piece taller than a line wraps; its last line ends at the paragraph's right edge.
-    return last.height <= lineHeight * 1.5
-      ? CGPoint(x: last.maxX, y: last.minY)
-      : CGPoint(x: frame.maxX, y: frame.maxY - lineHeight)
   }
 }
 

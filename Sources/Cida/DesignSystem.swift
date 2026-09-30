@@ -270,6 +270,8 @@ enum CidaMotion {
   static let smoothingAlphaPer120HzFrame = 0.15
   static let characterBlurRadius: CGFloat = 2
   static let cursorMinimumOpacity: Float = 0.3
+  static let waitingMaximumOpacity: Float = 0.18
+  static let waitingMinimumOpacity: Float = 0.10
   static let cursorWidth: CGFloat = 2
   static let cursorHeight: CGFloat = 20
 

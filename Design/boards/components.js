@@ -257,7 +257,7 @@ customElements.define("cida-status-menu", CidaStatusMenu);
 // <cida-layer-scene app="chat|browser" layer="…">. Translations are always on Cida's paper,
 // whatever the app looks like. Chat layers, as a walk through:
 //   once-pointing  the pointer rests on a message; nothing yet
-//   once-pending   ⌥D: a caret breathes after that message while it is translated
+//   once-pending   ⌥D: that message breathes on an accent underlay while it is translated
 //   once-done      it reads in place, among the originals
 //   once-two       ⌥D on another message: both translated, the rest original
 //   once-restore   ⌥D on a translated message: it turns back, the other stays

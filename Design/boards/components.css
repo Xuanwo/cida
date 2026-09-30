@@ -995,18 +995,16 @@ body {
 /* A sheet ends 3px below its last line; what follows keeps its place. */
 .layer-sheet > :last-child { margin-bottom: 0; }
 .layer-sheet + .page-code { margin-top: 16px; }
-/* A translation: Cida's result serif; links in accent. Once written it carries no caret. */
+/* A translation: Cida's result serif; links in accent. */
 .layer-text { font-family: var(--font-result-cjk); }
-/* Waiting: Cida's caret breathes after the original (drawn at its brightest). */
-.layer-waiting::after {
-  content: "";
-  display: inline-block;
-  width: 2px;
-  height: 15px;
-  margin-left: 3px;
-  vertical-align: -2px;
-  border-radius: 1px;
-  background: var(--accent);
+/* Waiting: the original breathes on an accent underlay the shape of the paper it turns into
+   (drawn at its strongest). */
+.layer-waiting {
+  display: block;
+  margin: -3px -8px;
+  padding: 3px 8px;
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--accent) calc(var(--motion-waiting-opacity-max) * 100%), transparent);
 }
 .chat-msg .text .layer-text .link, .page .layer-text .link { color: var(--accent); }
 .pointer {
