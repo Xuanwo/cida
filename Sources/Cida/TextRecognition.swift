@@ -29,6 +29,10 @@ enum TextRecognizer {
       Locale.Language(identifier: "en-US"),
     ]
     request.usesLanguageCorrection = true
+    // With a fixed zh-Hans-first order, English lines come back with
+    // full-width punctuation and misread words ("（job", "iob"); detecting
+    // the language per line reads both scripts as they are.
+    request.automaticallyDetectsLanguage = true
     let observations = try await request.perform(on: image)
     return observations.compactMap { observation in
       guard let text = observation.topCandidates(1).first?.string else { return nil }
@@ -74,10 +78,12 @@ struct RecognizedLine: Equatable, Sendable {
   let frame: CGRect
 }
 
-/// Rebuilds reading order and paragraphs from recognized lines: lines that
-/// share a row join with a space, consecutive rows join into one paragraph
-/// unless the gap between them is clearly wider than the text's line
-/// spacing, and a paragraph's lines join the way the language wraps.
+/// Rebuilds reading order and line breaks from recognized lines: lines that
+/// share a row join with a space, and consecutive rows join as one wrapped
+/// paragraph, the way the language wraps, unless the text broke the line
+/// itself. A row ends a line when the gap below it is clearly wider than the
+/// text's line spacing, when the next row starts a list item, or when the
+/// next row's first word would still have fit on it.
 enum RecognizedTextLayout {
   static func text(from lines: [RecognizedLine]) -> String? {
     let lines = lines.filter { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -85,26 +91,19 @@ enum RecognizedTextLayout {
 
     let rows = rows(of: lines)
     let typicalHeight = median(rows.map(\.frame.height))
-    var paragraphs: [String] = []
-    var paragraph = ""
-    var previous: Row?
-    for row in rows {
-      if let previous {
-        let gap = row.frame.minY - previous.frame.maxY
-        if gap > typicalHeight * 0.8 {
-          paragraphs.append(paragraph)
-          paragraph = row.text
-        } else {
-          paragraph = joinWrapped(paragraph, row.text)
-        }
+    let rightEdge = rows.map(\.frame.maxX).max() ?? 0
+    var text = rows[0].text
+    for (previous, row) in zip(rows, rows.dropFirst()) {
+      let gap = row.frame.minY - previous.frame.maxY
+      if gap > typicalHeight * 0.8 || startsListItem(row.text)
+        || hasRoom(for: row, after: previous, rightEdge: rightEdge)
+      {
+        text += "\n" + row.text
       } else {
-        paragraph = row.text
+        text = joinWrapped(text, row.text)
       }
-      previous = row
     }
-    paragraphs.append(paragraph)
-    let text = paragraphs.joined(separator: "\n")
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    text = text.trimmingCharacters(in: .whitespacesAndNewlines)
     return text.isEmpty ? nil : text
   }
 
@@ -134,6 +133,41 @@ enum RecognizedTextLayout {
       let frame = ordered.dropFirst().reduce(ordered[0].frame) { $0.union($1.frame) }
       return Row(text: text, frame: frame)
     }
+  }
+
+  /// A wrapped line only ends early when the next word does not fit, so room
+  /// for that word plus some slack means the line was broken on purpose. Widths
+  /// are estimated from the row's average character width.
+  private static func hasRoom(for row: Row, after previous: Row, rightEdge: CGFloat) -> Bool {
+    let characterWidth = previous.frame.width / CGFloat(previous.text.count)
+    let room = rightEdge - previous.frame.maxX
+    let firstWord: Int
+    if let first = row.text.first, first.isCJK {
+      firstWord = 1
+    } else {
+      firstWord = row.text.prefix { !$0.isWhitespace }.count
+    }
+    return room > characterWidth * (CGFloat(firstWord) * 1.4 + 1)
+  }
+
+  /// Bullets, dashes and numbers that open a list item, such as "• ", "- ",
+  /// "2. " and "3、".
+  private static func startsListItem(_ text: String) -> Bool {
+    guard let first = text.first else { return false }
+    if "•◦▪▫‣∙·●○■□▸►".contains(first) {
+      return true
+    }
+    let rest = text.dropFirst()
+    if "-*+".contains(first) {
+      return rest.first == " "
+    }
+    let digits = text.prefix { $0.isASCII && $0.isNumber }
+    guard (1...3).contains(digits.count) else { return false }
+    let marker = text.dropFirst(digits.count)
+    if marker.first == "、" {
+      return true
+    }
+    return (marker.first == "." || marker.first == ")") && marker.dropFirst().first == " "
   }
 
   /// Chinese and Japanese wrap without spaces; Latin text wraps at a space,

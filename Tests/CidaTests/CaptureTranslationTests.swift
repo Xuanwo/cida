@@ -34,11 +34,57 @@ final class CaptureTranslationTests: XCTestCase {
     XCTAssertNil(RecognizedTextLayout.text(from: [line("   ", row: 0)]))
   }
 
+  /// Geometry Vision reported for a Slack message: rows at the usual line
+  /// pitch, where only the long bullet reaches the right edge.
+  func testLinesThatEndShortOrStartAListItemKeepTheirLineBreaks() {
+    let text = RecognizedTextLayout.text(from: [
+      RecognizedLine(
+        text: "But here's a more verbose summary:",
+        frame: CGRect(x: 0, y: 0.034, width: 0.161, height: 0.114)),
+      RecognizedLine(
+        text: "Symptom (job j1, build 455b291a07, 10 workers × 32Gi, from the job registry events):",
+        frame: CGRect(x: 0, y: 0.235, width: 0.552, height: 0.12)),
+      RecognizedLine(
+        text: "• Memory stayed bounded: shuffle workers peaked at about 16 GiB.",
+        frame: CGRect(x: 0.004, y: 0.382, width: 0.304, height: 0.104)),
+      RecognizedLine(
+        text: "• About 11 to 12 minutes in (19:28:32 to 19:30:02 UTC), workers 8, 4, 6 and 3 "
+          + "stopped heartbeating. Their last snapshots showed about 0.01 CPU cores and memory "
+          + "down to 1 to 2 GiB, meaning they'd left the in-memory stage.",
+        frame: CGRect(x: 0.004, y: 0.527, width: 0.994, height: 0.12)),
+      RecognizedLine(
+        text: "• The other workers kept running at about 1.2 to 1.6 cores. Only one shuffle completed.",
+        frame: CGRect(x: 0.004, y: 0.676, width: 0.388, height: 0.119)),
+      RecognizedLine(
+        text: "• At 19:33:46 UTC, worker 2 failed the job: Index job failed: worker 8 timed out during shuffling.",
+        frame: CGRect(x: 0.004, y: 0.823, width: 0.424, height: 0.104)),
+    ])
+    XCTAssertEqual(
+      text?.components(separatedBy: "\n").map { String($0.prefix(12)) },
+      ["But here's a", "Symptom (job", "• Memory sta", "• About 11 t", "• The other ", "• At 19:33:4"])
+  }
+
+  func testChineseLinesBreakWhereTheyEndShortAndJoinWhereTheyWrap() {
+    let text = RecognizedTextLayout.text(from: [
+      line("明天的评审改到下午三点。", row: 0, width: 0.24),
+      line("我们的系统采用了全新的存储引擎，显著提升了读写性", row: 1, width: 0.48),
+      line("能，也降低了成本。", row: 2, width: 0.18),
+      line("1. 先合并存储引擎的改动", row: 3, width: 0.26),
+      line("2. 再发布新版本", row: 4, width: 0.16),
+    ])
+    XCTAssertEqual(
+      text,
+      "明天的评审改到下午三点。\n我们的系统采用了全新的存储引擎，显著提升了读写性能，也降低了成本。\n"
+        + "1. 先合并存储引擎的改动\n2. 再发布新版本")
+  }
+
   /// Rows 0.04 tall at a 0.06 pitch: consecutive rows leave a 0.02 gap, a
   /// skipped row a 0.08 gap, which starts a paragraph.
-  private func line(_ text: String, row: Int, x: CGFloat = 0.1) -> RecognizedLine {
+  private func line(
+    _ text: String, row: Int, x: CGFloat = 0.1, width: CGFloat = 0.15
+  ) -> RecognizedLine {
     RecognizedLine(
-      text: text, frame: CGRect(x: x, y: 0.1 + CGFloat(row) * 0.06, width: 0.15, height: 0.04))
+      text: text, frame: CGRect(x: x, y: 0.1 + CGFloat(row) * 0.06, width: width, height: 0.04))
   }
 
   // MARK: - Framing geometry
@@ -222,20 +268,24 @@ final class CaptureTranslationTests: XCTestCase {
 
   /// Real Vision recognition, so the first run in a process includes the
   /// model load.
-  func testRecognitionReadsChineseAndEnglishIntoParagraphs() async throws {
+  func testRecognitionReadsChineseAndEnglishIntoLines() async throws {
     let image = try XCTUnwrap(
       Self.renderedText([
         "我们的系统采用了全新的存储引擎。",
         "",
-        "The storage engine keeps every write in a log.",
+        "The engine keeps every write in a log.",
+        "Symptom (job 42, 10 workers × 32Gi, from the registry):",
       ]))
 
     let text = try await TextRecognizer.recognizeText(in: image)
 
     let lines = try XCTUnwrap(text).components(separatedBy: "\n")
-    XCTAssertEqual(lines.count, 2, "Two paragraphs: \(text ?? "")")
+    XCTAssertEqual(lines.count, 3, "Three lines: \(text ?? "")")
     XCTAssertTrue(lines[0].contains("存储引擎"), lines[0])
-    XCTAssertTrue(lines[1].contains("storage engine keeps every write"), lines[1])
+    XCTAssertTrue(lines[1].contains("engine keeps every write"), lines[1])
+    // English keeps its own punctuation next to Chinese.
+    XCTAssertTrue(lines[2].hasPrefix("Symptom (job 42"), lines[2])
+    XCTAssertTrue(lines[2].hasSuffix("registry):"), lines[2])
     let blank = try XCTUnwrap(Self.renderedText([]))
     let nothing = try await TextRecognizer.recognizeText(in: blank)
     XCTAssertNil(nothing)
