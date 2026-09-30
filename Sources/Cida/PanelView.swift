@@ -449,7 +449,6 @@ private struct ResultPane: View {
           record: model.result,
           generationState: model.generationState,
           isStale: model.isResultStale,
-          followRevision: model.resultFollowRevision,
           maxVisibleHeight: maxTextHeight
         )
         .frame(maxWidth: .infinity)

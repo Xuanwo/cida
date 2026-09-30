@@ -101,7 +101,7 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.inputDocumentUTF16Count, "Visible tail".utf16.count)
   }
 
-  func testStreamingPublishesPartialResultsAndCompletionFollowRequests() async throws {
+  func testStreamingPublishesPartialResultsAndCompletes() async throws {
     let model = AppModel(
       mode: .improve,
       inputText: "Draft",
@@ -112,7 +112,6 @@ final class AppModelTests: XCTestCase {
 
     try await waitUntil { model.generationState.phase == .waiting }
     try await waitUntil { model.result?.result.hasPrefix("Clear") == true }
-    let partialFollowRevision = model.resultFollowRevision
     XCTAssertTrue(model.isProcessing)
     XCTAssertEqual(model.generationState.phase, .revealing)
     XCTAssertEqual(model.result?.phase, .streaming)
@@ -126,21 +125,6 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(result.outputLanguage, .english, "Improvement keeps the source language")
     XCTAssertFalse(model.isProcessing)
     XCTAssertEqual(model.generationState, .idle)
-    XCTAssertGreaterThan(model.resultFollowRevision, partialFollowRevision)
-  }
-
-  func testTerminalResultFollowBypassesTheStreamingThrottle() {
-    let model = AppModel()
-
-    model.requestResultFollow(force: false)
-    let throttledRevision = model.resultFollowRevision
-    model.requestResultFollow(force: false)
-
-    XCTAssertEqual(model.resultFollowRevision, throttledRevision)
-
-    model.requestResultFollow(force: false, allowsThrottling: false)
-
-    XCTAssertEqual(model.resultFollowRevision, throttledRevision + 1)
   }
 
   func testCancellingStreamingKeepsTheVisiblePartialResult() async throws {
@@ -417,7 +401,6 @@ final class AppModelTests: XCTestCase {
 
     XCTAssertEqual(model.result?.result, chunks.joined())
     XCTAssertLessThan(model.streamPresentationUpdateCount, chunks.count)
-    XCTAssertLessThan(model.resultFollowRevision, model.streamPresentationUpdateCount)
   }
 
   func testLegacyPromptPlaceholdersMigrateToPlainPoliciesOnlyOnce() throws {
