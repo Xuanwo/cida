@@ -52,7 +52,7 @@ extension SelectionAnswer: CustomStringConvertible {
 }
 
 extension Duration {
-  fileprivate var milliseconds: Int64 {
+  var milliseconds: Int64 {
     components.seconds * 1000 + components.attoseconds / 1_000_000_000_000_000
   }
 }
