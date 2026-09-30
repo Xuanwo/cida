@@ -7,7 +7,7 @@ import NaturalLanguage
 /// languages are free text in Settings, so they are matched against language names; when my
 /// language matches nothing, every paragraph goes into it and the model returns those already
 /// in it unchanged, which are simply not drawn.
-struct LayerLanguageFilter: Sendable {
+struct MyLanguageFilter: Sendable {
   let myLanguageName: String
   let foreignLanguageName: String
   let myLanguage: NLLanguage?
@@ -31,12 +31,54 @@ struct LayerLanguageFilter: Sendable {
     return foreignLanguageName
   }
 
-  private func isInMyLanguage(_ text: String) -> Bool {
+  /// Whether `text` is recognizably in my language; false when my language names nothing
+  /// this Mac recognizes.
+  func isInMyLanguage(_ text: String) -> Bool {
     guard let myLanguage else { return false }
+    let sample = String(text.prefix(1_000))
+    if let decided = ScriptTally(sample).decides(isMine: Self.family(myLanguage)) { return decided }
     let recognizer = NLLanguageRecognizer()
-    recognizer.processString(String(text.prefix(1_000)))
+    recognizer.processString(sample)
     guard let dominant = recognizer.dominantLanguage else { return false }
     return Self.family(dominant) == Self.family(myLanguage)
+  }
+
+  /// Scripts first, the recognizer after. Chinese, Japanese and Korean writing mixes in Latin
+  /// terms all the time (「把 README 里的 install 步骤改一下」), and the recognizer weighs
+  /// letters, so it calls such text English or Norwegian. Counted as a reader counts, one Han
+  /// character, kana or Hangul syllable against one Latin word, the mixture is plainly CJK.
+  private struct ScriptTally {
+    var han = 0
+    var kana = 0
+    var hangul = 0
+    var latinWords = 0
+
+    init(_ text: String) {
+      var inLatinWord = false
+      for scalar in text.unicodeScalars {
+        let isLatin = scalar.properties.isAlphabetic && scalar.value < 0x0250
+        if isLatin, !inLatinWord { latinWords += 1 }
+        inLatinWord = isLatin || (inLatinWord && (scalar == "_" || scalar.properties.numericType != nil))
+        switch scalar.value {
+        case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF: han += 1
+        case 0x3040...0x30FF: kana += 1
+        case 0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F: hangul += 1
+        default: break
+        }
+      }
+    }
+
+    /// Whether text is in the language of `family`, or nil when scripts cannot tell and the
+    /// recognizer should.
+    func decides(isMine family: String) -> Bool? {
+      let cjk = han + kana + hangul
+      switch family {
+      case "zh": return kana == 0 && hangul == 0 && han > 0 && han >= latinWords
+      case NLLanguage.japanese.rawValue: return kana > 0 && han + kana >= latinWords
+      case NLLanguage.korean.rawValue: return hangul > 0 && hangul >= han && hangul >= latinWords
+      default: return cjk > latinWords ? false : nil
+      }
+    }
   }
 
   /// Chinese scripts count as one language: a Simplified Chinese reader needs no layer over

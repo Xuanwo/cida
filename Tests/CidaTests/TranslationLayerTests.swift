@@ -494,7 +494,7 @@ final class TranslationLayerTests: XCTestCase {
   // MARK: - Language
 
   func testTheWholeWindowGoesIntoMyLanguageAndAPointedParagraphFollowsThePanel() {
-    let chinese = LayerLanguageFilter(languages: (my: "简体中文", foreign: "English"))
+    let chinese = MyLanguageFilter(languages: (my: "简体中文", foreign: "English"))
     XCTAssertEqual(chinese.myLanguage, .simplifiedChinese)
     XCTAssertEqual(chinese.target(for: "Could it be the new prefetch default?", pointedAt: false), "简体中文")
     XCTAssertEqual(chinese.target(for: "Could it be the new prefetch default?", pointedAt: true), "简体中文")
@@ -505,16 +505,36 @@ final class TranslationLayerTests: XCTestCase {
       "⌥D on my language goes into my foreign language, like ⌥A")
     XCTAssertNil(chinese.target(for: "12:04 · 3", pointedAt: true), "No letters, nothing to translate")
     XCTAssertNil(
-      LayerLanguageFilter(languages: (my: "简体中文", foreign: "繁體中文")).target(for: "你好，世界", pointedAt: true),
+      MyLanguageFilter(languages: (my: "简体中文", foreign: "繁體中文")).target(for: "你好，世界", pointedAt: true),
       "Two names for one language leave nothing to go into")
 
-    XCTAssertEqual(LayerLanguageFilter(languages: (my: "English", foreign: "中文")).myLanguage, .english)
-    XCTAssertEqual(LayerLanguageFilter(languages: (my: "英式英语", foreign: "中文")).myLanguage, .english)
-    XCTAssertEqual(LayerLanguageFilter(languages: (my: "繁體中文（台灣）", foreign: "English")).myLanguage, .traditionalChinese)
-    XCTAssertEqual(LayerLanguageFilter(languages: (my: "日本語", foreign: "English")).myLanguage, .japanese)
+    XCTAssertEqual(MyLanguageFilter(languages: (my: "English", foreign: "中文")).myLanguage, .english)
+    XCTAssertEqual(MyLanguageFilter(languages: (my: "英式英语", foreign: "中文")).myLanguage, .english)
+    XCTAssertEqual(MyLanguageFilter(languages: (my: "繁體中文（台灣）", foreign: "English")).myLanguage, .traditionalChinese)
+    XCTAssertEqual(MyLanguageFilter(languages: (my: "日本語", foreign: "English")).myLanguage, .japanese)
     // Unknown wording: send everything into it and let the model return unchanged text.
     XCTAssertEqual(
-      LayerLanguageFilter(languages: (my: "克林贡语", foreign: "English")).target(for: "你好 world", pointedAt: true), "克林贡语")
+      MyLanguageFilter(languages: (my: "克林贡语", foreign: "English")).target(for: "你好 world", pointedAt: true), "克林贡语")
+  }
+
+  /// The recognizer alone calls these English, Norwegian or Portuguese.
+  func testChineseWithLatinTermsIsStillMyLanguage() {
+    let chinese = MyLanguageFilter(languages: (my: "简体中文", foreign: "English"))
+    for text in [
+      "我们需要在 Kubernetes cluster 上部署 service", "把 README 里的 install 步骤改一下",
+      "这个 function 为什么 return nil", "Thanks, 我明天看", "这是一段中文。CIDA_E2E_X", "好的",
+    ] {
+      XCTAssertTrue(chinese.isInMyLanguage(text), text)
+    }
+    for text in ["LGTM, merge it", "The new storage engine keeps every write.", "これは日本語の文です。"] {
+      XCTAssertFalse(chinese.isInMyLanguage(text), text)
+    }
+    let english = MyLanguageFilter(languages: (my: "English", foreign: "简体中文"))
+    XCTAssertTrue(english.isInMyLanguage("Please review the PR before Friday."))
+    XCTAssertFalse(english.isInMyLanguage("把 README 里的 install 步骤改一下"))
+    let japanese = MyLanguageFilter(languages: (my: "日本語", foreign: "English"))
+    XCTAssertTrue(japanese.isInMyLanguage("この PR をレビューしてください"))
+    XCTAssertFalse(japanese.isInMyLanguage("请帮我看看这个问题"))
   }
 
   // MARK: - Request
