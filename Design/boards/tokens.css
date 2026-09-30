@@ -111,6 +111,8 @@
   --motion-rate-alpha: 0.15;
   --motion-blur-char-px: 2;
   --motion-cursor-opacity-min: 0.3;
+  --motion-waiting-opacity-max: 0.18;
+  --motion-waiting-opacity-min: 0.1;
   --motion-cursor-w: 2;
   --motion-cursor-h: 20;
   --motion-ease-char-in: ease-out;

@@ -229,8 +229,11 @@ def plan_for(submitted_text):
             [{"id": block["id"], "text": translated(block["text"])} for block in layer_blocks],
             ensure_ascii=False,
         )
+        # ⌥D on paragraph 2 alone answers like a slow model, so the journey sees it wait.
+        slow = len(layer_blocks) == 1 and "PARAGRAPH 2." in layer_blocks[0]["text"]
         return {
             "chunks": [reply[: len(reply) // 2], reply[len(reply) // 2 :]],
+            "initialDelay": 10.0 if slow else 0,
             "requiredSystemFragments": [
                 "Keep every ⟦n⟧ placeholder exactly as written",
                 '"target_language":"English"' if into_foreign else '"target_language":"简体中文"',

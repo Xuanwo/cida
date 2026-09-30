@@ -260,8 +260,17 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     }
     XCTAssertTrue(layer.paragraph(2).waitForExistence(timeout: 5), "The source shows its article")
 
-    // ⌥D: this paragraph, then another; the rest stay original.
+    // ⌥D: this paragraph, then another; the rest stay original. The model takes ten seconds
+    // over paragraph 2, and the paragraph shows it is waiting meanwhile (§二 等待). A screenshot
+    // of the guest's screen can take seconds, so this checks that it waits visibly; the lifecycle
+    // log's `layer-drawn` right after `layer-paragraph-shortcut` shows how soon.
+    XCTAssertNil(layer.screenshotShowingWaiting(on: 2, within: 0), "The page is plain before ⌥D")
     layer.press(on: 2)
+    let waiting = XCTAttachment(
+      screenshot: try XCTUnwrap(layer.screenshotShowingWaiting(on: 2, within: 4), "⌥D shows the paragraph waiting"))
+    waiting.name = "layer-waiting"
+    waiting.lifetime = .keepAlways
+    add(waiting)
     let one = try XCTUnwrap(layer.wait(timeout: 20) { $0.contains("CIDA_LAYER_TRANSLATED_2") }, "⌥D translates it in place")
     XCTAssertFalse(one.contains("CIDA_LAYER_TRANSLATED_3"), "Only that paragraph")
     attach("layer-one-paragraph")
@@ -595,6 +604,52 @@ private struct TranslationLayerProbe {
       NSPredicate(format: "value BEGINSWITH %@ OR label BEGINSWITH %@",
         "CIDA LAYER PARAGRAPH \(number).", "CIDA LAYER PARAGRAPH \(number).")
     ).firstMatch
+  }
+
+  /// A screenshot, taken within `timeout`, in which paragraph `number` shows the accent underlay
+  /// of a paragraph waiting for its translation (§二 等待): on the source's white page, most of
+  /// its pixels turn green, the accent's hue, even at the breath's faintest 10 %. The screen, not
+  /// the element: an element's screenshot is its own window's, without Cida's overlay above it.
+  func screenshotShowingWaiting(on number: Int, within timeout: TimeInterval) -> XCUIScreenshot? {
+    let frame = paragraph(number).frame
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      let screenshot = XCUIScreen.main.screenshot()
+      if let (tinted, sampled) = Self.greenPixels(in: screenshot.image, within: frame), sampled > 0,
+        tinted * 2 > sampled
+      {
+        return screenshot
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    } while Date() < deadline
+    return nil
+  }
+
+  /// Samples `frame` (screen points, top-left origin) of a full-screen image, drawn into a
+  /// context of known layout: the first row in memory is the screen's top.
+  private static func greenPixels(in image: NSImage, within frame: CGRect) -> (Int, Int)? {
+    guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+      let screen = NSScreen.screens.first,
+      let context = CGContext(
+        data: nil, width: cgImage.width, height: cgImage.height, bitsPerComponent: 8,
+        bytesPerRow: cgImage.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
+    guard let data = context.data else { return nil }
+    let pixels = data.bindMemory(to: UInt8.self, capacity: cgImage.width * cgImage.height * 4)
+    let scale = CGFloat(cgImage.width) / screen.frame.width
+    var tinted = 0, sampled = 0
+    for y in stride(from: frame.minY + 2, to: frame.maxY - 2, by: 2) {
+      for x in stride(from: frame.minX + 2, to: frame.maxX - 2, by: 4) {
+        let column = Int(x * scale), row = Int(y * scale)
+        guard column < cgImage.width, row < cgImage.height else { continue }
+        let offset = (row * cgImage.width + column) * 4
+        sampled += 1
+        if Int(pixels[offset + 1]) - Int(pixels[offset]) >= 3 { tinted += 1 }
+      }
+    }
+    return (tinted, sampled)
   }
 
   /// Everything the layer draws now, across its panes.
