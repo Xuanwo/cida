@@ -441,6 +441,11 @@ final class SourceApplication {
   var drawnText: XCUIElement {
     app.descendants(matching: .any).matching(identifier: "source-drawn-text").firstMatch
   }
+  /// Selected on click, yet tells Accessibility nothing is selected, like
+  /// Telegram Desktop's message field; ⌘C copies it.
+  var besideText: XCUIElement {
+    app.descendants(matching: .any).matching(identifier: "source-beside-text").firstMatch
+  }
   /// Tells Accessibility nothing is selected, yet ⌘C copies its whole line.
   var lineCopyField: XCUIElement {
     app.descendants(matching: .any).matching(identifier: "source-line-copy").firstMatch

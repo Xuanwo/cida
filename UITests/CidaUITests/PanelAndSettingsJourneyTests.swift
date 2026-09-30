@@ -123,11 +123,10 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertFalse((completed.value as? String)?.contains("SELECTION_GATED") ?? true)
   }
 
-  /// `Design/spec/panel.md` §一 复制兜底: an application Accessibility cannot
-  /// read is sent ⌘C, and the clipboard the user had is put back. One that
-  /// answers "nothing selected" is never sent ⌘C, because it would copy its
-  /// whole line.
-  func testShortcutCopiesASelectionAccessibilityCannotReadAndPutsTheClipboardBack() throws {
+  /// `Design/spec/panel.md` §一 复制兜底: a selection the focused element
+  /// cannot give is copied with ⌘C, and the clipboard the user had is put
+  /// back. A copy of the focused element's own line is no selection.
+  func testShortcutCopiesASelectionAccessibilityCannotGiveAndPutsTheClipboardBack() throws {
     driver.launch()
     driver.hidePanel()
     let source = SourceApplication()
@@ -159,15 +158,34 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(pasteboard.data(forType: custom), Data([7, 7, 7]), "Every type is put back")
     driver.waitForCompletion()
 
+    // Telegram Desktop: the focused field answers "nothing selected" while
+    // the selection is elsewhere.
     driver.hidePanel()
-    let changeCount = pasteboard.changeCount
+    source.besideText.click()
+    source.press("a", modifierFlags: .option)
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
+    let besideBroughtIn = driver.waitForTextValue(
+      "CIDA_E2E_SELECTION_BESIDE", in: driver.composer, timeout: 3)
+    let besideTranslated = driver.result(containing: "CIDA_E2E_SELECTION_BESIDE_COMPLETE")
+      .waitForExistence(timeout: 8)
+    let besideShot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+    besideShot.name = "Copied selection beside a focused empty field"
+    besideShot.lifetime = .keepAlways
+    add(besideShot)
+    XCTAssertTrue(besideBroughtIn, "A selection outside the focused field is copied")
+    XCTAssertTrue(besideTranslated)
+    XCTAssertEqual(pasteboard.string(forType: .string), "CIDA_E2E_CLIPBOARD")
+    driver.waitForCompletion()
+
+    driver.hidePanel()
     source.lineCopyField.click()
     source.press("a", modifierFlags: .option)
     XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
     XCTAssertFalse(
-      driver.textValue(in: driver.composer).contains("CIDA_E2E_WHOLE_LINE"),
-      "An application that answers no selection is not asked to copy")
-    XCTAssertEqual(pasteboard.changeCount, changeCount, "The clipboard is not touched")
+      driver.textValue(in: driver.composer).contains("CIDA_E2E_LINE"),
+      "The whole line an editor copies with nothing selected is not brought in")
+    XCTAssertEqual(pasteboard.string(forType: .string), "CIDA_E2E_CLIPBOARD")
+    XCTAssertEqual(pasteboard.data(forType: custom), Data([7, 7, 7]), "Every type is put back")
   }
 
   /// `Design/spec/panel.md` §一 截图翻译, through the real ScreenCaptureKit

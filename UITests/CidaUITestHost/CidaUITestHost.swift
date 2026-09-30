@@ -39,14 +39,18 @@ private struct SourceView: View {
         .frame(height: 96)
         .border(Color.gray.opacity(0.3))
         .accessibilityIdentifier("source-editor")
-      // Selection journeys for applications Accessibility cannot read.
-      HStack(spacing: 24) {
+      // Selection journeys for selections Accessibility cannot give.
+      HStack(spacing: 16) {
         CopyOnlyText(
           text: "CIDA_E2E_SELECTION_DRAWN", copied: "CIDA_E2E_SELECTION_DRAWN",
-          identifier: "source-drawn-text", answersSelection: false)
+          identifier: "source-drawn-text", accessibility: .noSelectedText)
         CopyOnlyText(
-          text: "CIDA_E2E_LINE", copied: "CIDA_E2E_WHOLE_LINE",
-          identifier: "source-line-copy", answersSelection: true)
+          text: "CIDA_E2E_SELECTION_BESIDE", copied: "CIDA_E2E_SELECTION_BESIDE",
+          identifier: "source-beside-text", accessibility: .emptySelection(holding: ""))
+        CopyOnlyText(
+          text: "CIDA_E2E_LINE", copied: "CIDA_E2E_LINE\n",
+          identifier: "source-line-copy", accessibility: .emptySelection(holding: "CIDA_E2E_LINE"),
+          selectsOnClick: false)
       }
       .frame(height: 32)
       Rectangle()
@@ -78,19 +82,30 @@ private struct SourceView: View {
 /// Text drawn by the view itself, the way a custom-drawn application shows
 /// it: clicking it selects it all, and Edit › Copy (⌘C) copies `copied`.
 private struct CopyOnlyText: NSViewRepresentable {
+  enum Accessibility {
+    /// No selected text at all, like a custom-drawn application.
+    case noSelectedText
+    /// An empty selection in a field holding `text`: Telegram Desktop's
+    /// empty message field while a message is selected, or an editor that
+    /// copies its whole line when nothing is selected (VS Code).
+    case emptySelection(holding: String)
+  }
+
   let text: String
   let copied: String
   let identifier: String
-  /// Whether Accessibility is told the selection is empty, like an editor
-  /// that copies its whole line on ⌘C when nothing is selected (VS Code);
-  /// otherwise the view offers no selected text at all.
-  let answersSelection: Bool
+  let accessibility: Accessibility
+  var selectsOnClick = true
 
   func makeNSView(context: Context) -> CopyOnlyTextView {
-    let view =
-      answersSelection
-      ? EmptySelectionFieldView(text: text, copied: copied)
-      : CopyOnlyTextView(text: text, copied: copied)
+    let view: CopyOnlyTextView
+    switch accessibility {
+    case .noSelectedText:
+      view = CopyOnlyTextView(text: text, copied: copied, selectsOnClick: selectsOnClick)
+    case .emptySelection(let held):
+      view = EmptySelectionFieldView(
+        text: text, copied: copied, selectsOnClick: selectsOnClick, held: held)
+    }
     view.setAccessibilityIdentifier(identifier)
     return view
   }
@@ -101,18 +116,18 @@ private struct CopyOnlyText: NSViewRepresentable {
 class CopyOnlyTextView: NSView {
   let text: String
   private let copied: String
+  /// Whether a click selects the text.
+  private let selectsOnClick: Bool
   private var isSelected = false
 
-  init(text: String, copied: String) {
+  init(text: String, copied: String, selectsOnClick: Bool) {
     self.text = text
     self.copied = copied
+    self.selectsOnClick = selectsOnClick
     super.init(frame: .zero)
   }
 
   required init?(coder: NSCoder) { nil }
-
-  /// Whether a click selects the text.
-  var selectsOnClick: Bool { true }
 
   override var acceptsFirstResponder: Bool { true }
 
@@ -146,13 +161,20 @@ class CopyOnlyTextView: NSView {
   override func accessibilityRole() -> NSAccessibility.Role? { .group }
 }
 
-/// Answers that nothing is selected, yet copies its whole line.
+/// Answers that nothing is selected, yet copies.
 final class EmptySelectionFieldView: CopyOnlyTextView {
-  override var selectsOnClick: Bool { false }
+  private let held: String
+
+  init(text: String, copied: String, selectsOnClick: Bool, held: String) {
+    self.held = held
+    super.init(text: text, copied: copied, selectsOnClick: selectsOnClick)
+  }
+
+  required init?(coder: NSCoder) { nil }
 
   override func accessibilityRole() -> NSAccessibility.Role? { .textField }
 
-  override func accessibilityValue() -> Any? { text }
+  override func accessibilityValue() -> Any? { held }
 
   override func accessibilitySelectedText() -> String? { "" }
 
