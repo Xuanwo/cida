@@ -1,12 +1,13 @@
 import Foundation
 import NaturalLanguage
 
-/// Which language a paragraph goes into (`Design/spec/translation-layer.md` §一). Translating
-/// a whole window brings only other languages into mine. A paragraph ⌥D points at follows the
-/// panel's rule instead: one already in my language goes into my foreign language. The
-/// languages are free text in Settings, so they are matched against language names; when my
-/// language matches nothing, every paragraph goes into it and the model returns those already
-/// in it unchanged, which are simply not drawn.
+/// Whether text is in my language, and so which language it goes into
+/// (`Design/spec/translation-layer.md` §一, `Design/spec/panel.md` §三). Translating a whole
+/// window brings only other languages into mine. A paragraph ⌥D points at follows the panel's
+/// rule instead: one already in my language goes into my foreign language, and the panel writes
+/// that language after 翻译 for a source in my language. The languages are free text, so they
+/// are matched against language names; when my language matches nothing, every paragraph goes
+/// into it and the model returns those already in it unchanged, which are simply not drawn.
 struct MyLanguageFilter: Sendable {
   let myLanguageName: String
   let foreignLanguageName: String

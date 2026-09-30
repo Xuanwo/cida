@@ -257,6 +257,10 @@ enum CidaMotion {
   static let copiedHoldMilliseconds = 800
   static let breatheMilliseconds = 1_200
   static let catchUpMilliseconds = 400
+  /// How long typing pauses before the panel decides which language the source is in.
+  static let languageSettleMilliseconds = 250
+  /// The gap between two glyphs of the foreign language written after 翻译.
+  static let languageStaggerMilliseconds = 20
 
   static let characterInSeconds: CFTimeInterval = 0.120
   static let iconInSeconds: Double = 0.120

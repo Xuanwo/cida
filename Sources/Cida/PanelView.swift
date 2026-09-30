@@ -318,50 +318,67 @@ struct ModeSegmentedControl: View {
       selected: ProcessingMode.allCases.firstIndex(of: model.mode) ?? 0,
       identifiers: ProcessingMode.allCases.map { "action-\($0.rawValue)" },
       isEnabled: isEnabled,
-      onSelect: { model.setMode(ProcessingMode.allCases[$0]) }
+      onSelect: { model.setMode(ProcessingMode.allCases[$0]) },
+      accessory: { index in
+        // Only 翻译 has an object: the language a source in my language goes into.
+        if ProcessingMode.allCases[index] == .translate {
+          PanelForeignLanguage(model: model)
+        }
+      }
     )
     .accessibilityLabel("动作")
     .accessibilityIdentifier("action-segment")
   }
 }
 
+enum PanelSegmentedControlMetrics {
+  /// From an item's title to its edges.
+  static let titlePadding: CGFloat = 12
+}
+
 /// The control bar's segmented control: the panel's two actions, or a message's choices.
-struct PanelSegmentedControl: View {
+/// An item can carry an accessory after its title, inside the same selected background.
+struct PanelSegmentedControl<Accessory: View>: View {
   let titles: [String]
   let selected: Int
   let identifiers: [String]
   var isEnabled = true
   let onSelect: @MainActor (Int) -> Void
+  @ViewBuilder let accessory: (Int) -> Accessory
 
   var body: some View {
     HStack(spacing: 2) {
       ForEach(titles.indices, id: \.self) { index in
         let isSelected = index == selected
-        Button {
-          onSelect(index)
-        } label: {
-          // The board's item: a 14 pt line in 4/11 padding inside a 1 pt border that
-          // is transparent unless selected, so 5/12 from the text to the item's edge.
-          Text(titles[index])
-            .font(CidaDesign.mainUI(11.5, weight: isSelected ? .semibold : .medium))
-            .foregroundStyle(isSelected ? CidaDesign.accent : CidaDesign.textSecondary)
-            .frame(height: 14)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background {
-              if isSelected {
-                RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
-                  .fill(CidaDesign.surface)
-                  .overlay {
-                    RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
-                      .strokeBorder(CidaDesign.border, lineWidth: 1)
-                  }
-              }
-            }
+        HStack(spacing: 0) {
+          Button {
+            onSelect(index)
+          } label: {
+            // The board's item: a 14 pt line in 4/11 padding inside a 1 pt border that
+            // is transparent unless selected, so 5/12 from the text to the item's edge.
+            Text(titles[index])
+              .font(CidaDesign.mainUI(11.5, weight: isSelected ? .semibold : .medium))
+              .foregroundStyle(isSelected ? CidaDesign.accent : CidaDesign.textSecondary)
+              .frame(height: 14)
+              .padding(.horizontal, PanelSegmentedControlMetrics.titlePadding)
+              .padding(.vertical, 5)
+              .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .accessibilityAddTraits(isSelected ? .isSelected : [])
+          .accessibilityIdentifier(identifiers[index])
+          accessory(index)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier(identifiers[index])
+        .background {
+          if isSelected {
+            RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
+              .fill(CidaDesign.surface)
+              .overlay {
+                RoundedRectangle(cornerRadius: CidaDesign.Radius.segmentItem, style: .continuous)
+                  .strokeBorder(CidaDesign.border, lineWidth: 1)
+              }
+          }
+        }
       }
     }
     .padding(2)
@@ -370,6 +387,20 @@ struct PanelSegmentedControl: View {
     .modifier(DimmedWhileWorking(isDimmed: !isEnabled))
     .disabled(!isEnabled)
     .accessibilityElement(children: .contain)
+  }
+}
+
+extension PanelSegmentedControl where Accessory == EmptyView {
+  init(
+    titles: [String],
+    selected: Int,
+    identifiers: [String],
+    isEnabled: Bool = true,
+    onSelect: @escaping @MainActor (Int) -> Void
+  ) {
+    self.init(
+      titles: titles, selected: selected, identifiers: identifiers, isEnabled: isEnabled,
+      onSelect: onSelect, accessory: { _ in EmptyView() })
   }
 }
 

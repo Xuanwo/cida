@@ -33,9 +33,12 @@ compared natively:
 | ⑩ 带入选区 | `selection-imported` | (global shortcut; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
 | ⑪ 截图 · 未识别到文字 | `capture-unrecognized` | (capture shortcut; XCUI `testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt`) |
 | ⑫ 最大高度 | `long` | `long` |
+| ⑯ 译成我的语言 | `translate-into-mine` | `translate-into-mine` |
+| ⑰ 换一门外语 · ⌘L | `target-editing` | `target-editing` |
+| ⑱ 已换成日本語 | `target-changed` | (after ⏎ in the field; `ForeignLanguageTests`) |
 | 设置 · 模型（默认） | `settings` | `settings` |
 | 设置 · 翻译 | `settings-translation` | `settings-translation` |
-| 设置 · 翻译 · 常用外语输入中 | `settings-language-editing` | `settings-language-editing` |
+| 设置 · 翻译 · 我的语言输入中 | `settings-language-editing` | `settings-language-editing` |
 | 设置 · 翻译 · 编辑改进提示词 | `settings-prompt-editing` | `settings-prompt-editing` |
 | 设置 · 快捷键 · 未授权 | `settings-shortcuts` | `settings-shortcuts` |
 | 设置 · 快捷键 · 自定义快捷键 · 已授权 | `settings-shortcuts-custom` | `settings-shortcuts-custom` |

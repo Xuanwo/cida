@@ -1,5 +1,5 @@
 // Parts that repeat across states, as small custom elements so a state reads
-// as what differs: <cida-bar mode action processing> and <cida-note kind>.
+// as what differs: <cida-bar mode action processing target> and <cida-note kind>.
 
 // The panel's own actions by default; a lifecycle panel (spec/lifecycle.md §一) passes its
 // choices as options="移到「应用程序」|暂不" with selected="0", and a status text for the slot.
@@ -16,6 +16,9 @@ const copyMenu = `
     <div class="row on"><i class="icon icon-image"></i><b>复制图片</b><kbd>⇧⌘C</kbd></div>
   </div>`;
 
+// target="English" writes the foreign language my language goes into after 翻译
+// (spec/panel.md §三); target-editing="日本語" draws it as a field, target-selected with its
+// text selected as ⌘L leaves it.
 class CidaBar extends HTMLElement {
   connectedCallback() {
     const mode = this.getAttribute("mode") ?? "translate";
@@ -34,8 +37,23 @@ class CidaBar extends HTMLElement {
     const selected = this.hasAttribute("options")
       ? Number(this.getAttribute("selected") ?? 0)
       : (mode === "improve" ? 1 : 0);
+    const editing = this.getAttribute("target-editing");
+    const target = editing ?? this.getAttribute("target");
+    // Motion frames (spec/streaming-motion.md §四): target-written="4" has four glyphs
+    // written, the next two still fading in and the rest not yet there; target-leaving
+    // draws the word fading out before the segment closes.
+    const written = this.getAttribute("target-written");
+    const glyphs = target === null ? [] : [...target];
+    const word = written === null ? target : `${glyphs.slice(0, written).join("")}<span class="fading">${
+      glyphs.slice(written, Number(written) + 2).join("")}</span><span class="pending">${glyphs.slice(Number(written) + 2).join("")}</span>`;
+    const objectClass = editing !== null ? " editing" : this.hasAttribute("target-leaving") ? " leaving" : "";
+    const targetSelected = this.hasAttribute("target-selected");
+    const object = target === null ? ""
+      : `<span class="object${objectClass}">${targetSelected ? `<span class="selected">${word}</span>` : word}${editing !== null && !targetSelected ? `<i class="caret"></i>` : ""}</span>`;
     const segments = options
-      .map((option, index) => `<span${index === selected ? ' class="on"' : ""}>${option}</span>`)
+      .map((option, index) => index === selected
+        ? `<span class="on">${option}${index === 0 ? object : ""}</span>`
+        : `<span>${option}</span>`)
       .join("");
     const hint = options.length > 1 ? `<span class="tab-hint">⇥ 切换</span>` : "";
     this.outerHTML = `
@@ -86,11 +104,10 @@ class CidaSettings extends HTMLElement {
         <div class="controls ${align}">${controls}</div>
       </div>`;
 
-    // spec/settings.md §三: free text; language="editing" shows the second field focused.
+    // spec/settings.md §三: free text; language="editing" shows the field focused.
     const field = (value, extra = "") => `<span class="field text ${extra}">${value}</span>`;
-    const languages = row("互译", "其他语言都译成左边",
-      `${field("简体中文")}<span class="swap">⇄</span>${is("language", "editing")
-        ? field("英式英语<i class=\"caret\"></i>", "focused") : field("English")}`);
+    const languages = row("我的语言", "其他语言都译成它", is("language", "editing")
+      ? field("繁體中文（台灣）<i class=\"caret\"></i>", "short focused") : field("简体中文", "short"), "end");
 
     const prompt = (title, preview) => `
       <div class="row prompt">

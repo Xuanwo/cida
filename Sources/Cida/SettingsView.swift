@@ -373,66 +373,44 @@ private struct SettingsBody: View {
 
 // MARK: - Languages
 
-/// The user's two languages in one row (`Design/spec/settings.md` §三): mine on the left, the
-/// foreign one on the right. Both are free text the model reads, so a dialect, a regional variant
-/// or a register works as well as a language. An emptied field takes its default back when it
-/// loses focus. One row keeps the window whole on a 14-inch screen.
+/// My language (`Design/spec/settings.md` §三): the one place every other language goes, free
+/// text the model reads, so a dialect, a regional variant or a register works as well as a
+/// language. The foreign language a source in my language goes into is written after 翻译 in
+/// the panel instead (`Design/spec/panel.md` §三). An emptied field takes its default back when
+/// it loses focus.
 private struct LanguagesRow: View {
   @Bindable var model: AppModel
-  @FocusState private var focused: Side?
-
-  enum Side {
-    case mine, foreign
-  }
+  @FocusState private var isFocused: Bool
 
   var body: some View {
-    SettingsRow(title: "互译", caption: "其他语言都译成左边") {
-      HStack(spacing: 10) {
-        SettingsTextField(
-          text: $model.settings.myLanguage,
-          placeholder: defaults.my,
-          accessibilityLabel: "我的语言",
-          accessibilityIdentifier: "settings-my-language-editor",
-          isFocused: focused == .mine
-        )
-        .focused($focused, equals: .mine)
-        Text("⇄")
-          .font(CidaDesign.ui(13))
-          .foregroundStyle(CidaDesign.textTertiary)
-          .accessibilityHidden(true)
-        SettingsTextField(
-          text: $model.settings.foreignLanguage,
-          placeholder: defaults.foreign,
-          accessibilityLabel: "常用外语",
-          accessibilityIdentifier: "settings-foreign-language-editor",
-          isFocused: focused == .foreign
-        )
-        .focused($focused, equals: .foreign)
-      }
+    SettingsRow(title: "我的语言", caption: "其他语言都译成它", alignment: .trailing) {
+      SettingsTextField(
+        text: $model.settings.myLanguage,
+        placeholder: defaultLanguage,
+        accessibilityLabel: "我的语言",
+        accessibilityIdentifier: "settings-my-language-editor",
+        isFocused: isFocused
+      )
+      .focused($isFocused)
+      .frame(width: 180)
     }
-    .onChange(of: focused) { previous, _ in
-      if let previous { restoreDefaultIfEmpty(previous) }
+    .onChange(of: isFocused) { _, focused in
+      if !focused { restoreDefaultIfEmpty() }
     }
     .onAppear {
       #if DEBUG
-        if model.focusesForeignLanguageForDesign { focused = .foreign }
+        if model.focusesMyLanguageForDesign { isFocused = true }
       #endif
     }
   }
 
-  private var defaults: (my: String, foreign: String) {
-    CidaSettings.defaultLanguages()
+  private var defaultLanguage: String {
+    CidaSettings.defaultLanguages().my
   }
 
-  private func restoreDefaultIfEmpty(_ side: Side) {
-    let isEmpty = { (text: String) in text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    switch side {
-    case .mine where isEmpty(model.settings.myLanguage):
-      model.settings.myLanguage = defaults.my
-    case .foreign where isEmpty(model.settings.foreignLanguage):
-      model.settings.foreignLanguage = defaults.foreign
-    default:
-      break
+  private func restoreDefaultIfEmpty() {
+    if model.settings.myLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      model.settings.myLanguage = defaultLanguage
     }
   }
 }

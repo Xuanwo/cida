@@ -31,7 +31,8 @@
 | `auth` | `bearer` / `x-api-key` / `api-key` / `none` | Key 放在哪个请求头；默认随 `format`（Anthropic 为 `x-api-key`，其余 `bearer`） |
 | `headers` | JSON 对象 | 额外请求头 |
 | `body` | JSON 对象 | 合并进请求体的额外参数（如关闭推理） |
-| `my-language` / `foreign-language` | 文本，如 `简体中文`、`English`、`粤语` | 与设置「翻译」页的「语言」相同，任意写法（`spec/settings.md` §三） |
+| `my-language` | 文本，如 `简体中文`、`粤语` | 与设置「翻译」页的「我的语言」相同，任意写法（`spec/settings.md` §三） |
+| `foreign-language` | 文本，如 `English`、`日本語` | 我的语言译成的外语，即面板「翻译」后面写着的那一门（`spec/panel.md` §三），默认 `English` |
 | `translation-prompt` / `improvement-prompt` | 文本，可 `--file` / `--stdin` | 与设置里的提示词相同 |
 | `shortcut` / `capture-shortcut` / `layer-shortcut` | 如 `option+a`，`none` 为不设置 | 与设置里的快捷键相同；三个不能相同（`none` 除外），`layer-shortcut` 不能带 shift（加 shift 是翻译整个窗口，也不能与另外两个相同） |
 | `launch-at-login` | `true` / `false` | 与设置里的开关相同 |

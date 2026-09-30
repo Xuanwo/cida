@@ -106,6 +106,8 @@
   --motion-copied-hold-ms: 800;
   --motion-breathe-ms: 1200;
   --motion-catchup-ms: 400;
+  --motion-language-settle-ms: 250;
+  --motion-language-stagger-ms: 20;
   --motion-rate-min-cps: 30;
   --motion-rate-max-cps: 400;
   --motion-rate-alpha: 0.15;

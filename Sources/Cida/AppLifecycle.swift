@@ -574,8 +574,8 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         updater.state.availableVersion = "1.1.0"
       }
       if launchOptions.designState == .settingsLanguageEditing {
-        model.settings.foreignLanguage = "英式英语"
-        model.focusesForeignLanguageForDesign = true
+        model.settings.myLanguage = "繁體中文（台灣）"
+        model.focusesMyLanguageForDesign = true
       }
       switch launchOptions.designState {
       case .settingsConfigCopied:
@@ -754,6 +754,9 @@ extension CidaAppDelegate: UpdatePresenter {
       if launchOptions.designState == .lifecycleWelcomeSubmitted {
         model.submit()
       }
+      if launchOptions.designState == .targetEditing {
+        model.beginEditingForeignLanguage()
+      }
     }
   #endif
 }
@@ -792,6 +795,8 @@ private enum DesignState: String {
   case stopped
   case failed
   case long
+  case translateIntoMine = "translate-into-mine"
+  case targetEditing = "target-editing"
   case settings
   case settingsTranslation = "settings-translation"
   case settingsLanguageEditing = "settings-language-editing"
@@ -989,6 +994,10 @@ private struct LaunchOptions {
         )
       case .long:
         return ResultRecord.designLong()
+      case .translateIntoMine:
+        return ResultRecord.designIntoMine()
+      case .targetEditing:
+        return ResultRecord.designCompleted(mode: .translate)
       case .empty, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
         .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
@@ -1009,8 +1018,10 @@ private struct LaunchOptions {
     guard usesDesignFixtures else { return "" }
     #if DEBUG
       return switch designState {
-      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate:
+      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate, .targetEditing:
         ResultRecord.designTranslateSource
+      case .translateIntoMine:
+        ResultRecord.designIntoMineSource
       case .improve, .shareImprove:
         ResultRecord.designImproveSource
       case .shareRead:
