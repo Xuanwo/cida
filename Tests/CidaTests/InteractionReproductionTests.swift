@@ -253,6 +253,15 @@ final class InteractionReproductionTests: XCTestCase {
     defer { window.orderOut(nil) }
     window.contentView?.layoutSubtreeIfNeeded()
 
+    /// A recorder that just resigned ends its recording on the next turn of the run loop
+    /// (`ShortcutCaptureNSView.resignFirstResponder`); that late end would cancel a recording
+    /// started in the same turn, which no person can do, so let it land first.
+    func startRecording() async throws {
+      try await Task.sleep(for: .milliseconds(20))
+      model.recordingShortcut = .showPanel
+      try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    }
+
     model.recordingShortcut = .showPanel
     try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
     let recorder = try XCTUnwrap(window.firstResponder as? ShortcutCaptureNSView)
@@ -269,30 +278,26 @@ final class InteractionReproductionTests: XCTestCase {
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     try await waitUntil(timeout: .seconds(5)) { !(window.firstResponder is ShortcutCaptureNSView) }
 
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_Escape, "\u{1B}", []))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(model.settings.shortcut, recorded, "Escape keeps the combination")
 
     // A combination the system refuses leaves the current one in place.
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_ANSI_Q, "q", [.command]))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(model.settings.shortcut, recorded)
     XCTAssertEqual(applied.values.count, 2)
 
     // ⌫ alone leaves the action without a shortcut; the system only releases it.
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_Delete, "\u{7F}", []))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertNil(model.settings.shortcut)
     XCTAssertEqual(applied.values.last, .some(nil))
     // ⌥⌫ is a combination like any other.
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_Delete, "\u{7F}", [.option]))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(
