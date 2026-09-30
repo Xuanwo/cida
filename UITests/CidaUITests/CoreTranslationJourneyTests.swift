@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
-  func testUnevenStreamingGrowsThePanelAndFollowsToCompletion() throws {
+  func testUnevenStreamingGrowsThePanelAndCompletes() throws {
     driver.launch()
     let emptyHeight = driver.panel.frame.height
 

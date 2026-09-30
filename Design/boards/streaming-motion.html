@@ -37,7 +37,7 @@
     <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves <span class="fading">read and write performance</span><span class="cursor"></span></div></div>
   </section>
   <cida-motion-note>逐字在光标后淡入:每字 120ms(motion-char-in-ms)ease-out(motion-ease-char-in),blur 2px(motion-blur-char-px)→ 0;光标随书写头前进,无呼吸;上屏粒度为字素簇</cida-motion-note>
-  <cida-motion-note>每换一行结果栏与面板高度 +26pt,150ms(motion-height-ms)ease-out(motion-ease-height),不逐 token 跳变;到面板上限(panel-max-ratio)后结果栏内部滚动并跟随尾部 — 用户上滚立即解除,滚回底部自动恢复</cida-motion-note>
+  <cida-motion-note>每换一行结果栏与面板高度 +26pt,150ms(motion-height-ms)ease-out(motion-ease-height),不逐 token 跳变;到面板上限(panel-max-ratio)后结果栏停在开头,新文字在下方继续写、底边渐隐 — 用户滚到末尾才跟随尾部,上滚即解除</cida-motion-note>
   <div class="divider"></div>
 
   <div class="state-label">T3 — 完成</div>

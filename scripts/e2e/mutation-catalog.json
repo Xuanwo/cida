@@ -37,8 +37,8 @@
       "description": "Keep the previous result record instead of replacing it with the new submission.",
       "contracts": ["PANEL-SINGLE-RESULT"],
       "file": "Sources/Cida/AppModel.swift",
-      "before": "    generationState = .waiting(entryID: record.id)\n    result = record\n    requestResultFollow()",
-      "after": "    generationState = .waiting(entryID: record.id)\n    if result == nil {\n      result = record\n    }\n    requestResultFollow()",
+      "before": "    generationState = .waiting(entryID: record.id)\n    result = record\n    return record",
+      "after": "    generationState = .waiting(entryID: record.id)\n    if result == nil {\n      result = record\n    }\n    return record",
       "occurrences": 1,
       "unitTests": [
         "MutationContractTests/testSubmitReplacesTheResultAndKeepsTheSource",

@@ -112,6 +112,13 @@ enum CidaDesign {
     static let component: CGFloat = 12
   }
 
+  /// `result-fade*` (`Design/spec/panel.md`): an edge of the result pane with
+  /// text beyond it fades the ink over `length`, down to `inkFloor` at the edge.
+  enum ResultFade {
+    static let length: CGFloat = 58
+    static let inkFloor: CGFloat = 0.04
+  }
+
   /// `Design/spec/panel.md`: the floating panel's fixed width and the
   /// screen-relative limits of its height.
   enum Panel {

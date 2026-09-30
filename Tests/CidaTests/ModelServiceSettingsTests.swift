@@ -99,7 +99,14 @@ final class ModelServiceSettingsTests: XCTestCase {
 
     XCTAssertEqual(model.settings.modelService.model, "deepseek-reasoner")
     XCTAssertTrue(model.isModelServiceRecentlyUpdated)
-    try await Task.sleep(for: .seconds(3.2))
+    try await Task.sleep(for: .seconds(2.5))
+    XCTAssertTrue(model.isModelServiceRecentlyUpdated, "Still recent before three seconds")
+    // The three-second task can resume late on a loaded machine; wait for it
+    // rather than racing it with a fixed sleep.
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while model.isModelServiceRecentlyUpdated, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(20))
+    }
     XCTAssertFalse(model.isModelServiceRecentlyUpdated)
 
     model.applyExternalSettings(changed, lastCheck: nil)

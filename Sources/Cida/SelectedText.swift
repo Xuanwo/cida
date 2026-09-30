@@ -5,14 +5,20 @@ import os
 
 /// What the frontmost application says about its selection.
 enum SelectionAnswer: Equatable, Sendable {
-  /// The application answered: the trimmed selection, or nil when nothing is
-  /// selected. Selections Cida must not read (a password field, Cida itself,
-  /// no Accessibility permission) are answered as nothing selected too.
-  case selection(String?)
+  /// The focused element's selection, trimmed.
+  case selection(String)
+  /// The focused element has nothing selected. The selection can still be
+  /// somewhere else: Telegram Desktop keeps the focus in its message field
+  /// while text in a message is selected. `elementText` is the text the
+  /// element holds, nil when it does not say.
+  case nothingSelected(elementText: String?)
   /// The application cannot say what is selected: it has no focused
   /// element, or its focused element does not offer `kAXSelectedText`. The
   /// error is what Accessibility reported.
   case unreadable(AXError)
+  /// There is nothing to bring in and nothing to copy: a password field,
+  /// Cida itself, no Accessibility permission, or no answer in time.
+  case withheld
 }
 
 /// Where the global shortcut first asks for the text selected in the
@@ -26,8 +32,8 @@ protocol SelectedTextSource: Sendable {
   @MainActor func currentSelection() async -> SelectionAnswer
 }
 
-/// Gets the selection out of an application that cannot say what it is, by
-/// having the application copy it (`Design/spec/panel.md` §一 复制兜底).
+/// Gets the selection out of an application whose focused element cannot
+/// give it, by having the application copy it (`Design/spec/panel.md` §一 复制兜底).
 protocol SelectionCopier: Sendable {
   /// The copied text, trimmed, or nil when the application copied nothing
   /// that reads as text. The pasteboard is left as it was.
@@ -37,8 +43,10 @@ protocol SelectionCopier: Sendable {
 extension SelectionAnswer: CustomStringConvertible {
   var description: String {
     switch self {
-    case .selection(let selection): selection == nil ? "none" : "selection"
+    case .selection: "selection"
+    case .nothingSelected: "none"
     case .unreadable(let error): "unreadable(\(error.rawValue))"
+    case .withheld: "withheld"
     }
   }
 }
@@ -62,9 +70,8 @@ enum SelectedText {
   }
 
   /// Reads the selection through `source`, and copies it through `copier`
-  /// only when the application cannot answer: an application that answers
-  /// "nothing selected" may copy its whole line on ⌘C. `record` hears how
-  /// the selection was found.
+  /// when the focused element has none to give. `record` hears how the
+  /// selection was found.
   @MainActor
   static func read(
     from source: any SelectedTextSource, copyingWith copier: any SelectionCopier,
@@ -74,21 +81,33 @@ enum SelectedText {
     let startedAt = clock.now
     let answer = await answer(from: source)
     record("selection-answer \(answer) ms=\(startedAt.duration(to: clock.now).milliseconds)")
+    let elementText: String?
     switch answer {
     case .selection(let selection):
       return selection
+    case .withheld:
+      return nil
     case .unreadable:
-      let copiedAt = clock.now
-      let copied = await copier.copySelection()
-      record(
-        "selection-copied found=\(copied != nil) ms=\(copiedAt.duration(to: clock.now).milliseconds)")
-      return copied
+      elementText = nil
+    case .nothingSelected(let text):
+      elementText = text
     }
+    let copiedAt = clock.now
+    let copied = await copier.copySelection()
+    // With nothing selected, VS Code copies the line the cursor is on, and
+    // that line is in the element's own text; a selection somewhere else is
+    // not.
+    let isElementLine = copied.map { elementText?.contains($0) ?? false } ?? false
+    record(
+      "selection-copied found=\(copied != nil) element-line=\(isElementLine) ms=\(copiedAt.duration(to: clock.now).milliseconds)"
+    )
+    return isElementLine ? nil : copied
   }
 
   /// Asks `source` but gives up at its deadline: an application that does
   /// not answer must not hold the panel back, and one that is that slow would
-  /// not copy in time either. A late answer is dropped.
+  /// not copy in time either, so it is not asked to. A late answer is
+  /// dropped.
   @MainActor
   static func answer(from source: any SelectedTextSource) async -> SelectionAnswer {
     await withCheckedContinuation { continuation in
@@ -108,7 +127,7 @@ enum SelectedText {
       }
       Task {
         try? await Task.sleep(for: deadline)
-        resume(.selection(nil))
+        resume(.withheld)
       }
     }
   }
@@ -130,7 +149,7 @@ struct AccessibilitySelectedTextSource: SelectedTextSource {
       let application = NSWorkspace.shared.frontmostApplication,
       application.processIdentifier != ProcessInfo.processInfo.processIdentifier
     else {
-      return .selection(nil)
+      return .withheld
     }
     let processIdentifier = application.processIdentifier
     return await withCheckedContinuation { continuation in
@@ -164,7 +183,7 @@ struct AccessibilitySelectedTextSource: SelectedTextSource {
     if AXUIElementCopyAttributeValue(focused, kAXSubroleAttribute as CFString, &subrole)
       == .success, subrole as? String == kAXSecureTextFieldSubrole
     {
-      return .selection(nil)
+      return .withheld
     }
     var selected: CFTypeRef?
     switch AXUIElementCopyAttributeValue(
@@ -172,13 +191,26 @@ struct AccessibilitySelectedTextSource: SelectedTextSource {
     {
     case .success:
       guard let text = selected as? String else { return .unreadable(.illegalArgument) }
-      return .selection(SelectedText.normalized(text))
+      if let selection = SelectedText.normalized(text) {
+        return .selection(selection)
+      }
+      return .nothingSelected(elementText: heldText(of: focused))
     // The element has the attribute but nothing in it: nothing is selected.
     case .noValue:
-      return .selection(nil)
+      return .nothingSelected(elementText: heldText(of: focused))
     case let error:
       return .unreadable(error)
     }
+  }
+
+  private static func heldText(of element: AXUIElement) -> String? {
+    var value: CFTypeRef?
+    guard
+      AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success
+    else {
+      return nil
+    }
+    return value as? String
   }
 }
 

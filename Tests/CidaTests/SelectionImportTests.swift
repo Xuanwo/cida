@@ -109,24 +109,48 @@ final class SelectionImportTests: XCTestCase {
     XCTAssertEqual(answered, "selected")
   }
 
-  /// §一 复制兜底: only an application that cannot answer is asked to copy;
-  /// one that answers "nothing selected" may copy its whole line on ⌘C.
-  func testOnlyAnUnreadableSelectionIsCopied() async {
-    let copier = RecordingCopier()
-    let empty = await SelectedText.read(
-      from: FixedSelectedTextSource(answer: .selection(nil)), copyingWith: copier)
-    XCTAssertNil(empty)
-    XCTAssertEqual(copier.copies, 0)
-
+  /// §一 复制兜底: whatever the focused element cannot give is copied,
+  /// except where Cida must not look.
+  func testASelectionTheFocusedElementCannotGiveIsCopied() async {
+    let copier = RecordingCopier(copied: "copied")
     let read = await SelectedText.read(
       from: FixedSelectedTextSource(answer: .selection("read")), copyingWith: copier)
     XCTAssertEqual(read, "read")
     XCTAssertEqual(copier.copies, 0)
 
-    let copied = await SelectedText.read(
+    let withheld = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .withheld), copyingWith: copier)
+    XCTAssertNil(withheld)
+    XCTAssertEqual(copier.copies, 0, "A password field or Cida itself is never copied")
+
+    let unreadable = await SelectedText.read(
       from: FixedSelectedTextSource(answer: .unreadable(.attributeUnsupported)), copyingWith: copier)
-    XCTAssertEqual(copied, "copied")
+    XCTAssertEqual(unreadable, "copied")
     XCTAssertEqual(copier.copies, 1)
+
+    // Telegram Desktop: the focus stays in the empty message field while
+    // text in a message is selected.
+    let beside = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .nothingSelected(elementText: "")),
+      copyingWith: copier)
+    XCTAssertEqual(beside, "copied")
+    XCTAssertEqual(copier.copies, 2)
+  }
+
+  /// With nothing selected, VS Code copies the line the cursor is on.
+  func testACopiedLineOfTheFocusedElementIsNoSelection() async {
+    let copier = RecordingCopier(copied: "let engine = Engine()")
+    let line = await SelectedText.read(
+      from: FixedSelectedTextSource(
+        answer: .nothingSelected(elementText: "import Storage\nlet engine = Engine()\n")),
+      copyingWith: copier)
+    XCTAssertNil(line)
+    XCTAssertEqual(copier.copies, 1)
+
+    let unknown = await SelectedText.read(
+      from: FixedSelectedTextSource(answer: .nothingSelected(elementText: nil)),
+      copyingWith: copier)
+    XCTAssertEqual(unknown, "let engine = Engine()", "An element that holds no text rules nothing out")
   }
 
   func testCopiedSelectionIsTakenAndThePasteboardPutBack() async throws {
@@ -260,11 +284,16 @@ private struct FixedSelectedTextSource: SelectedTextSource {
 
 @MainActor
 private final class RecordingCopier: SelectionCopier {
+  private let copied: String
   private(set) var copies = 0
+
+  init(copied: String = "copied") {
+    self.copied = copied
+  }
 
   func copySelection() async -> String? {
     copies += 1
-    return "copied"
+    return copied
   }
 }
 

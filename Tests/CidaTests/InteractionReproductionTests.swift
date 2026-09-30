@@ -253,6 +253,15 @@ final class InteractionReproductionTests: XCTestCase {
     defer { window.orderOut(nil) }
     window.contentView?.layoutSubtreeIfNeeded()
 
+    /// A recorder that just resigned ends its recording on the next turn of the run loop
+    /// (`ShortcutCaptureNSView.resignFirstResponder`); that late end would cancel a recording
+    /// started in the same turn, which no person can do, so let it land first.
+    func startRecording() async throws {
+      try await Task.sleep(for: .milliseconds(20))
+      model.recordingShortcut = .showPanel
+      try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    }
+
     model.recordingShortcut = .showPanel
     try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
     let recorder = try XCTUnwrap(window.firstResponder as? ShortcutCaptureNSView)
@@ -269,30 +278,26 @@ final class InteractionReproductionTests: XCTestCase {
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     try await waitUntil(timeout: .seconds(5)) { !(window.firstResponder is ShortcutCaptureNSView) }
 
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_Escape, "\u{1B}", []))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(model.settings.shortcut, recorded, "Escape keeps the combination")
 
     // A combination the system refuses leaves the current one in place.
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_ANSI_Q, "q", [.command]))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(model.settings.shortcut, recorded)
     XCTAssertEqual(applied.values.count, 2)
 
     // ⌫ alone leaves the action without a shortcut; the system only releases it.
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_Delete, "\u{7F}", []))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertNil(model.settings.shortcut)
     XCTAssertEqual(applied.values.last, .some(nil))
     // ⌥⌫ is a combination like any other.
-    model.recordingShortcut = .showPanel
-    try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
+    try await startRecording()
     recorder.record(keyEvent(kVK_Delete, "\u{7F}", [.option]))
     try await waitUntil(timeout: .seconds(5)) { model.recordingShortcut == nil }
     XCTAssertEqual(
@@ -394,15 +399,27 @@ final class InteractionReproductionTests: XCTestCase {
     let content = try XCTUnwrap(
       ([contentView] + contentView.subviews).first { $0.accessibilityLabel() == "设置窗口内容" })
     /// Waits for a move to end, checking on every turn of the run loop that the content's top
-    /// stays on the window's top edge while the frame moves.
+    /// stays on the window's top edge while the frame moves. Every move changes the height, so
+    /// the move has ended once the height has left where it started and held for 0.2 s; a
+    /// loaded machine may start it late, so there is no fixed window.
     func settle(_ move: String) {
-      let end = Date().addingTimeInterval(0.4)
+      let startHeight = window.frame.height
+      let deadline = Date().addingTimeInterval(2)
+      var lastHeight = startHeight
+      var heldSince = Date()
       var drift: [String] = []
-      while Date() < end {
+      while Date() < deadline {
         RunLoop.current.run(until: Date().addingTimeInterval(0.004))
+        let height = window.frame.height
         let top = content.convert(content.bounds, to: nil).maxY
-        if abs(top - window.frame.height) > 0.5 {
-          drift.append(String(format: "%.0f in %.0f", top, window.frame.height))
+        if abs(top - height) > 0.5 {
+          drift.append(String(format: "%.0f in %.0f", top, height))
+        }
+        if abs(height - lastHeight) > 0.1 {
+          lastHeight = height
+          heldSince = Date()
+        } else if abs(height - startHeight) > 0.5, Date().timeIntervalSince(heldSince) >= 0.2 {
+          break
         }
       }
       XCTAssertEqual(drift, [], "\(move): the tabs stay under the title while the window moves")
@@ -433,7 +450,7 @@ final class InteractionReproductionTests: XCTestCase {
   }
 
   /// A growing pane must not scroll its text up and snap it back on every new
-  /// line: the tail is followed only once the pane has reached its cap.
+  /// line, and a result that outgrows the pane stays at its start.
   func testStreamingResultDoesNotBounceWhileThePaneGrows() async throws {
     let source = String(repeating: ">> [ ] Download links are valid and checksums match.\n", count: 80)
     let piece = "这是一段较长的中文译文，用来观察流式输出时结果栏的高度与滚动位置是否会来回跳动。"
@@ -455,7 +472,8 @@ final class InteractionReproductionTests: XCTestCase {
     var scrollReversals: [String] = []
     var panelShrinks: [String] = []
     var sourceTopDrift: [String] = []
-    var scrolledPastTheCap = false
+    var scrolledAwayFromTheStart: [String] = []
+    var outgrewThePane = false
     let composer = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))
     let composerScrollView = try XCTUnwrap(composer.enclosingScrollView)
     func sourceTopInset() -> CGFloat {
@@ -475,7 +493,10 @@ final class InteractionReproductionTests: XCTestCase {
       if panelHeight < lastPanelHeight - 0.5 {
         panelShrinks.append("\(lastPanelHeight) -> \(panelHeight)")
       }
-      if scrollY > 0 { scrolledPastTheCap = true }
+      if scrollY > 0.5 { scrolledAwayFromTheStart.append(String(format: "%.1f", scrollY)) }
+      if scrollView.container.frame.height > scrollView.contentView.bounds.height + 1 {
+        outgrewThePane = true
+      }
       let sourceTop = sourceTopInset()
       if abs(sourceTop - initialSourceTop) > 0.5 {
         sourceTopDrift.append(String(format: "%.1f", sourceTop))
@@ -485,7 +506,9 @@ final class InteractionReproductionTests: XCTestCase {
     }
     streaming.cancel()
 
-    XCTAssertTrue(scrolledPastTheCap, "The result outgrew the pane and followed its tail")
+    XCTAssertTrue(outgrewThePane, "The result outgrew the pane")
+    XCTAssertEqual(
+      scrolledAwayFromTheStart, [], "The result stays at its start while it streams below the fold")
     XCTAssertEqual(scrollReversals, [], "The text never jumped back down")
     XCTAssertEqual(panelShrinks, [], "The panel only grew")
     XCTAssertEqual(
@@ -497,6 +520,53 @@ final class InteractionReproductionTests: XCTestCase {
       controller.panel.frame.height,
       PanelHeightBudget.automation.panelMaxHeight - CidaDesign.Typography.resultLineHeightCJK,
       "At its cap the result pane shows whole lines")
+    assertTestProcessIsNotFrontmost()
+  }
+
+  /// Scrolling to the end of a streaming result is asking to watch it: the
+  /// pane follows the tail from then on.
+  func testStreamingResultFollowsItsTailOnceTheUserScrollsThere() async throws {
+    let chunks = (0..<100).map { index in
+      (index % 9 == 8 ? "\n" : "") + "用户滚到底部之后，结果栏跟着新写出的文字往下走。"
+    }
+    let model = AppModel(
+      inputText: "Source",
+      service: DelayedStreamingService(chunks: chunks, delay: .milliseconds(6))
+    )
+    let controller = makeHiddenPanel(model: model)
+    controller.panel.orderBack(nil)
+    let hostingView = try XCTUnwrap(controller.contentView)
+    try await Task.sleep(for: .milliseconds(150))
+
+    let streaming = Task { await model.process(text: "Source") }
+    defer { streaming.cancel() }
+    var scrollView: ResultScrollView?
+    try await waitUntil(timeout: .seconds(4)) {
+      guard let found = self.firstResultScrollView(in: hostingView) else { return false }
+      scrollView = found
+      return found.container.frame.height
+        > found.contentView.bounds.height + 2 * CidaDesign.Typography.resultLineHeightCJK
+    }
+    let pane = try XCTUnwrap(scrollView)
+    XCTAssertEqual(pane.contentView.bounds.minY, 0, accuracy: 0.5, "Nothing scrolled before the user")
+
+    pane.contentView.scroll(
+      to: NSPoint(x: 0, y: pane.container.frame.height - pane.contentView.bounds.height))
+    pane.reflectScrolledClipView(pane.contentView)
+    let wheel = try XCTUnwrap(
+      CGEvent(
+        scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 0, wheel2: 0, wheel3: 0))
+    pane.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: wheel)))
+    let reachedTheTailAt = pane.contentView.bounds.minY
+
+    try await waitUntil(timeout: .seconds(2)) {
+      pane.contentView.bounds.minY > reachedTheTailAt + CidaDesign.Typography.resultLineHeightCJK
+    }
+    XCTAssertLessThanOrEqual(
+      pane.container.frame.height - pane.contentView.bounds.maxY,
+      CidaDesign.Typography.resultLineHeightCJK,
+      "The tail stays in view")
+    XCTAssertEqual(model.result?.phase, .streaming)
     assertTestProcessIsNotFrontmost()
   }
 

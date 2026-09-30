@@ -57,6 +57,8 @@ final class DesignTokenTests: XCTestCase {
       ("space-entry-y", CidaDesign.Spacing.entryVertical),
       ("space-pane-y", CidaDesign.Spacing.paneVertical),
       ("space-result-y", CidaDesign.Spacing.resultVertical),
+      ("result-fade", CidaDesign.ResultFade.length),
+      ("result-fade-floor", CidaDesign.ResultFade.inkFloor),
       ("font-size-body", CidaDesign.Typography.bodySize),
       ("font-size-result", CidaDesign.Typography.resultSize),
       ("font-size-result-cjk", CidaDesign.Typography.resultSizeCJK),

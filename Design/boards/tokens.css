@@ -79,6 +79,11 @@
   --space-pane-y: 18px;
   --space-result-y: 22px;
 
+  /* Result pane: an edge with text beyond it fades the ink over this length
+     down to this opacity (spec/panel.md) */
+  --result-fade: 58px;
+  --result-fade-floor: 0.04;
+
   /* Panel */
   --panel-width: 800px;
   --panel-top-ratio: 0.2;

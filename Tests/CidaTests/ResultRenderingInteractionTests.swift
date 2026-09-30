@@ -7,6 +7,86 @@ import XCTest
 
 @MainActor
 extension InteractionReproductionTests {
+  /// Each edge of a long result with text beyond it fades: as deep as the
+  /// hidden text up to `ResultFade.length`, flush with that edge, and painted
+  /// over the ink so the last visible line reads as continuing.
+  func testALongResultFadesTheEdgesWithTextBeyondThem() async throws {
+    let model = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
+    model.setResultForTesting(ResultRecord.designLong())
+    let controller = makeHiddenPanel(model: model)
+    controller.panel.orderBack(nil)
+    let hostingView = try XCTUnwrap(controller.contentView)
+    try await Task.sleep(for: .milliseconds(100))
+    let pane = try XCTUnwrap(firstResultScrollView(in: hostingView))
+    let length = CidaDesign.ResultFade.length
+    try await waitUntil(timeout: .seconds(2)) {
+      hostingView.layoutSubtreeIfNeeded()
+      return pane.container.frame.height > pane.contentView.bounds.height + 2 * length
+    }
+    let fades = pane.subviews.compactMap { $0 as? ResultEdgeFadeView }
+    let top = try XCTUnwrap(fades.first { $0.edge == .top })
+    let bottom = try XCTUnwrap(fades.first { $0.edge == .bottom })
+    func depth(_ fade: ResultEdgeFadeView) -> CGFloat { fade.isHidden ? 0 : fade.frame.height }
+    func scroll(to y: CGFloat) {
+      pane.contentView.scroll(to: NSPoint(x: 0, y: y))
+      pane.reflectScrolledClipView(pane.contentView)
+    }
+    let end = pane.container.frame.height - pane.contentView.bounds.height
+
+    XCTAssertEqual(depth(top), 0, "Nothing is above the start")
+    XCTAssertEqual(depth(bottom), length)
+    let clipInWindow = pane.contentView.convert(pane.contentView.bounds, to: nil)
+    XCTAssertEqual(bottom.convert(bottom.bounds, to: nil).minY, clipInWindow.minY, accuracy: 0.5)
+    XCTAssertEqual(bottom.convert(bottom.bounds, to: nil).width, clipInWindow.width, accuracy: 0.5)
+    XCTAssertNil(pane.hitTest(pane.convert(NSPoint(x: bottom.frame.midX, y: bottom.frame.midY), to: pane.superview)) as? ResultEdgeFadeView)
+
+    // The last visible line is painted nearer the paper than a line above it,
+    // in the panel as a whole: the fade covers the paper drawn behind the pane.
+    let panelRect = hostingView.bounds
+    let rep = try XCTUnwrap(hostingView.bitmapImageRepForCachingDisplay(in: panelRect))
+    hostingView.cacheDisplay(in: panelRect, to: rep)
+    let scale = CGFloat(rep.pixelsWide) / panelRect.width
+    func pixelRows(of rectInClip: NSRect) -> Range<Int> {
+      let rect = pane.contentView.convert(rectInClip, to: hostingView)
+      let top = hostingView.isFlipped ? rect.minY : panelRect.height - rect.maxY
+      return Int(top * scale)..<Int((top + rect.height) * scale)
+    }
+    func strongestInk(in rectInClip: NSRect) throws -> CGFloat {
+      let rows = pixelRows(of: rectInClip)
+      // The pane's left inset is bare paper.
+      let paper = try XCTUnwrap(rep.colorAt(x: Int(8 * scale), y: rows.lowerBound))
+      var strongest: CGFloat = 0
+      for y in rows {
+        for x in stride(from: Int(CidaDesign.Spacing.windowHorizontal * scale), to: Int(400 * scale), by: 2) {
+          guard let color = rep.colorAt(x: x, y: y) else { continue }
+          strongest = max(strongest, abs(color.brightnessComponent - paper.brightnessComponent))
+        }
+      }
+      return strongest
+    }
+    let line = CidaDesign.Typography.resultLineHeight
+    let visible = pane.contentView.bounds
+    let lastLine = NSRect(x: 0, y: visible.maxY - line, width: visible.width, height: line)
+    let middleLine = NSRect(x: 0, y: visible.midY - line / 2, width: visible.width, height: line)
+    let middleInk = try strongestInk(in: middleLine)
+    XCTAssertGreaterThan(middleInk, 0.5, "A line away from the edges is full ink")
+    XCTAssertLessThan(try strongestInk(in: lastLine), middleInk * 0.6, "The last visible line fades")
+
+    scroll(to: 20)
+    XCTAssertEqual(depth(top), 20, "The top fade is as deep as the text above")
+    XCTAssertEqual(top.convert(top.bounds, to: nil).maxY, clipInWindow.maxY, accuracy: 0.5)
+    XCTAssertEqual(depth(bottom), length)
+    scroll(to: end / 2)
+    XCTAssertEqual(depth(top), length)
+    XCTAssertEqual(depth(bottom), length)
+    scroll(to: end - 10)
+    XCTAssertEqual(depth(bottom), 10, "The bottom fade shrinks away toward the end")
+    scroll(to: end)
+    XCTAssertEqual(depth(top), length)
+    XCTAssertEqual(depth(bottom), 0, "Nothing is below the end")
+    assertTestProcessIsNotFrontmost()
+  }
+
   func testLongResultUsesIncrementalNaturalTextLayoutWithoutNestedScrolling() {
     let resultView = ResultTextContainer(
       frame: NSRect(x: 0, y: 0, width: 720, height: ResultTextContainer.minimumHeight)
