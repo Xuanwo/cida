@@ -249,6 +249,144 @@ final class SelectionImportTests: XCTestCase {
     XCTAssertEqual(pasteboard.changeCount, changeCount)
   }
 
+  func testRaycastClipboardHandoffPastesTheChosenClipboardText() async throws {
+    let pasteboard = privatePasteboard()
+    pasteboard.clearContents()
+    pasteboard.setString("before", forType: .string)
+    let handoff = ClipboardManagerPasteHandoff(
+      pasteboard: pasteboard, pollInterval: .milliseconds(5),
+      activationTimeout: .milliseconds(100), selectionTimeout: .milliseconds(300),
+      inactiveGrace: .milliseconds(40), pasteSuppressionDuration: .milliseconds(40))
+    var pasted: String?
+    var hidden = false
+
+    XCTAssertTrue(
+      handoff.begin(isClipboardManagerActive: { true }) { text in
+        pasted = text
+        return true
+      } hide: {
+        hidden = true
+      })
+
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(20))
+      pasteboard.clearContents()
+      pasteboard.setString("chosen from Raycast", forType: .string)
+    }
+
+    try await waitUntil(timeout: .seconds(1)) {
+      pasted == "chosen from Raycast"
+    }
+    XCTAssertFalse(hidden)
+    XCTAssertNil(pasteboard.string(forType: .string), "Raycast's synthetic paste has no text to send")
+    try await waitUntil(timeout: .seconds(1)) {
+      pasteboard.string(forType: .string) == "chosen from Raycast"
+    }
+  }
+
+  func testRaycastClipboardHandoffWaitsForLateActivation() async throws {
+    let pasteboard = privatePasteboard()
+    pasteboard.clearContents()
+    pasteboard.setString("before", forType: .string)
+    let handoff = ClipboardManagerPasteHandoff(
+      pasteboard: pasteboard, pollInterval: .milliseconds(5),
+      activationTimeout: .milliseconds(100), selectionTimeout: .milliseconds(300),
+      inactiveGrace: .milliseconds(40), pasteSuppressionDuration: .milliseconds(40))
+    var isRaycastActive = false
+    var pasted: String?
+
+    XCTAssertTrue(
+      handoff.begin(isClipboardManagerActive: { isRaycastActive }) { text in
+        pasted = text
+        return true
+      } hide: {
+        XCTFail("Raycast activated before the handoff gave up")
+      })
+
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(20))
+      isRaycastActive = true
+      try? await Task.sleep(for: .milliseconds(20))
+      pasteboard.clearContents()
+      pasteboard.setString("chosen after activation", forType: .string)
+    }
+
+    try await waitUntil(timeout: .seconds(1)) {
+      pasted == "chosen after activation"
+    }
+  }
+
+  func testKeyboardClipboardHandoffDoesNotRequireApplicationActivation() async throws {
+    let pasteboard = privatePasteboard()
+    pasteboard.clearContents()
+    pasteboard.setString("before", forType: .string)
+    let handoff = ClipboardManagerPasteHandoff(
+      pasteboard: pasteboard, pollInterval: .milliseconds(5),
+      activationTimeout: .milliseconds(30), selectionTimeout: .milliseconds(200),
+      inactiveGrace: .milliseconds(20), pasteSuppressionDuration: .milliseconds(40))
+    var pasted: String?
+    var pasteboardTextDuringPaste: String?
+    var hidden = false
+
+    handoff.beginKeyboardInvocation { text in
+      pasteboardTextDuringPaste = pasteboard.string(forType: .string)
+      pasted = text
+      return true
+    } hide: {
+      hidden = true
+    }
+
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(20))
+      pasteboard.clearContents()
+      pasteboard.setString("chosen without activation", forType: .string)
+    }
+
+    try await waitUntil(timeout: .seconds(1)) {
+      pasted == "chosen without activation"
+    }
+    XCTAssertFalse(hidden)
+    XCTAssertNil(pasteboardTextDuringPaste, "The pasteboard is suppressed before Cida inserts the text")
+    XCTAssertNil(pasteboard.string(forType: .string), "The old focused app must not receive text")
+  }
+
+  func testClipboardHandoffHidesWhenNoClipboardManagerActivates() async throws {
+    let pasteboard = privatePasteboard()
+    let handoff = ClipboardManagerPasteHandoff(
+      pasteboard: pasteboard, pollInterval: .milliseconds(5),
+      activationTimeout: .milliseconds(30), selectionTimeout: .milliseconds(100),
+      inactiveGrace: .milliseconds(20), pasteSuppressionDuration: .milliseconds(40))
+    var hidden = false
+
+    XCTAssertTrue(
+      handoff.begin(isClipboardManagerActive: { false }) { _ in
+        XCTFail("No clipboard manager should not paste")
+        return true
+      } hide: {
+        hidden = true
+      })
+    try await waitUntil(timeout: .seconds(1)) { hidden }
+  }
+
+  func testRaycastClipboardHandoffHidesWhenNoClipboardItemArrives() async throws {
+    let pasteboard = privatePasteboard()
+    let handoff = ClipboardManagerPasteHandoff(
+      pasteboard: pasteboard, pollInterval: .milliseconds(5),
+      activationTimeout: .milliseconds(30), selectionTimeout: .milliseconds(100),
+      inactiveGrace: .milliseconds(20), pasteSuppressionDuration: .milliseconds(40))
+    var hidden = false
+
+    XCTAssertTrue(
+      handoff.begin(isClipboardManagerActive: { true }) { _ in
+        XCTFail("No clipboard change should be pasted")
+        return true
+      } hide: {
+        hidden = true
+      })
+
+    try await waitUntil(timeout: .seconds(1)) { hidden }
+  }
+
   private func privatePasteboard() -> NSPasteboard {
     let pasteboard = NSPasteboard(name: .init("io.xuanwo.cida.tests.\(UUID().uuidString)"))
     addTeardownBlock { @MainActor in pasteboard.releaseGlobally() }

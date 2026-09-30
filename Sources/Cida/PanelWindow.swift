@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
 /// The floating panel that is Cida's main interface (`Design/spec/panel.md`
@@ -58,6 +59,7 @@ final class PanelController {
   let panel: CidaPanel
   private let model: AppModel
   private let hostingView: NSHostingView<PanelView>
+  private let clipboardHandoff: ClipboardManagerPasteHandoff
   private var keyMonitor: Any?
   private var resignObserver: NSObjectProtocol?
   private var contentHeight: CGFloat = 120
@@ -76,11 +78,13 @@ final class PanelController {
   init(
     model: AppModel,
     hidesOnResignKey: Bool,
-    openSettings: @escaping @MainActor () -> Void
+    openSettings: @escaping @MainActor () -> Void,
+    clipboardHandoff: ClipboardManagerPasteHandoff = ClipboardManagerPasteHandoff()
   ) {
     self.model = model
     self.hidesOnResignKey = hidesOnResignKey
     self.openSettings = openSettings
+    self.clipboardHandoff = clipboardHandoff
     panel = CidaPanel(width: CidaDesign.Panel.width)
 
     // Sized before the hosting view joins it: the hosting view's flexible
@@ -112,6 +116,12 @@ final class PanelController {
         guard let self else { return }
         self.model.isCopyMenuOpen = false
         guard self.hidesOnResignKey, self.panel.isVisible else { return }
+        if self.clipboardHandoff.isWaiting { return }
+        if !Self.currentEventIsMouseDismissal() {
+          self.beginKeyboardClipboardManagerHandoff()
+          return
+        }
+        if self.beginClipboardManagerHandoffIfNeeded() { return }
         self.hide()
       }
     }
@@ -187,6 +197,7 @@ final class PanelController {
   /// (`Design/spec/lifecycle.md` §一).
   func hide() {
     guard panel.isVisible else { return }
+    clipboardHandoff.cancel()
     panel.orderOut(nil)
     model.isCopyMenuOpen = false
     model.dismissPanelMessage()
@@ -268,6 +279,82 @@ final class PanelController {
     )
   }
 
+  private func beginClipboardManagerHandoffIfNeeded() -> Bool {
+    clipboardHandoff.begin(
+      isClipboardManagerActive: Self.isSupportedClipboardManagerActive,
+      paste: { [weak self] text in
+        self?.pasteClipboardManagerSelection(text) ?? false
+      },
+      hide: { [weak self] in
+        guard let self, self.panel.isVisible, !self.panel.isKeyWindow else { return }
+        self.hide()
+      }
+    )
+  }
+
+  private func beginKeyboardClipboardManagerHandoff() {
+    clipboardHandoff.beginKeyboardInvocation(
+      paste: { [weak self] text in
+        self?.pasteClipboardManagerSelection(text) ?? false
+      },
+      hide: { [weak self] in
+        guard let self, self.panel.isVisible, !self.panel.isKeyWindow else { return }
+        self.hide()
+      }
+    )
+  }
+
+  private static func isSupportedClipboardManagerActive() -> Bool {
+    if ClipboardManagerPasteHandoff.isSupported(
+      bundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+    {
+      return true
+    }
+    return ClipboardManagerPasteHandoff.supportedBundleIdentifiers.contains { bundleIdentifier in
+      NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+        .contains { $0.isActive }
+    }
+  }
+
+  private static func currentEventIsMouseDismissal() -> Bool {
+    guard let event = NSApp.currentEvent else { return false }
+    switch event.type {
+    case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+      return true
+    default:
+      return false
+    }
+  }
+
+  private func pasteClipboardManagerSelection(_ text: String) -> Bool {
+    guard
+      panel.isVisible,
+      let contentView = panel.contentView,
+      let input = Self.firstComposerInput(in: contentView)
+    else {
+      return false
+    }
+    panel.makeKeyAndOrderFront(nil)
+    panel.makeFirstResponder(input)
+    model.requestInputFocus()
+    let prepared = ComposerPreparedPaste(text)
+    if input.performPaste(prepared) { return true }
+    input.insertText(text, replacementRange: input.selectedRange())
+    return true
+  }
+
+  private static func firstComposerInput(in view: NSView) -> ComposerNativeTextView? {
+    if let input = view as? ComposerNativeTextView,
+      input.accessibilityIdentifier() == "composer-input"
+    {
+      return input
+    }
+    for child in view.subviews {
+      if let found = firstComposerInput(in: child) { return found }
+    }
+    return nil
+  }
+
   /// Panel-level keys (`Design/spec/panel.md` §五). Text editing keys stay
   /// with the editor; these only fire while the panel is key.
   private func installKeyMonitor() {
@@ -279,6 +366,11 @@ final class PanelController {
       let modifiers = event.modifierFlags
         .intersection(.deviceIndependentFlagsMask)
         .subtracting(.capsLock)
+
+      if ClipboardManagerShortcutRouting.isInvocationShortcut(event, modifiers: modifiers) {
+        self.beginKeyboardClipboardManagerHandoff()
+        return event
+      }
 
       if CopyShortcutRouting.isImageShortcut(event) {
         return self.model.copyResultImage() ? nil : event
@@ -359,6 +451,196 @@ final class PanelController {
       return underPointer
     }
     return NSScreen.main
+  }
+}
+
+/// Keeps the panel alive while a clipboard manager writes the item the user picked,
+/// then lets the source editor paste it as if the manager's simulated paste had
+/// reached the non-activating panel.
+@MainActor
+final class ClipboardManagerPasteHandoff {
+  static let supportedBundleIdentifiers: Set<String> = ["com.raycast.macos"]
+
+  private let pasteboard: NSPasteboard
+  private let pollInterval: Duration
+  private let activationTimeout: Duration
+  private let selectionTimeout: Duration
+  private let inactiveGrace: Duration
+  private let pasteSuppressionDuration: Duration
+  private var task: Task<Void, Never>?
+
+  var isWaiting: Bool {
+    task != nil
+  }
+
+  init(
+    pasteboard: NSPasteboard = .general,
+    pollInterval: Duration = .milliseconds(20),
+    activationTimeout: Duration = .milliseconds(300),
+    selectionTimeout: Duration = .seconds(30),
+    inactiveGrace: Duration = .milliseconds(250),
+    pasteSuppressionDuration: Duration = .milliseconds(700)
+  ) {
+    self.pasteboard = pasteboard
+    self.pollInterval = pollInterval
+    self.activationTimeout = activationTimeout
+    self.selectionTimeout = selectionTimeout
+    self.inactiveGrace = inactiveGrace
+    self.pasteSuppressionDuration = pasteSuppressionDuration
+  }
+
+  static func isSupported(bundleIdentifier: String?) -> Bool {
+    supportedBundleIdentifiers.contains(bundleIdentifier ?? "")
+  }
+
+  func begin(
+    isClipboardManagerActive: @escaping @MainActor () -> Bool,
+    paste: @escaping @MainActor (String) -> Bool,
+    hide: @escaping @MainActor () -> Void
+  ) -> Bool {
+    cancel()
+    let startingChangeCount = pasteboard.changeCount
+    let pasteboard = pasteboard
+    let pollInterval = pollInterval
+    let activationTimeout = activationTimeout
+    let selectionTimeout = selectionTimeout
+    let inactiveGrace = inactiveGrace
+    let pasteSuppressionDuration = pasteSuppressionDuration
+    task = Task { @MainActor [weak self] in
+      defer { self?.task = nil }
+      let clock = ContinuousClock()
+      let activationDeadline = clock.now.advanced(by: activationTimeout)
+      while !Task.isCancelled, clock.now < activationDeadline {
+        if Self.consumeClipboardChange(
+          since: startingChangeCount, from: pasteboard,
+          suppressFor: pasteSuppressionDuration, paste: paste, hide: hide)
+        {
+          return
+        }
+        if isClipboardManagerActive() { break }
+        try? await Task.sleep(for: pollInterval)
+      }
+      guard !Task.isCancelled, isClipboardManagerActive() else {
+        hide()
+        return
+      }
+
+      let selectionDeadline = clock.now.advanced(by: selectionTimeout)
+      var inactiveSince: ContinuousClock.Instant?
+      while !Task.isCancelled, clock.now < selectionDeadline {
+        if Self.consumeClipboardChange(
+          since: startingChangeCount, from: pasteboard,
+          suppressFor: pasteSuppressionDuration, paste: paste, hide: hide)
+        {
+          return
+        }
+        if isClipboardManagerActive() {
+          inactiveSince = nil
+        } else if let inactiveSince {
+          if inactiveSince.duration(to: clock.now) >= inactiveGrace {
+            hide()
+            return
+          }
+        } else {
+          inactiveSince = clock.now
+        }
+        try? await Task.sleep(for: pollInterval)
+      }
+      if !Task.isCancelled { hide() }
+    }
+    return true
+  }
+
+  func beginKeyboardInvocation(
+    paste: @escaping @MainActor (String) -> Bool,
+    hide: @escaping @MainActor () -> Void
+  ) {
+    beginWaitingForClipboardChange(
+      since: pasteboard.changeCount,
+      timeout: selectionTimeout,
+      paste: paste,
+      hide: hide
+    )
+  }
+
+  private func beginWaitingForClipboardChange(
+    since startingChangeCount: Int,
+    timeout: Duration,
+    paste: @escaping @MainActor (String) -> Bool,
+    hide: @escaping @MainActor () -> Void
+  ) {
+    cancel()
+    let pasteboard = pasteboard
+    let pollInterval = pollInterval
+    let pasteSuppressionDuration = pasteSuppressionDuration
+    let deadline = ContinuousClock().now.advanced(by: timeout)
+    task = Task { @MainActor [weak self] in
+      defer { self?.task = nil }
+      let clock = ContinuousClock()
+      while !Task.isCancelled, clock.now < deadline {
+        if Self.consumeClipboardChange(
+          since: startingChangeCount, from: pasteboard,
+          suppressFor: pasteSuppressionDuration, paste: paste, hide: hide)
+        {
+          return
+        }
+        try? await Task.sleep(for: pollInterval)
+      }
+      if !Task.isCancelled { hide() }
+    }
+  }
+
+  private static func consumeClipboardChange(
+    since startingChangeCount: Int,
+    from pasteboard: NSPasteboard,
+    suppressFor suppressionDuration: Duration,
+    paste: @escaping @MainActor (String) -> Bool,
+    hide: @escaping @MainActor () -> Void
+  ) -> Bool {
+    guard pasteboard.changeCount != startingChangeCount else { return false }
+    guard pasteboard.types?.isEmpty != true else { return false }
+    guard let text = pasteboard.string(forType: .string) else {
+      hide()
+      return true
+    }
+    suppressExternalPaste(of: text, on: pasteboard, for: suppressionDuration)
+    guard paste(text) else {
+      hide()
+      return true
+    }
+    return true
+  }
+
+  private static func suppressExternalPaste(
+    of text: String,
+    on pasteboard: NSPasteboard,
+    for duration: Duration
+  ) {
+    let empty = NSPasteboardItem()
+    empty.setData(Data(), forType: PasteboardSnapshot.transientType)
+    pasteboard.clearContents()
+    pasteboard.writeObjects([empty])
+    let suppressionChangeCount = pasteboard.changeCount
+    Task { @MainActor in
+      try? await Task.sleep(for: duration)
+      guard pasteboard.changeCount == suppressionChangeCount else { return }
+      let restored = NSPasteboardItem()
+      restored.setString(text, forType: .string)
+      restored.setData(Data(), forType: PasteboardSnapshot.transientType)
+      pasteboard.clearContents()
+      pasteboard.writeObjects([restored])
+    }
+  }
+
+  func cancel() {
+    task?.cancel()
+    task = nil
+  }
+}
+
+enum ClipboardManagerShortcutRouting {
+  static func isInvocationShortcut(_ event: NSEvent, modifiers: NSEvent.ModifierFlags) -> Bool {
+    modifiers == .option && event.keyCode == UInt16(kVK_Space)
   }
 }
 
