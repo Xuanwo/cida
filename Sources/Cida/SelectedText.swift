@@ -218,8 +218,11 @@ struct AccessibilitySelectedTextSource: SelectedTextSource {
 /// puts the pasteboard back the way it was (`Design/spec/panel.md` §一 复制兜底).
 struct PasteboardSelectionCopier: SelectionCopier {
   /// How long the application gets to copy before the selection counts as
-  /// empty.
-  var copyDeadline: Duration = .milliseconds(150)
+  /// empty. An application with nothing to copy never writes, so ⌥A without
+  /// a selection waits all of it; one that copies has written within 25 ms
+  /// (TextEdit, Safari, Terminal, Chrome, Obsidian and Slack, idle and under
+  /// load), and a later copy is still put back.
+  var copyDeadline: Duration = .milliseconds(50)
   /// How long a copy that arrives after the deadline is still put back.
   var lateCopyWindow: Duration = .seconds(1)
   var pasteboardName: NSPasteboard.Name = .general
