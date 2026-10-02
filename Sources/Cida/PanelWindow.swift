@@ -424,10 +424,13 @@ enum CopyShortcutRouting {
     return event.keyCode == 8 || event.charactersIgnoringModifiers?.lowercased() == "c"
   }
 
-  /// ⌘C keeps its native meaning while a text view has a selection or is the
-  /// editable source; only then does it fall through to copying the result.
+  /// Explicit text selections keep native copy. The source's automatic
+  /// replacement selection leaves ⌘C available to copy the result.
   static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {
     guard let textView = window?.firstResponder as? NSTextView else { return false }
+    if let composer = textView as? ComposerNativeTextView, composer.hasAutomaticSelection {
+      return false
+    }
     return textView.selectedRange().length > 0
   }
 }

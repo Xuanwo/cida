@@ -261,7 +261,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     if context.coordinator.consumeSelectAllRevision(selectAllRevision),
       !textView.isVirtualizingLargeDocument
     {
-      textView.setSelectedRange(NSRange(location: 0, length: textView.textStorage?.length ?? 0))
+      textView.selectAllForReplacement()
     }
 
     // After the update, so the panel has become key by then.

@@ -79,6 +79,21 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       "and is translated without ⏎")
     driver.waitForCompletion()
 
+    driver.composer.typeKey("c", modifierFlags: .command)
+    let resultValue = driver.result(containing: "CIDA_E2E_SELECTION_A_COMPLETE").value as? String ?? ""
+    let copied = driver.waitForPasteboard(resultValue, timeout: 2)
+    let copyShot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+    copyShot.name = "Command-C after Option-A translation"
+    copyShot.lifetime = .keepAlways
+    add(copyShot)
+    XCTAssertTrue(copied, "The automatic source selection must not intercept result copying")
+
+    driver.composer.typeKey("a", modifierFlags: .command)
+    driver.composer.typeKey("c", modifierFlags: .command)
+    XCTAssertTrue(
+      driver.waitForPasteboard("CIDA_E2E_SELECTION_A", timeout: 2),
+      "Explicit Select All copies the source even when it was already automatically selected")
+
     driver.composer.typeText("CIDA_E2E_EDITED")
     driver.hidePanel()
     source.press("a", modifierFlags: .option)
@@ -87,6 +102,10 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       driver.textValue(in: driver.composer), "CIDA_E2E_EDITED",
       "The selection brought in last time keeps the edited source")
     XCTAssertTrue(driver.result(containing: "CIDA_E2E_SELECTION_A_COMPLETE").exists)
+    driver.composer.typeKey("c", modifierFlags: .command)
+    XCTAssertTrue(
+      driver.waitForPasteboard(resultValue, timeout: 2),
+      "Reopening the panel also leaves Command-C available for the retained result")
     XCTAssertEqual(
       try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_SELECTION_A" }.count, 1,
       "The same selection is not requested again")

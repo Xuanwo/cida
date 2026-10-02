@@ -27,6 +27,28 @@ final class ComposerNativeTextView: NSTextView {
   private var isApplyingMaterializedText = false
   private var isPageLoadScheduled = false
 
+  /// Selecting the source when the panel opens prepares typing to replace it;
+  /// it must not claim ⌘C from the translated result.
+  private(set) var hasAutomaticSelection = false
+
+  func selectAllForReplacement() {
+    setSelectedRange(NSRange(location: 0, length: textStorage?.length ?? 0))
+    hasAutomaticSelection = selectedRange().length > 0
+  }
+
+  override func setSelectedRanges(
+    _ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool
+  ) {
+    hasAutomaticSelection = false
+    super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+  }
+
+  override func selectAll(_ sender: Any?) {
+    // Explicit ⌘A claims copy even if the range is already the whole source.
+    hasAutomaticSelection = false
+    super.selectAll(sender)
+  }
+
   /// How far the text is drawn above its TextKit line boxes. TextKit puts all of
   /// a fixed line height's extra leading above the glyphs, where CSS splits it
   /// above and below (`CidaDesign.halfLeading`). TextKit 2 shrinks the line box
