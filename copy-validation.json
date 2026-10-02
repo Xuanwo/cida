@@ -1,7 +1,7 @@
 {
   "baseCommit": "a90adcdd0a6929ffe6979bab24b2289b8ed513cc",
-  "fixedCommit": "612d19e908cf9893c46edd08a56368174e6dd322",
-  "testedSource": "Final source was tested before commit; committing did not change it.",
+  "fixedCommit": "da65d3c422a2f0b45f171e61b9a5ea0a33027535",
+  "testedSource": "Final source was built before commit; committing did not change it. The artifact manifest retains its pre-commit source identity.",
   "before": {
     "journey": "PanelAndSettingsJourneyTests/testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone",
     "result": "Failed: The automatic source selection must not intercept result copying",
@@ -32,30 +32,32 @@
     "designBoardRender": "passed",
     "journeysPassed": [
       "PanelAndSettingsJourneyTests/testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone",
-      "ComposerJourneyTests/testCommandCCopiesTheSelectionOrTheResult",
-      "PanelAndSettingsJourneyTests/testShortcutCopiesASelectionAccessibilityCannotGiveAndPutsTheClipboardBack"
+      "PanelAndSettingsJourneyTests/testPanelHidesOnEscapeReturnsOnOptionAAndKeepsItsState",
+      "PanelAndSettingsJourneyTests/testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt",
+      "ComposerJourneyTests/testCommandCCopiesTheSelectionOrTheResult"
     ],
     "artifact": {
       "schemaVersion": 1,
       "teamIdentifier": "3GMS63N4BQ",
       "signatureTimestamp": "none",
       "macOSVersion": "27.0.1",
-      "sourceCommit": "a90adcdd0a6929ffe6979bab24b2289b8ed513cc",
-      "builtAt": "2026-10-02T10:34:16Z",
+      "sourceCommit": "612d19e908cf9893c46edd08a56368174e6dd322",
+      "builtAt": "2026-10-02T10:53:13Z",
       "configuration": "release",
       "bundleIdentifier": "com.xuanwo.Cida",
       "sourceDirty": true,
       "swiftVersion": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)",
       "xcodeVersion": "Xcode 27.0 Build version 27A266a",
-      "appTreeSHA256": "18c2b7fcef0bd15d2ecf8884e232c4a778b96398583328bcba07aa8e258013d2",
+      "appTreeSHA256": "410dcdc9dbe3d94975d0cbf03cdf31aab3001b8bc8f3ca464e1278e3911bf783",
       "codesignAuthority": "Developer ID Application: Hao Ding (3GMS63N4BQ)",
       "appRelativePath": "Cida.app",
-      "executableSHA256": "6318c45580749a7c48cecc84f996dc8f550f5e637c00591002ad9ea3efc73380",
+      "executableSHA256": "c4c2702840aafb44792d90f51088a9da75886f30206d90a470cb6df39cb7ceef",
       "signatureMode": "developer-id"
     },
     "hostIsolationGuard": "passed"
   },
-  "reproduce": "CIDA_TART_DIAGNOSTIC_MODE=1 CIDA_UI_TEST_ONLY_TESTING='CidaUITests/PanelAndSettingsJourneyTests/testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone,CidaUITests/ComposerJourneyTests/testCommandCCopiesTheSelectionOrTheResult,CidaUITests/PanelAndSettingsJourneyTests/testShortcutCopiesASelectionAccessibilityCannotGiveAndPutsTheClipboardBack' scripts/test-ui-in-tart.sh",
+  "reproduce": "CIDA_TART_DIAGNOSTIC_MODE=1 CIDA_UI_TEST_ONLY_TESTING='CidaUITests/PanelAndSettingsJourneyTests/testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone,CidaUITests/PanelAndSettingsJourneyTests/testPanelHidesOnEscapeReturnsOnOptionAAndKeepsItsState,CidaUITests/PanelAndSettingsJourneyTests/testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt,CidaUITests/ComposerJourneyTests/testCommandCCopiesTheSelectionOrTheResult' scripts/test-ui-in-tart.sh",
   "verificationScope": "Signed Release diagnostic journeys, not a release gate.",
-  "screenshotInterpretation": "Both images preserve automatic source selection. Clipboard assertions fail before the fix and pass afterward; the screenshots do not measure clipboard content."
+  "screenshotInterpretation": "Before: source is automatically selected and result clipboard assertion fails. After: source remains unselected and the result clipboard assertion passes.",
+  "behavior": "Opening focuses the source without changing the caret or selection. Imported and captured text are not automatically selected. Native selections retain normal copying."
 }
