@@ -6,9 +6,10 @@ import SwiftUI
 /// the result's own stroke (`Design/spec/streaming-motion.md` §四).
 ///
 /// The segment's title keeps its 12 pt trailing padding. 成 starts at the end of the verb, all
-/// 12 pt into it, and the language follows 5 pt later; a renamed 翻译 has no 成, so the language
-/// starts 7 pt into the padding, 5 pt after the name. Either way the segment ends with the same
-/// 12 pt, and collapsed to zero width it is exactly what it is without a language.
+/// 12 pt into it, so a click on 成 lands on the title; the language follows 5 pt later, inside
+/// this view's own frame. A renamed 翻译 has no 成, so the language starts 7 pt into the
+/// padding, 5 pt after the name. Either way the segment ends with the same 12 pt, and collapsed
+/// to zero width it is exactly what it is without a language.
 struct PanelForeignLanguage: View {
   @Bindable var model: AppModel
   static let gapAfterTitle: CGFloat = 5
