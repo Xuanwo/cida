@@ -16,9 +16,9 @@ const copyMenu = `
     <div class="row on"><i class="icon icon-image"></i><b>复制图片</b><kbd>⇧⌘C</kbd></div>
   </div>`;
 
-// target="English" writes the foreign language my language goes into after 翻译
-// (spec/panel.md §三); target-editing="日本語" draws it as a field, target-selected with its
-// text selected as ⌘L leaves it.
+// target="English" writes the foreign language my language goes into after 翻译, which then
+// reads 翻译成 (spec/panel.md §三); target-editing="日本語" draws it as a field, target-selected
+// with its text selected as ⌘L leaves it.
 class CidaBar extends HTMLElement {
   connectedCallback() {
     const mode = this.getAttribute("mode") ?? "translate";
@@ -50,9 +50,12 @@ class CidaBar extends HTMLElement {
     const targetSelected = this.hasAttribute("target-selected");
     const object = target === null ? ""
       : `<span class="object${objectClass}">${targetSelected ? `<span class="selected">${word}</span>` : word}${editing !== null && !targetSelected ? `<i class="caret"></i>` : ""}</span>`;
+    // 成 joins the verb and leaves with the language.
+    const joint = (option) => target === null || option !== "翻译" ? ""
+      : `<span class="joint${this.hasAttribute("target-leaving") ? " leaving" : ""}">成</span>`;
     const segments = options
       .map((option, index) => index === selected
-        ? `<span class="on">${option}${index === 0 ? object : ""}</span>`
+        ? `<span class="on">${option}${index === 0 ? joint(option) + object : ""}</span>`
         : `<span>${option}</span>`)
       .join("");
     const hint = options.length > 1 ? `<span class="tab-hint">⇥ 切换</span>` : "";

@@ -77,7 +77,7 @@
     <div class="source">我们的系统采用了全新的存储引擎</div>
     <cida-bar target="English" target-written="3"></cida-bar>
   </section>
-  <cida-motion-note>「翻译」段在 150ms(motion-height-ms)ease-out(motion-ease-height)里一次变到最终宽度,「改进」与 Tab 提示一起平移;同时外语逐字写入,与译文同一种笔触:每字 120ms(motion-char-in-ms)ease-out(motion-ease-char-in)淡入,blur 2px(motion-blur-char-px)→ 0,相邻两字相隔 20ms(motion-language-stagger-ms)。段宽先到,字永远写在已经让出的位置里,不被裁切</cida-motion-note>
+  <cida-motion-note>「翻译」段在 150ms(motion-height-ms)ease-out(motion-ease-height)里一次变到最终宽度,「改进」与 Tab 提示一起平移;同时「成」与外语逐字写入,「成」是第一个字,与译文同一种笔触:每字 120ms(motion-char-in-ms)ease-out(motion-ease-char-in)淡入,blur 2px(motion-blur-char-px)→ 0,相邻两字相隔 20ms(motion-language-stagger-ms)。段宽先到,字永远写在已经让出的位置里,不被裁切</cida-motion-note>
   <div class="divider"></div>
 
   <div class="state-label">L2 — 写完</div>
@@ -85,7 +85,7 @@
     <div class="source">我们的系统采用了全新的存储引擎</div>
     <cida-bar target="English"></cida-bar>
   </section>
-  <cida-motion-note>English 共约 270ms 写完。原文变成其他语言时(换成粘贴的英文)反向离开,见 L3</cida-motion-note>
+  <cida-motion-note>「成 English」共约 290ms 写完。原文变成其他语言时(换成粘贴的英文)反向离开,见 L3</cida-motion-note>
   <div class="divider"></div>
 
   <div class="state-label">L3 — 离开 · 字先淡去,段再收起</div>
@@ -93,8 +93,8 @@
     <div class="source">The new storage engine keeps every write in an append-only log.</div>
     <cida-bar target="English" target-leaving></cida-bar>
   </section>
-  <cida-motion-note>整词一起 120ms(motion-char-in-ms)淡出,blur 0 → 2px,不逐字;淡出过半(60ms)时段在 150ms(motion-height-ms)里收回到只有动词,邻居平移回去。离开比写入短,退场不抢注意力</cida-motion-note>
-  <cida-motion-note>改写外语(⌘L)时段宽跟着输入即时变化,不做过渡;Esc 复原时输入的文字淡出,原来的外语按 L1 重新写入。唤起面板、带入选区或截图时直接排好,不播放写入。「减弱动态效果」开启时:段宽直接跳变,字整体 150ms(motion-icon-swap-ms)淡入淡出,没有 blur 与逐字</cida-motion-note>
+  <cida-motion-note>「成」与外语一起 120ms(motion-char-in-ms)淡出,blur 0 → 2px,不逐字;淡出过半(60ms)时段在 150ms(motion-height-ms)里收回到只有「翻译」,邻居平移回去。离开比写入短,退场不抢注意力</cida-motion-note>
+  <cida-motion-note>改写外语(⌘L)时段宽跟着输入即时变化,不做过渡;Esc 复原时输入的文字淡出,原来的外语按 L1 重新写入,「成」留在原处。唤起面板、带入选区或截图时直接排好,不播放写入。「减弱动态效果」开启时:段宽直接跳变,字整体 150ms(motion-icon-swap-ms)淡入淡出,没有 blur 与逐字</cida-motion-note>
 </main>
 </body>
 </html>
