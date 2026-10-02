@@ -11,7 +11,7 @@
 
 ## How it works
 
-- **Select text and press <kbd>⌥</kbd> <kbd>A</kbd>.** The panel appears with your selection and runs the first action, translation by default. When translating, text in other languages comes into your language, Simplified Chinese unless Settings says otherwise, in any language, dialect or register such as Cantonese; text in your language goes into the foreign language written beside 翻译, English by default, and you rewrite it right there, such as 日本語 or British English.
+- **Select text and press <kbd>⌥</kbd> <kbd>A</kbd>.** The panel appears with your selection and runs the first action, translation by default. When translating, text in other languages comes into your language, Simplified Chinese unless Settings says otherwise, in any language, dialect or register such as Cantonese; text in your language goes into the foreign language written after 翻译成, English by default, and you rewrite it right there, such as 日本語 or British English.
 
   <img src="docs/images/demo-translate.gif" width="720" alt="Selecting a paragraph in Chrome and pressing Option-A streams its Chinese translation into the panel">
 
