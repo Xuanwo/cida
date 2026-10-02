@@ -178,7 +178,7 @@ final class LayerOverlayPanel: NSPanel {
 /// Paints the translated paragraphs as layers, so hiding while scrolling and showing an
 /// original under the pointer are opacity changes.
 final class LayerOverlayView: NSView {
-  private var blockLayers: [CALayer] = []
+  private var blockLayers: [CALayer?] = []
   private let blocksLayer = CALayer()
   /// Underlays breathing under the paragraphs whose translation is on the way.
   private let pendingLayer = CALayer()
@@ -191,6 +191,7 @@ final class LayerOverlayView: NSView {
   override init(frame: NSRect) {
     super.init(frame: frame)
     wantsLayer = true
+    layer?.masksToBounds = true
     layer?.addSublayer(blocksLayer)
     blocksLayer.addSublayer(pendingLayer)
     occlusionMask.fillRule = .evenOdd
@@ -264,7 +265,7 @@ final class LayerOverlayView: NSView {
   var hasContent: Bool { !drawings.isEmpty || !pendingFrames.isEmpty }
 
   /// How many paragraphs are painted: a translation that does not fit leaves its original.
-  var paintedCount: Int { blockLayers.count }
+  var paintedCount: Int { blockLayers.compactMap { $0 }.count }
 
   func show(_ drawings: [LayerDrawing], scale: CGFloat) {
     // The tree is read again every second; unchanged paragraphs keep their layers and a
@@ -273,15 +274,33 @@ final class LayerOverlayView: NSView {
     self.drawings = drawings
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    blockLayers.forEach { $0.removeFromSuperlayer() }
-    blockLayers = drawings.compactMap { makeLayer(for: $0, scale: scale) }
-    blockLayers.forEach(blocksLayer.addSublayer)
+    blockLayers.forEach { $0?.removeFromSuperlayer() }
+    blockLayers = drawings.map { makeLayer(for: $0, scale: scale) }
+    blockLayers.compactMap { $0 }.forEach(blocksLayer.addSublayer)
     pendingLayer.removeFromSuperlayer()
     blocksLayer.insertSublayer(pendingLayer, at: 0)
     CATransaction.commit()
     setAccessibilityValue(drawings.map(\.text).joined(separator: "\n"))
   }
 
+
+  /// Move only matched paragraphs; the occlusion mask and pane clipping stay in screen space.
+  /// Nil restores AX geometry. A missing offset hides just that paragraph until reacquired.
+  func setMotion(_ offsets: [CGFloat?]?, pending: [CGFloat?]? = nil) {
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    for (index, layer) in blockLayers.enumerated() {
+      let dy: CGFloat? = offsets.map { index < $0.count ? $0[index] : nil } ?? 0
+      layer?.isHidden = dy == nil
+      layer?.setAffineTransform(CGAffineTransform(translationX: 0, y: dy ?? 0))
+    }
+    for (index, layer) in (pendingLayer.sublayers ?? []).enumerated() {
+      let dy: CGFloat? = pending.map { index < $0.count ? $0[index] : nil } ?? 0
+      layer.isHidden = dy == nil
+      layer.setAffineTransform(CGAffineTransform(translationX: 0, y: dy ?? 0))
+    }
+    CATransaction.commit()
+  }
 
   /// Parts covered by other windows are not painted (§五), in this view's coordinates.
   func setOcclusion(_ covered: [CGRect]) {

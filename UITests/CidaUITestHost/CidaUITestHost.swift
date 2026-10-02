@@ -19,9 +19,25 @@ private struct SourceView: View {
   /// English paragraphs, and one in the user's own language after the third, which ⌥D turns
   /// into the foreign language.
   static let layerParagraphs: [String] = {
-    let english = (1...16).map { number in
-      "CIDA LAYER PARAGRAPH \(number). The storage engine keeps every write in an append-only log and compacts it in the background."
-    }
+    let subjects = [
+      "The storage engine preserves every write in an append-only log before compacting old records in the background.",
+      "Morning sunlight reaches the library through tall windows while readers quietly browse the shelves for books.",
+      "A mountain trail follows the river past ancient trees and crosses a narrow wooden bridge beside the waterfall.",
+      "Our deployment checklist requires a signed package, passing integration tests, and an independent review of the changes.",
+      "Fresh vegetables arrive at the market each Saturday, where farmers explain how the seasonal crops were grown.",
+      "The orchestra rehearsed the final movement slowly, giving each musician time to hear the neighboring instruments.",
+      "Network requests share a bounded connection pool so that bursts of activity cannot exhaust the available sockets.",
+      "Students measured the shadow at noon and compared their observations with predictions from a simple geometric model.",
+      "The bakery opens before dawn to prepare warm bread, fruit pastries, and a fresh pot of coffee for commuters.",
+      "Each archived photograph includes a date, a location, and a short description provided by its original owner.",
+      "A small telescope reveals bright planets above the city when clear weather allows an uninterrupted view of the sky.",
+      "Database snapshots retain the versions needed by active readers while background maintenance reclaims obsolete files.",
+      "The design team compared three navigation layouts and recorded where participants expected to find their saved work.",
+      "Water from the hillside flows into a reservoir that supplies nearby gardens throughout the dry summer months.",
+      "A written emergency plan identifies the responsible people and explains how to restore essential services safely.",
+      "The research vessel returned with samples collected at several depths, each labeled carefully before analysis.",
+    ]
+    let english = subjects.enumerated().map { index, text in "CIDA LAYER PARAGRAPH \(index + 1). \(text)" }
     return Array(english[..<3]) + ["CIDA LAYER PARAGRAPH 17. 存储引擎把每次写入都追加到只追加的日志里，并在后台压缩它。"]
       + Array(english[3...])
   }()

@@ -308,6 +308,15 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let article = source.app.descendants(matching: .any).matching(identifier: "source-article").firstMatch
     // A wheel scrolls what is under the pointer.
     article.hover()
+    let motionLog = driver.environment.lifecycleLogDirectory + "/" + driver.settingsNamespace + ".log"
+    XCTAssertNotNil(layer.wait(timeout: 10) { _ in
+      (try? String(contentsOfFile: motionLog, encoding: .utf8).contains("layer-motion-ready")) == true
+    }, "The source-window stream starts before testing scrolling")
+    article.scroll(byDeltaX: 0, deltaY: -40)
+    XCTAssertNotNil(layer.wait(timeout: 10) { _ in
+      (try? String(contentsOfFile: motionLog, encoding: .utf8).contains("layer-motion-tracked")) == true
+    }, "Captured source pixels move visible translations, rather than only using the settled fallback")
+    attach("layer-tracked-scroll")
     // New paragraphs scrolled into view are translated too.
     let firstTop = layer.paragraph(1).frame.minY
     article.scroll(byDeltaX: 0, deltaY: -600)

@@ -544,6 +544,17 @@ final class LayerPaneSession {
   private(set) var failure: LayerTranslationError?
   private(set) var isFinished = false
   private var lastCoveringCount = -1
+  private var motionCapture: LayerMotionCapture?
+  private var startingCapture = false
+  private var captureGeneration = 0
+  private var captureRetryAfter = Date.distantPast
+  private var referenceRevision = 0
+  private var motionRevision = 0
+  private var trackingFrames: [CGRect] = []
+  private var trackedOffsets: [CGFloat?] = []
+  private var lastImageTime: TimeInterval = 0
+  private var motionActive = false
+
 
   init(
     application: LayerApplication, window: AccessibilityLayerNode, pane: AccessibilityLayerNode,
@@ -566,6 +577,7 @@ final class LayerPaneSession {
   /// never show the overlay again, or it would float over every app with no one to hide it.
   func close() {
     translating?.cancel()
+    stopMotionCapture()
     overlay.orderOut(nil)
     isFinished = true
   }
@@ -599,7 +611,22 @@ final class LayerPaneSession {
   /// ⌥D on a paragraph of this pane from the last read: turns a translation back into its
   /// original, or an original into its translation. Nil when no paragraph is there.
   func toggleParagraph(at point: CGPoint) -> String? {
-    guard let index = LayerBlockExtractor.paragraphIndex(at: point, in: readBlocks) else { return nil }
+    let index: Int?
+    if motionActive {
+      let candidates: [(index: Int, block: LayerBlock)] = readBlocks.indices.compactMap { candidate in
+        let block = readBlocks[candidate]
+        guard ProcessInfo.processInfo.systemUptime - lastImageTime < 0.1,
+          let tracked = trackingFrames.firstIndex(of: block.frame), tracked < trackedOffsets.count,
+          let offset = trackedOffsets[tracked] else { return nil }
+        return (candidate, LayerBlock(
+          pieces: block.pieces, frame: block.frame.offsetBy(dx: 0, dy: offset), lineHeight: block.lineHeight))
+      }
+      index = LayerBlockExtractor.paragraphIndex(at: point, in: candidates.map(\.block))
+        .map { candidates[$0].index }
+    } else {
+      index = LayerBlockExtractor.paragraphIndex(at: point, in: readBlocks)
+    }
+    guard let index else { return nil }
     let block = readBlocks[index]
     let node = readNodes[index]
     let isShown = blocks.contains { $0.block == block }
@@ -623,6 +650,7 @@ final class LayerPaneSession {
   func hideUntilWindowsSettle(_ date: Date) {
     if windowsSettle == nil, overlay.alphaValue > 0 { owner.log("layer-hidden-for-app-switch") }
     windowsSettle = date
+    stopMotionCapture()
     overlay.alphaValue = 0
   }
 
@@ -631,19 +659,17 @@ final class LayerPaneSession {
     if windowsSettle != nil { windowsSettle = Date() }
   }
 
-  /// The content may be moving (§七): a scroll over the pane, its paragraphs or frame moving in
-  /// the tree. The translations go at once and come back where the text is once it is still;
-  /// no outside view of another app's content keeps pace with it while it moves.
+  /// Wheel events wake tracking; pixels, rather than wheel deltas or stale AX positions,
+  /// determine which paragraphs can remain visible.
   func noteMotion() {
     lastMotion = Date()
+    motionRevision += 1
     needsRead = true
-    overlay.alphaValue = 0
+    motionActive = true
+    applyMotion()
   }
 
-
-  /// Nothing has moved for long enough to trust the tree's positions: no scroll and no move in
-  /// the tree for 0.2 s. Chromium updates the tree's positions about every 150 ms while
-  /// content moves, and eases a wheel's scroll in over some 150 ms after the last click.
+  /// AX remains the fallback when imagery cannot establish an unambiguous position.
   private var isStill: Bool {
     lastMotion.map { Date().timeIntervalSince($0) > 0.2 } ?? true
   }
@@ -658,6 +684,8 @@ final class LayerPaneSession {
       return
     }
     placeOverWindow(windows)
+    ensureMotionCapture()
+    if motionActive { applyMotion() }
     probeMotion()
     let settled = isStill
     if settled, !isReading, needsRead || Date().timeIntervalSince(lastRead) > 1.0 {
@@ -685,6 +713,7 @@ final class LayerPaneSession {
       windowFrame.map({ LayerWindowInfo.isInPlace(info, windowFrame: $0, within: wasOnScreen ? 4 : 2) }) ?? true
     else {
       isOnScreen = false
+      stopMotionCapture()
       overlay.orderOut(nil)
       return
     }
@@ -737,9 +766,15 @@ final class LayerPaneSession {
         if paneFrame != self.paneFrame {
           // The window moved or resized: the overlay goes with it. A window away from its
           // place (in the Stage Manager strip) shows nothing to hide.
+          stopMotionCapture()
           place(paneFrame)
           if isOnScreen { noteMotion() } else { needsRead = true }
         } else if frames.count == anchorFrames.count, frames != anchorFrames {
+          let reflowed = zip(frames, anchorFrames).contains { current, previous in
+            guard let current, let previous else { return false }
+            return current.size != previous.size || abs(current.minX - previous.minX) > 1
+          }
+          if reflowed { stopMotionCapture() }
           noteMotion()
         }
         anchorFrames = frames
@@ -753,6 +788,93 @@ final class LayerPaneSession {
     if overlay.frame != shown { overlay.setFrame(shown, display: false) }
   }
 
+  // MARK: Source-window motion
+
+  private func ensureMotionCapture() {
+    guard motionCapture == nil, !startingCapture, isOnScreen, windowsSettle == nil,
+      overlay.overlayView.hasContent, Date() >= captureRetryAfter, let windowNumber
+    else { return }
+    startingCapture = true
+    let generation = captureGeneration
+    let frame = paneFrame
+    Task { [weak self] in
+      guard let self else { return }
+      let capture = try? await LayerMotionCapture.start(windowID: windowNumber, pane: frame) { [weak self] update in
+        guard let self, !isFinished, generation == captureGeneration else { return }
+        receiveMotion(update)
+      }
+      guard !isFinished, generation == captureGeneration, frame == paneFrame else {
+        capture?.stop()
+        return
+      }
+      startingCapture = false
+      motionCapture = capture
+      if capture == nil { captureRetryAfter = Date().addingTimeInterval(5) }
+      else if isStill {
+        resetMotionReference()
+        owner.log("layer-motion-ready")
+      }
+    }
+  }
+
+  private func stopMotionCapture() {
+    captureGeneration += 1
+    motionCapture?.stop()
+    motionCapture = nil
+    startingCapture = false
+    lastImageTime = 0
+    trackedOffsets = []
+    motionActive = false
+    overlay.overlayView.setMotion(nil)
+  }
+
+  private func resetMotionReference() {
+    referenceRevision += 1
+    // Bound per-frame work. Other paragraphs retain the settled-position fallback.
+    trackingFrames = Array(blocks.prefix(12).map { $0.block.frame })
+    trackedOffsets = []
+    lastImageTime = 0
+    motionActive = false
+    overlay.overlayView.setMotion(nil)
+    motionCapture?.setReference(
+      trackingFrames.map { $0.offsetBy(dx: -paneFrame.minX, dy: -paneFrame.minY) }, revision: referenceRevision)
+  }
+
+  private func receiveMotion(_ update: LayerMotionUpdate?) {
+    guard let update else {
+      stopMotionCapture()
+      captureRetryAfter = Date().addingTimeInterval(5)
+      noteMotion()
+      return
+    }
+    guard update.reference == referenceRevision,
+      ProcessInfo.processInfo.systemUptime - update.time < 0.1 else { return }
+    let changed = !trackedOffsets.isEmpty && trackedOffsets != update.offsets
+    lastImageTime = update.time
+    trackedOffsets = update.offsets
+    if changed {
+      noteMotion()
+      if overlay.alphaValue > 0, update.offsets.contains(where: { abs($0 ?? 0) >= 1 }) {
+        owner.log("layer-motion-tracked count=\(update.offsets.compactMap { $0 }.count)")
+      }
+    } else if motionActive { applyMotion() }
+  }
+
+  private func applyMotion() {
+    guard motionActive, isOnScreen, windowsSettle == nil else { return }
+    let fresh = ProcessInfo.processInfo.systemUptime - lastImageTime < 0.1
+    func offset(for localFrame: CGRect) -> CGFloat? {
+      let frame = localFrame.offsetBy(dx: paneFrame.minX, dy: paneFrame.minY)
+      guard fresh, let index = trackingFrames.firstIndex(of: frame), index < trackedOffsets.count else { return nil }
+      return trackedOffsets[index]
+    }
+    let positions = overlay.overlayView.drawings.map { offset(for: $0.frame) }
+    let pending = overlay.overlayView.pendingFrames.map { offset(for: $0) }
+    overlay.overlayView.setMotion(positions, pending: pending)
+    // A window fade must not interpolate through a stale position after tracking recovers.
+    overlay.alphaValue = positions.contains(where: { $0 != nil }) || pending.contains(where: { $0 != nil }) ? 1 : 0
+  }
+
   // MARK: Paragraphs
 
   func read() {
@@ -761,6 +883,7 @@ final class LayerPaneSession {
     needsRead = false
     let pane = pane
     let translatesAll = translatesAll
+    let revision = motionRevision
     Task.detached(priority: .userInitiated) {
       guard let frame = pane.currentFrame else {
         await MainActor.run { [weak self] in self?.close() }
@@ -775,16 +898,20 @@ final class LayerPaneSession {
         automatic.contains { $0.block == located[index].block && $0.node.isSameElement(as: located[index].node) }
       })
       await MainActor.run { [weak self] in
-        self?.applyRead(frame: frame, blocks: blocks, nodes: nodes, automatic: automaticIndices)
+        self?.applyRead(revision: revision, frame: frame, blocks: blocks, nodes: nodes, automatic: automaticIndices)
       }
     }
   }
 
   private func applyRead(
-    frame: CGRect, blocks newBlocks: [LayerBlock], nodes: [AccessibilityLayerNode], automatic: Set<Int>
+    revision: Int, frame: CGRect, blocks newBlocks: [LayerBlock], nodes: [AccessibilityLayerNode], automatic: Set<Int>
   ) {
     isReading = false
     guard !isFinished else { return }
+    guard revision == motionRevision, isStill, windowsSettle == nil else {
+      needsRead = true
+      return
+    }
     lastRead = Date()
     place(frame)
     readBlocks = newBlocks
@@ -800,6 +927,7 @@ final class LayerPaneSession {
     let picks = [0, nodes.count / 2, nodes.count - 1].filter { $0 >= 0 && $0 < nodes.count }
     anchors = Array(Set(picks)).sorted().map { nodes[$0] }
     anchorFrames = anchors.map(\.frame)
+    resetMotionReference()
     redraw()
     translatePending()
   }
@@ -902,7 +1030,8 @@ final class LayerPaneSession {
     overlay.overlayView.setPending(waiting.map { $0.frame.offsetBy(dx: origin.x, dy: origin.y) })
     let settled = isStill
     // A read landing while another app's windows animate in stays hidden with the rest.
-    if settled, windowsSettle == nil { reveal() }
+    if motionActive { applyMotion() }
+    else if settled, windowsSettle == nil { reveal() }
     if isOnScreen, overlay.overlayView.hasContent { overlay.orderFront(nil) }
     owner.log(
       "layer-drawn drawings=\(drawings.count) painted=\(overlay.overlayView.paintedCount) blocks=\(blocks.count) onScreen=\(isOnScreen)"

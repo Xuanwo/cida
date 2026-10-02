@@ -360,7 +360,7 @@ class CidaLayerScene extends HTMLElement {
     // Which messages read as translations and which one breathes.
     const all = [0, 1, 2, 3, 4];
     const translated = {
-      "once-done": [2], "once-two": [2, 4], "once-restore": [4],
+      "once-done": [2], "once-two": [2, 4], "once-restore": [4], scrolling: [2],
       "window-on": all, translating: [0, 1, 2, 3], "window-one-original": [0, 1, 3, 4],
     }[layer] ?? [];
     const pending = { "once-pending": 2, translating: 4 }[layer];
@@ -384,7 +384,7 @@ class CidaLayerScene extends HTMLElement {
           <small>私信</small><span>Maya Chen</span><span>Leo Park</span><span>Sam Rivera</span></div>
         <div class="chat-main">
           <div class="chat-header"># storage-eng</div>
-          <div class="chat-messages"><div class="chat-day">今天</div>${rows}${empty}</div>
+          <div class="chat-messages">${layer === "scrolling" ? `<div style="transform:translateY(-48px)"><div class="chat-day">今天</div>${rows}${empty}</div>` : `<div class="chat-day">今天</div>${rows}${empty}`}</div>
           <div class="chat-composer">发消息到 #storage-eng</div>
         </div>
       </div>`;

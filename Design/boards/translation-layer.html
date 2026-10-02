@@ -26,9 +26,12 @@
   <div class="state-label">③ 换上 — 约 1.5 秒后原文被辞达的纸色(surface-paper)盖住,译文用面板结果的衬线字、墨色(text-ink)写在原位,纸与底色同形,底色随之收起;链接用 accent。不取应用的颜色:任何应用、深浅主题里译文都是辞达的样子(深色外观时用深色的纸与墨,见 appearance.html)。前后的消息仍是原文,带着上下文读</div>
   <cida-layer-scene state="layer-once-done" app="chat" layer="once-done"></cida-layer-scene>
 
-  <div class="state-label">④ 再指一段再按 — 那一段也换成译文,已换好的保持不变;几段译文与原文穿插着读;滚动时一起隐去,停稳后按准确位置淡入</div>
+  <div class="state-label">④ 再指一段再按 — 那一段也换成译文,已换好的保持不变;几段译文与原文穿插着读;滚动时能确认位置的译文继续跟随,不确定的段落暂时隐去,停稳后重新定位</div>
   <cida-layer-scene state="layer-once-two" app="chat" layer="once-two"></cida-layer-scene>
 
+
+  <div class="state-label">④′ 滚动中 — 上方消息与译文同步向上移动;下方段落匹配不确定时保持原文。译文在消息区域边缘裁切,不盖到标题栏或输入区</div>
+  <cida-layer-scene state="layer-scrolling" app="chat" layer="scrolling"></cida-layer-scene>
 
   <div class="state-label">⑤ 换回 — 指着一段译文再按 ⌥D,这一帧就换回原文;另一段仍是译文。想点这段里的链接、摘原话里的词,先这样换回;再按一次回到译文,不重新请求。看原文只靠按键,指针停在哪里都不会变</div>
   <cida-layer-scene state="layer-once-restore" app="chat" layer="once-restore"></cida-layer-scene>
