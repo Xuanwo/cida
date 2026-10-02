@@ -1,0 +1,61 @@
+{
+  "baseCommit": "a90adcdd0a6929ffe6979bab24b2289b8ed513cc",
+  "fixedCommit": "612d19e908cf9893c46edd08a56368174e6dd322",
+  "testedSource": "Final source was tested before commit; committing did not change it.",
+  "before": {
+    "journey": "PanelAndSettingsJourneyTests/testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone",
+    "result": "Failed: The automatic source selection must not intercept result copying",
+    "artifact": {
+      "schemaVersion": 1,
+      "teamIdentifier": "3GMS63N4BQ",
+      "signatureTimestamp": "none",
+      "macOSVersion": "27.0.1",
+      "sourceCommit": "a90adcdd0a6929ffe6979bab24b2289b8ed513cc",
+      "builtAt": "2026-10-02T10:31:24Z",
+      "configuration": "release",
+      "bundleIdentifier": "com.xuanwo.Cida",
+      "sourceDirty": true,
+      "swiftVersion": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)",
+      "xcodeVersion": "Xcode 27.0 Build version 27A266a",
+      "appTreeSHA256": "2078e9af282dab5891edc89fa95eaabc22689fca548f7019cdcd22012dc5693a",
+      "codesignAuthority": "Developer ID Application: Hao Ding (3GMS63N4BQ)",
+      "appRelativePath": "Cida.app",
+      "executableSHA256": "854bfb1b952d5f98b42815040a55095524da57d63be839d3624c1b2447fbfe18",
+      "signatureMode": "developer-id"
+    }
+  },
+  "after": {
+    "swiftTestsPassed": 290,
+    "swiftTestsFailed": 0,
+    "swiftBuildWarningsAsErrors": "passed",
+    "websiteBuild": "passed",
+    "designBoardRender": "passed",
+    "journeysPassed": [
+      "PanelAndSettingsJourneyTests/testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone",
+      "ComposerJourneyTests/testCommandCCopiesTheSelectionOrTheResult",
+      "PanelAndSettingsJourneyTests/testShortcutCopiesASelectionAccessibilityCannotGiveAndPutsTheClipboardBack"
+    ],
+    "artifact": {
+      "schemaVersion": 1,
+      "teamIdentifier": "3GMS63N4BQ",
+      "signatureTimestamp": "none",
+      "macOSVersion": "27.0.1",
+      "sourceCommit": "a90adcdd0a6929ffe6979bab24b2289b8ed513cc",
+      "builtAt": "2026-10-02T10:34:16Z",
+      "configuration": "release",
+      "bundleIdentifier": "com.xuanwo.Cida",
+      "sourceDirty": true,
+      "swiftVersion": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)",
+      "xcodeVersion": "Xcode 27.0 Build version 27A266a",
+      "appTreeSHA256": "18c2b7fcef0bd15d2ecf8884e232c4a778b96398583328bcba07aa8e258013d2",
+      "codesignAuthority": "Developer ID Application: Hao Ding (3GMS63N4BQ)",
+      "appRelativePath": "Cida.app",
+      "executableSHA256": "6318c45580749a7c48cecc84f996dc8f550f5e637c00591002ad9ea3efc73380",
+      "signatureMode": "developer-id"
+    },
+    "hostIsolationGuard": "passed"
+  },
+  "reproduce": "CIDA_TART_DIAGNOSTIC_MODE=1 CIDA_UI_TEST_ONLY_TESTING='CidaUITests/PanelAndSettingsJourneyTests/testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone,CidaUITests/ComposerJourneyTests/testCommandCCopiesTheSelectionOrTheResult,CidaUITests/PanelAndSettingsJourneyTests/testShortcutCopiesASelectionAccessibilityCannotGiveAndPutsTheClipboardBack' scripts/test-ui-in-tart.sh",
+  "verificationScope": "Signed Release diagnostic journeys, not a release gate.",
+  "screenshotInterpretation": "Both images preserve automatic source selection. Clipboard assertions fail before the fix and pass afterward; the screenshots do not measure clipboard content."
+}
