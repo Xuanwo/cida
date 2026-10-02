@@ -55,7 +55,9 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 `scripts/capture-design-states.sh` captures every panel and Settings state from an isolated, non-activating build into `Design/ImplementationCurrent` and compares each with its board.
 
-The README's demos (`docs/images/demo-*.gif`, one per way of translating) are screen recordings of the signed Release app driven by an XCUI journey in a Tart guest, on a blog post served locally and read in Chrome: a selection translated with ⌥Space, a reply improved with Tab, a chart framed with ⌥S, a paragraph turned with ⌥D, and the whole page with ⌥⇧D. The runner records the display with ScreenCaptureKit; the model's replies came from the loopback scenario server, and system banners and desktop widgets were cleared from the guest first. The Chrome window is 1180 × 760 pt in the middle of the 1512 × 982 pt display, and each clip is cropped to the window with a margin of wallpaper, idle stretches shortened. That recording journey is not part of the regression suite; when the panel's look or a flow changes, record the affected clip again the same way. `scripts/make-demo-media.py <recordings>` turns the exported recordings (`translate.mov`, `improve.mov`, …) into the READMEs' GIFs, 1440 px wide for their 720 px column on a Retina display, and the website's clips, 760 and 1520 px H.264 with a poster frame; keep the recordings, since every output is cut from them.
+The README's demos (`docs/images/demo-*.gif`) are screen recordings of the signed Release app driven by XCUI in a Tart guest. The translation and capture clips use a local article in Chrome. The improvement, custom-action and in-place translation clips use a native writing fixture with public sample text. Model replies come from the loopback scenario server, so the recordings demonstrate interactions rather than remote-model quality. The guest display is 1512 × 982 pt at 2x; recording stays inside the guest, with no host capture or input. Keep the finalized movie as an XCTest attachment with `.keepAlways`, then export it with `xcrun xcresulttool export attachments`. Successful tests normally discard their automatic screen recordings. Decode from the start before cutting the exported movie: direct seeking can lose the reference frames needed by its screen-content encoding.
+
+`scripts/make-demo-media.py <recordings> --only improve --only actions --only paragraph --only window --crop crop=2544:1632:240:120` turns those recordings into the READMEs' GIFs (1440 px wide), the website's H.264 clips (760 and 1520 px wide), and poster frames. It crops to the central working area, shortens idle stretches and holds the result before looping. Keep the original recordings and recording source with the task's verification evidence. Recording fixtures are separate from the regression suite; record affected clips again when a demonstrated flow changes.
 
 ## Verification
 
@@ -159,7 +161,7 @@ scripts/build-website.py                # writes build/website
 python3 -m http.server --directory build/website
 ```
 
-The build copies `website/`, maps each path outside it to `/assets`, and fills the version and update notes from the newest `vX.Y.Z` tag. It fails when a page or an update note in `docs/releases` uses a character the committed font subsets do not cover; `scripts/build-website.py --subset-fonts` (with `pip install fonttools brotli`) makes them again. The clips come from `scripts/make-demo-media.py` (below).
+The build copies `website/`, maps each path outside it to `/assets`, and fills the version and update notes from the newest `vX.Y.Z` tag. It fails when a page or an update note in `docs/releases` uses a character the committed font subsets do not cover; `scripts/build-website.py --subset-fonts` (with `pip install fonttools brotli`) makes them again. The clips come from `scripts/make-demo-media.py` (see Screenshots above).
 
 The CI workflow builds the site on every pull request, as the required `website` check, since a change to the shared board files can break it. `.github/workflows/website.yml` deploys from `main` after a push that changes the site, with `wrangler deploy --config website/wrangler.jsonc`. A release does not redeploy it; after a release run `gh workflow run Website --repo Xuanwo/cida` so the page shows the new version and notes. The Worker `cida-website` only serves static assets, on the custom domain `cida.xuanwo.io`. The custom domain is attached to the Worker in Cloudflare, not listed in `wrangler.jsonc`, so a deploy never touches it. The deploy reads the repository secret `CLOUDFLARE_API_TOKEN`: an account API token of the Xuanwo account with the Workers Editor role scoped to the Worker `cida-website` only.
 
@@ -198,8 +200,8 @@ clipping and occlusion masks remain fixed. Horizontal motion and AX-reported ref
 reference. Reads racing motion are discarded. `TranslationLayerMotionTests` covers ambiguity,
 identity loss, missing frames and per-paragraph rendering; the translation-layer Tart journey
 requires both `layer-motion-ready` and `layer-motion-tracked` in the actual app's lifecycle log and
-saves screenshots. The paragraph and whole-window README demos need new recordings when publishing
-this interaction change.
+saves screenshots. The paragraph and whole-window README demos show this scroll tracking with
+Screen Recording permission already granted.
 
 ## Custom actions
 

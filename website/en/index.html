@@ -63,24 +63,32 @@
 
   <section class="block">
     <div class="wrap">
-      <h2>Five ways to use it</h2>
+      <h2>Six ways to use it</h2>
       <p class="section-note">The shortcuts are defaults; record your own in Settings.</p>
       <div class="uses">
         <article class="use">
           <div>
             <h3>Translate the selection</h3>
             <div class="keys"><kbd>⌥</kbd> <kbd>A</kbd></div>
-            <p>The panel appears with your selection and the translation streams in. Anything else comes into your language; yours goes into the foreign language written beside 翻译, English by default, which you rewrite right there. Both take any language, dialect or register.</p>
+            <p>The panel appears with your selection and runs the first action, translation by default. When translating, text in other languages comes into your language; yours goes into the foreign language written beside 翻译, English by default, which you rewrite right there. Both take any language, dialect or register.</p>
           </div>
           <video class="clip" poster="../assets/clips/translate.jpg" muted loop playsinline preload="none" aria-label="Selecting a paragraph in Chrome and pressing Option-A streams its Chinese translation into the panel"><source src="../assets/clips/translate-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="../assets/clips/translate.mp4" type="video/mp4"></video>
         </article>
         <article class="use">
           <div>
-            <h3>Polish your writing</h3>
-            <div class="keys"><kbd>Tab</kbd> <kbd>⏎</kbd></div>
-            <p>In the panel, press Tab to switch to improving, then Return. The improved text stays in its own language, ready to paste back.</p>
+            <h3>Improve and replace</h3>
+            <div class="keys"><kbd>⌥</kbd> <kbd>F</kbd></div>
+            <p>Select text in your editor to improve and replace it directly. The language stays the same; undo with ⌘Z in the source app. If you edit or switch apps while it works, view and copy the result instead.</p>
           </div>
-          <video class="clip" poster="../assets/clips/improve.jpg" muted loop playsinline preload="none" aria-label="Selecting an English reply in a comment box, pressing Option-A, then Tab and Return, gives the improved English"><source src="../assets/clips/improve-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="../assets/clips/improve.mp4" type="video/mp4"></video>
+          <video class="clip" poster="../assets/clips/improve.jpg" muted loop playsinline preload="none" aria-label="Selecting an English reply and pressing Option-F replaces it with the improved text"><source src="../assets/clips/improve-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="../assets/clips/improve.mp4" type="video/mp4"></video>
+        </article>
+        <article class="use">
+          <div>
+            <h3>Make your own actions</h3>
+            <div class="keys"><kbd>⌘</kbd> <kbd>,</kbd></div>
+            <p>Add a name and prompt in Settings → 动作, then preview the sample with your model. Drag actions into order; the first becomes the panel default.</p>
+          </div>
+          <video class="clip" poster="../assets/clips/actions.jpg" muted loop playsinline preload="none" aria-label="Creating an action and previewing the sample with the configured model"><source src="../assets/clips/actions-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="../assets/clips/actions.mp4" type="video/mp4"></video>
         </article>
         <article class="use">
           <div>
@@ -104,7 +112,7 @@
             <div class="keys"><kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd></div>
             <p>For a Slack channel or a long article in a language you do not read. New text is translated as it appears and a second press stops; code stays as it is, and clicks and scrolling still reach the app.</p>
           </div>
-          <video class="clip" poster="../assets/clips/window.jpg" muted loop playsinline preload="none" aria-label="Option-Shift-D translates the whole page; translations hide while it scrolls and follow once it stops"><source src="../assets/clips/window-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="../assets/clips/window.mp4" type="video/mp4"></video>
+          <video class="clip" poster="../assets/clips/window.jpg" muted loop playsinline preload="none" aria-label="Option-Shift-D translates the whole page; translations follow vertical scrolling with Screen Recording permission"><source src="../assets/clips/window-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="../assets/clips/window.mp4" type="video/mp4"></video>
         </article>
       </div>
     </div>
@@ -129,8 +137,8 @@
       </ol>
       <div class="permissions">
         <div class="row head"><span>Optional permission</span><span>With it</span><span>Without it</span></div>
-        <div class="row"><b>Accessibility</b><span>The panel brings in the selected text; translating in place works</span><span class="muted">Copy with ⌘C, then paste into the panel; no in-place translation</span></div>
-        <div class="row"><b>Screen Recording</b><span>Text on screen can be translated</span><span class="muted">Screenshot translation is unavailable</span></div>
+        <div class="row"><b>Accessibility</b><span>Import selections, translate in place, and improve and replace selections</span><span class="muted">Copy with ⌘C, then paste into the panel; no in-place translation or selection replacement</span></div>
+        <div class="row"><b>Screen Recording</b><span>Screenshot translation and in-place scroll tracking</span><span class="muted">No screenshot translation; in-place translations return after scrolling stops</span></div>
       </div>
     </div>
   </section>
@@ -140,8 +148,8 @@
       <h2>Your text goes only where you send it</h2>
       <ul>
         <li>The API key is stored only in the macOS Keychain.</li>
-        <li>There is no history and no telemetry; translation and improvement requests go only to the provider you chose.</li>
-        <li>Screenshots are recognized on your Mac with Apple’s Vision and never leave it. In-place translation reads only the text apps expose and never captures the screen.</li>
+        <li>There is no history and no telemetry; text processing and action preview requests go only to the provider you chose.</li>
+        <li>Screenshots are recognized on your Mac with Apple's Vision and never leave it. In-place translation reads text through Accessibility. With Screen Recording already allowed, it also processes images of the source window in memory on your Mac to follow scrolling; these images are neither saved nor uploaded. Without that permission, translations hide during scrolling and return once it stops.</li>
       </ul>
     </div>
   </section>

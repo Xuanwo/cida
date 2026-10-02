@@ -62,24 +62,32 @@
 
   <section class="block">
     <div class="wrap">
-      <h2>五种用法</h2>
+      <h2>六种用法</h2>
       <p class="section-note">快捷键都是默认值，可以在设置里重新录制。</p>
       <div class="uses">
         <article class="use">
           <div>
             <h3>翻译选中的文字</h3>
             <div class="keys"><kbd>⌥</kbd> <kbd>A</kbd></div>
-            <p>面板带着选中的文字出现，译文随即流出。其他语言都译成你的语言；你的语言译成「翻译」旁边写着的外语，默认英文，要换就在那里直接写。两者都可以写成任何语言、方言或文体。</p>
+            <p>面板带着选中的文字出现，执行首项动作，默认是翻译。翻译时，其他语言都译成你的语言；你的语言译成「翻译」旁边写着的外语，默认英文，要换就在那里直接写。两者都可以写成任何语言、方言或文体。</p>
           </div>
           <video class="clip" poster="assets/clips/translate.jpg" muted loop playsinline preload="none" aria-label="在 Chrome 里选中一段英文，按 ⌥A，面板里流出中文译文"><source src="assets/clips/translate-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="assets/clips/translate.mp4" type="video/mp4"></video>
         </article>
         <article class="use">
           <div>
-            <h3>润色</h3>
-            <div class="keys"><kbd>Tab</kbd> <kbd>⏎</kbd></div>
-            <p>在面板里按 Tab 切到「改进」，再按 Return。润色后的文字保持原来的语言，复制回去就能用。</p>
+            <h3>改进并替换</h3>
+            <div class="keys"><kbd>⌥</kbd> <kbd>F</kbd></div>
+            <p>选中正在写的文字，直接润色并替换，语言不变。在原应用按 ⌘Z 可以撤销；生成期间编辑或切换应用时，结果保留供你查看和复制。</p>
           </div>
-          <video class="clip" poster="assets/clips/improve.jpg" muted loop playsinline preload="none" aria-label="选中评论框里的英文回复，按 ⌥A 后按 Tab 和 Return，得到润色后的英文"><source src="assets/clips/improve-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="assets/clips/improve.mp4" type="video/mp4"></video>
+          <video class="clip" poster="assets/clips/improve.jpg" muted loop playsinline preload="none" aria-label="选中英文回复，按 ⌥F，原文直接替换成润色后的英文"><source src="assets/clips/improve-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="assets/clips/improve.mp4" type="video/mp4"></video>
+        </article>
+        <article class="use">
+          <div>
+            <h3>用自己的方式处理文字</h3>
+            <div class="keys"><kbd>⌘</kbd> <kbd>,</kbd></div>
+            <p>在设置的「动作」页写好名字和提示词，用当前模型预览样例。精简、提取待办或改成邮件，都可以成为动作；拖到第一项，就成为面板的默认动作。</p>
+          </div>
+          <video class="clip" poster="assets/clips/actions.jpg" muted loop playsinline preload="none" aria-label="新建动作并使用当前模型预览固定样例"><source src="assets/clips/actions-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="assets/clips/actions.mp4" type="video/mp4"></video>
         </article>
         <article class="use">
           <div>
@@ -103,7 +111,7 @@
             <div class="keys"><kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>D</kbd></div>
             <p>连续读 Slack 频道或一篇长文时用。新内容出现就翻译，再按一次停止；代码保持原样，点击和滚动照常落到原来的应用。</p>
           </div>
-          <video class="clip" poster="assets/clips/window.jpg" muted loop playsinline preload="none" aria-label="按 ⌥⇧D 整页换成译文；滚动时译文隐去，停下后接着翻译"><source src="assets/clips/window-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="assets/clips/window.mp4" type="video/mp4"></video>
+          <video class="clip" poster="assets/clips/window.jpg" muted loop playsinline preload="none" aria-label="按 ⌥⇧D 整页换成译文；已有屏幕录制权限时，译文跟随纵向滚动"><source src="assets/clips/window-2x.mp4" type="video/mp4" media="(min-resolution: 2dppx)"><source src="assets/clips/window.mp4" type="video/mp4"></video>
         </article>
       </div>
     </div>
@@ -128,8 +136,8 @@
       </ol>
       <div class="permissions">
         <div class="row head"><span>可选权限</span><span>开启后</span><span>不开启时</span></div>
-        <div class="row"><b>辅助功能</b><span>唤出面板时自动带入选中的文字；可以原处翻译</span><span class="muted">先 ⌘C，再在面板里 ⌘V；原处翻译不可用</span></div>
-        <div class="row"><b>屏幕录制</b><span>可以翻译屏幕上的文字</span><span class="muted">截图翻译不可用</span></div>
+        <div class="row"><b>辅助功能</b><span>面板带入选区；原处翻译和改进并替换可用</span><span class="muted">先 ⌘C，再在面板里 ⌘V；原处翻译和改进并替换不可用</span></div>
+        <div class="row"><b>屏幕录制</b><span>截图翻译；原处译文可跟随纵向滚动</span><span class="muted">截图翻译不可用；原处译文在滚动停止后重新定位</span></div>
       </div>
     </div>
   </section>
@@ -139,8 +147,8 @@
       <h2>文字只去你选的地方</h2>
       <ul>
         <li>API Key 只存在 macOS 的钥匙串里。</li>
-        <li>不保存历史记录，不收集任何数据；翻译和润色的请求只发往你选择的服务商。</li>
-        <li>截图在本机用 Apple 的 Vision 识别，图片不会离开你的 Mac。原处翻译只读取应用提供的文字，不截取屏幕画面。</li>
+        <li>不保存历史记录，不收集任何数据；文字处理和动作预览的请求只发往你选择的服务商。</li>
+        <li>截图在本机用 Apple 的 Vision 识别，图片不会离开你的 Mac。原处翻译通过辅助功能读取文字；已有屏幕录制权限时，还会在本机内存中处理源窗口的画面，让译文跟随滚动，画面不保存、不上传。未授权时，滚动中的译文暂时隐去，停下后重新定位。</li>
       </ul>
     </div>
   </section>

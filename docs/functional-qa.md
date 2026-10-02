@@ -283,5 +283,5 @@ Visual evidence includes [the previous prompt rows](images/actions-settings-befo
 [dark appearance](../Design/QACurrent/comparison-dark-settings-prompt-editing.png), and the
 screenshots retained by the Tart journeys. The interactive source is
 [actions.html](../Design/boards/actions.html). Run results and the tested commit are recorded in
-the pull request. Existing README demos show the default built-in actions; recordings that
-explain action switching should be refreshed to include custom actions when publishing.
+the pull request. The custom-action README and website recording demonstrates creating an action,
+previewing the fixed sample, reordering it and running it in the production panel.
