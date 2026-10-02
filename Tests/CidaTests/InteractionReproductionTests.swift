@@ -373,7 +373,8 @@ final class InteractionReproductionTests: XCTestCase {
     XCTAssertEqual(window.frame.height, 400, accuracy: 1)
 
     model.settingsTab = .translation
-    model.editingPrompt = .improve
+    model.actionEditor.select(.improve)
+    model.actionEditor.begin(model.settings)
     RunLoop.current.run(until: Date().addingTimeInterval(0.4))
     XCTAssertEqual(window.frame.height, 400, accuracy: 1, "An open prompt sheet scrolls too")
     assertTestProcessIsNotFrontmost()
@@ -434,15 +435,16 @@ final class InteractionReproductionTests: XCTestCase {
     model.settingsTab = .translation
     settle("快捷键 → 翻译")
     let collapsedFrame = window.frame
-    XCTAssertEqual(collapsedFrame.height, 364, accuracy: 4, "The board's 翻译 is 365 pt tall")
+    XCTAssertGreaterThan(collapsedFrame.height, 400, "The actions tab includes a fixed sample and a result paper")
 
-    model.editingPrompt = .improve
+    model.actionEditor.select(.improve)
+    model.actionEditor.begin(model.settings)
     settle("展开提示词")
     let expandedFrame = window.frame
-    XCTAssertGreaterThan(expandedFrame.height, collapsedFrame.height + 80, "The prompt sheet grows the window")
+    XCTAssertGreaterThan(expandedFrame.height, collapsedFrame.height, "The prompt grows only as much as its content requires")
     XCTAssertEqual(expandedFrame.maxY, modelFrame.maxY, accuracy: 0.5, "The top edge stays put")
 
-    model.editingPrompt = nil
+    model.actionEditor.discard(settings: model.settings)
     settle("收起提示词")
     XCTAssertEqual(window.frame.height, collapsedFrame.height, accuracy: 0.5)
     assertTestProcessIsNotFrontmost()

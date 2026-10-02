@@ -2,6 +2,8 @@ import AppKit
 import SwiftUI
 
 enum LucideIconName: String, CaseIterable {
+  case penLine = "pen-line"
+  case plus
   case languages
   case sparkles
   case scanText = "scan-text"

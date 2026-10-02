@@ -328,6 +328,13 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
   /// the first frame is given time.
   func testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt() {
     driver.launch()
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    driver.app.buttons["settings-action-improve"].click()
+    driver.settingsWindow.typeKey(.leftArrow, modifierFlags: .option)
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    driver.showPanel()
+    XCTAssertTrue(driver.improveAction.isSelected, "The generic entry uses the reordered first action")
     driver.hidePanel()
     let source = SourceApplication()
     source.launch()
@@ -599,10 +606,11 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       "A changed configuration is 已就绪 until it is checked")
     XCTAssertFalse(driver.modelFailure.exists)
 
-    driver.showSettingsTab("translation", title: "翻译")
-    XCTAssertFalse(driver.app.textViews["settings-prompt-editor-improve"].exists, "Prompts start collapsed")
-    driver.app.buttons["settings-prompt-edit-improve"].click()
-    let improveEditor = driver.app.textViews["settings-prompt-editor-improve"]
+    driver.showSettingsTab("translation", title: "动作")
+    XCTAssertFalse(driver.app.textViews["settings-action-prompt"].exists, "Prompts start collapsed")
+    driver.app.buttons["settings-action-improve"].click()
+    driver.app.buttons["settings-action-edit"].click()
+    let improveEditor = driver.app.textViews["settings-action-prompt"]
     XCTAssertTrue(improveEditor.waitForExistence(timeout: 3))
     let customPrompt = "Improve this text while preserving its source language."
     driver.replaceText(in: improveEditor, with: customPrompt)
@@ -613,16 +621,19 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.showPanel()
     driver.openSettings()
     XCTAssertTrue(
-      driver.waitForTitle("翻译", of: settingsWindow, timeout: 3), "Settings reopens on the last tab")
+      driver.waitForTitle("动作", of: settingsWindow, timeout: 3), "Settings reopens on the last tab")
     XCTAssertEqual(
-      driver.app.textViews["settings-prompt-editor-improve"].value as? String,
+      driver.app.textViews["settings-action-prompt"].value as? String,
       customPrompt
     )
+    driver.app.buttons["settings-action-done"].click()
+    XCTAssertTrue(driver.app.buttons["settings-action-edit"].waitForExistence(timeout: 10))
     let show = try driver.runCommandLine(["config", "show", "--json"])
     XCTAssertTrue(show.output.contains(customPrompt), "Settings and the command line share one store")
     XCTAssertTrue(show.output.contains(#""model": "cida-ui-mock-model""#), "and Settings kept it")
 
-    let resetPrompt = driver.app.buttons["settings-prompt-reset-improve"]
+    driver.app.buttons["settings-action-edit"].click()
+    let resetPrompt = driver.app.buttons["settings-action-reset"]
     XCTAssertTrue(resetPrompt.waitForExistence(timeout: 3))
     resetPrompt.click()
     XCTAssertTrue(
@@ -630,7 +641,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
         "You are a writing assistant. Improve the user-provided text for clarity, grammar, "
           + "and natural tone. Keep the original language and meaning. Prefer precise technical "
           + "wording. Return only the improved text.",
-        in: driver.app.textViews["settings-prompt-editor-improve"],
+        in: driver.app.textViews["settings-action-prompt"],
         timeout: 3
       )
     )
@@ -641,6 +652,210 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let feedback = driver.app.buttons["settings-feedback"]
     XCTAssertTrue(feedback.exists, "反馈 lives in Settings, not in the menu bar menu")
     XCTAssertEqual(feedback.label, "去反馈")
+  }
+
+  func testCustomActionsEditPreviewReorderAndRunInThePanel() throws {
+    driver.launch()
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    func shot(_ name: String) {
+      let attachment = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+      attachment.name = name
+      attachment.lifetime = .keepAlways
+      add(attachment)
+    }
+    shot("actions-browse")
+    let sample = driver.element(identifier: "settings-action-sample")
+    let sampleFrame = sample.frame
+    let editFrame = driver.app.buttons["settings-action-edit"].frame
+    let adjacentActionFrame = driver.app.buttons["settings-action-improve"].frame
+    driver.app.buttons["settings-action-edit"].click()
+    XCTAssertTrue(driver.app.textViews["settings-action-prompt"].waitForExistence(timeout: 3))
+    XCTAssertFalse(driver.element(identifier: "settings-action-preview").exists,
+      "Editing without an old result has no empty output pane")
+    XCTAssertFalse(driver.app.buttons["settings-action-delete"].exists,
+      "The required translation action does not offer deletion")
+    XCTAssertEqual(sample.frame.minY, sampleFrame.minY, accuracy: 1)
+    XCTAssertEqual(driver.app.buttons["settings-action-improve"].frame, adjacentActionFrame,
+      "Turning the selected label into a name field must not shift adjacent actions")
+    XCTAssertEqual(driver.app.buttons["settings-action-done"].frame, editFrame,
+      "Editing keeps the action bar and its button in place")
+    shot("actions-editing-without-result")
+    driver.settingsWindow.typeKey(.escape, modifierFlags: [])
+    driver.app.buttons["settings-action-add"].click()
+    let name = driver.app.textFields["settings-action-name"]
+    XCTAssertTrue(name.waitForExistence(timeout: 3))
+    driver.replaceText(in: name, with: "Summary")
+    let prompt = driver.app.textViews["settings-action-prompt"]
+    driver.replaceText(in: prompt, with: "Temporary wording")
+    prompt.typeKey(.leftArrow, modifierFlags: .option)
+    prompt.typeKey(.delete, modifierFlags: .command)
+    XCTAssertTrue(prompt.exists, "Text editing shortcuts must not reorder or delete the action")
+    driver.replaceText(in: prompt, with: "Summarize the source in French.")
+    shot("actions-editing")
+    XCTAssertFalse(driver.app.buttons["settings-action-add"].isEnabled)
+    driver.app.buttons["settings-action-done"].click()
+    let preview = driver.element(identifier: "settings-action-preview")
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE", in: preview, timeout: 10))
+    shot("actions-preview")
+    let requests = try scenarioServer.state().count
+    driver.app.buttons["settings-action-edit"].click()
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE", in: preview, timeout: 3),
+      "A real previous result stays available while editing")
+    shot("actions-editing-with-result")
+    driver.replaceText(in: name, with: "Concise")
+    driver.app.buttons["settings-action-done"].click()
+    XCTAssertEqual(try scenarioServer.state().count, requests, "Renaming keeps the cached preview")
+    let custom = driver.app.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch
+    let target = driver.app.buttons["settings-action-translate"]
+    custom.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+      .press(forDuration: 0.2, thenDragTo: target.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)))
+    driver.settingsWindow.typeKey(.rightArrow, modifierFlags: .option)
+    driver.settingsWindow.typeKey(.leftArrow, modifierFlags: .option)
+    shot("actions-reordered")
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    driver.showPanel()
+    let selected = driver.app.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch
+    XCTAssertTrue(selected.waitForExistence(timeout: 3))
+    XCTAssertTrue(selected.isSelected)
+    driver.submit("CIDA_E2E_POOL_CUSTOM_ACTION")
+    XCTAssertTrue(driver.result(containing: "CIDA_E2E_POOL_CUSTOM_ACTION_COMPLETE").waitForExistence(timeout: 10))
+    driver.waitForCompletion()
+    let result = XCTAttachment(screenshot: driver.panel.screenshot())
+    result.name = "actions-panel"
+    result.lifetime = .keepAlways
+    add(result)
+    driver.openSettings()
+    driver.app.buttons["settings-action-edit"].click()
+    driver.app.buttons["settings-action-delete"].click()
+    XCTAssertTrue(driver.app.buttons["settings-action-undo"].waitForExistence(timeout: 3))
+    driver.app.buttons["settings-action-undo"].click()
+    XCTAssertTrue(driver.app.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch.exists)
+  }
+
+  func testActionPreviewFailureRetryAndStopKeepThePreviousResult() throws {
+    driver.launch()
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    let preview = driver.element(identifier: "settings-action-preview")
+    let status = driver.element(identifier: "settings-action-preview-status")
+    func apply(_ policy: String) {
+      driver.app.buttons["settings-action-edit"].click()
+      driver.replaceText(in: driver.app.textViews["settings-action-prompt"], with: policy)
+      driver.settingsWindow.typeKey(.return, modifierFlags: .command)
+    }
+    apply("Translate the sample.")
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE", in: preview, timeout: 10))
+    apply("Translate the sample. CIDA_ACTION_RETRY")
+    XCTAssertNotNil(try scenarioServer.wait(for: "CIDA_ACTION_RETRY", status: "failed"))
+    XCTAssertTrue(driver.app.buttons["settings-action-edit"].waitForExistence(timeout: 5))
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE", in: preview, timeout: 3))
+    XCTAssertTrue(driver.waitForText(containing: "503", in: status, timeout: 3))
+    let failure = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+    failure.name = "actions-preview-failed"
+    failure.lifetime = .keepAlways
+    add(failure)
+    driver.app.buttons["settings-action-edit"].click()
+    driver.app.buttons["settings-action-done"].click()
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_RECOVERED", in: preview, timeout: 10))
+    XCTAssertEqual(try scenarioServer.state().filter { $0.scenario == "CIDA_ACTION_RETRY" }.count, 2)
+    apply("Translate the sample. CIDA_ACTION_STOP")
+    XCTAssertNotNil(try scenarioServer.wait(for: "CIDA_ACTION_STOP", status: "headers-sent"))
+    XCTAssertTrue(driver.app.buttons["settings-action-stop"].waitForExistence(timeout: 3))
+    driver.app.buttons["settings-action-stop"].click()
+    XCTAssertTrue(driver.waitForText(containing: "已停止", in: status, timeout: 3))
+    try scenarioServer.releaseFirstByte(for: "CIDA_ACTION_STOP")
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_RECOVERED", in: preview, timeout: 3))
+    XCTAssertFalse(driver.waitForText(containing: "CIDA_ACTION_STOPPED_LATE", in: preview, timeout: 1))
+    let stopped = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+    stopped.name = "actions-preview-stopped"
+    stopped.lifetime = .keepAlways
+    add(stopped)
+  }
+
+  func testActionDraftSurvivesSettingsClosureAndOnlyAppliedChangesSurviveRelaunch() throws {
+    driver.launch()
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    driver.app.buttons["settings-action-add"].click()
+    let name = driver.app.textFields["settings-action-name"]
+    let prompt = driver.app.textViews["settings-action-prompt"]
+    driver.replaceText(in: name, with: "Persistent summary")
+    driver.replaceText(in: prompt, with: "Summarize the source in French.")
+    driver.showSettingsTab("model", title: "模型")
+    driver.showSettingsTab("translation", title: "动作")
+    XCTAssertEqual(name.value as? String, "Persistent summary")
+    XCTAssertEqual(prompt.value as? String, "Summarize the source in French.")
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    driver.showPanel()
+    driver.openSettings()
+    XCTAssertEqual(name.value as? String, "Persistent summary")
+    XCTAssertEqual(prompt.value as? String, "Summarize the source in French.")
+    driver.app.buttons["settings-action-done"].click()
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE",
+      in: driver.element(identifier: "settings-action-preview"), timeout: 10))
+    driver.settingsWindow.typeKey(.leftArrow, modifierFlags: .option)
+    driver.settingsWindow.typeKey(.leftArrow, modifierFlags: .option)
+    driver.app.buttons["settings-action-edit"].click()
+    driver.replaceText(in: name, with: "Unsaved rename")
+    driver.replaceText(in: prompt, with: "Unsaved policy")
+    driver.terminate()
+    driver.launch()
+    let saved = driver.app.buttons.matching(NSPredicate(format: "label == %@", "Persistent summary")).firstMatch
+    XCTAssertTrue(saved.waitForExistence(timeout: 3))
+    XCTAssertTrue(saved.isSelected, "The reordered default survives a process restart")
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    XCTAssertFalse(driver.app.textViews["settings-action-prompt"].exists)
+    XCTAssertFalse(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE",
+      in: driver.element(identifier: "settings-action-preview"), timeout: 1), "Previews are session-only")
+    driver.app.buttons["settings-action-edit"].click()
+    XCTAssertEqual(driver.app.textFields["settings-action-name"].value as? String, "Persistent summary")
+    XCTAssertEqual(driver.app.textViews["settings-action-prompt"].value as? String, "Summarize the source in French.")
+  }
+
+  func testActionValidationAndOverflowKeepCreationReachable() throws {
+    driver.launch()
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    let initialWidth = driver.settingsWindow.frame.width
+    driver.app.buttons["settings-action-add"].click()
+    let name = driver.app.textFields["settings-action-name"]
+    let prompt = driver.app.textViews["settings-action-prompt"]
+    driver.replaceText(in: name, with: " ")
+    driver.app.buttons["settings-action-done"].click()
+    XCTAssertTrue(driver.waitForText(containing: "给动作起一个名字",
+      in: driver.element(identifier: "settings-action-validation"), timeout: 3))
+    driver.replaceText(in: name, with: "Long action name that exceeds the visible segment width")
+    driver.app.buttons["settings-action-done"].click()
+    XCTAssertTrue(driver.waitForText(containing: "写下你希望这个动作做什么",
+      in: driver.element(identifier: "settings-action-validation"), timeout: 3))
+    XCTAssertEqual(try scenarioServer.state().count, 0, "Invalid drafts send no model requests")
+    for index in 0..<6 {
+      if index > 0 {
+        let add = driver.app.buttons["settings-action-add"]
+        XCTAssertTrue(add.isHittable, "Creation stays reachable when the action rail overflows")
+        add.click()
+      }
+      driver.replaceText(in: name, with: "Long action name \(index) that exceeds the visible segment width")
+      driver.replaceText(in: prompt, with: "Summarize the source in French.")
+      driver.app.buttons["settings-action-done"].click()
+      XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE",
+        in: driver.element(identifier: "settings-action-preview"), timeout: 10))
+      XCTAssertEqual(driver.settingsWindow.frame.width, initialWidth, accuracy: 1)
+    }
+    let overflow = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+    overflow.name = "actions-overflow"
+    overflow.lifetime = .keepAlways
+    add(overflow)
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    driver.showPanel()
+    for _ in 0..<7 { driver.composer.typeKey(.tab, modifierFlags: []) }
+    let last = driver.app.buttons.matching(NSPredicate(format: "label == %@",
+      "Long action name 5 that exceeds the visible segment width")).firstMatch
+    XCTAssertTrue(last.isSelected)
+    XCTAssertTrue(last.isHittable, "Tab scrolls the selected action into the production panel")
+    XCTAssertEqual(driver.panel.frame.width, 800, accuracy: 1)
   }
 
   func testGlobalShortcutIsRecordedInSettingsAndSummonsThePanel() {

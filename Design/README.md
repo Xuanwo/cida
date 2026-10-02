@@ -16,6 +16,7 @@ a versioned copy.
 | Configuration: the command line, model fields, the agent prompt, Settings' model group | [`spec/configuration.md`](spec/configuration.md) | [`boards/configuration.html`](boards/configuration.html) |
 | Translation layer: Option-D, one paragraph once or a pane kept, translations over the original, following scroll | [`spec/translation-layer.md`](spec/translation-layer.md) | [`boards/translation-layer.html`](boards/translation-layer.html) |
 | Appearance: following the system, the dark palette, what does not follow it | [`spec/appearance.md`](spec/appearance.md) | [`boards/appearance.html`](boards/appearance.html) |
+| Actions: any text transform as an action, tuned in Settings on a fixed sample with its prompt written above the last result | [`spec/settings.md`](spec/settings.md), [`spec/panel.md`](spec/panel.md) | [`boards/actions.html`](boards/actions.html) |
 | Website: cida.xuanwo.io, its sections, styling, hero motion and publishing | [`spec/website.md`](spec/website.md) | none; the pages in [`../website`](../website) use the tokens and components directly |
 
 ## Boards

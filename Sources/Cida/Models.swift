@@ -11,15 +11,38 @@ enum ResultStorageNotificationKey {
   static let presentationRevision = "presentationRevision"
 }
 
-enum ProcessingMode: String, CaseIterable, Codable, Sendable {
-  case translate
-  case improve
+/// Stable action identity. Built-in identities also select their language contract.
+struct ProcessingMode: RawRepresentable, Hashable, Codable, Sendable {
+  let rawValue: String
+  static let translate = Self(rawValue: "translate")
+  static let improve = Self(rawValue: "improve")
 
   var title: String {
     switch self {
     case .translate: "翻译"
     case .improve: "改进"
+    default: rawValue
     }
+  }
+
+  init(rawValue: String) { self.rawValue = rawValue }
+  init(from decoder: Decoder) throws {
+    rawValue = try decoder.singleValueContainer().decode(String.self)
+  }
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+}
+
+struct TextAction: Identifiable, Equatable, Codable, Sendable {
+  let id: ProcessingMode
+  var name: String
+  var prompt: String
+
+  static var builtIns: [Self] {
+    [Self(id: .translate, name: "翻译", prompt: CidaSettings.defaultTranslationPrompt),
+     Self(id: .improve, name: "改进", prompt: CidaSettings.defaultImprovementPrompt)]
   }
 }
 
@@ -101,6 +124,7 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
   let mode: ProcessingMode
   let source: String
   let sourceCharacterCount: Int
+  let actionPrompt: String?
   /// The script the result is written in; it selects the CJK or Latin result typography. A
   /// translation starts from a guess and settles once its first characters arrive, since the
   /// model decides the direction.
@@ -120,10 +144,12 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
     outputLanguage: Language,
     result: String = "",
     phase: ResultPhase = .streaming,
-    presentationRevision: Int = 0
+    presentationRevision: Int = 0,
+    actionPrompt: String? = nil
   ) {
     self.id = id
     self.mode = mode
+    self.actionPrompt = actionPrompt
     self.source = source
     self.sourceCharacterCount = sourceCharacterCount ?? source.count
     self.outputLanguage = outputLanguage
@@ -207,8 +233,24 @@ struct CidaSettings: Equatable, Sendable {
   var modelService = ModelConfiguration()
   /// The key from the Keychain. It is never written with the rest of the settings.
   var apiKey = ""
-  var translationPrompt = defaultTranslationPrompt
-  var improvementPrompt = defaultImprovementPrompt
+  var actions = TextAction.builtIns
+  // The command line's published prompt fields address the same action collection.
+  var translationPrompt: String {
+    get { prompt(for: .translate) }
+    set { setBuiltInPrompt(newValue, for: .translate) }
+  }
+  var improvementPrompt: String {
+    get { prompt(for: .improve) }
+    set { setBuiltInPrompt(newValue, for: .improve) }
+  }
+
+  private mutating func setBuiltInPrompt(_ prompt: String, for id: ProcessingMode) {
+    if let index = actions.firstIndex(where: { $0.id == id }) {
+      actions[index].prompt = prompt
+    } else {
+      actions.append(TextAction(id: id, name: id.title, prompt: prompt))
+    }
+  }
   /// What every other language is translated into; any wording, e.g. 粤语 or 英式英语.
   var myLanguage = defaultLanguages().my
   /// What text in `myLanguage` is translated into: written after 翻译 in the panel and
@@ -266,11 +308,11 @@ struct CidaSettings: Equatable, Sendable {
   }
 
   func prompt(for mode: ProcessingMode) -> String {
-    mode == .translate ? translationPrompt : improvementPrompt
+    actions.first { $0.id == mode }?.prompt ?? Self.defaultPrompt(for: mode)
   }
 
   static func defaultPrompt(for mode: ProcessingMode) -> String {
-    mode == .translate ? defaultTranslationPrompt : defaultImprovementPrompt
+    mode == .translate ? defaultTranslationPrompt : mode == .improve ? defaultImprovementPrompt : ""
   }
 
   /// The two languages before the user writes any (`Design/spec/settings.md` §三): Cida speaks
@@ -321,6 +363,7 @@ struct CidaSettings: Equatable, Sendable {
 extension CidaSettings: Codable {
   private enum CodingKeys: String, CodingKey {
     case modelService
+    case actions
     case translationPrompt
     case improvementPrompt
     case myLanguage
@@ -367,6 +410,13 @@ extension CidaSettings: Codable {
       translationPrompt = decodedTranslationPrompt
       improvementPrompt = decodedImprovementPrompt
     }
+    if let decodedActions = try container.decodeIfPresent([TextAction].self, forKey: .actions) {
+      var seen = Set<ProcessingMode>()
+      actions = decodedActions.filter { !$0.id.rawValue.isEmpty && seen.insert($0.id).inserted }
+      if !actions.contains(where: { $0.id == .translate }) {
+        actions.insert(TextAction.builtIns[0], at: 0)
+      }
+    }
     let defaults = Self.defaultLanguages()
     myLanguage = try container.decodeIfPresent(String.self, forKey: .myLanguage) ?? defaults.my
     foreignLanguage =
@@ -392,8 +442,7 @@ extension CidaSettings: Codable {
   func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(modelService, forKey: .modelService)
-    try container.encode(translationPrompt, forKey: .translationPrompt)
-    try container.encode(improvementPrompt, forKey: .improvementPrompt)
+    try container.encode(actions, forKey: .actions)
     try container.encode(myLanguage, forKey: .myLanguage)
     try container.encode(foreignLanguage, forKey: .foreignLanguage)
     try container.encode(launchAtLogin, forKey: .launchAtLogin)
@@ -448,7 +497,7 @@ extension CidaSettings: Codable {
           result: designTranslateResult,
           phase: .completed
         )
-      case .improve:
+      default:
         ResultRecord(
           mode: .improve,
           source: designImproveSource,
