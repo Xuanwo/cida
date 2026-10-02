@@ -218,6 +218,9 @@ body {
 .seg span.on .object .selected { padding: 0; border: 0; border-radius: 0; background: var(--accent-soft); }
 .seg span.on .object.leaving { opacity: 0.4; filter: blur(calc(var(--motion-blur-char-px) * 0.5px)); }
 .seg span.on .object .caret { display: inline-block; width: 1px; height: 13px; margin-left: 1px; background: var(--text-primary); }
+/* 成 is part of the verb, set like it, and leaves with the language. */
+.seg span.on .joint { padding: 0; border: 0; border-radius: 0; font-weight: 600; color: var(--accent); }
+.seg span.on .joint.leaving { opacity: 0.4; filter: blur(calc(var(--motion-blur-char-px) * 0.5px)); }
 
 .bar-action {
   display: flex;
