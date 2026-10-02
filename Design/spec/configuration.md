@@ -34,8 +34,10 @@
 | `my-language` | 文本，如 `简体中文`、`粤语` | 与设置「翻译」页的「我的语言」相同，任意写法（`spec/settings.md` §三） |
 | `foreign-language` | 文本，如 `English`、`日本語` | 我的语言译成的外语，即面板「翻译」后面写着的那一门（`spec/panel.md` §三），默认 `English` |
 | `translation-prompt` / `improvement-prompt` | 文本，可 `--file` / `--stdin` | 与设置里的提示词相同 |
-| `shortcut` / `capture-shortcut` / `layer-shortcut` | 如 `option+a`，`none` 为不设置 | 与设置里的快捷键相同；三个不能相同（`none` 除外），`layer-shortcut` 不能带 shift（加 shift 是翻译整个窗口，也不能与另外两个相同） |
+| `shortcut` / `capture-shortcut` / `layer-shortcut` / `improvement-shortcut` | 如 `option+a`，`none` 为不设置 | 与设置里的快捷键相同；四个不能相同（`none` 除外），`layer-shortcut` 不能带 shift（加 shift 是翻译整个窗口，也不能与其他快捷键相同） |
 | `launch-at-login` | `true` / `false` | 与设置里的开关相同 |
+
+- `improvement-shortcut`：改进并替换的全局快捷键，默认 `option+f`，支持 `none`；与其他快捷键及原处翻译的 Shift 变体不能重复。
 
 请求体里辞达自己带的参数：Anthropic Messages 的 `max_tokens` 为 8192；Responses 带 `"store": false`（辞达不留请求记录，也请服务不留）。`body` 逐层合并进请求体，值为 `null` 的键会被去掉，所以这些都可以改或去掉。
 

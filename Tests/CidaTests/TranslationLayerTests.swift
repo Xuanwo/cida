@@ -792,7 +792,7 @@ final class TranslationLayerTests: XCTestCase {
     XCTAssertEqual(panelTop, 945 - 189)
 
     let size = CGSize(width: 380, height: 112)
-    let layerPill = CidaHintPill.pill(in: LayerHintPanel.frame(fitting: size, in: visible))
+    let layerPill = CidaHintPill.pill(in: CidaHintPanel.frame(fitting: size, in: visible))
     XCTAssertEqual(layerPill.maxY, panelTop, accuracy: 1)
     XCTAssertEqual(layerPill.midX, visible.midX, accuracy: 1)
 

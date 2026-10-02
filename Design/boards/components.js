@@ -122,7 +122,7 @@ class CidaSettings extends HTMLElement {
          </div>`
       : prompt("改进", "You are a writing assistant. Improve the user-provided text…");
 
-    // spec/settings.md §四: three recordable shortcuts; shortcut="unset" is someone who only
+    // spec/settings.md §四: four recordable shortcuts; shortcut="unset" is someone who only
     // captures text, with 显示辞达 and 原处翻译 cleared.
     const unset = `<span class="link">恢复默认</span><span class="chip unset">未设置</span>`;
     const shortcut = is("shortcut", "recording")
@@ -136,6 +136,9 @@ class CidaSettings extends HTMLElement {
     const layerShortcut = is("shortcut", "unset")
       ? row("原处翻译", "加 ⇧ 翻译整个窗口", unset, "end spaced")
       : row("原处翻译", "加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
+    const improvementShortcut = is("shortcut", "unset")
+      ? row("改进并替换", "改进并替换选中文字", unset, "end spaced")
+      : row("改进并替换", "改进并替换选中文字", `<span class="chip">⌥ F</span>`, "end");
     // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
     const permission = (title, caption) => row(title, caption,
       granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
@@ -199,8 +202,8 @@ class CidaSettings extends HTMLElement {
         <div class="group"><h3>语言</h3>${languages}</div>
         <div class="group"><h3>提示词</h3>${prompt("翻译", "Translate the user-provided text into the target language…")}${improve}</div>`,
       shortcuts: `
-        <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}</div>
-        <div class="group"><h3>权限</h3>${permission("辅助功能", "选中文字与原处翻译")}${permission("屏幕录制", "截图翻译")}</div>`,
+        <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}${improvementShortcut}</div>
+        <div class="group"><h3>权限</h3>${permission("辅助功能", "读取与替换应用文字")}${permission("屏幕录制", "截图翻译")}</div>`,
       general: `
         <div class="group">${launch}${updates}${feedback}</div>
         <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>`,

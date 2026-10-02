@@ -24,7 +24,7 @@ final class TranslationLayerController {
   private var discovering = false
   private var enabledTrees: Set<pid_t> = []
   /// Everything the layer says (§五 提示胶囊).
-  private lazy var hints = LayerHintPanel()
+  private lazy var hints = CidaHintPanel()
   /// The failure the hint pill shows, so it is said once and taken back when it clears.
   private var shownFailure: LayerTranslationError?
   private lazy var outline = LayerOutlinePanel()
@@ -126,7 +126,7 @@ final class TranslationLayerController {
           // It also says what to press, so it stays as long as the other instructions (§五).
           hints.show(
             "\(application.name) 里读不到文字，选中后按 \(shortcut.displayText) 翻译，或用\(capture)",
-            for: LayerHintPanel.instructiveSeconds)
+            for: CidaHintPanel.instructiveSeconds)
           logHint()
         } else {
           hint("\(application.name) 里读不到文字，可以用\(capture)")
@@ -182,7 +182,7 @@ final class TranslationLayerController {
         session.close()
       }
       sessions.removeAll(where: \.isFinished)
-      hints.show("已停止翻译这个窗口", for: LayerHintPanel.briefSeconds)
+      hints.show("已停止翻译这个窗口", for: CidaHintPanel.briefSeconds)
       log("layer-window-off app=\(application.bundleIdentifier)")
       return
     }
@@ -194,7 +194,7 @@ final class TranslationLayerController {
     outline.flash(around: frame)
     // Only the layer's shortcut reaches here, so it is set.
     let stop = settings().layerShortcut?.addingShift.displayText ?? ""
-    hints.show("翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止", for: LayerHintPanel.instructiveSeconds)
+    hints.show("翻译整个窗口 · \(rule.scope.label(applicationName: application.name)) · 再按 \(stop) 停止", for: CidaHintPanel.instructiveSeconds)
     logHint()
     log("layer-window-on app=\(application.bundleIdentifier)")
     discover()
@@ -205,7 +205,7 @@ final class TranslationLayerController {
   }
 
   private func hint(_ text: String) {
-    hints.show(text, for: LayerHintPanel.briefSeconds)
+    hints.show(text, for: CidaHintPanel.briefSeconds)
     logHint()
   }
 
@@ -226,7 +226,7 @@ final class TranslationLayerController {
     shownFailure = failure
     switch failure {
     case .notConfigured:
-      hints.show("还没有模型服务", for: LayerHintPanel.briefSeconds)
+      hints.show("还没有模型服务", for: CidaHintPanel.briefSeconds)
     case .some:
       hints.show("翻译失败 · 点按重试", for: nil) { [weak self] in
         guard let self else { return }

@@ -140,12 +140,12 @@ final class PanelController {
 
   /// Shows the panel on the active screen. Every appearance resets the action
   /// to 翻译 and selects the whole source, so typing or ⌘V starts a new task.
-  func show() {
+  func show(preservingMode: Bool = false) {
     if model.panelMessage == nil, model.needsModelConfiguration {
       // The welcome may have been answered with ⏎ in an earlier appearance.
       model.clearConfigurationReminder()
     }
-    model.resetModeToDefault()
+    if !preservingMode { model.resetModeToDefault() }
     if let screen = Self.activeScreen() {
       heightBudget = PanelHeightBudget(visibleScreenHeight: screen.visibleFrame.height)
       applyRootView()

@@ -419,6 +419,8 @@ struct CidaHintPill: View {
   }
 
   let text: String
+  var action: String? = nil
+  var onPress: (() -> Void)? = nil
 
   var body: some View {
     HStack(spacing: 12) {
@@ -426,6 +428,15 @@ struct CidaHintPill: View {
       Text(text)
         .font(CidaDesign.ui(12.5, weight: .medium))
         .foregroundStyle(CidaDesign.textControl)
+      if let action, let onPress {
+        Button(action, action: onPress)
+          .font(CidaDesign.ui(12.5, weight: .medium))
+          .buttonStyle(.plain)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 3)
+          .overlay { Capsule().strokeBorder(CidaDesign.border, lineWidth: 1) }
+          .accessibilityIdentifier("hint-action")
+      }
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
@@ -437,7 +448,7 @@ struct CidaHintPill: View {
       y: Self.ambientShadowOffset)
     .contentShape(Capsule())
     .padding(Self.shadowInsets)
-    .accessibilityElement(children: .combine)
+    .accessibilityElement(children: action == nil ? .combine : .contain)
   }
 }
 

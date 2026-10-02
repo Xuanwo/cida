@@ -729,7 +729,7 @@ struct ResultNoteRow: View {
     case .stale: .info
     case .stopped: .circleStop
     case .failed: .circleAlert
-    case .unrecognized: .info
+    case .unrecognized, .replacement: .info
     }
   }
 
@@ -739,6 +739,7 @@ struct ResultNoteRow: View {
     case .stopped: "stopped"
     case .failed: "failed"
     case .unrecognized: "unrecognized"
+    case .replacement: "replacement"
     }
   }
 }

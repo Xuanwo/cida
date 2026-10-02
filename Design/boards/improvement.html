@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>States — 改进并替换</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+  <style>
+    .improvement-state { padding: 36px 56px 86px; align-self: flex-start; }
+    .improvement-state .hint-action { border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+  </style>
+</head>
+<body>
+<main class="board" data-board="improvement">
+  <div class="board-title">改进并替换 · ⌥F</div>
+  <p class="caption">spec/panel.md §八。原应用保持焦点，完整结果一次性替换；提示胶囊与主面板共用屏幕上沿。再次按快捷键或点击取消停止生成，Esc 留给原应用。</p>
+  <div class="state-label">生成中 · 不改原文</div>
+  <section class="improvement-state" data-state="improvement-working">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>正在改进…</span><span class="hint-action">取消</span></div>
+  </section>
+  <div class="state-label">粘贴已发出 · 确认期间不接受取消</div>
+  <section class="improvement-state" data-state="improvement-applying">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>正在确认替换…</span></div>
+  </section>
+  <div class="state-label">完成 · 1.5 秒后消失</div>
+  <section class="improvement-state" data-state="improvement-replaced">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>已替换 · ⌘Z 撤销</span></div>
+  </section>
+  <div class="state-label">选区变化或无法回填 · 保留结果，不自动重试</div>
+  <section class="improvement-state" data-state="improvement-unavailable">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>已改进 · 原文未替换</span><span class="hint-action">查看结果</span></div>
+  </section>
+  <section class="improvement-state" data-state="improvement-unconfirmed">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>请检查原文 · 替换结果未确认</span><span class="hint-action">查看结果</span></div>
+  </section>
+  <section class="improvement-state" data-state="improvement-failed">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>改进失败 · 原文未变</span><span class="hint-action">查看结果</span></div>
+  </section>
+  <section class="improvement-state" data-state="improvement-cancelled">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>已取消</span></div>
+  </section>
+  <section class="improvement-state" data-state="improvement-empty">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>请先选中要改进的文字</span></div>
+  </section>
+  <section class="improvement-state" data-state="improvement-unchanged">
+    <div class="capture-hint static"><span class="wordmark">辞达</span><span>无需修改 · 原文未变</span></div>
+  </section>
+  <div class="state-label">查看结果 · 保留改进动作，不重新生成</div>
+  <section class="panel" data-state="improvement-fallback">
+    <div class="source">I has send you the file yesterday.</div>
+    <cida-bar mode="improve" action="copy"></cida-bar>
+    <div class="result"><div class="text">I sent you the file yesterday.</div><cida-note kind="unrecognized">编辑位置已变化或无法直接替换，请复制结果后手动使用。</cida-note></div>
+  </section>
+</main>
+</body>
+</html>

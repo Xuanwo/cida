@@ -3,6 +3,111 @@ import XCTest
 
 @MainActor
 final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
+  func testImprovementShortcutReplacesSelectionPreservesClipboardAndUndoes() throws {
+    driver.launch()
+    driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    let original = "  CIDA_E2E_IMPROVEMENT_OK\n"
+    source.select(original)
+    XCTAssertEqual(source.editor.value as? String, original, "The native editor accepted the fixture verbatim")
+    let before = XCTAttachment(screenshot: source.app.screenshot())
+    before.name = "improvement-before"
+    before.lifetime = .keepAlways
+    add(before)
+    let board = NSPasteboard.general
+    let custom = NSPasteboard.PasteboardType("cida.improvement.test")
+    board.clearContents()
+    board.setString("User clipboard", forType: .string)
+    board.setData(Data([4, 5]), forType: custom)
+    source.press("f", modifierFlags: .option)
+    XCTAssertTrue(driver.waitForTextValue("  Improved writing.\n", in: source.editor, timeout: 10))
+    XCTAssertFalse(driver.panel.exists, "Normal improvement never opens the main panel")
+    XCTAssertEqual(board.string(forType: .string), "User clipboard")
+    XCTAssertEqual(board.data(forType: custom), Data([4, 5]))
+    let after = XCTAttachment(screenshot: source.app.screenshot())
+    after.name = "improvement-after"
+    after.lifetime = .keepAlways
+    add(after)
+    source.press("z", modifierFlags: .command)
+    XCTAssertTrue(driver.waitForTextValue(original, in: source.editor, timeout: 3))
+  }
+
+  func testImprovementShortcutCancelsAndKeepsChangedTargetForManualCopy() throws {
+    driver.launch()
+    driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    let cancelled = "CIDA_E2E_IMPROVEMENT_CANCEL_GATED"
+    source.select(cancelled)
+    source.press("f", modifierFlags: .option)
+    XCTAssertNotNil(try scenarioServer.wait(for: cancelled, status: "headers-sent", timeout: 5))
+    source.press("f", modifierFlags: .option)
+    try scenarioServer.releaseFirstByte(for: cancelled)
+    XCTAssertNotNil(try scenarioServer.wait(for: cancelled, status: "client-disconnected", timeout: 5))
+    XCTAssertEqual(source.editor.value as? String, cancelled)
+
+    let changed = "CIDA_E2E_IMPROVEMENT_EDIT_GATED"
+    source.select(changed)
+    source.press("f", modifierFlags: .option)
+    XCTAssertNotNil(try scenarioServer.wait(for: changed, status: "headers-sent", timeout: 5))
+    source.editor.typeText("User edit")
+    try scenarioServer.releaseFirstByte(for: changed)
+    let view = driver.app.buttons["hint-action"]
+    XCTAssertTrue(view.waitForExistence(timeout: 8))
+    // The generation's cancel button becomes the result's view button.
+    XCTAssertTrue(NSPredicate(format: "label == %@", "查看结果").evaluate(with: view)
+      || XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+        predicate: NSPredicate(format: "label == %@", "查看结果"), object: view)], timeout: 8) == .completed)
+    XCTAssertEqual(source.editor.value as? String, "User edit")
+    let fallback = XCTAttachment(screenshot: driver.app.screenshot())
+    fallback.name = "improvement-not-replaced"
+    fallback.lifetime = .keepAlways
+    add(fallback)
+    view.click()
+    XCTAssertTrue(driver.panel.waitForExistence(timeout: 5))
+    XCTAssertTrue(driver.improveAction.isSelected)
+    XCTAssertEqual(driver.textValue(in: driver.composer), changed)
+    XCTAssertTrue(driver.result(containing: "Improved writing.").waitForExistence(timeout: 5))
+    XCTAssertTrue(driver.resultNote("replacement").exists)
+    driver.copyButton.click()
+    XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Improved writing.")
+  }
+
+  func testImprovementShortcutDoesNotFollowAChangedSelectionOrApplication() throws {
+    driver.launch()
+    driver.hidePanel()
+    let source = SourceApplication()
+    source.launch()
+    addTeardownBlock { [source] in source.app.terminate() }
+    for change in ["MOVE", "SWITCH"] {
+      let original = "CIDA_E2E_IMPROVEMENT_\(change)_GATED"
+      source.select(original)
+      source.press("f", modifierFlags: .option)
+      XCTAssertNotNil(try scenarioServer.wait(for: original, status: "headers-sent", timeout: 5))
+      if change == "MOVE" {
+        source.press(.rightArrow, modifierFlags: [])
+        // Restoring the same range must not reauthorize an invalidated operation.
+        source.press("a", modifierFlags: .command)
+      } else {
+        XCUIApplication(bundleIdentifier: "com.apple.finder").activate()
+        source.app.activate()
+      }
+      try scenarioServer.releaseFirstByte(for: original)
+      let view = driver.app.buttons["hint-action"]
+      let ready = XCTNSPredicateExpectation(
+        predicate: NSPredicate(format: "exists == true AND label == %@", "查看结果"), object: view)
+      XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 8), .completed)
+      XCTAssertEqual(source.editor.value as? String, original)
+    }
+    source.clearSelection()
+    let requests = try scenarioServer.state().count
+    source.press("f", modifierFlags: .option)
+    XCTAssertEqual(try scenarioServer.state().count, requests, "An empty selection starts no request")
+  }
+
   func testPanelHidesOnEscapeReturnsOnOptionAAndKeepsItsState() throws {
     driver.launch()
     let frame = driver.panel.frame

@@ -227,7 +227,7 @@ struct PasteboardSelectionCopier: SelectionCopier {
   var lateCopyWindow: Duration = .seconds(1)
   var pasteboardName: NSPasteboard.Name = .general
   /// Sends the copy command; false when it could not be sent.
-  var postCopyCommand: @MainActor @Sendable () -> Bool = CopyCommand.post
+  var postCopyCommand: @MainActor @Sendable () -> Bool = TextEditingCommand.copy
 
   @MainActor
   func copySelection() async -> String? {
@@ -317,17 +317,22 @@ struct PasteboardSnapshot {
   }
 }
 
-/// ⌘C as the frontmost application receives it from the keyboard.
-enum CopyCommand {
+/// Copy and paste with explicit modifiers and the current keyboard layout.
+enum TextEditingCommand {
   /// Posts ⌘C with only ⌘ held: the user is still holding the shortcut's ⌥,
   /// and ⌥⌘C is a different command (Finder's Copy as Pathname). Nothing is
   /// posted while secure input is on, when keystrokes are not meant to be
   /// seen or synthesized.
   @MainActor
-  static func post() -> Bool {
+  static func copy() -> Bool {
+    post(character: "c")
+  }
+
+  @MainActor
+  static func post(character: Character, to processIdentifier: pid_t? = nil) -> Bool {
     guard !IsSecureEventInputEnabled() else { return false }
     let source = CGEventSource(stateID: .privateState)
-    let keyCode = CGKeyCode(keyCode(typing: "c") ?? kVK_ANSI_C)
+    let keyCode = CGKeyCode(keyCode(typing: character) ?? (character == "v" ? kVK_ANSI_V : kVK_ANSI_C))
     guard
       let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
       let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
@@ -336,8 +341,13 @@ enum CopyCommand {
     }
     down.flags = .maskCommand
     up.flags = .maskCommand
-    down.post(tap: .cgSessionEventTap)
-    up.post(tap: .cgSessionEventTap)
+    if let processIdentifier {
+      down.postToPid(processIdentifier)
+      up.postToPid(processIdentifier)
+    } else {
+      down.post(tap: .cgSessionEventTap)
+      up.post(tap: .cgSessionEventTap)
+    }
     return true
   }
 
