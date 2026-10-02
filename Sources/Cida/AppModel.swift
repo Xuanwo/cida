@@ -136,9 +136,6 @@ final class AppModel {
   /// The Settings tab on screen; Settings reopens on it until Cida quits.
   var settingsTab: SettingsTab = .model
   var inputFocusRequestID = 0
-  /// Bumped when the whole source should be selected, e.g. when the panel is
-  /// shown again with the previous text still in it.
-  var inputSelectAllRequestID = 0
   /// Bumped when the model replaces the whole source (a selection brought in
   /// by the global shortcut); the editor then drops whatever it holds,
   /// including a large virtual document.
@@ -429,10 +426,6 @@ final class AppModel {
 
   func requestInputFocus() {
     inputFocusRequestID &+= 1
-  }
-
-  func requestInputSelectAll() {
-    inputSelectAllRequestID &+= 1
   }
 
   func attachDisplayLink(to view: NSView) {

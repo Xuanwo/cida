@@ -139,7 +139,7 @@ final class PanelController {
   }
 
   /// Shows the panel on the active screen. Every appearance resets the action
-  /// to 翻译 and selects the whole source, so typing or ⌘V starts a new task.
+  /// to 翻译 and focuses the source without changing its selection.
   func show() {
     if model.panelMessage == nil, model.needsModelConfiguration {
       // The welcome may have been answered with ⏎ in an earlier appearance.
@@ -165,7 +165,6 @@ final class PanelController {
     panel.alphaValue = 1
     panel.makeKeyAndOrderFront(nil)
     model.requestInputFocus()
-    model.requestInputSelectAll()
     onVisibilityChange?(true)
   }
 
@@ -424,13 +423,9 @@ enum CopyShortcutRouting {
     return event.keyCode == 8 || event.charactersIgnoringModifiers?.lowercased() == "c"
   }
 
-  /// Explicit text selections keep native copy. The source's automatic
-  /// replacement selection leaves ⌘C available to copy the result.
+  /// Text selections keep native copy; without one, ⌘C copies the result.
   static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {
     guard let textView = window?.firstResponder as? NSTextView else { return false }
-    if let composer = textView as? ComposerNativeTextView, composer.hasAutomaticSelection {
-      return false
-    }
     return textView.selectedRange().length > 0
   }
 }

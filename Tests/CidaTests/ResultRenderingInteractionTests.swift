@@ -489,7 +489,7 @@ extension InteractionReproductionTests {
     XCTAssertTrue(CopyShortcutRouting.isImageShortcut(commandShiftC), "⇧⌘C copies the share card")
     XCTAssertFalse(CopyShortcutRouting.isImageShortcut(commandC))
 
-    let textView = ComposerNativeTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 80))
+    let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 80))
     let window = CidaWindow(
       contentRect: textView.frame,
       styleMask: [.borderless],
@@ -508,21 +508,6 @@ extension InteractionReproductionTests {
 
     textView.setSelectedRange(NSRange(location: 0, length: 8))
     XCTAssertTrue(CopyShortcutRouting.nativeTextResponderOwnsCopy(window: window))
-
-    textView.selectAllForReplacement()
-    XCTAssertEqual(textView.selectedRange().length, textView.string.utf16.count)
-    XCTAssertFalse(CopyShortcutRouting.nativeTextResponderOwnsCopy(window: window))
-    textView.selectAll(nil)
-    XCTAssertTrue(CopyShortcutRouting.nativeTextResponderOwnsCopy(window: window))
-
-    textView.selectAllForReplacement()
-    textView.setSelectedRange(NSRange(location: 0, length: 8))
-    XCTAssertTrue(CopyShortcutRouting.nativeTextResponderOwnsCopy(window: window))
-
-    textView.selectAllForReplacement()
-    textView.insertText("Replacement", replacementRange: textView.selectedRange())
-    XCTAssertEqual(textView.string, "Replacement")
-    XCTAssertFalse(textView.hasAutomaticSelection)
     assertTestProcessIsNotFrontmost()
   }
 }
