@@ -48,7 +48,7 @@
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑤ 已复制 — 点击复制结果或 ⌘C(原文与结果都无选区时;有选区时 ⌘C 复制选区,复制原文即在原文栏选中后 ⌘C):按钮变「✓ 已复制」800ms(motion-copied-hold-ms)后复原</p>
+  <p class="caption">⑤ 已复制 — 点击复制结果或 ⌘C(原文与结果都无选区时;有选区时 ⌘C 复制选区):按钮变「✓ 已复制」800ms(motion-copied-hold-ms)后复原</p>
   <section class="panel" data-state="copied">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="English" action="copied"></cida-bar>
@@ -104,23 +104,23 @@
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑨ 再次唤起 — 面板带着上次的原文与结果原样出现,动作回到「翻译」,原文全选:直接输入或 ⌘V 即替换,方向键取消选择继续编辑</p>
+  <p class="caption">⑨ 再次唤起 — 面板带着上次的原文与结果原样出现,动作回到「翻译」,焦点回到原文栏,保留光标与选区,不自动全选;替换整段原文先按 ⌘A,再输入或粘贴</p>
   <section class="panel" data-state="reopened">
-    <div class="source"><span class="selected">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</span></div>
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="English" action="copy"></cida-bar>
     <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑩ 带入选区 — 前台应用有新的选中文字时,Option-A 用它替换原文(全选),动作回到「翻译」并立即生成;选区与上次带入的相同、没有选区、读不到或未授权辅助功能时,按 ⑨ 原样出现</p>
+  <p class="caption">⑩ 带入选区 — 前台应用有新的选中文字时,Option-A 用它替换原文,动作回到「翻译」并立即生成;选区与上次带入的相同、没有选区、读不到或未授权辅助功能时,按 ⑨ 原样出现</p>
   <section class="panel" data-state="selection-imported">
-    <div class="source"><span class="selected">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</span></div>
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="English" processing action="stop"></cida-bar>
     <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write <span class="fading">performance whi</span><span class="cursor"></span></div></div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑪ 截图 · 未识别到文字 — 截图翻译快捷键框选的区域里没有文字:原文清空,结果栏只有一行说明「截图里没有识别到文字」(info 图标),不发请求;识别到文字时与 ⑩ 相同,原文是识别结果(全选)并立即翻译</p>
+  <p class="caption">⑪ 截图 · 未识别到文字 — 截图翻译快捷键框选的区域里没有文字:原文清空,结果栏只有一行说明「截图里没有识别到文字」(info 图标),不发请求;识别到文字时与 ⑩ 相同,原文是识别结果并立即翻译</p>
   <section class="panel" data-state="capture-unrecognized">
     <div class="source"><span class="placeholder">输入内容，回车翻译…</span></div>
     <cida-bar></cida-bar>

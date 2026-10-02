@@ -236,7 +236,6 @@ private struct SourcePane: View {
         metrics: $metrics,
         horizontalInset: CidaDesign.Spacing.windowHorizontal,
         maxVisibleHeight: editorMaxHeight,
-        selectAllRevision: model.inputSelectAllRequestID,
         focusRevision: model.inputFocusRequestID,
         replacementRevision: model.inputReplacementRevision,
         onSubmit: { model.submit() },

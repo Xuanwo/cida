@@ -148,9 +148,6 @@ struct ComposerTextEditor: NSViewRepresentable {
   /// The source pane's cap. Below it the pane grows to show every line, so the
   /// text never scrolls.
   var maxVisibleHeight: CGFloat = .greatestFiniteMagnitude
-  /// Bumped when the whole text should be selected, e.g. when the panel is
-  /// shown again with the previous source in it.
-  var selectAllRevision = 0
   /// Bumped when the editor should take keyboard focus, e.g. every time the
   /// panel is shown, so typing goes straight into the source.
   var focusRevision = 0
@@ -256,12 +253,6 @@ struct ComposerTextEditor: NSViewRepresentable {
       context.coordinator.isApplyingBindingReplacement = false
       applyTypography(to: textView)
       context.coordinator.publishMetrics(for: text, in: textView)
-    }
-
-    if context.coordinator.consumeSelectAllRevision(selectAllRevision),
-      !textView.isVirtualizingLargeDocument
-    {
-      textView.setSelectedRange(NSRange(location: 0, length: textView.textStorage?.length ?? 0))
     }
 
     // After the update, so the panel has become key by then.
@@ -378,14 +369,6 @@ struct ComposerTextEditor: NSViewRepresentable {
 
     func discardNativeBindingEcho() {
       expectsNativeBindingEcho = false
-    }
-
-    private var lastSelectAllRevision = 0
-
-    func consumeSelectAllRevision(_ revision: Int) -> Bool {
-      guard revision != lastSelectAllRevision else { return false }
-      lastSelectAllRevision = revision
-      return true
     }
 
     private var lastFocusRevision = 0
