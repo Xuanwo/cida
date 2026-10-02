@@ -54,11 +54,12 @@
       "description": "Report an edited source or a changed action as still matching the result.",
       "contracts": ["PANEL-STALE"],
       "file": "Sources/Cida/AppModel.swift",
-      "before": "    if result.mode != mode { return true }\n    if result.source.utf16.count != inputDocumentUTF16Count { return true }\n    return result.source != currentInputDocument",
+      "before": "    if result.mode != mode { return true }\n    if let prompt = result.actionPrompt, prompt != settings.prompt(for: mode) { return true }\n    if result.source.utf16.count != inputDocumentUTF16Count { return true }\n    return result.source != currentInputDocument",
       "after": "    _ = result\n    return false",
       "occurrences": 1,
       "unitTests": [
-        "MutationContractTests/testEditedSourceMarksTheResultStale"
+        "MutationContractTests/testEditedSourceMarksTheResultStale",
+        "ActionEditorTests/testChangingAnAppliedPromptMarksThePanelResultStale"
       ],
       "releaseTests": [
         "ComposerJourneyTests/testImprovementPreservesEnglishAndChineseSourceLanguages"
@@ -66,15 +67,16 @@
     },
     {
       "id": "panel-show-keeps-action",
-      "description": "Keep the previous action when the panel is shown again instead of returning to 翻译.",
+      "description": "Keep the previous action when the panel is shown again instead of selecting the first saved action.",
       "contracts": ["PANEL-DEFAULT-ACTION"],
       "file": "Sources/Cida/AppModel.swift",
-      "before": "  func resetModeToDefault() {\n    setMode(.translate, animated: false)\n  }",
+      "before": "  func resetModeToDefault() {\n    setMode(settings.actions.first?.id ?? .translate, animated: false)\n  }",
       "after": "  func resetModeToDefault() {\n  }",
       "occurrences": 1,
       "unitTests": [
         "MutationContractTests/testEveryPanelAppearanceResetsTheActionToTranslate",
-        "TranslationJourneyPropertyTests/testDeterministicCommandSequencesPreserveProductAndDurabilityInvariants"
+        "TranslationJourneyPropertyTests/testDeterministicCommandSequencesPreserveProductAndDurabilityInvariants",
+        "ActionEditorTests/testDefaultActionIsUsedByPanelAndSelectionButCaptureStillTranslates"
       ],
       "releaseTests": [
         "PanelAndSettingsJourneyTests/testPanelHidesOnEscapeReturnsOnOptionAAndKeepsItsState"
@@ -115,8 +117,8 @@
       "description": "Send the user's two translation languages during improvement so the model translates instead of keeping the input's language.",
       "contracts": ["CIDA-E2E-009"],
       "file": "Sources/Cida/ModelPrompt.swift",
-      "before": "    case .improve:\n      languageBehavior = .preserveSource\n      myLanguage = nil\n      foreignLanguage = nil",
-      "after": "    case .improve:\n      languageBehavior = .preserveSource\n      myLanguage = request.myLanguage\n      foreignLanguage = request.foreignLanguage",
+      "before": "    default:\n      languageBehavior = request.mode == .improve ? .preserveSource : .followPolicy\n      myLanguage = nil\n      foreignLanguage = nil",
+      "after": "    default:\n      languageBehavior = request.mode == .improve ? .preserveSource : .followPolicy\n      myLanguage = request.mode == .improve ? request.myLanguage : nil\n      foreignLanguage = request.mode == .improve ? request.foreignLanguage : nil",
       "occurrences": 1,
       "unitTests": [
         "AppModelTests/testPromptBuilderSeparatesTypedParametersFromTheUserDocument"
