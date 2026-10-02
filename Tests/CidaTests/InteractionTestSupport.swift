@@ -30,13 +30,15 @@ extension InteractionReproductionTests {
 
   func waitUntil(
     timeout: Duration,
+    file: StaticString = #filePath,
+    line: UInt = #line,
     condition: @escaping @MainActor () -> Bool
   ) async throws {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: timeout)
     while !condition() {
       if clock.now >= deadline {
-        XCTFail("Timed out waiting for condition")
+        XCTFail("Timed out waiting for condition", file: file, line: line)
         return
       }
       try await Task.sleep(for: .milliseconds(10))
