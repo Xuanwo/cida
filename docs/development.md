@@ -174,3 +174,29 @@ The CI workflow builds the site on every pull request, as the required `website`
 - No idle display link or timer runs during normal use.
 
 See [`functional-qa.md`](functional-qa.md) for regression evidence and [`design-qa.md`](design-qa.md) for the design comparison matrix.
+
+
+### Translation layer motion
+
+`LayerPaneSession` owns one optional source-window stream and its reference revision. A settled AX
+read supplies text, paragraph identity and base rectangles. `LayerMotionCapture` crops only that
+pane from the source window through ScreenCaptureKit, excluding the overlay by construction. It
+keeps images in memory on a serial processing queue and releases them when the pane closes, leaves
+the screen, changes geometry or switches applications. Without an existing screen-recording grant,
+the layer retains its AX-only fallback and does not request permission from a background task.
+
+`LayerImageAnchor` searches the pane vertically against a paragraph's reference pixels using
+normalized correlation and a competing-match check. A small vertical low-pass filter tolerates
+subpixel text antialiasing. `LayerMotionReference` requires an unambiguous initial match; a failed
+match, a capture gap of 100 ms, or a jump above 80 points invalidates that paragraph until another
+AX read. No wheel deltas or cumulative displacements become paragraph coordinates. Frame results
+older than 100 ms or belonging to a replaced reference/stream are ignored. Work is bounded to the
+first 12 selected paragraphs per pane; other paragraphs use the settled-position fallback.
+
+The overlay moves each matched paragraph and its waiting underlay without re-typesetting. Pane
+clipping and occlusion masks remain fixed. Horizontal motion and AX-reported reflow invalidate the
+reference. Reads racing motion are discarded. `TranslationLayerMotionTests` covers ambiguity,
+identity loss, missing frames and per-paragraph rendering; the translation-layer Tart journey
+requires both `layer-motion-ready` and `layer-motion-tracked` in the actual app's lifecycle log and
+saves screenshots. The paragraph and whole-window README demos need new recordings when publishing
+this interaction change.
