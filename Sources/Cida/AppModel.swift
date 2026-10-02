@@ -521,6 +521,18 @@ final class AppModel {
     return true
   }
 
+  /// Opens a completed background operation without generating again or translating it.
+  func importImprovementResult(_ record: ResultRecord) {
+    processingTask?.cancel()
+    processingTask = nil
+    generationState = .idle
+    lastImportedSelection = nil
+    replaceSource(with: record.source)
+    setMode(.improve)
+    result = record
+    dismissPanelMessage()
+  }
+
   /// The text the capture shortcut recognized in the framed part of the
   /// screen (`Design/spec/panel.md` §一 截图翻译). Recognized text replaces
   /// the source and is translated at once, superseding a running request.

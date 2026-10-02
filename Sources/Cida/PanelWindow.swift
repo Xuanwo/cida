@@ -138,14 +138,14 @@ final class PanelController {
     panel.contentView
   }
 
-  /// Shows the panel on the active screen. Every appearance resets the action
-  /// to 翻译 and focuses the source without changing its selection.
-  func show() {
+  /// Shows the panel on the active screen and focuses the source without changing its selection.
+  /// Ordinary appearances reset to 翻译; a retained improvement keeps its action and result.
+  func show(preservingMode: Bool = false) {
     if model.panelMessage == nil, model.needsModelConfiguration {
       // The welcome may have been answered with ⏎ in an earlier appearance.
       model.clearConfigurationReminder()
     }
-    model.resetModeToDefault()
+    if !preservingMode { model.resetModeToDefault() }
     if let screen = Self.activeScreen() {
       heightBudget = PanelHeightBudget(visibleScreenHeight: screen.visibleFrame.height)
       applyRootView()

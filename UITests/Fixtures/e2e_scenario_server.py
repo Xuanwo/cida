@@ -255,6 +255,12 @@ def plan_for(submitted_text):
         return {
             "chunks": ["Captured text translated.\n", "CIDA_CAPTURE_SCENARIO_COMPLETE"],
         }
+    if submitted_text.strip().startswith("CIDA_E2E_IMPROVEMENT_"):
+        return {
+            "chunks": ["Improved ", "writing."],
+            "gateFirstByte": submitted_text.strip().endswith("_GATED"),
+            "requiredSystemFragments": ['"operation":"improve"', '"language_behavior":"preserve_source"'],
+        }
     if submitted_text.startswith("CIDA_E2E_SELECTION_"):
         return {
             "chunks": [

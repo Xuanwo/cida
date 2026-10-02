@@ -64,6 +64,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         self?.captureHotKey?.setSuspended(isSuspended)
         self?.layerHotKey?.setSuspended(isSuspended)
         self?.layerWindowHotKey?.setSuspended(isSuspended)
+        self?.improvementHotKey?.setSuspended(isSuspended)
       },
       selectionAccess: launchOptions.selectionAccess,
       captureAccess: launchOptions.captureAccess,
@@ -89,6 +90,28 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   private var globalHotKey: GlobalHotKey?
   private var captureHotKey: GlobalHotKey?
   private var layerHotKey: GlobalHotKey?
+  private var improvementHotKey: GlobalHotKey?
+  private var improvementScreen: NSScreen?
+  private lazy var improvementHint = CidaHintPanel(identifier: "improvement-hint")
+  private lazy var selectionImprovement: SelectionImprovement = {
+    let operation = SelectionImprovement(service: launchOptions.textProcessingService)
+    operation.recordEvent = { [weak self] event in self?.lifecycleLog?.record(event) }
+    operation.onFeedback = { [weak self] feedback in
+      guard let self else { return }
+      guard let feedback else { improvementHint.hide(); return }
+      improvementHint.show(feedback.text, for: feedback.dismissAfter, action: feedback.action, on: improvementScreen,
+        onPress: feedback.action == nil ? nil : { [weak self] in
+          self?.selectionImprovement.performFeedbackAction()
+        })
+    }
+    operation.onResult = { [weak self] result in
+      guard let self else { return }
+      model.importImprovementResult(result)
+      panelController?.show(preservingMode: true)
+    }
+    return operation
+  }()
+
   /// The layer shortcut with ⇧: the whole window (`Design/spec/translation-layer.md` §三).
   private var layerWindowHotKey: GlobalHotKey?
   /// The translation layer (`Design/spec/translation-layer.md`); nil in automation that shows
@@ -152,6 +175,9 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       }
       layerWindowHotKey = GlobalHotKey(shortcut: model.settings.layerShortcut?.addingShift) { [weak self] in
         self?.handleLayerShortcut(wholeWindow: true)
+      }
+      improvementHotKey = GlobalHotKey(shortcut: model.settings.improvementShortcut) { [weak self] in
+        self?.handleImprovementShortcut()
       }
       updateTranslationLayer(for: model.settings.layerShortcut)
       warmUpTextRecognition()
@@ -236,6 +262,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       case .showPanel: globalHotKey
       case .captureText: captureHotKey
       case .translationLayer: layerHotKey
+      case .improveSelection: improvementHotKey
       }
     let previous = hotKey?.shortcut
     if let hotKey, !hotKey.update(to: shortcut) {
@@ -248,6 +275,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       if let previous { _ = hotKey?.update(to: previous) }
       return false
     }
+    if action == .improveSelection, shortcut == nil { selectionImprovement.dismiss() }
     updateMenuItem(for: action, shortcut: shortcut)
     if action == .translationLayer { updateTranslationLayer(for: shortcut) }
     return true
@@ -260,7 +288,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       switch action {
       case .showPanel: showPanelMenuItem
       case .captureText: captureMenuItem
-      case .translationLayer: nil as NSMenuItem?
+      case .translationLayer, .improveSelection: nil as NSMenuItem?
       }
     item?.keyEquivalent = shortcut?.menuKeyEquivalent ?? ""
     item?.keyEquivalentModifierMask = shortcut?.menuModifierMask ?? []
@@ -280,6 +308,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       logShortcut("shortcut-ignored reading-selection")
       return
     }
+    selectionImprovement.dismiss()
     isReadingSelection = true
     let pressedAt = ContinuousClock.now
     logShortcut(
@@ -312,6 +341,21 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     lifecycleLog?.record(event)
   }
 
+  private func handleImprovementShortcut() {
+    guard !isCapturing, !isReadingSelection else { return }
+    if selectionImprovement.isRunning { selectionImprovement.cancel(); return }
+    model.refreshSelectionAccess()
+    guard model.isSelectionAccessGranted else {
+      model.requestSelectionAccess()
+      return
+    }
+    recoverAPIKeyIfNeeded()
+    guard !model.needsModelConfiguration else { showPanel(); return }
+    guard panelController?.isVisible != true else { return }
+    improvementScreen = PanelController.activeScreen()
+    selectionImprovement.trigger(settings: model.settings)
+  }
+
   /// The capture shortcut (`Design/spec/panel.md` §一 截图翻译): freezes
   /// the screen under the pointer, lets the user frame some text, and shows
   /// the panel translating what was recognized. Without the Screen Recording
@@ -319,6 +363,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   @objc
   func handleCaptureShortcut() {
     guard !isCapturing, !isReadingSelection else { return }
+    selectionImprovement.dismiss()
     panelController?.hide()
     model.refreshCaptureAccess()
     guard model.isCaptureAccessGranted else {
@@ -385,6 +430,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
   /// the panel's welcome.
   private func handleLayerShortcut(wholeWindow: Bool) {
     guard let translationLayer, !isCapturing, !isReadingSelection else { return }
+    selectionImprovement.dismiss()
     model.refreshSelectionAccess()
     guard model.isSelectionAccessGranted else {
       model.requestSelectionAccess()
@@ -418,6 +464,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   @objc
   func showPanel() {
+    selectionImprovement.dismiss()
     recoverAPIKeyIfNeeded()
     lifecycleLog?.record("show-panel-requested", panel: panelController?.panel)
     panelController?.show()
@@ -431,6 +478,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
   /// Opens Settings on `tab`, or on the tab it showed last.
   func openSettings(on tab: SettingsTab?) {
+    selectionImprovement.dismiss()
     if let tab { model.settingsTab = tab }
     ensureSettingsWindowController()
 
@@ -944,6 +992,7 @@ private struct LaunchOptions {
         // Someone who only captures text.
         settings.shortcut = nil
         settings.layerShortcut = nil
+        settings.improvementShortcut = nil
       }
     #endif
     return applyingEndpointOverride(to: settings)

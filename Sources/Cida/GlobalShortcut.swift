@@ -62,6 +62,7 @@ struct GlobalShortcut: Equatable, Hashable, Sendable {
 
   static let optionA = GlobalShortcut(keyCode: UInt16(kVK_ANSI_A), modifiers: .option)
   static let optionS = GlobalShortcut(keyCode: UInt16(kVK_ANSI_S), modifiers: .option)
+  static let optionF = GlobalShortcut(keyCode: UInt16(kVK_ANSI_F), modifiers: .option)
   static let optionD = GlobalShortcut(keyCode: UInt16(kVK_ANSI_D), modifiers: .option)
 
   init(keyCode: UInt16, modifiers: Modifiers) {
@@ -209,12 +210,15 @@ enum GlobalShortcutAction: CaseIterable, Sendable {
   case captureText
   /// Opens the translation layer's configuration over the screen.
   case translationLayer
+  /// Improves the foreground selection and replaces it when its target is unchanged.
+  case improveSelection
 
   var defaultShortcut: GlobalShortcut {
     switch self {
     case .showPanel: .optionA
     case .captureText: .optionS
     case .translationLayer: .optionD
+    case .improveSelection: .optionF
     }
   }
 }

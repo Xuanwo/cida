@@ -80,6 +80,7 @@ enum SettingsStore {
     stored.shortcut = settings.shortcut
     stored.captureShortcut = settings.captureShortcut
     stored.layerShortcut = settings.layerShortcut
+    stored.improvementShortcut = settings.improvementShortcut
     stored.launchAtLogin = settings.launchAtLogin
     save(stored, namespace: namespace)
   }

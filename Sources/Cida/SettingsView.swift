@@ -332,6 +332,7 @@ private struct SettingsBody: View {
           GlobalShortcutRow(model: model, action: .showPanel)
           GlobalShortcutRow(model: model, action: .captureText)
           GlobalShortcutRow(model: model, action: .translationLayer)
+          GlobalShortcutRow(model: model, action: .improveSelection)
         }
         Hairline()
         SettingsGroup(title: "权限") {
@@ -835,6 +836,7 @@ private struct GlobalShortcutRow: View {
     case .showPanel: "显示辞达"
     case .captureText: "截图翻译"
     case .translationLayer: "原处翻译"
+    case .improveSelection: "改进并替换"
     }
   }
 
@@ -851,6 +853,7 @@ private struct GlobalShortcutRow: View {
     case .showPanel: return "在任何应用里唤起"
     case .captureText: return "框选屏幕文字并翻译"
     case .translationLayer: return "加 ⇧ 翻译整个窗口"
+    case .improveSelection: return "改进并替换选中文字"
     }
   }
 
@@ -859,6 +862,7 @@ private struct GlobalShortcutRow: View {
     case .showPanel: "settings-shortcut"
     case .captureText: "settings-capture-shortcut"
     case .translationLayer: "settings-layer-shortcut"
+    case .improveSelection: "settings-improvement-shortcut"
     }
   }
 
@@ -867,6 +871,7 @@ private struct GlobalShortcutRow: View {
     case .showPanel: "显示辞达快捷键"
     case .captureText: "截图翻译快捷键"
     case .translationLayer: "原处翻译快捷键"
+    case .improveSelection: "改进并替换快捷键"
     }
   }
 
@@ -955,7 +960,7 @@ private struct AccessibilityPermissionRow: View {
 
   var body: some View {
     PermissionRow(
-      title: "辅助功能", caption: "选中文字与原处翻译", isGranted: model.isSelectionAccessGranted,
+      title: "辅助功能", caption: "读取与替换应用文字", isGranted: model.isSelectionAccessGranted,
       request: model.requestSelectionAccess, identifier: "settings-selection-access"
     )
     // The system does not say when the permission changes for this process;

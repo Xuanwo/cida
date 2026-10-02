@@ -108,6 +108,7 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
   @ObservationIgnored var outputLanguageSettled = false
   let storage: ResultTextStorage
   var phase: ResultPhase
+  var replacementNote: String?
   @ObservationIgnored var presentationRevision: Int
   @ObservationIgnored var latestPresentationDelta: String?
 
@@ -168,7 +169,7 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
   var note: ResultNote? {
     switch phase {
     case .streaming, .completed:
-      nil
+      replacementNote.map { ResultNote(kind: .replacement, text: $0) }
     case .stopped:
       ResultNote(kind: .stopped, text: "已停止 · ⏎ 重新生成")
     case .failed(let message):
@@ -185,6 +186,7 @@ struct ResultNote: Equatable, Sendable {
     case stopped
     case failed
     case unrecognized
+    case replacement
   }
 
   let kind: Kind
@@ -213,13 +215,14 @@ struct CidaSettings: Equatable, Sendable {
   /// rewritten there (`Design/spec/panel.md` §三), not in Settings.
   var foreignLanguage = defaultLanguages().foreign
   var launchAtLogin = false
-  /// The combination that shows the panel from any application. Each of the three can be left
+  /// The combination that shows the panel from any application. Each action can be left
   /// without one (nil): the action then has no global shortcut and the combination is free.
   var shortcut: GlobalShortcut? = .optionA
   /// The combination that captures text on screen and translates it.
   var captureShortcut: GlobalShortcut? = .optionS
   /// The combination that translates the paragraph under the pointer; with ⇧, the whole window.
   var layerShortcut: GlobalShortcut? = .optionD
+  var improvementShortcut: GlobalShortcut? = .optionF
 
   /// Whether requests can be sent (`Design/spec/configuration.md`): a valid endpoint, a model,
   /// and a key unless the endpoint is on this Mac or `auth` is `none`.
@@ -238,12 +241,13 @@ struct CidaSettings: Equatable, Sendable {
     case .showPanel: shortcut
     case .captureText: captureShortcut
     case .translationLayer: layerShortcut
+    case .improveSelection: improvementShortcut
     }
   }
 
   /// Every combination the global shortcuts hold: the layer's also holds its ⇧ variant.
   var heldShortcuts: [GlobalShortcut] {
-    [shortcut, captureShortcut, layerShortcut, layerShortcut?.addingShift].compactMap(\.self)
+    [shortcut, captureShortcut, layerShortcut, layerShortcut?.addingShift, improvementShortcut].compactMap(\.self)
   }
 
   /// No two shortcuts share a combination, and the layer's leaves ⇧ to its whole-window variant.
@@ -257,6 +261,7 @@ struct CidaSettings: Equatable, Sendable {
     case .showPanel: shortcut = newShortcut
     case .captureText: captureShortcut = newShortcut
     case .translationLayer: layerShortcut = newShortcut
+    case .improveSelection: improvementShortcut = newShortcut
     }
   }
 
@@ -324,6 +329,7 @@ extension CidaSettings: Codable {
     case shortcut
     case captureShortcut
     case layerShortcut
+    case improvementShortcut
     case promptContractVersion
     /// 1.0's provider preset, model and custom endpoint; read once to build `modelService`.
     case legacyProvider = "provider"
@@ -375,6 +381,12 @@ extension CidaSettings: Codable {
     shortcut = try decodeShortcut(.shortcut, default: .optionA)
     captureShortcut = try decodeShortcut(.captureShortcut, default: .optionS)
     layerShortcut = try decodeShortcut(.layerShortcut, default: .optionD)
+    improvementShortcut = try decodeShortcut(.improvementShortcut, default: .optionF)
+    if !container.contains(.improvementShortcut),
+      [shortcut, captureShortcut, layerShortcut, layerShortcut?.addingShift].contains(.optionF)
+    {
+      improvementShortcut = nil
+    }
   }
 
   func encode(to encoder: Encoder) throws {
@@ -387,7 +399,7 @@ extension CidaSettings: Codable {
     try container.encode(launchAtLogin, forKey: .launchAtLogin)
     for (value, key) in [
       (shortcut, CodingKeys.shortcut), (captureShortcut, .captureShortcut),
-      (layerShortcut, .layerShortcut),
+      (layerShortcut, .layerShortcut), (improvementShortcut, .improvementShortcut),
     ] {
       if let value {
         try container.encode(value, forKey: key)
