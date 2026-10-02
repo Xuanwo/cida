@@ -19,12 +19,12 @@ The current core experience contract (`Design/spec/panel.md`) includes:
    capped at 30% of the screen, the panel at 70%, and both panes scroll past their caps.
 3. One result at a time. Return runs the selected action on the current source, keeps the source
    in the editor, and replaces the previous result immediately. Every appearance of the panel
-   resets the action to 翻译 and selects the whole source.
+   selects the first saved action without changing the source selection; explicit capture and translation-layer commands still translate.
 4. Delayed-first-byte, bursty, character-at-a-time, paused, stopped, failed, and recovered
    OpenAI-compatible streaming, rendered with display-linked smoothing, bounded grapheme batches,
    the per-run 120 ms glyph reveal behind the caret, the waiting caret, coalesced TextKit
    natural-height publication, and the 150 ms height slide for pane and panel growth.
-5. A control bar with the `翻译 | 改进` action (Tab switches it) and one context slot: `停止`
+5. A control bar with the ordered saved actions (Tab cycles through them) and one context slot: `停止`
    while a request runs, `复制结果` once a result exists, `✓ 已复制` for 800 ms after copying.
 6. Result notes instead of alerts: an edited source or a changed action dims the result and notes
    `原文已修改 · ⏎ 重新生成`; a stopped request keeps its partial text with `已停止`; a failed
@@ -249,3 +249,39 @@ workloads, and complete workload-specific invariants.
 
 Tart frame rate is never used as 120 Hz evidence. If only a 60 Hz display is detected, correctness
 and diagnostic latency can still be reported, but physical 120 Hz certification remains pending.
+
+## Custom actions
+
+`ActionEditorTests` covers legacy migration, ordered persistence, draft validation and trimming,
+restore-default application, deletion/undo, required translation protection, preview cancellation,
+late-response rejection, failure/retry, cache invalidation after model or language changes,
+unconfigured service behavior, panel-result isolation and default-action routing.
+
+The signed-app Tart journeys in `PanelAndSettingsJourneyTests` cover:
+
+- `testCustomActionsEditPreviewReorderAndRunInThePanel`: native creation, editing, fixed sample,
+  rename without another request, drag and keyboard sorting, panel submission, deletion/undo.
+  It also checks stable sample/button/adjacent-action frames when editing, absence of an empty
+  output pane and retention of the previous preview.
+- `testActionPreviewFailureRetryAndStopKeepThePreviousResult`: controlled HTTP failure, visible
+  error, retry of the same policy, stop before the first byte, and retention of the prior output.
+- `testActionDraftSurvivesSettingsClosureAndOnlyAppliedChangesSurviveRelaunch`: tab changes,
+  Settings closure, persistent names/prompts/order across restart, and session-only drafts/previews.
+- `testActionValidationAndOverflowKeepCreationReachable`: invalid drafts send no request, long
+  names and overflowing action rails preserve window width and access to creation.
+- The capture journey puts improvement first and verifies capture still translates. Selection,
+  improvement replacement, translation-layer, shortcut and configuration journeys cover the
+  neighboring entry points.
+
+Preview requests use the production client against local deterministic HTTP servers. These tests
+check request policy and interaction behavior, not the output quality of a remote model. Layout
+assertions and screenshots cover settled geometry, not frame-by-frame animation smoothness.
+
+Visual evidence includes [the previous prompt rows](images/actions-settings-before.png),
+[the board/native browse comparison](../Design/QACurrent/comparison-settings-translation.png),
+[editing](../Design/QACurrent/comparison-settings-prompt-editing.png),
+[dark appearance](../Design/QACurrent/comparison-dark-settings-prompt-editing.png), and the
+screenshots retained by the Tart journeys. The interactive source is
+[actions.html](../Design/boards/actions.html). Run results and the tested commit are recorded in
+the pull request. Existing README demos show the default built-in actions; recordings that
+explain action switching should be refreshed to include custom actions when publishing.

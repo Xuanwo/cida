@@ -4,6 +4,7 @@ enum ModelLanguageBehavior: String, Codable, Equatable, Sendable {
   /// Translate between the user's two languages; the model decides the direction.
   case translateBetween = "translate_between"
   case preserveSource = "preserve_source"
+  case followPolicy = "follow_policy"
   /// Translate into target_language only: the translation layer names the language itself.
   case translateInto = "translate_into"
 }
@@ -30,8 +31,8 @@ struct ModelTaskParameters: Codable, Equatable, Sendable {
         foreignLanguage = request.foreignLanguage
         targetLanguage = nil
       }
-    case .improve:
-      languageBehavior = .preserveSource
+    default:
+      languageBehavior = request.mode == .improve ? .preserveSource : .followPolicy
       myLanguage = nil
       foreignLanguage = nil
       targetLanguage = nil
@@ -82,7 +83,9 @@ enum ModelPromptBuilder {
         - Translate each text field, using the other paragraphs as context. Keep every ⟦n⟧ placeholder exactly as written; it stands for a name, a link or a mention.
         - Return only a JSON array of objects with exactly id and text fields, one per id. No Markdown fences or commentary. Never omit an id or return an empty text. Keep the translation concise without losing meaning.
         """
-      : "- Return only the transformed text without commentary or wrappers."
+      : request.mode == .translate || request.mode == .improve
+        ? "- Return only the transformed text without commentary or wrappers."
+        : "- Return the output requested by the policy, including its requested format."
     let systemMessage = """
       \(policy)
 

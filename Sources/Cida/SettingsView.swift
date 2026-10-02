@@ -13,7 +13,7 @@ enum SettingsTab: String, CaseIterable {
   var title: String {
     switch self {
     case .model: "模型"
-    case .translation: "翻译"
+    case .translation: "动作"
     case .shortcuts: "快捷键"
     case .general: "通用"
     }
@@ -22,7 +22,7 @@ enum SettingsTab: String, CaseIterable {
   var icon: LucideIconName {
     switch self {
     case .model: .sparkles
-    case .translation: .languages
+    case .translation: .penLine
     case .shortcuts: .keyboard
     case .general: .slidersHorizontal
     }
@@ -30,7 +30,7 @@ enum SettingsTab: String, CaseIterable {
 }
 
 /// The Settings window (`Design/spec/settings.md`, `Design/boards/settings-states.html`): four
-/// tabs under the titlebar, each as tall as its content. Everything saves itself.
+/// tabs under the titlebar, each as tall as its content. Action drafts apply on completion.
 struct SettingsWindowView: View {
   @Bindable var model: AppModel
   let updates: UpdateState
@@ -323,9 +323,8 @@ private struct SettingsBody: View {
           LanguagesRow(model: model)
         }
         Hairline()
-        SettingsGroup(title: "提示词") {
-          PromptRow(model: model, mode: .translate)
-          PromptRow(model: model, mode: .improve)
+        SettingsGroup {
+          ActionsSettingsView(model: model, editor: model.actionEditor)
         }
       case .shortcuts:
         SettingsGroup(title: "快捷键", isFirst: true) {
@@ -514,12 +513,13 @@ private struct SettingsLabel: View {
 }
 
 /// The bordered button of every row; highlighted, it is the copied feedback on `accent-soft`.
-private struct SettingsBorderedButtonStyle: ButtonStyle {
+struct SettingsBorderedButtonStyle: ButtonStyle {
   var isHighlighted = false
+  var fontSize: CGFloat = 12.5
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(CidaDesign.ui(12.5, weight: .medium))
+      .font(CidaDesign.ui(fontSize, weight: .medium))
       .foregroundStyle(isHighlighted ? CidaDesign.accent : CidaDesign.textControl)
       .padding(.horizontal, 12)
       .frame(height: 30)
@@ -717,91 +717,6 @@ private struct CopyConfigurationPromptButton: View {
     .animation(.easeOut(duration: CidaMotion.iconSwapSeconds), value: isCopied)
     .accessibilityLabel(isCopied ? "已复制" : "复制配置提示词")
     .accessibilityIdentifier("settings-copy-configuration-prompt")
-  }
-}
-
-// MARK: - 提示词
-
-private struct PromptRow: View {
-  @Bindable var model: AppModel
-  let mode: ProcessingMode
-
-  private var prompt: Binding<String> {
-    mode == .translate ? $model.settings.translationPrompt : $model.settings.improvementPrompt
-  }
-
-  var body: some View {
-    if model.editingPrompt == mode {
-      ExpandedPromptRow(
-        mode: mode,
-        prompt: prompt,
-        reset: mode == .translate ? model.resetTranslationPrompt : model.resetImprovementPrompt
-      )
-    } else {
-      CollapsedPromptRow(mode: mode, preview: prompt.wrappedValue) {
-        model.editingPrompt = mode
-      }
-    }
-  }
-}
-
-private struct CollapsedPromptRow: View {
-  let mode: ProcessingMode
-  let preview: String
-  let edit: () -> Void
-
-  var body: some View {
-    HStack(alignment: .center, spacing: 24) {
-      SettingsLabel(mode.title, caption: preview)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      Button("编辑", action: edit)
-        .buttonStyle(SettingsBorderedButtonStyle())
-        .accessibilityIdentifier("settings-prompt-edit-\(mode.rawValue)")
-    }
-    .padding(.vertical, 10)
-  }
-}
-
-/// The prompt sheet: paper under the text the model will read.
-private struct ExpandedPromptRow: View {
-  let mode: ProcessingMode
-  @Binding var prompt: String
-  let reset: () -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Text(mode.title)
-          .font(CidaDesign.ui(13.5))
-          .foregroundStyle(CidaDesign.textPrimary)
-        Spacer()
-        Button("恢复默认", action: reset)
-          .buttonStyle(.plain)
-          .font(CidaDesign.ui(12, weight: .medium))
-          .foregroundStyle(CidaDesign.textSecondary)
-          .accessibilityIdentifier("settings-prompt-reset-\(mode.rawValue)")
-      }
-      .frame(height: 20)
-
-      PromptTextEditor(
-        text: $prompt,
-        accessibilityLabel: "\(mode.title)提示词",
-        accessibilityIdentifier: "settings-prompt-editor-\(mode.rawValue)"
-      )
-      .frame(height: 92)
-      .background(CidaDesign.surfacePaper)
-      .clipShape(.rect(cornerRadius: CidaDesign.Radius.card, style: .continuous))
-      .overlay {
-        RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
-          .strokeBorder(CidaDesign.accent, lineWidth: 1.5)
-      }
-
-      Text("自动保存 · 目标语言与任务由应用传入，不必写占位符")
-        .font(CidaDesign.ui(11.5))
-        .foregroundStyle(CidaDesign.textTertiary)
-        .frame(height: 17)
-    }
-    .padding(.vertical, 10)
   }
 }
 

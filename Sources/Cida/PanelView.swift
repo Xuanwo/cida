@@ -312,15 +312,26 @@ struct ModeSegmentedControl: View {
   var isEnabled = true
 
   var body: some View {
+    ViewThatFits(in: .horizontal) {
+      segments.fixedSize()
+      ScrollViewReader { proxy in
+        ScrollView(.horizontal) { segments }
+          .scrollIndicators(.hidden)
+          .onChange(of: model.mode) { proxy.scrollTo(model.mode.rawValue, anchor: .center) }
+      }
+    }
+  }
+
+  private var segments: some View {
     PanelSegmentedControl(
-      titles: ProcessingMode.allCases.map(\.title),
-      selected: ProcessingMode.allCases.firstIndex(of: model.mode) ?? 0,
-      identifiers: ProcessingMode.allCases.map { "action-\($0.rawValue)" },
+      titles: model.settings.actions.map(\.name),
+      selected: model.settings.actions.firstIndex(where: { $0.id == model.mode }) ?? 0,
+      identifiers: model.settings.actions.map { "action-\($0.id.rawValue)" },
       isEnabled: isEnabled,
-      onSelect: { model.setMode(ProcessingMode.allCases[$0]) },
+      onSelect: { model.setMode(model.settings.actions[$0].id) },
       accessory: { index in
         // Only 翻译 has an object: the language a source in my language goes into.
-        if ProcessingMode.allCases[index] == .translate {
+        if model.settings.actions[index].id == .translate {
           PanelForeignLanguage(model: model)
         }
       }
@@ -366,6 +377,7 @@ struct PanelSegmentedControl<Accessory: View>: View {
           .buttonStyle(.plain)
           .accessibilityAddTraits(isSelected ? .isSelected : [])
           .accessibilityIdentifier(identifiers[index])
+          .id(identifiers[index].replacingOccurrences(of: "action-", with: ""))
           accessory(index)
         }
         .background {
@@ -997,7 +1009,7 @@ private struct PaperText: View {
     var composed = Text(text).foregroundStyle(CidaDesign.textInk)
     if let caretOpacity {
       // Like the result pane's caret: 2 pt past the text, 4 pt below the baseline.
-      composed = composed + Text(Image(nsImage: Self.caret(opacity: caretOpacity)))
+      composed = composed + Text(Image(nsImage: PaperCaret.image(opacity: caretOpacity)))
         .baselineOffset(-Self.caretDescent)
     }
     return composed
@@ -1008,9 +1020,13 @@ private struct PaperText: View {
   }
 
   private static let caretDescent = ResultTextStyle.caretDescent
+}
 
+/// Shared by the panel paper and its Settings preview.
+@MainActor
+enum PaperCaret {
   /// The caret with room before it, as the board's `margin-left: 2px`.
-  private static func caret(opacity: Double) -> NSImage {
+  static func image(opacity: Double) -> NSImage {
     let gap = ResultTextStyle.caretGap
     let size = NSSize(width: gap + CidaMotion.cursorWidth, height: CidaMotion.cursorHeight)
     return NSImage(size: size, flipped: false) { rect in

@@ -117,6 +117,18 @@ def plan_for(submitted_text):
         ],
         "CIDA_UI_E2E_COMPLETE",
     ]
+    if submitted_text == "想跟你同步一下，原定周五的分享会要改到下周三下午三点，地点还是二楼会议室。主要是因为演示还没准备好，有几处细节想再确认一下。如果这个时间不方便，麻烦明天中午前告诉我，我们再一起看看怎么安排。":
+        return {"chunks": ["The sharing session moves to next Wednesday at 3 p.m. ", "CIDA_ACTION_SAMPLE_COMPLETE"], "initialDelay": 0.5}
+    if submitted_text == "CIDA_E2E_POOL_CUSTOM_ACTION":
+        return {"chunks": ["CIDA_E2E_POOL_CUSTOM_ACTION_COMPLETE"],
+                "requiredSystemFragments": ["Summarize the source in French.", '"language_behavior":"follow_policy"']}
+    if submitted_text == "CIDA_ACTION_RETRY":
+        attempts = sum(item["scenario"] == submitted_text for item in state.snapshot()["requests"])
+        if attempts == 1:
+            return {"status": 503, "body": "controlled preview failure"}
+        return {"chunks": ["CIDA_ACTION_RECOVERED"]}
+    if submitted_text == "CIDA_ACTION_STOP":
+        return {"chunks": ["CIDA_ACTION_STOPPED_LATE"], "gateFirstByte": True}
     plans = {
         # What Settings' 检查 and `Cida check` send (ModelServiceCheck.source).
         "hello": {"chunks": ["你好"]},
@@ -355,17 +367,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         )
         temporary_record.replace(record_path)
 
-        scenario = submitted_text
-        request_id = state.begin(scenario, request)
-        plan = plan_for(scenario)
         system_message = next(
-            (
-                message.get("content", "")
-                for message in messages
-                if message.get("role") == "system"
-            ),
+            (message.get("content", "") for message in messages if message.get("role") == "system"),
             "",
         )
+        scenario = submitted_text
+        # The preview's input stays fixed; policies identify controlled failure/stop scenarios.
+        if submitted_text.startswith("想跟你同步一下，原定周五的分享会"):
+            for marker in ("CIDA_ACTION_RETRY", "CIDA_ACTION_STOP"):
+                if marker in system_message:
+                    scenario = marker
+                    break
+        request_id = state.begin(scenario, request)
+        plan = plan_for(scenario)
         missing_fragments = [
             fragment
             for fragment in plan.get("requiredSystemFragments", [])

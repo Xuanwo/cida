@@ -200,3 +200,22 @@ identity loss, missing frames and per-paragraph rendering; the translation-layer
 requires both `layer-motion-ready` and `layer-motion-tracked` in the actual app's lifecycle log and
 saves screenshots. The paragraph and whole-window README demos need new recordings when publishing
 this interaction change.
+
+## Custom actions
+
+`CidaSettings.actions` is the ordered, persisted collection of action identities, names and prompts.
+Translation and improvement keep stable built-in identities; the legacy command-line prompt fields
+address these same records. Legacy saved prompts migrate on decode. The first action is the default
+for showing the panel or importing a selection; capture and the translation layer explicitly translate.
+Custom actions use the prompt's language and output-format policy, without inheriting the built-ins' restrictions.
+
+`ActionEditor` owns one draft, one undo operation, and in-memory sample results. Applying a draft
+updates the settings and previews the fixed sample through `TextProcessingService`. A preview keeps
+the previous complete output until its replacement finishes. Request identities and cancellation
+prevent an obsolete response from replacing a newer one. Browsing and renaming a cached action do
+not make requests. The draft survives Settings closure and tab changes, but neither drafts nor sample
+outputs are written to disk. The production panel keeps its independent streaming result.
+
+`ActionEditorTests` covers migration, request policies, editing, undo, cancellation and default routing.
+`PanelAndSettingsJourneyTests/testCustomActionsEditPreviewReorderAndRunInThePanel` drives creation,
+real preview requests, native drag sorting and panel submission in Tart and retains screenshots.

@@ -73,8 +73,7 @@ enum SettingsStore {
     namespace: String = storageNamespace
   ) {
     var stored = loadWithoutAPIKey(namespace: namespace)
-    stored.translationPrompt = settings.translationPrompt
-    stored.improvementPrompt = settings.improvementPrompt
+    stored.actions = settings.actions
     stored.myLanguage = settings.myLanguage
     stored.foreignLanguage = settings.foreignLanguage
     stored.shortcut = settings.shortcut

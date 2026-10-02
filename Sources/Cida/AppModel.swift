@@ -26,7 +26,7 @@ import SwiftUI
                   request.text,
                   target: TextLanguageDetector.typography(of: request.text) == .chinese
                     ? .english : .chinese)
-              case .improve:
+              default:
                 improve(request.text)
               }
 
@@ -93,8 +93,7 @@ extension String {
 @MainActor
 @Observable
 final class AppModel {
-  /// The action the next ⏎ runs. It resets to `.translate` every time the
-  /// panel is shown (see `PanelController`).
+  /// The action the next ⏎ runs. Showing the panel selects the first saved action.
   var mode: ProcessingMode
   var inputText: String {
     didSet {
@@ -107,6 +106,7 @@ final class AppModel {
   var settings = CidaSettings() {
     didSet {
       if settings.requestLanguages != oldValue.requestLanguages { settleSourceLanguage(animated: false) }
+      if !settings.actions.contains(where: { $0.id == mode }) { resetModeToDefault() }
     }
   }
   /// Whether the source is in my language, as the panel last decided once typing paused
@@ -131,8 +131,8 @@ final class AppModel {
   /// Errors from Settings actions (launch at login); request failures live
   /// on the result record instead.
   var errorMessage: String?
-  /// The prompt whose sheet is open in Settings; at most one at a time.
-  var editingPrompt: ProcessingMode?
+  /// Settings keeps one uncommitted draft and independent sample results.
+  let actionEditor: ActionEditor
   /// The Settings tab on screen; Settings reopens on it until Cida quits.
   var settingsTab: SettingsTab = .model
   var inputFocusRequestID = 0
@@ -241,6 +241,7 @@ final class AppModel {
     self.result = result
     self.settings = settings
     self.service = service
+    self.actionEditor = ActionEditor(service: service)
     self.streamPresentationPolicy = streamPresentationPolicy
     self.saveSettings = saveSettings
     self.applyGlobalShortcut = applyGlobalShortcut
@@ -329,16 +330,19 @@ final class AppModel {
     mode = newMode
   }
 
-  /// Tab: the other action. While a request runs the action choice is dimmed and
+  /// Tab: the next action. While a request runs the action choice is dimmed and
   /// cannot change (`Design/spec/panel.md` §三), so Tab does nothing.
   func toggleMode() {
     guard !isProcessing else { return }
-    setMode(mode == .translate ? .improve : .translate)
+    let actions = settings.actions
+    guard !actions.isEmpty else { return }
+    let index = actions.firstIndex { $0.id == mode } ?? -1
+    setMode(actions[(index + 1) % actions.count].id)
   }
 
   /// Every appearance of the panel starts from the default action.
   func resetModeToDefault() {
-    setMode(.translate, animated: false)
+    setMode(settings.actions.first?.id ?? .translate, animated: false)
   }
 
   // MARK: - Foreign language
@@ -476,6 +480,7 @@ final class AppModel {
   var isResultStale: Bool {
     guard let result, result.phase.isTerminal else { return false }
     if result.mode != mode { return true }
+    if let prompt = result.actionPrompt, prompt != settings.prompt(for: mode) { return true }
     if result.source.utf16.count != inputDocumentUTF16Count { return true }
     return result.source != currentInputDocument
   }
@@ -539,6 +544,7 @@ final class AppModel {
   /// A capture without text clears the source and says so under an empty
   /// result, without a request.
   func importCapturedText(_ text: String?) {
+    setMode(.translate, animated: false)
     guard let text else {
       processingTask?.cancel()
       generationState = .idle
@@ -547,17 +553,17 @@ final class AppModel {
         mode: .translate, source: "", outputLanguage: .english, phase: .unrecognized)
       return
     }
-    replaceSource(with: text)
+    replaceSource(with: text, action: .translate)
     startGeneration()
   }
 
   /// The whole source becomes `text`, with the default action; the editor
   /// drops whatever it held.
-  private func replaceSource(with text: String) {
+  private func replaceSource(with text: String, action: ProcessingMode? = nil) {
     inputText = text
     stageInputDocument(nil)
     inputReplacementRevision &+= 1
-    setMode(.translate, animated: false)
+    setMode(action ?? settings.actions.first?.id ?? .translate, animated: false)
     settleSourceLanguage(animated: false)
   }
 
@@ -604,8 +610,9 @@ final class AppModel {
       request: request,
       reportedSourceCharacterCount: requestCharacterCount
     )
+    let requestSettings = settings
     processingTask = Task { [weak self] in
-      await self?.runGeneration(request: request, record: record)
+      await self?.runGeneration(request: request, record: record, settings: requestSettings)
     }
   }
 
@@ -657,14 +664,6 @@ final class AppModel {
   private func copyToPasteboard(_ value: String) {
     pasteboard.clearContents()
     pasteboard.setString(value, forType: .string)
-  }
-
-  func resetImprovementPrompt() {
-    settings.improvementPrompt = CidaSettings().improvementPrompt
-  }
-
-  func resetTranslationPrompt() {
-    settings.translationPrompt = CidaSettings().translationPrompt
   }
 
   func persistSettings() {
@@ -846,7 +845,7 @@ final class AppModel {
       request: request,
       reportedSourceCharacterCount: reportedSourceCharacterCount
     )
-    await runGeneration(request: request, record: record)
+    await runGeneration(request: request, record: record, settings: settings)
   }
 
   private func makeRequest(text: String) -> ProcessingRequest {
@@ -875,7 +874,8 @@ final class AppModel {
       source: request.text,
       sourceCharacterCount: reportedSourceCharacterCount ?? request.text.utf16.count,
       outputLanguage: Self.expectedTypography(for: request),
-      phase: .streaming
+      phase: .streaming,
+      actionPrompt: settings.prompt(for: request.mode)
     )
     generationState = .waiting(entryID: record.id)
     result = record
@@ -884,7 +884,8 @@ final class AppModel {
 
   private func runGeneration(
     request: ProcessingRequest,
-    record: ResultRecord
+    record: ResultRecord,
+    settings: CidaSettings
   ) async {
     let latencyActivity = ProcessInfo.processInfo.beginActivity(
       options: [.userInitiated, .latencyCritical],

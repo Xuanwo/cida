@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>Cida — 动作</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="components.js" defer></script>
+  <!-- Interactive action examples. Native screenshot fixtures live in settings-states.html. -->
+  <style id="actions-proposal-style">
+    .icon-pen-line { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M13 21h8'/><path d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/></svg>"); }
+    .icon-plus { --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12h14'/><path d='M12 5v14'/></svg>"); }
+
+    .proposal { display: block; }
+    .proposal button, .proposal input, .proposal textarea { font-family: var(--font-ui); }
+    .proposal button { cursor: default; }
+    .proposal .nav { display: flex; justify-content: flex-end; padding-top: 9px; }
+    .proposal .nav button { padding: 0; border: 0; background: transparent; font-size: var(--font-size-caption); color: var(--text-secondary); }
+    .proposal .nav kbd { margin-left: 4px; font: inherit; color: var(--text-tertiary); }
+    .proposal [hidden] { display: none !important; }
+
+    /* Segments as buttons, in the production panel and in the mirror. */
+    .proposal .seg-button { display: flex; flex: none; position: relative; margin: 0; padding: 0; border: 0; background: transparent; border-radius: var(--radius-seg-item); }
+    .proposal .seg-button > span { max-width: 180px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .proposal .seg-button:not([aria-pressed="true"]):not(:disabled):not([aria-disabled="true"]):hover > span { color: var(--text-control); }
+    .proposal .seg-button:disabled > span, .proposal .seg-button[aria-disabled="true"] > span { opacity: 0.45; }
+
+    /* The production panel, editable. */
+    .proposal textarea.source { display: block; width: 100%; margin: 0; border: 0; resize: none; overflow: hidden; outline: none; }
+    .proposal .panel .result .text { white-space: pre-wrap; }
+    .proposal .result .cursor.waiting { animation: actions-breathe calc(var(--motion-breathe-ms) * 1ms) var(--motion-ease-breathe) infinite; }
+
+    /* Settings · 动作 */
+    .actions-head { display: flex; align-items: baseline; justify-content: space-between; }
+    .actions-head h3 { margin: 0; font-size: 12px; font-weight: 600; line-height: 17px; color: var(--text-control); }
+    .actions-head small { font-size: var(--font-size-caption); color: var(--text-tertiary); }
+
+    /* The mirror: the fixed sample, the action bar and the paper, in the panel's materials. */
+    .mirror { margin-top: 12px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); }
+    .mirror .sample { padding: 16px 18px 17px; }
+    .mirror .sample .label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: var(--font-size-caption); line-height: 1.5; color: var(--text-tertiary); }
+    .mirror .sample p { margin: 0; font-family: var(--font-body); font-size: 13px; line-height: 21px; color: var(--text-primary); }
+    .mirror .bar { gap: 10px; padding: 0 12px; }
+    .mirror .rail { position: relative; display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+    .mirror .seg { min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+    .mirror .seg::-webkit-scrollbar { display: none; }
+    .mirror .tab-hint { flex: none; }
+    .mirror .seg-button[data-id] { touch-action: none; }
+    .mirror .seg-button.lifted { opacity: 0.35; }
+    .mirror .seg-button.drop-before::before, .mirror .seg-button.drop-after::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 2px; border-radius: 1px; background: var(--accent); }
+    .mirror .seg-button.drop-before::before { left: -2px; }
+    .mirror .seg-button.drop-after::after { right: -2px; }
+    .mirror .add > span { display: flex; align-items: center; padding-left: 9px; padding-right: 9px; }
+    .mirror .add .icon { width: 12px; height: 14px; color: var(--text-tertiary); }
+    .mirror .add:not([aria-disabled="true"]):hover .icon { color: var(--text-control); }
+    /* The edited action's name, written in its own segment like 翻译's foreign language. */
+    .mirror .seg span.on input.name { width: 4em; margin: 0; padding: 0; border: 0; background: transparent; font: inherit; color: inherit; box-shadow: none; outline: none; }
+    .mirror .seg span.on input.name:focus { box-shadow: 0 1px 0 var(--accent); }
+    .mirror .trash { display: none; position: absolute; z-index: 2; top: calc(100% + 6px); left: 0; right: 0; height: 44px; align-items: center; justify-content: center; border: 1px dashed var(--border); border-radius: var(--radius-card); background: var(--surface); font-size: var(--font-size-label); color: var(--text-secondary); }
+    .mirror.dragging .trash { display: flex; }
+    .mirror .trash.over { border-color: var(--text-secondary); color: var(--text-control); }
+    .mirror .bar-action { flex: none; width: 80px; justify-content: center; font-family: var(--font-ui); }
+
+    /* The paper: what the selected action does to the sample. Editing writes its prompt on the
+       same paper above the result, in the input face; a hairline separates cause from effect
+       and takes the accent while the prompt has the focus. */
+    .mirror .result { gap: 0; padding: 18px; }
+    .mirror .instruction { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .mirror .instruction .error:empty { display: none; }
+    .mirror .instruction:has(+ .effect[data-empty]) { border-bottom: 0; padding-bottom: 0; margin-bottom: 10px; }
+    .mirror .instruction .head { display: flex; justify-content: space-between; gap: 12px; font-size: var(--font-size-caption); line-height: 1.5; color: var(--text-tertiary); }
+    .mirror .instruction .head span { display: flex; gap: 12px; }
+    .mirror .instruction .head button { padding: 0; border: 0; background: transparent; font: inherit; font-weight: 500; color: var(--text-secondary); }
+    .mirror .instruction .head button:hover { color: var(--text-control); }
+    .mirror .instruction textarea { display: block; width: 100%; min-height: 21px; margin: 0; padding: 0; border: 0; background: transparent; resize: none; overflow: hidden; outline: none; font-family: var(--font-ui); font-size: var(--font-size-body); line-height: calc(var(--font-size-body) * var(--line-height-body)); color: var(--text-ink); caret-color: var(--accent); }
+    .mirror .instruction textarea::placeholder { color: var(--text-tertiary); }
+    .mirror .effect { display: flex; flex-direction: column; gap: 10px; }
+    .mirror .effect .text.placeholder { font-family: var(--font-body); font-size: 13px; line-height: 21px; color: var(--text-tertiary); }
+    .mirror .note { height: auto; }
+    .actions-message { display: flex; align-items: center; gap: 8px; padding-top: 10px; font-size: var(--font-size-label); line-height: 17px; color: var(--text-secondary); }
+    .actions-message:empty { display: none; }
+    .actions-message button { padding: 0; border: 0; background: transparent; font: inherit; font-weight: 500; color: var(--text-control); }
+    @keyframes actions-breathe { 50% { opacity: var(--motion-cursor-opacity-min); } }
+    @media (prefers-reduced-motion: reduce) { .proposal .result .cursor.waiting { animation: none; } }
+  </style>
+</head>
+<body>
+<!-- Rules: ../spec/settings.md. Interactive examples use prewritten responses; native fixtures have
+     a --design-state, and spec/panel.md and spec/settings.md stay the rules in force. -->
+<main class="board" data-board="actions">
+  <div class="board-title">动作 — 任意「原文 → 提示词 → 结果」都是一个动作；在设置里用固定样例调校</div>
+  <p class="caption">规则见 spec/settings.md。原生应用已经实现；这份交互稿使用预置结果演示。没有连接模型：只有预置的提示词在样例上有预置结果，其他提示词写明没有结果。下面的窗口可以直接操作：点分段看效果；编辑 ⌘E 把提示词写在纸面上方、旧结果留在下面，完成 ⌘↵ 应用并在样例上生成；+ 新建；拖动排序、首项默认；Esc 放弃与删除都可以撤销。「在面板中查看」是同一份动作在生产面板里的样子。</p>
+  <cida-actions-proposal view="switch"></cida-actions-proposal>
+  <div class="divider"></div>
+
+  <p class="caption">状态 — 每一张都由同一段交互代码按点击与输入走到</p>
+  <div class="states-grid">
+    <figure><div class="state-label">浏览：点「精简」，纸面换成它在样例上的结果（actions-browse）</div>
+      <cida-actions-proposal state="actions-browse" scenario="browse"></cida-actions-proposal></figure>
+    <figure><div class="state-label">编辑：提示词在纸面上方，旧结果留作参照；有改动时其他动作暂停（actions-editing）</div>
+      <cida-actions-proposal state="actions-editing" scenario="editing"></cida-actions-proposal></figure>
+    <figure><div class="state-label">完成：提示词收起，旧结果标明正在更新（actions-updating）</div>
+      <cida-actions-proposal state="actions-updating" scenario="updating"></cida-actions-proposal></figure>
+    <figure><div class="state-label">更新完成：预置示例的结果（actions-updated）</div>
+      <cida-actions-proposal state="actions-updated" scenario="updated"></cida-actions-proposal></figure>
+    <figure><div class="state-label">没有预置结果的提示词：原位说明，旧结果不冒充（actions-no-example）</div>
+      <cida-actions-proposal state="actions-no-example" scenario="no-example"></cida-actions-proposal></figure>
+    <figure><div class="state-label">+ 新建：名字写在分段里，再写提示词（actions-new）</div>
+      <cida-actions-proposal state="actions-new" scenario="new"></cida-actions-proposal></figure>
+    <figure><div class="state-label">Esc 放弃：可以撤销（actions-discarded）</div>
+      <cida-actions-proposal state="actions-discarded" scenario="discarded"></cida-actions-proposal></figure>
+    <figure><div class="state-label">拖动排序，下方出现删除区（actions-dragging）</div>
+      <cida-actions-proposal state="actions-dragging" scenario="dragging"></cida-actions-proposal></figure>
+    <figure><div class="state-label">删除后可以撤销（actions-deleted）</div>
+      <cida-actions-proposal state="actions-deleted" scenario="deleted"></cida-actions-proposal></figure>
+  </div>
+  <div class="divider"></div>
+
+  <p class="caption">面板 — 动作栏就是设置里的顺序；「精简」拖到首项后，⌥A 唤起默认就是它（截图翻译与原处翻译仍用「翻译」）</p>
+  <cida-actions-proposal state="actions-panel" scenario="panel" view="panel"></cida-actions-proposal>
+</main>
+<script id="actions-proposal-script">
+// <cida-actions-proposal view="switch|settings|panel" scenario state> (spec/settings.md).
+// view="switch" is the Settings window with its production panel one click away; the static
+// views draw one window for a board state. Changes are announced as "cida-actions-change" with a
+// snapshot; setting element.snapshot before it connects restores one.
+(() => {
+  const SAMPLE = "想跟你同步一下，原定周五的分享会要改到下周三下午三点，地点还是二楼会议室。主要是因为演示还没准备好，有几处细节想再确认一下。如果这个时间不方便，麻烦明天中午前告诉我，我们再一起看看怎么安排。";
+  const CONCISE = "删去冗余表达，保留所有事实与限制，不改变原文语言。只返回精简后的文字。";
+  const PRESETS = [
+    { id: "translate", name: "翻译", builtin: true,
+      prompt: "Translate the user-provided text into the target language specified by the application. Preserve meaning, tone, and terminology. Return only the translated text.",
+      output: "Just wanted to let you know that the sharing session originally scheduled for Friday is moving to next Wednesday at 3 p.m. The venue is still the second-floor meeting room. The main reason is that the demo is not ready yet, and there are a few details we would like to double-check. If that time does not work for you, please let me know by noon tomorrow so we can work out another arrangement." },
+    { id: "improve", name: "改进", builtin: true,
+      prompt: "You are a writing assistant. Improve the user-provided text for clarity, grammar, and natural tone. Keep the original language and meaning. Prefer precise technical wording. Return only the improved text.",
+      output: "跟你同步一下：原定周五的分享会改到下周三下午三点，地点仍是二楼会议室。演示还没准备好，有几处细节需要再确认。如果时间不方便，请在明天中午前告诉我，我们再一起调整安排。" },
+    { id: "concise", name: "精简", prompt: CONCISE,
+      output: "分享会因演示尚未准备好、细节待确认，从周五改至下周三15:00，仍在二楼会议室；时间不便请于明天中午前告知，以便调整。" },
+  ];
+  // The prototype's only "model": exact prompts with outputs written for the sample. Spacing and a
+  // final 。 do not matter; any other prompt has no result.
+  const EXAMPLES = [...PRESETS.map((a) => [a.prompt, a.output]), [`${CONCISE}用两句话表达。`, "原定周五的分享会因演示尚未准备好且细节待确认，改到下周三下午三点，地点仍为二楼会议室。如果时间不便，请于明天中午前告知，以便另行安排。"]];
+  const exampleKey = (prompt) => prompt.replace(/\s+/g, "").replace(/。$/, "");
+  const OUTPUTS = new Map(EXAMPLES.map(([prompt, output]) => [exampleKey(prompt), output]));
+  const DEFAULTS = Object.fromEntries(PRESETS.filter((a) => a.builtin).map((a) => [a.id, a.prompt]));
+  // 截图翻译 and 原处翻译 always translate, so 翻译 cannot be deleted (spec/settings.md §四).
+  const KEPT = "translate";
+  const NO_EXAMPLE = "没有连接模型，新提示词没有预置结果 · 上面仍是上次的结果";
+  const PREVIEW_MS = 950, PANEL_MS = 600;
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const cjk = (s) => /[\u3400-\u9fff]/.test(s);
+  const note = (kind, text) => `<cida-note kind="${kind}">${esc(text)}</cida-note>`;
+  const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const start = () => {
+  class CidaActionsProposal extends HTMLElement {
+    connectedCallback() {
+      if (this.m) return;
+      this.classList.add("proposal");
+      // Scenario instances queue their timers, so a board state holds still until settle().
+      this.still = this.hasAttribute("scenario");
+      this.queue = [];
+      this.serials = { mirror: 0, panel: 0 };
+      this.view = this.getAttribute("view") ?? "settings";
+      this.m = this.initial();
+      if (this.snapshot) this.restore(this.snapshot);
+      this.build();
+      this.listen();
+      this.render();
+      SCENARIOS[this.getAttribute("scenario")]?.(this);
+      // Connecting and restoring are not changes; only what happens afterwards is announced.
+      this.announcing = !this.still;
+    }
+
+    /* ---------- Model ---------- */
+    initial() {
+      return {
+        actions: PRESETS.map(({ output, ...a }) => ({ ...a })),
+        selected: "translate",
+        edit: null,        // the one action being edited: { id, name, prompt, created, from }
+        previews: Object.fromEntries(PRESETS.map((a) => [a.id, { prompt: a.prompt, output: a.output }])),
+        run: null,         // { id, prompt } while the sample is being generated
+        failed: {},        // id → applied prompt that has no result
+        stopped: null,
+        error: "",
+        undo: null,        // { kind: "discard" | "delete", ... } for the one step 撤销 takes back
+        message: "",
+        page: "settings",
+        panel: { current: "translate", source: SAMPLE, running: false, result: { id: "translate", source: SAMPLE, output: PRESETS[0].output } },
+      };
+    }
+    snapshotState() {
+      const { actions, selected, edit, previews, failed, page } = this.m;
+      return { version: 1, actions, selected, edit, previews, failed, page, current: this.m.panel.current };
+    }
+    restore(s) {
+      const valid = s?.version === 1 && Array.isArray(s.actions) && s.actions.some((a) => a.id === KEPT)
+        && s.actions.every((a) => typeof a.id === "string" && typeof a.name === "string" && typeof a.prompt === "string");
+      if (!valid) return;
+      Object.assign(this.m, { actions: s.actions, previews: s.previews ?? {}, failed: s.failed ?? {}, page: s.page === "panel" ? "panel" : "settings" });
+      this.m.selected = s.actions.some((a) => a.id === s.selected) ? s.selected : s.actions[0].id;
+      this.m.edit = s.edit && s.actions.some((a) => a.id === s.edit.id) ? s.edit : null;
+      if (this.m.edit) this.m.selected = this.m.edit.id;
+      this.m.panel.current = this.ready().some((a) => a.id === s.current) ? s.current : this.ready()[0].id;
+    }
+    changed() { if (this.announcing) this.dispatchEvent(new CustomEvent("cida-actions-change", { detail: this.snapshotState() })); }
+    action(id = this.m.selected) { return this.m.actions.find((a) => a.id === id); }
+    // Actions the panel offers: a new one joins when it is first applied.
+    ready() { return this.m.actions.filter((a) => !a.created); }
+    dirty() {
+      const e = this.m.edit, a = e && this.action(e.id);
+      return Boolean(e && (e.created || e.name !== a.name || e.prompt !== a.prompt));
+    }
+    schedule(channel, ms, fn) {
+      const serial = ++this.serials[channel], go = () => { if (serial === this.serials[channel]) fn(); };
+      if (this.still) this.queue.push(go); else setTimeout(go, ms);
+    }
+    settle() { const queue = this.queue; this.queue = []; queue.forEach((go) => go()); }
+
+    select(id) {
+      if (!this.action(id) || id === this.m.selected) return;
+      if (this.dirty()) return;
+      this.m.edit = null; this.m.error = "";
+      this.m.selected = id;
+      this.render();
+    }
+    startEdit(field = "prompt") {
+      const a = this.action();
+      if (!this.m.edit) {
+        this.m.edit = { id: a.id, name: a.name, prompt: a.prompt };
+        Object.assign(this.m, { undo: null, message: "", error: "", stopped: null });
+        this.render();
+      }
+      const el = this.mirror.querySelector(field === "name" ? "input.name" : ".instruction textarea");
+      this.focus(el);
+      if (field === "name") el?.select(); else el?.setSelectionRange(el.value.length, el.value.length);
+    }
+    done() {
+      const e = this.m.edit; if (!e) return;
+      const a = this.action(e.id), name = e.name.trim();
+      if (!name || this.m.actions.some((x) => x.id !== a.id && x.name === name)) return this.invalid("名字不能为空，也不能与其他动作相同。", "input.name");
+      if (!e.prompt.trim()) return this.invalid("请先写下这个动作的提示词。", ".instruction textarea");
+      a.name = name; a.prompt = e.prompt; delete a.created;
+      this.m.edit = null; this.m.error = "";
+      // Applying without a change sends nothing: the result on the sample already answers it.
+      if (this.m.previews[a.id]?.prompt !== a.prompt) this.preview(a.id); else this.render();
+      this.focus(this.railButton(a.id));
+      if (a.id === this.m.actions.at(-1)?.id) {
+        const seg = this.mirror.querySelector(".seg"); seg.scrollLeft = seg.scrollWidth;
+      }
+    }
+    invalid(text, field) { this.m.error = text; this.paintInstruction(); this.focus(this.mirror.querySelector(field)); }
+    // Esc. Unchanged, it only leaves editing; changed, it drops the changes, and 撤销 brings them back.
+    discard() {
+      const e = this.m.edit; if (!e) return;
+      if (!this.dirty()) { this.m.edit = null; this.render(); this.focus(this.railButton()); return; }
+      const index = this.m.actions.findIndex((a) => a.id === e.id), item = this.m.actions[index];
+      this.m.undo = { kind: "discard", edit: { ...e }, item, index };
+      this.m.message = e.created ? `已放弃新建「${e.name.trim() || item.name}」` : "已放弃修改";
+      if (e.created) { this.m.actions.splice(index, 1); this.m.selected = this.action(e.from) ? e.from : this.m.actions[0].id; }
+      this.m.edit = null; this.m.error = "";
+      this.render(); this.focus(this.railButton());
+    }
+    undo() {
+      const u = this.m.undo; if (!u) return;
+      if (u.kind === "delete" || u.edit.created) this.m.actions.splice(u.index, 0, u.item);
+      Object.assign(this.m, { undo: null, message: "", selected: u.item.id, edit: u.kind === "discard" ? u.edit : null });
+      this.render();
+      if (this.m.edit) this.startEdit(); else this.focus(this.railButton());
+    }
+    add() {
+      if (this.dirty()) return;
+      let n = 1; while (this.m.actions.some((a) => a.name === `新动作 ${n}`)) n++;
+      const a = { id: `custom-${Date.now().toString(36)}-${n}`, name: `新动作 ${n}`, prompt: "", created: true };
+      this.m.actions.push(a);
+      Object.assign(this.m, { edit: { id: a.id, name: a.name, prompt: "", created: true, from: this.m.selected }, selected: a.id, undo: null, message: "", error: "" });
+      this.render(); this.startEdit("name");
+      const seg = this.mirror.querySelector(".seg"); seg.scrollLeft = seg.scrollWidth;
+    }
+    remove(id) {
+      if (id === KEPT) { this.m.message = "「翻译」用于截图翻译与原处翻译，不能删除"; this.m.undo = null; this.paintMessage(); return; }
+      if (this.dirty() && this.m.edit.id !== id) return;
+      const list = this.m.actions, index = list.findIndex((a) => a.id === id);
+      if (index < 0) return;
+      const [item] = list.splice(index, 1);
+      if (this.m.run?.id === id) { this.serials.mirror++; this.m.run = null; }
+      Object.assign(this.m, { undo: { kind: "delete", item, index }, message: `已删除「${item.name}」`, error: "",
+        edit: this.m.edit?.id === id ? null : this.m.edit,
+        selected: this.m.selected === id ? list[Math.min(index, list.length - 1)].id : this.m.selected });
+      if (this.m.panel.current === id) this.m.panel.current = this.ready()[0].id;
+      if (item.created) { this.m.undo = null; this.m.message = ""; }
+      this.render(); this.focus(this.railButton());
+    }
+    reorder(id, targetId, after) {
+      if (this.dirty()) return;
+      const list = this.m.actions, from = list.findIndex((a) => a.id === id);
+      if (from < 0 || id === targetId) return;
+      const [a] = list.splice(from, 1);
+      list.splice(list.findIndex((x) => x.id === targetId) + (after ? 1 : 0), 0, a);
+      this.m.undo = null; this.m.message = "";
+      this.render();
+    }
+    // One request at a time on the sample: a newer one replaces it, and only its answer lands.
+    preview(id) {
+      const prompt = this.action(id).prompt;
+      this.m.run = { id, prompt }; this.m.stopped = null; delete this.m.failed[id];
+      this.render();
+      this.schedule("mirror", PREVIEW_MS, () => {
+        this.m.run = null;
+        const output = OUTPUTS.get(exampleKey(prompt));
+        if (output) this.m.previews[id] = { prompt, output }; else this.m.failed[id] = prompt;
+        this.render();
+      });
+    }
+    stop() {
+      if (!this.m.run) return;
+      this.serials.mirror++; this.queue = [];
+      this.m.stopped = this.m.run.id; this.m.run = null;
+      this.render();
+    }
+
+    /* ---------- Settings · 动作 ---------- */
+    build() {
+      const settings = this.view !== "panel", panel = this.view !== "settings", state = this.getAttribute("state");
+      this.innerHTML = `${settings ? `<div class="settings-host"><cida-settings tab="translation"${state ? ` state="${state}"` : ""}></cida-settings>${
+        this.view === "switch" ? `<div class="nav"><button type="button" class="cursor-interaction" data-command="show-panel">在面板中查看<kbd>⌥A</kbd></button></div>` : ""}</div>` : ""}${
+        panel ? `<div class="panel-host"><section class="panel" aria-label="辞达面板"${this.view === "panel" && state ? ` data-state="${state}"` : ""}>
+          <textarea class="source" aria-label="原文" rows="1"></textarea><div class="bar-host"></div><div class="result-host" aria-live="polite"></div></section>${
+          this.view === "switch" ? `<div class="nav"><button type="button" class="cursor-interaction" data-command="show-settings">返回设置<kbd>⌘,</kbd></button></div>` : ""}</div>` : ""}`;
+      if (settings) this.buildSettings();
+      if (panel) this.buildPanel();
+    }
+    buildSettings() {
+      const win = this.querySelector(".window");
+      win.querySelector(".title").textContent = "动作";
+      const tab = win.querySelector(".settings-tabs .on");
+      tab.querySelector(".icon").className = "icon icon-pen-line"; tab.lastChild.textContent = "动作";
+      const group = win.querySelectorAll(".settings .group")[1];
+      group.innerHTML = `<div class="actions-head"><h3>动作</h3><small>拖动排序 · 首项默认</small></div>
+        <section class="mirror" aria-label="动作在样例上的效果">
+          <div class="sample"><div class="label"><span>样例</span><span>结果为预置示例 · 未连接模型</span></div><p>${esc(SAMPLE)}</p></div>
+          <div class="bar"><div class="rail"><div class="seg" role="group" aria-label="动作"></div><span class="tab-hint"></span><div class="trash" aria-hidden="true"></div></div><div class="slot"></div></div>
+          <div class="result" aria-live="polite"></div>
+        </section>
+        <div class="actions-message" aria-live="polite"></div>`;
+      this.mirror = group.querySelector(".mirror");
+      this.paper = this.mirror.querySelector(".result");
+      this.messageBox = group.querySelector(".actions-message");
+    }
+    railButton(id = this.m.selected) { return this.mirror?.querySelector(`[data-id="${CSS.escape(id)}"]`); }
+    focus(el) { if (el && !this.still) el.focus({ preventScroll: true }); }
+
+    paintRail() {
+      const e = this.m.edit, locked = this.dirty(), seg = this.mirror.querySelector(".seg");
+      seg.innerHTML = this.m.actions.map((a) => {
+        const on = a.id === this.m.selected;
+        if (on && e) return `<span class="on"><input class="name" aria-label="动作名称" maxlength="20" spellcheck="false" value="${esc(e.name)}"></span>`;
+        const object = on && a.id === "translate" ? `<span class="object">English</span>` : "";
+        return `<button type="button" class="seg-button cursor-interaction" data-id="${esc(a.id)}" aria-pressed="${on}"${locked && !on ? ' aria-disabled="true"' : ""} data-tooltip="拖动排序 · 双击改名" aria-description="拖动排序；双击或 F2 改名；Option 方向键移动；Command Delete 删除"><span class="${on ? "on" : ""}">${esc(a.name)}${object}</span></button>`;
+      }).join("") + `<button type="button" class="seg-button add cursor-interaction" data-command="add" aria-label="新建动作" data-tooltip="新建动作"${locked ? ' aria-disabled="true"' : ""}><span><i class="icon icon-plus"></i></span></button>`;
+      this.mirror.querySelector(".tab-hint").textContent = locked ? "Esc 放弃" : "";
+      const name = seg.querySelector("input.name");
+      if (!name) return;
+      const fit = () => {
+        const context = (this.measure ??= document.createElement("canvas").getContext("2d"));
+        context.font = `600 ${getComputedStyle(name).fontSize} Inter, system-ui, sans-serif`;
+        name.style.width = `${Math.max(24, Math.ceil(context.measureText(name.value || " ").width) + 2)}px`;
+      };
+      fit();
+      name.addEventListener("input", () => { e.name = name.value; fit(); this.m.error = ""; this.paintLock(); this.changed(); });
+      name.addEventListener("keydown", (event) => {
+        if (event.isComposing || event.key !== "Enter") return;
+        event.preventDefault(); this.focus(this.mirror.querySelector(".instruction textarea"));
+      });
+    }
+    // Locking follows typing without repainting the field being typed in.
+    paintLock() {
+      const locked = this.dirty();
+      this.mirror.querySelectorAll("[data-id]:not([aria-pressed=true]), .add").forEach((b) => { if (locked) b.setAttribute("aria-disabled", "true"); else b.removeAttribute("aria-disabled"); });
+      this.mirror.querySelector(".tab-hint").textContent = locked ? "Esc 放弃" : "";
+      this.paintEffect(); this.paintLinks();
+      if (!this.m.error) this.mirror.querySelector(".instruction .error")?.replaceChildren();
+    }
+    paintSlot() {
+      const running = this.m.run?.id === this.m.selected;
+      const [command, label, key] = running ? ["stop", "停止", "⌘."] : this.m.edit ? ["done", "完成", "⌘↵"] : ["edit", "编辑", "⌘E"];
+      this.mirror.querySelector(".slot").innerHTML = `<button type="button" class="bar-action cursor-interaction" data-command="${command}">${running ? '<i class="stop-icon"></i>' : ""}<span class="label">${label}</span><span class="key">${key}</span></button>`;
+    }
+    paintPaper() {
+      const e = this.m.edit;
+      this.paper.innerHTML = e
+        ? `<div class="instruction"><div class="head"><span>提示词</span><span class="links"></span></div>
+             <textarea aria-label="${esc(this.action(e.id).name)}的提示词" rows="1" spellcheck="false" placeholder="告诉辞达怎么处理上面的样例，例如：改写成一封简短、礼貌的英文邮件。">${esc(e.prompt)}</textarea>
+             <div class="error" role="alert"></div></div><div class="effect"></div>`
+        : `<div class="effect"></div>`;
+      this.paintEffect();
+      if (!e) return;
+      this.paintInstruction();
+      const field = this.paper.querySelector("textarea");
+      const fit = () => { field.style.height = "auto"; field.style.height = `${field.scrollHeight}px`; };
+      requestAnimationFrame(fit); fit();
+      field.addEventListener("input", () => { e.prompt = field.value; fit(); this.m.error = ""; this.paintLock(); this.changed(); });
+    }
+    paintInstruction() {
+      this.paintLinks();
+      const box = this.paper.querySelector(".instruction .error");
+      if (box) box.innerHTML = this.m.error ? note("failed", this.m.error) : "";
+    }
+    // Low-frequency text actions on the edited action: built-ins go back to their default,
+    // anything but 翻译 can be deleted.
+    paintLinks() {
+      const e = this.m.edit, links = this.paper.querySelector(".instruction .links");
+      if (!e || !links) return;
+      const a = this.action(e.id);
+      links.innerHTML = `${a.builtin && e.prompt !== DEFAULTS[a.id] ? '<button type="button" class="cursor-interaction" data-command="restore">恢复默认</button>' : ""}${
+        a.id !== KEPT ? '<button type="button" class="cursor-interaction" data-command="delete">删除动作</button>' : ""}`;
+    }
+    paintEffect() {
+      const host = this.paper.querySelector(".effect"), a = this.action(), e = this.m.edit;
+      const preview = this.m.previews[a.id], running = this.m.run?.id === a.id;
+      host.toggleAttribute("data-empty", !!e && !preview);
+      if (e && !preview) { host.innerHTML = '<div class="note">完成后预览 · ⌘↵</div>'; return; }
+      const target = e ? e.prompt : a.prompt, fresh = preview && preview.prompt === target && !running;
+      const text = preview
+        ? `<div class="text ${cjk(preview.output) ? "cjk" : ""} ${fresh ? "" : "stale"}">${esc(preview.output)}${running ? '<i class="cursor waiting"></i>' : ""}</div>`
+        : running ? '<div class="text"><i class="cursor waiting"></i></div>'
+        : `<div class="text placeholder">完成后，这里是它在样例上的结果。</div>`;
+      const status = running ? note("stale", "正在按新提示词更新 · ⌘. 停止")
+        : e ? (preview && !fresh ? note("stale", "上次的结果 · 完成后更新") : "")
+        : this.m.failed[a.id] === a.prompt ? note("failed", NO_EXAMPLE)
+        : this.m.stopped === a.id ? note("stopped", "已停止 · 仍是上次的结果")
+        : "";
+      host.innerHTML = text + status;
+    }
+    paintMessage() {
+      this.messageBox.innerHTML = this.m.message ? `<span>${esc(this.m.message)}</span>${this.m.undo ? '<button type="button" class="cursor-interaction" data-command="undo">撤销</button>' : ""}` : "";
+    }
+    // The window grows and shrinks with its content; its top edge stays (spec/settings.md §一).
+    resize(paint) {
+      const box = this.mirror, before = box.getBoundingClientRect().height;
+      clearTimeout(this.resizing);
+      box.style.transition = ""; box.style.height = "";
+      paint();
+      const after = box.offsetHeight, ms = Number(getComputedStyle(box).getPropertyValue("--motion-height-ms")) || 150;
+      if (this.still || before === after || reducedMotion() || !box.isConnected || box.offsetParent === null) return;
+      box.style.height = `${before}px`; box.offsetHeight;
+      box.style.transition = `height ${ms}ms ease-out`; box.style.height = `${after}px`;
+      this.resizing = setTimeout(() => { box.style.height = ""; box.style.transition = ""; }, ms + 20);
+    }
+
+    /* ---------- Production panel ---------- */
+    buildPanel() {
+      this.source = this.querySelector("textarea.source");
+      this.source.value = this.m.panel.source;
+      const fit = () => { this.source.style.height = "auto"; this.source.style.height = `${this.source.scrollHeight}px`; };
+      requestAnimationFrame(fit);
+      this.source.addEventListener("input", () => { this.m.panel.source = this.source.value; fit(); this.paintPanel(); });
+      this.source.addEventListener("keydown", (e) => {
+        if (e.isComposing) return;
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.runPanel(); }
+        if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          if (this.m.panel.running) return;
+          const list = this.ready(), i = list.findIndex((a) => a.id === this.m.panel.current);
+          this.m.panel.current = list[(i + (e.shiftKey ? -1 : 1) + list.length) % list.length].id; this.paintPanel();
+        }
+      });
+    }
+    runPanel() {
+      const p = this.m.panel, a = this.action(p.current);
+      if (p.running || !p.source.trim()) return;
+      const output = p.source === SAMPLE ? OUTPUTS.get(exampleKey(a.prompt)) ?? null : null;
+      p.running = true; this.paintPanel();
+      this.schedule("panel", PANEL_MS, () => { p.running = false; p.result = { id: a.id, source: p.source, output }; this.paintPanel(); });
+    }
+    // Every invocation starts on the first action (spec/settings.md §四), with the source selected.
+    reopen() { this.m.panel.current = this.ready()[0].id; this.paintPanel(); this.focus(this.source); if (!this.still || this.view === "panel") this.source?.select(); }
+    paintPanel() {
+      const p = this.m.panel, list = this.ready(), index = list.findIndex((a) => a.id === p.current);
+      const names = list.map((a) => esc(esc(a.name.replaceAll("|", "｜")))).join("|");
+      const target = p.current === "translate" && cjk(p.source) ? ' target="English"' : "";
+      const action = p.running ? "stop" : p.result?.output ? "copy" : "none";
+      this.querySelector(".bar-host").innerHTML = `<cida-bar options="${names}" selected="${index}" action="${action}"${p.running ? " processing" : ""}${target}></cida-bar>`;
+      this.querySelectorAll(".bar-host .seg > span").forEach((span, i) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "seg-button cursor-interaction"; b.dataset.pick = list[i].id;
+        b.setAttribute("aria-pressed", String(i === index)); b.disabled = p.running;
+        span.replaceWith(b); b.append(span);
+      });
+      const r = p.result, stale = r && (r.id !== p.current || r.source !== p.source);
+      this.querySelector(".result-host").innerHTML = p.running
+        ? `<div class="result"><div class="text"><i class="cursor waiting"></i></div></div>`
+        : !r ? ""
+        : r.output === null ? `<div class="result">${note("failed", "没有连接模型：只有预置动作在这段样例上有结果")}</div>`
+        : `<div class="result"><div class="text ${cjk(r.output) ? "cjk" : ""} ${stale ? "stale" : ""}">${esc(r.output)}</div>${stale ? note("stale", "原文已修改 · ⏎ 重新生成") : ""}</div>`;
+    }
+    showPage(page) {
+      this.m.page = page;
+      if (page === "panel") this.reopen();
+      this.render();
+      if (page === "settings") this.focus(this.m.edit ? this.mirror.querySelector(".instruction textarea") : this.railButton());
+    }
+
+    render() {
+      // Repainting the rail replaces its buttons; a focused one keeps the focus.
+      const focused = document.activeElement?.closest?.(".mirror [data-id]")?.dataset.id;
+      if (this.mirror) this.resize(() => { this.paintRail(); this.paintSlot(); this.paintPaper(); this.paintMessage(); });
+      if (this.source) this.paintPanel();
+      if (this.view === "switch") {
+        this.querySelector(".settings-host").hidden = this.m.page !== "settings";
+        this.querySelector(".panel-host").hidden = this.m.page !== "panel";
+      }
+      if (focused && !document.activeElement?.closest?.(".mirror")) this.focus(this.railButton(focused));
+      this.changed();
+    }
+
+    /* ---------- Input ---------- */
+    listen() {
+      this.addEventListener("click", (e) => {
+        if (this.swallow) return;
+        const b = e.target.closest("button"); if (!b || b.disabled || b.getAttribute("aria-disabled") === "true") return;
+        if (b.dataset.pick) { this.m.panel.current = b.dataset.pick; this.paintPanel(); this.focus(this.source); return; }
+        // A clicked segment keeps the keyboard focus, as in AppKit, so ⌘E reaches the window.
+        if (b.dataset.id) { this.select(b.dataset.id); this.focus(this.railButton()); return; }
+        ({
+          add: () => this.add(), edit: () => this.startEdit(), done: () => this.done(), stop: () => this.stop(),
+          undo: () => this.undo(), delete: () => this.remove(this.m.edit.id),
+          restore: () => { this.m.edit.prompt = DEFAULTS[this.m.edit.id]; this.render(); this.startEdit(); },
+          "show-panel": () => this.showPage("panel"), "show-settings": () => this.showPage("settings"),
+        })[b.dataset.command]?.();
+      });
+      this.addEventListener("dblclick", (e) => {
+        const b = e.target.closest(".mirror [data-id]");
+        if (b && b.getAttribute("aria-disabled") !== "true") { this.select(b.dataset.id); this.startEdit("name"); }
+      });
+      this.addEventListener("keydown", (e) => {
+        if (e.isComposing) return;
+        const command = e.metaKey || e.ctrlKey;
+        const b = e.target.closest?.(".mirror [data-id]");
+        if (b) {
+          const list = this.m.actions, i = list.findIndex((a) => a.id === b.dataset.id);
+          if (e.key === "F2") { e.preventDefault(); this.select(b.dataset.id); this.startEdit("name"); return; }
+          if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+            e.preventDefault();
+            const j = i + (e.key === "ArrowLeft" ? -1 : 1);
+            if (j >= 0 && j < list.length) { this.reorder(b.dataset.id, list[j].id, j > i); this.focus(this.railButton(b.dataset.id)); }
+            return;
+          }
+          if (command && e.key === "Backspace") { e.preventDefault(); this.remove(b.dataset.id); return; }
+        }
+        if (this.view === "switch" && command && e.key === ",") { e.preventDefault(); this.showPage("settings"); return; }
+        if (!this.mirror || !e.target.closest?.(".window")) return;
+        const typing = e.target.matches?.("textarea, input");
+        if (command && e.key.toLowerCase() === "e") { e.preventDefault(); this.startEdit(); }
+        else if (command && e.key === "Enter" && this.m.edit) { e.preventDefault(); this.done(); }
+        else if (command && e.key === ".") { e.preventDefault(); this.stop(); }
+        else if (e.key === "Escape" && this.m.edit) { e.preventDefault(); this.discard(); }
+        else if (command && !e.shiftKey && e.key.toLowerCase() === "z" && !typing && this.m.undo) { e.preventDefault(); this.undo(); }
+      });
+
+      // As in AppKit, clicking a button or the window's background leaves the keyboard focus where
+      // it was (the prompt keeps it while 完成 and ⌘↵ apply it); fields and readable text still take it.
+      this.addEventListener("mousedown", (e) => {
+        if (e.target.closest?.(".window") && !e.target.closest("input, textarea, .sample p, .effect .text")) e.preventDefault();
+      });
+
+      // Pointer drag on the mirror's rail; 6 pt of travel keeps a click a click.
+      let drag = null;
+      this.addEventListener("pointerdown", (e) => {
+        const b = e.target.closest(".mirror [data-id]");
+        if (b && e.button === 0 && !this.dirty()) drag = { id: b.dataset.id, x: e.clientX, y: e.clientY, pointer: e.pointerId, button: b, active: false };
+      });
+      this.addEventListener("pointermove", (e) => {
+        if (!drag || drag.pointer !== e.pointerId) return;
+        if (!drag.active && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+        if (!drag.active) { drag.active = true; drag.button.setPointerCapture(e.pointerId); }
+        this.showDrag(drag.id, document.elementFromPoint(e.clientX, e.clientY), e.clientX);
+      });
+      const end = (e, cancelled) => {
+        if (!drag) return;
+        const d = drag; drag = null;
+        if (!d.active) return;
+        this.swallow = true; setTimeout(() => { this.swallow = false; }, 0);
+        const hit = document.elementFromPoint(e.clientX, e.clientY), target = hit?.closest(".mirror [data-id]");
+        this.clearDrag();
+        if (cancelled) return;
+        if (hit?.closest(".mirror .trash")) this.remove(d.id);
+        else if (target && target.dataset.id !== d.id) { const r = target.getBoundingClientRect(); this.reorder(d.id, target.dataset.id, e.clientX > r.x + r.width / 2); }
+      };
+      this.addEventListener("pointerup", (e) => end(e, false));
+      this.addEventListener("pointercancel", (e) => end(e, true));
+    }
+    // The lifted segment, an accent bar where it would land, and the delete area under the rail.
+    showDrag(id, hit, x) {
+      this.clearDrag();
+      this.mirror.classList.add("dragging");
+      this.mirror.querySelector(".trash").textContent = id === KEPT ? "「翻译」用于截图翻译与原处翻译，不能删除" : "拖到这里删除";
+      this.railButton(id)?.classList.add("lifted");
+      const trash = hit?.closest(".mirror .trash"), target = hit?.closest(".mirror [data-id]");
+      if (trash && id !== KEPT) trash.classList.add("over");
+      else if (target && target.dataset.id !== id) { const r = target.getBoundingClientRect(); target.classList.add(x > r.x + r.width / 2 ? "drop-after" : "drop-before"); }
+    }
+    clearDrag() {
+      this.mirror.classList.remove("dragging");
+      this.mirror.querySelectorAll(".lifted,.drop-before,.drop-after,.over").forEach((el) => el.classList.remove("lifted", "drop-before", "drop-after", "over"));
+    }
+  }
+
+  // Each board state is reached through the events a person would cause.
+  const click = (el) => el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const command = (p, name) => p.querySelector(`[data-command="${name}"]`);
+  const type = (p, selector, text) => { const field = p.querySelector(selector); field.value += text; field.dispatchEvent(new Event("input", { bubbles: true })); };
+  const press = (el, key, options = {}) => el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, ...options }));
+  const shorten = (p) => { click(p.railButton("concise")); click(command(p, "edit")); type(p, ".instruction textarea", "用两句话表达。"); };
+  const SCENARIOS = {
+    browse: (p) => click(p.railButton("concise")),
+    editing: shorten,
+    updating: (p) => { shorten(p); click(command(p, "done")); },
+    updated: (p) => { shorten(p); click(command(p, "done")); p.settle(); },
+    "no-example": (p) => { click(p.railButton("improve")); click(command(p, "edit")); type(p, ".instruction textarea", " Keep it casual."); click(command(p, "done")); p.settle(); },
+    new: (p) => { click(p.railButton("concise")); click(command(p, "add")); const name = p.querySelector("input.name"); name.value = ""; type(p, "input.name", "英文邮件"); },
+    discarded: (p) => { shorten(p); press(p.querySelector(".instruction textarea"), "Escape"); },
+    dragging: (p) => { const t = p.railButton("translate"); p.showDrag("concise", t, t.getBoundingClientRect().x + 1); },
+    deleted: (p) => { click(p.railButton("concise")); press(p.railButton("concise"), "Backspace", { metaKey: true }); },
+    panel: (p) => { p.reorder("concise", "translate", false); p.reopen(); p.runPanel(); p.settle(); },
+  };
+
+  customElements.define("cida-actions-proposal", CidaActionsProposal);
+  };
+  if (customElements.get("cida-settings")) start(); else document.addEventListener("DOMContentLoaded", start, { once: true });
+})();
+</script>
+</body>
+</html>
