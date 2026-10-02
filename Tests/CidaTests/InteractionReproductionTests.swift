@@ -253,11 +253,10 @@ final class InteractionReproductionTests: XCTestCase {
     defer { window.orderOut(nil) }
     window.contentView?.layoutSubtreeIfNeeded()
 
-    /// A recorder that just resigned ends its recording on the next turn of the run loop
-    /// (`ShortcutCaptureNSView.resignFirstResponder`); that late end would cancel a recording
-    /// started in the same turn, which no person can do, so let it land first.
+    /// Finish the previous focus transition before starting another recording. A fixed delay
+    /// can expire before SwiftUI updates the recorder on a busy runner.
     func startRecording() async throws {
-      try await Task.sleep(for: .milliseconds(20))
+      try await waitUntil(timeout: .seconds(5)) { !(window.firstResponder is ShortcutCaptureNSView) }
       model.recordingShortcut = .showPanel
       try await waitUntil(timeout: .seconds(5)) { window.firstResponder is ShortcutCaptureNSView }
     }

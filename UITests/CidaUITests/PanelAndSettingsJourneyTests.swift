@@ -120,6 +120,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       driver.result(containing: "CIDA_E2E_POOL_PANEL_COMPLETE").waitForExistence(timeout: 8))
     driver.waitForCompletion()
     driver.composer.click()
+    driver.composer.typeKey(.rightArrow, modifierFlags: .command)
     driver.composer.typeKey(.tab, modifierFlags: [])
     XCTAssertTrue(driver.improveAction.isSelected)
 
@@ -132,8 +133,16 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     driver.composer.typeText("X")
     XCTAssertEqual(
-      driver.textValue(in: driver.composer), "X",
-      "The source is fully selected on show, so typing replaces it")
+      driver.textValue(in: driver.composer), "CIDA_E2E_POOL_PANELX",
+      "Reopening keeps the caret, so typing continues instead of replacing the source")
+
+    driver.composer.typeKey("a", modifierFlags: .command)
+    driver.hidePanel()
+    driver.showPanel()
+    driver.composer.typeKey("c", modifierFlags: .command)
+    XCTAssertTrue(
+      driver.waitForPasteboard("CIDA_E2E_POOL_PANELX", timeout: 2),
+      "Reopening also preserves an explicit source selection")
 
     // A request keeps running behind the hidden panel, and the menu bar caret
     // breathes until it is done (Design/spec/brand.md §三).
@@ -184,6 +193,21 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       "and is translated without ⏎")
     driver.waitForCompletion()
 
+    let resultValue = driver.result(containing: "CIDA_E2E_SELECTION_A_COMPLETE").value as? String ?? ""
+    driver.composer.typeKey("c", modifierFlags: .command)
+    let copied = driver.waitForPasteboard(resultValue, timeout: 2)
+    let copyShot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+    copyShot.name = "Command-C after Option-A translation"
+    copyShot.lifetime = .keepAlways
+    add(copyShot)
+    XCTAssertTrue(copied, "Command-C after importing a selection copies the result")
+
+    driver.composer.typeKey("a", modifierFlags: .command)
+    driver.composer.typeKey("c", modifierFlags: .command)
+    XCTAssertTrue(
+      driver.waitForPasteboard("CIDA_E2E_SELECTION_A", timeout: 2),
+      "Explicit Select All copies the source")
+
     driver.composer.typeText("CIDA_E2E_EDITED")
     driver.hidePanel()
     source.press("a", modifierFlags: .option)
@@ -192,6 +216,10 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       driver.textValue(in: driver.composer), "CIDA_E2E_EDITED",
       "The selection brought in last time keeps the edited source")
     XCTAssertTrue(driver.result(containing: "CIDA_E2E_SELECTION_A_COMPLETE").exists)
+    driver.composer.typeKey("c", modifierFlags: .command)
+    XCTAssertTrue(
+      driver.waitForPasteboard(resultValue, timeout: 2),
+      "Reopening the panel also leaves Command-C available for the retained result")
     XCTAssertEqual(
       try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_SELECTION_A" }.count, 1,
       "The same selection is not requested again")
@@ -331,6 +359,12 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       driver.result(containing: "CIDA_CAPTURE_SCENARIO_COMPLETE").waitForExistence(timeout: 8),
       "and is translated without ⏎")
     driver.waitForCompletion()
+
+    let captureResult = driver.result(containing: "CIDA_CAPTURE_SCENARIO_COMPLETE").value as? String ?? ""
+    driver.composer.typeKey("c", modifierFlags: .command)
+    XCTAssertTrue(
+      driver.waitForPasteboard(captureResult, timeout: 2),
+      "Capture translation leaves Command-C available for the result")
 
     driver.hidePanel()
     source.press("s", modifierFlags: .option)

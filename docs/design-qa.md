@@ -29,7 +29,7 @@ compared natively:
 | ⑥ 已修改 | `stale` | `stale` |
 | ⑦ 已停止 / 出错 | `stopped` / `failed` | `stopped` / `failed` |
 | ⑧ 改进 · 完成 | `improve` | `improve` |
-| ⑨ 再次唤起 · 全选 | `reopened` | (selection, no fixture) |
+| ⑨ 再次唤起 · 保留光标与选区 | `reopened` | (interaction, no fixture) |
 | ⑩ 带入选区 | `selection-imported` | (global shortcut; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
 | ⑪ 截图 · 未识别到文字 | `capture-unrecognized` | (capture shortcut; XCUI `testCaptureShortcutFramesTextOnTheFrozenScreenAndTranslatesIt`) |
 | ⑫ 最大高度 | `long` | `long` |
