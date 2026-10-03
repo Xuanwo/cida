@@ -301,6 +301,12 @@ final class PanelController {
         self.openSettings()
         return nil
       }
+      // ⌘S saves what the panel holds as a note (`Design/spec/notes.md` §三); unlike ⌘C it does
+      // not belong to any text editor, so no responder check is needed.
+      if NoteShortcutRouting.isNoteShortcut(event) {
+        self.model.saveNoteFromPanel()
+        return nil
+      }
 
       if self.model.isCopyMenuOpen, event.keyCode == 53, modifiers.isEmpty {
         self.model.isCopyMenuOpen = false
@@ -431,5 +437,18 @@ enum CopyShortcutRouting {
   static func nativeTextResponderOwnsCopy(window: NSWindow?) -> Bool {
     guard let textView = window?.firstResponder as? NSTextView else { return false }
     return textView.selectedRange().length > 0
+  }
+}
+
+/// ⌘S in the panel: the text it holds becomes a note (`Design/spec/notes.md` §三). Only ⌘S, with
+/// no ⇧ and nothing else held: ⇧⌘S is not this action.
+@MainActor
+enum NoteShortcutRouting {
+  static func isNoteShortcut(_ event: NSEvent) -> Bool {
+    let modifiers = event.modifierFlags
+      .intersection(.deviceIndependentFlagsMask)
+      .subtracting(.capsLock)
+    guard modifiers == .command else { return false }
+    return event.charactersIgnoringModifiers?.lowercased() == "s"
   }
 }

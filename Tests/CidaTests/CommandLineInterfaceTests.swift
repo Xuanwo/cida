@@ -170,6 +170,21 @@ final class CommandLineInterfaceTests: XCTestCase {
     XCTAssertFalse(store.launchAtLogin)
   }
 
+  /// The note fields of `Design/spec/notes.md`: where notes go, and whether generated results
+  /// are kept too (on by default).
+  func testNoteFieldsAreWrittenAndReset() async {
+    let store = InMemoryConfigurationStore()
+    await expect(
+      0,
+      ["config", "set", "note-file=~/Documents/notes.jsonl", "note-results=false"], in: store)
+    XCTAssertEqual(store.settings.noteFile, "~/Documents/notes.jsonl")
+    XCTAssertFalse(store.settings.noteResults)
+
+    await expect(0, ["config", "unset", "note-file", "note-results"], in: store)
+    XCTAssertEqual(store.settings.noteFile, "")
+    XCTAssertTrue(store.settings.noteResults)
+  }
+
   func testLanguagesTakeAnyWordingAndResetToChinese() async {
     let store = InMemoryConfigurationStore()
     await expect(0, ["config", "set", "my-language=粤语", "foreign-language=英式英语"], in: store)

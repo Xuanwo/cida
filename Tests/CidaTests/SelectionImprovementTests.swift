@@ -29,6 +29,39 @@ final class SelectionImprovementTests: XCTestCase {
     XCTAssertEqual(model.resultNote?.kind, .replacement)
   }
 
+  /// A completed improvement is handed over with its source (`Design/spec/notes.md` §四), even
+  /// when the replacement could not be confirmed: the model's work is worth keeping either way.
+  func testACompletedImprovementIsHandedOverWithItsSource() async throws {
+    let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+    let target = ReplacementTarget(text: "bad sentence")
+    let operation = SelectionImprovement(service: ControlledService(stream: stream), capture: { target })
+    var generated: [(String, String)] = []
+    operation.onGenerated = { generated.append(($0, $1)) }
+    operation.trigger(settings: CidaSettings())
+    target.isCurrent = false
+    continuation.yield("Better sentence")
+    continuation.finish()
+    try await wait { !operation.isRunning }
+
+    XCTAssertEqual(generated.map(\.0), ["bad sentence"])
+    XCTAssertEqual(generated.map(\.1), ["Better sentence"])
+  }
+
+  /// A failed request has no result to keep.
+  func testAFailedImprovementIsNotHandedOver() async throws {
+    let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+    let target = ReplacementTarget(text: "bad sentence")
+    let operation = SelectionImprovement(service: ControlledService(stream: stream), capture: { target })
+    var generated: [(String, String)] = []
+    operation.onGenerated = { generated.append(($0, $1)) }
+    operation.trigger(settings: CidaSettings())
+    continuation.yield("Partial")
+    continuation.finish(throwing: ModelServiceError.emptyResult)
+    try await wait { !operation.isRunning }
+
+    XCTAssertTrue(generated.isEmpty)
+  }
+
   func testCancellationDropsLateOutputAndFreesTheNextRequest() async throws {
     let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
     let target = ReplacementTarget(text: "source")

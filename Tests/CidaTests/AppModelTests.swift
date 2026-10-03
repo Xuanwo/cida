@@ -174,6 +174,45 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(submitted.phase, .stopped)
   }
 
+  /// A completed generation is handed to the note owner, source and result both
+  /// (`Design/spec/notes.md` §四); whether it is kept is the owner's decision, not the panel's.
+  func testACompletedResultIsHandedToTheNoteOwner() async throws {
+    var saved: [ResultRecord] = []
+    let model = AppModel(
+      inputText: "Source",
+      service: ImmediateStreamingService(),
+      saveResultNote: { saved.append($0) })
+
+    await model.process(text: "Source")
+
+    XCTAssertEqual(saved.count, 1)
+    XCTAssertEqual(saved.first?.source, "Source")
+    XCTAssertEqual(saved.first?.result, "Done")
+    XCTAssertEqual(saved.first?.mode, .translate)
+  }
+
+  /// Only a completed result is worth keeping: one the user stopped, and one that failed, are
+  /// not handed over.
+  func testAStoppedOrFailedResultIsNotHandedToTheNoteOwner() async throws {
+    var saved: [ResultRecord] = []
+    let stopped = AppModel(
+      inputText: "Draft",
+      service: DelayedStreamingService(chunks: ["First", " second"], delay: .milliseconds(100)),
+      saveResultNote: { saved.append($0) })
+    stopped.submit()
+    try await waitUntil { stopped.result?.result.isEmpty == false }
+    stopped.cancelProcessing()
+    try await waitUntil { !stopped.isProcessing }
+
+    let failed = AppModel(
+      inputText: "Draft",
+      service: FailingStreamingService(chunks: ["Partial"], message: "boom"),
+      saveResultNote: { saved.append($0) })
+    await failed.process(text: "Draft")
+
+    XCTAssertTrue(saved.isEmpty, "停止与失败的请求都不进笔记")
+  }
+
   func testFailedRequestKeepsThePartialTextAndExplainsInline() async throws {
     let model = AppModel(
       inputText: "Draft",
@@ -429,6 +468,22 @@ final class AppModelTests: XCTestCase {
     let decoded = try JSONDecoder().decode(CidaSettings.self, from: encoded)
 
     XCTAssertEqual(decoded.translationPrompt, settings.translationPrompt)
+  }
+
+  /// The note settings survive a round trip, and a settings file written before the option
+  /// existed reads as its default, which is 开 (`Design/spec/notes.md` §四).
+  func testNoteSettingsRoundTrip() throws {
+    var settings = CidaSettings()
+    settings.noteFile = "~/Documents/notes.jsonl"
+    settings.noteResults = false
+
+    let encoded = try JSONEncoder().encode(settings)
+    let decoded = try JSONDecoder().decode(CidaSettings.self, from: encoded)
+    XCTAssertEqual(decoded.noteFile, settings.noteFile)
+    XCTAssertFalse(decoded.noteResults)
+
+    XCTAssertTrue(
+      try JSONDecoder().decode(CidaSettings.self, from: Data("{}".utf8)).noteResults)
   }
 
   func testPromptBuilderSeparatesTypedParametersFromTheUserDocument() throws {

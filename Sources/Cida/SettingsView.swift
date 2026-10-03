@@ -332,6 +332,12 @@ private struct SettingsBody: View {
           GlobalShortcutRow(model: model, action: .captureText)
           GlobalShortcutRow(model: model, action: .translationLayer)
           GlobalShortcutRow(model: model, action: .improveSelection)
+          GlobalShortcutRow(model: model, action: .saveNote)
+        }
+        Hairline()
+        SettingsGroup(title: "笔记") {
+          NoteFileRow(model: model)
+          NoteResultsRow(model: model)
         }
         Hairline()
         SettingsGroup(title: "权限") {
@@ -752,6 +758,7 @@ private struct GlobalShortcutRow: View {
     case .captureText: "截图翻译"
     case .translationLayer: "原处翻译"
     case .improveSelection: "改进并替换"
+    case .saveNote: "存为笔记"
     }
   }
 
@@ -769,6 +776,7 @@ private struct GlobalShortcutRow: View {
     case .captureText: return "框选屏幕文字并翻译"
     case .translationLayer: return "加 ⇧ 翻译整个窗口"
     case .improveSelection: return "改进并替换选中文字"
+    case .saveNote: return "把选中文字存进笔记文件"
     }
   }
 
@@ -778,6 +786,7 @@ private struct GlobalShortcutRow: View {
     case .captureText: "settings-capture-shortcut"
     case .translationLayer: "settings-layer-shortcut"
     case .improveSelection: "settings-improvement-shortcut"
+    case .saveNote: "settings-note-shortcut"
     }
   }
 
@@ -787,6 +796,7 @@ private struct GlobalShortcutRow: View {
     case .captureText: "截图翻译快捷键"
     case .translationLayer: "原处翻译快捷键"
     case .improveSelection: "改进并替换快捷键"
+    case .saveNote: "存为笔记快捷键"
     }
   }
 
@@ -968,6 +978,49 @@ private struct LaunchAtLoginRow: View {
       .accessibilityIdentifier("settings-launch-at-login-toggle")
     }
     .onAppear(perform: model.refreshLaunchAtLoginStatus)
+  }
+}
+
+/// Where a note goes (`Design/spec/notes.md` §二). Empty means Cida's own inbox; the placeholder
+/// shows that path while the field is empty.
+private struct NoteFileRow: View {
+  @Bindable var model: AppModel
+  @FocusState private var isFocused: Bool
+
+  var body: some View {
+    SettingsRow(title: "笔记文件", caption: "留空用默认位置", alignment: .trailing) {
+      SettingsTextField(
+        text: $model.settings.noteFile,
+        placeholder: (NoteStore.defaultFileURL.path as NSString).abbreviatingWithTildeInPath,
+        accessibilityLabel: "笔记文件",
+        accessibilityIdentifier: "settings-note-file-editor",
+        isFocused: isFocused
+      )
+      .focused($isFocused)
+    }
+    .onChange(of: isFocused) { _, focused in
+      if !focused {
+        model.settings.noteFile = model.settings.noteFile.trimmingCharacters(
+          in: .whitespacesAndNewlines)
+      }
+    }
+  }
+}
+
+/// Whether completed translations and improvements are kept beside their source
+/// (`Design/spec/notes.md` §四). On by default; off leaves the file to ⌥N and ⌘S alone.
+private struct NoteResultsRow: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    SettingsRow(title: "存结果", caption: "翻译与改写的结果也写进笔记", alignment: .trailing) {
+      Toggle("", isOn: $model.settings.noteResults)
+        .labelsHidden()
+        .toggleStyle(.switch)
+        .tint(CidaDesign.accent)
+        .controlSize(.small)
+        .accessibilityIdentifier("settings-note-results-toggle")
+    }
   }
 }
 

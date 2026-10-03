@@ -14,6 +14,9 @@ final class SelectionImprovement {
   private let capture: @MainActor () -> (any SelectionReplacementTarget)?
   var onFeedback: (ImprovementFeedback?) -> Void = { _ in }
   var onResult: (ResultRecord) -> Void = { _ in }
+  /// A completed improvement, before its replacement is confirmed (`Design/spec/notes.md` §四):
+  /// the owner may keep the pair as a note whatever the target did with the text.
+  var onGenerated: (_ source: String, _ output: String) -> Void = { _, _ in }
   var recordEvent: (String) -> Void = { _ in }
   private(set) var result: ResultRecord?
   private(set) var isApplying = false
@@ -112,6 +115,7 @@ final class SelectionImprovement {
       record.replacementNote = outcome.note
       result = record
       recordEvent("improvement-\(outcome)")
+      onGenerated(target.text, output)
       guard showsFeedback else { return }
       switch outcome {
       case .replaced, .unchanged:

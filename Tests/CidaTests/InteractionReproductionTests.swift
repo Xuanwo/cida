@@ -428,7 +428,7 @@ final class InteractionReproductionTests: XCTestCase {
     // The window follows over motion-height-ms; wait for each move to end.
     model.settingsTab = .shortcuts
     settle("模型 → 快捷键")
-    XCTAssertEqual(window.frame.height, 524, accuracy: 4, "The board's four-shortcut tab is 525 pt tall")
+    XCTAssertEqual(window.frame.height, 727, accuracy: 4, "The board's five-shortcut tab is 729 pt tall")
     XCTAssertEqual(window.frame.maxY, modelFrame.maxY, accuracy: 0.5, "The top edge stays put")
     XCTAssertEqual(window.title, "快捷键", "The title names the tab")
 
