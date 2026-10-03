@@ -5,6 +5,7 @@ import SwiftUI
 /// Shared nonactivating feedback for the translation layer and selection improvement.
 /// Optional actions stay clickable without taking keyboard focus from the source editor.
 final class CidaHintPanel: NSPanel {
+  private let container = NSView()
   private let hosting = NSHostingView(rootView: HintContent(text: ""))
   private var shownAt: Date?
   private(set) var text: String?
@@ -22,7 +23,10 @@ final class CidaHintPanel: NSPanel {
     animationBehavior = .none
     hidesOnDeactivate = false
     isReleasedWhenClosed = false
-    contentView = hosting
+    hosting.autoresizingMask = [.width, .height]
+    hosting.frame = container.bounds
+    container.addSubview(hosting)
+    contentView = container
     setAccessibilityIdentifier("\(identifier)-panel")
     setAccessibilityLabel("辞达提示")
     // The pill is read as one element, like the translations, whether or not the panel is key.
@@ -55,6 +59,7 @@ final class CidaHintPanel: NSPanel {
     let mouse = NSEvent.mouseLocation
     let screen = screen ?? NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
     setFrame(Self.frame(fitting: hosting.fittingSize, in: screen?.visibleFrame ?? .zero), display: true)
+    hosting.frame = container.bounds
     ignoresMouseEvents = onPress == nil
     hosting.setAccessibilityElement(action == nil)
     hosting.setAccessibilityLabel(text)
@@ -80,6 +85,11 @@ final class CidaHintPanel: NSPanel {
   }
 
   func hide() {
+    guard isVisible || shownAt != nil else {
+      text = nil
+      orderOut(nil)
+      return
+    }
     let shown = shownAt
     text = nil
     // A layer fade: a window's own alpha animation does not always run in a Release build

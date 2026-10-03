@@ -881,4 +881,16 @@ final class TranslationLayerTests: XCTestCase {
     let pane = Node("AXGroup", CGRect(x: 0, y: 0, width: 600, height: 60), children: [measured, .link("x", .zero)])
     XCTAssertEqual(LayerBlockExtractor.blocks(in: pane).first?.lineHeight, 18)
   }
+
+  func testHintPanelInitializationAndLayoutDoesNotTriggerConstraintLoop() {
+    let panel = CidaHintPanel(identifier: "test-hint")
+    panel.hide()
+    panel.layoutIfNeeded()
+    XCTAssertFalse(panel.isVisible)
+    panel.show("测试提示", for: 1.0)
+    panel.layoutIfNeeded()
+    XCTAssertTrue(panel.isVisible)
+    panel.hide()
+    panel.orderOut(nil)
+  }
 }
