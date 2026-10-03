@@ -27,6 +27,9 @@ enum ConfigurationField: String, CaseIterable, Sendable {
   case captureShortcut = "capture-shortcut"
   case layerShortcut = "layer-shortcut"
   case improvementShortcut = "improvement-shortcut"
+  case noteShortcut = "note-shortcut"
+  case noteFile = "note-file"
+  case noteResults = "note-results"
   case launchAtLogin = "launch-at-login"
 
   /// The fields that describe the model service; `show` always lists these.
@@ -121,7 +124,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       Schema(
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionS.configurationText,
         example: "control+option+s",
-        description: "截图翻译的快捷键，写法同 shortcut（none 表示不设置），四个快捷键不能相同")
+        description: "截图翻译的快捷键，写法同 shortcut（none 表示不设置），五个快捷键不能相同")
     case .improvementShortcut:
       Schema(
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionF.configurationText,
@@ -131,7 +134,23 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       Schema(
         type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionD.configurationText,
         example: "control+option+d",
-        description: "原处翻译的快捷键：把指针下这一段换成译文、再按换回；加 shift 翻译整个窗口。写法同 shortcut（none 表示不设置），不能带 shift，四个快捷键（含加 shift 的这个）不能相同")
+        description: "原处翻译的快捷键：把指针下这一段换成译文、再按换回；加 shift 翻译整个窗口。写法同 shortcut（none 表示不设置），不能带 shift，五个快捷键（含加 shift 的这个）不能相同")
+    case .noteShortcut:
+      Schema(
+        type: "shortcut", values: nil, defaultValue: GlobalShortcut.optionN.configurationText,
+        example: "control+option+n",
+        description: "存为笔记的快捷键：把选中文字追加进笔记文件，不弹面板、不请求模型。写法同 shortcut（none 表示不设置），所有快捷键不能相同")
+    case .noteFile:
+      Schema(
+        type: "path", values: nil, defaultValue: NoteStore.defaultFileURL.path,
+        example: "~/Documents/notes.jsonl",
+        description:
+          "笔记文件的位置，一行一条 JSON；开头可用 ~，留空表示用默认位置")
+    case .noteResults:
+      Schema(
+        type: "boolean", values: ["true", "false"], defaultValue: "true", example: "false",
+        description:
+          "翻译与改进的结果也写进笔记文件：每次生成成功后追一行，原文在 text、译文/改写结果在 note，与设置里的「存结果」相同")
     case .launchAtLogin:
       Schema(
         type: "boolean", values: ["true", "false"], defaultValue: "false", example: "true",
@@ -198,7 +217,18 @@ enum ConfigurationField: String, CaseIterable, Sendable {
       } else {
         settings.improvementPrompt = value
       }
-    case .shortcut, .captureShortcut, .layerShortcut, .improvementShortcut:
+    case .noteFile:
+      guard !value.contains("\n"), !value.contains("\r") else {
+        throw invalid("要是一行路径，例如 \(schema.example)")
+      }
+      settings.noteFile =
+        value == (NoteStore.defaultFileURL.path as NSString).expandingTildeInPath ? "" : value
+    case .noteResults:
+      guard let enabled = ["true": true, "false": false][value] else {
+        throw invalid("只能是 true 或 false")
+      }
+      settings.noteResults = enabled
+    case .shortcut, .captureShortcut, .layerShortcut, .improvementShortcut, .noteShortcut:
       if value.lowercased() == GlobalShortcut.noneConfigurationText {
         settings.setShortcut(nil, for: shortcutAction!)
       } else if let shortcut = GlobalShortcut(configurationText: value) {
@@ -236,6 +266,9 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .captureShortcut: configuration.settings.captureShortcut = defaults.captureShortcut
     case .layerShortcut: configuration.settings.layerShortcut = defaults.layerShortcut
     case .improvementShortcut: configuration.settings.improvementShortcut = defaults.improvementShortcut
+    case .noteShortcut: configuration.settings.noteShortcut = defaults.noteShortcut
+    case .noteFile: configuration.settings.noteFile = defaults.noteFile
+    case .noteResults: configuration.settings.noteResults = defaults.noteResults
     case .launchAtLogin:
       configuration.launchAtLogin = false
       configuration.settings.launchAtLogin = false
@@ -248,14 +281,18 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     if settings.layerShortcut?.modifiers.contains(.shift) == true {
       throw InvalidValue(field: "layer-shortcut", message: "layer-shortcut 不能带 shift：加 shift 是翻译整个窗口")
     }
-    for field in [ConfigurationField.shortcut, .captureShortcut, .improvementShortcut]
+    for field in [
+      ConfigurationField.shortcut, .captureShortcut, .improvementShortcut, .noteShortcut,
+    ]
     where settings.layerShortcut != nil
       && settings.shortcut(for: field.shortcutAction!) == settings.layerShortcut?.addingShift
     {
       throw InvalidValue(
         field: field.rawValue, message: "\(field.rawValue) 不能与 layer-shortcut 加 shift 相同（翻译整个窗口）")
     }
-    let fields: [ConfigurationField] = [.shortcut, .captureShortcut, .layerShortcut, .improvementShortcut]
+    let fields: [ConfigurationField] = [
+      .shortcut, .captureShortcut, .layerShortcut, .improvementShortcut, .noteShortcut,
+    ]
     for (index, field) in fields.enumerated() {
       // Two actions without a shortcut do not share one.
       for earlier in fields[..<index]
@@ -275,6 +312,7 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .captureShortcut: .captureText
     case .layerShortcut: .translationLayer
     case .improvementShortcut: .improveSelection
+    case .noteShortcut: .saveNote
     default: nil
     }
   }
@@ -341,7 +379,10 @@ enum ConfigurationField: String, CaseIterable, Sendable {
     case .foreignLanguage: return .string(settings.foreignLanguage)
     case .translationPrompt: return .string(settings.translationPrompt)
     case .improvementPrompt: return .string(settings.improvementPrompt)
-    case .shortcut, .captureShortcut, .layerShortcut, .improvementShortcut:
+    case .noteFile:
+      return .string(settings.noteFile.isEmpty ? NoteStore.defaultFileURL.path : settings.noteFile)
+    case .noteResults: return .bool(settings.noteResults)
+    case .shortcut, .captureShortcut, .layerShortcut, .improvementShortcut, .noteShortcut:
       return .string(
         settings.shortcut(for: shortcutAction!)?.configurationText
           ?? GlobalShortcut.noneConfigurationText)
@@ -370,8 +411,8 @@ enum ConfigurationField: String, CaseIterable, Sendable {
         ? configuration.settings.translationPrompt : configuration.settings.improvementPrompt
       let line = prompt.replacingOccurrences(of: "\n", with: " ")
       return line.count > 60 ? String(line.prefix(60)) + "…" : line
-    case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .layerShortcut, .improvementShortcut,
-      .launchAtLogin:
+    case .format, .myLanguage, .foreignLanguage, .shortcut, .captureShortcut, .layerShortcut,
+      .improvementShortcut, .noteShortcut, .noteFile, .noteResults, .launchAtLogin:
       let value = jsonValue(in: configuration, hasAPIKey: hasAPIKey)
       return value.stringValue ?? value.compactText
     }

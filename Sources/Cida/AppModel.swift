@@ -170,6 +170,11 @@ final class AppModel {
   private let saveSettings: @MainActor (CidaSettings) -> Void
   private let applyGlobalShortcut: @MainActor (GlobalShortcut?, GlobalShortcutAction) -> Bool
   private let suspendGlobalShortcuts: @MainActor (Bool) -> Void
+  /// Saves text as a note (`Design/spec/notes.md`); the owner shows the pill.
+  private let saveNote: @MainActor (String) -> Void
+  /// Hands a completed result to the note store (`Design/spec/notes.md` §四); whether it is
+  /// kept is the owner's decision, not the panel's.
+  private let saveResultNote: @MainActor (ResultRecord) -> Void
   /// The Settings chip waiting for the next key press. While one records,
   /// every global shortcut is suspended so any combination reaches it.
   var recordingShortcut: GlobalShortcutAction? {
@@ -225,6 +230,8 @@ final class AppModel {
       _, _ in true
     },
     suspendGlobalShortcuts: @escaping @MainActor (Bool) -> Void = { _ in },
+    saveNote: @escaping @MainActor (String) -> Void = { _ in },
+    saveResultNote: @escaping @MainActor (ResultRecord) -> Void = { _ in },
     selectionAccess: SystemPermission = .accessibility,
     captureAccess: SystemPermission = .screenRecording,
     lastModelServiceCheck: ModelServiceCheckRecord? = nil,
@@ -246,6 +253,8 @@ final class AppModel {
     self.saveSettings = saveSettings
     self.applyGlobalShortcut = applyGlobalShortcut
     self.suspendGlobalShortcuts = suspendGlobalShortcuts
+    self.saveNote = saveNote
+    self.saveResultNote = saveResultNote
     self.selectionAccess = selectionAccess
     self.captureAccess = captureAccess
     self.lastModelServiceCheck = lastModelServiceCheck
@@ -524,6 +533,13 @@ final class AppModel {
     replaceSource(with: selection)
     startGeneration()
     return true
+  }
+
+  /// Saves the panel's text as a note (`Design/spec/notes.md` §三). The panel's ⌘S runs this;
+  /// ⌥N with the panel up lands in the same place. Nothing is sent to the model and the text
+  /// stays where it is.
+  func saveNoteFromPanel() {
+    saveNote(inputText)
   }
 
   /// Opens a completed background operation without generating again or translating it.
@@ -938,6 +954,11 @@ final class AppModel {
     guard result === record else { return }
     record.phase = phase
     settleTypography(of: record)
+    // A result the user stopped or that failed is not worth keeping; a completed one may be,
+    // and the owner decides (`Design/spec/notes.md` §四).
+    if phase == .completed {
+      saveResultNote(record)
+    }
   }
 
   private func makeStreamPresenter(for record: ResultRecord) -> SmoothStreamPresenter {

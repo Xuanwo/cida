@@ -123,7 +123,7 @@ class CidaSettings extends HTMLElement {
         </div>
       </section>`;
 
-    // spec/settings.md §四: four recordable shortcuts; shortcut="unset" is someone who only
+    // spec/settings.md §四: five recordable shortcuts; shortcut="unset" is someone who only
     // captures text, with 显示辞达 and 原处翻译 cleared.
     const unset = `<span class="link">恢复默认</span><span class="chip unset">未设置</span>`;
     const shortcut = is("shortcut", "recording")
@@ -140,6 +140,10 @@ class CidaSettings extends HTMLElement {
     const improvementShortcut = is("shortcut", "unset")
       ? row("改进并替换", "改进并替换选中文字", unset, "end spaced")
       : row("改进并替换", "改进并替换选中文字", `<span class="chip">⌥ F</span>`, "end");
+    // spec/notes.md §一, §二, §四: where notes go, and whether generated results go in too.
+    const noteShortcut = row("存为笔记", "把选中文字存进笔记文件", `<span class="chip">⌥ N</span>`, "end");
+    const noteFile = row("笔记文件", "留空用默认位置", field("~/.cida/items.jsonl"), "end");
+    const noteResults = row("存结果", "翻译与改写的结果也写进笔记", `<span class="toggle on"></span>`, "end");
     // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
     const permission = (title, caption) => row(title, caption,
       granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
@@ -203,7 +207,8 @@ class CidaSettings extends HTMLElement {
         <div class="group"><h3>语言</h3>${languages}</div>
         <div class="group">${actions}</div>`,
       shortcuts: `
-        <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}${improvementShortcut}</div>
+        <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}${improvementShortcut}${noteShortcut}</div>
+        <div class="group"><h3>笔记</h3>${noteFile}${noteResults}</div>
         <div class="group"><h3>权限</h3>${permission("辅助功能", "读取与替换应用文字")}${permission("屏幕录制", "截图翻译")}</div>`,
       general: `
         <div class="group">${launch}${updates}${feedback}</div>
