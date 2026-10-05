@@ -316,13 +316,16 @@ final class InteractionReproductionTests: XCTestCase {
     window.alphaValue = 0
     retainedTestWindows.append(window)
     let recorder = ShortcutCaptureNSView()
+    XCTAssertFalse(recorder.acceptsFirstResponder, "An idle recorder must not intercept Tab navigation")
 
     recorder.wantsKeyFocus = true
+    XCTAssertTrue(recorder.acceptsFirstResponder)
     XCTAssertNil(recorder.window)
     window.contentView?.addSubview(recorder)
     XCTAssertTrue(window.firstResponder === recorder)
 
     recorder.wantsKeyFocus = false
+    XCTAssertFalse(recorder.acceptsFirstResponder)
     XCTAssertFalse(window.firstResponder === recorder)
     assertTestProcessIsNotFrontmost()
   }

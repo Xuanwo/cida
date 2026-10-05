@@ -93,6 +93,7 @@ struct ActionsSettingsView: View {
           Button("撤销") { editor.undoChange(settings: &model.settings) }
             .buttonStyle(.plain)
             .foregroundStyle(CidaDesign.accent)
+            .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem, inset: -3)
             .keyboardShortcut("z", modifiers: .command)
             .disabled(editor.isDirty)
             .accessibilityIdentifier("settings-action-undo")
@@ -141,6 +142,7 @@ struct ActionsSettingsView: View {
               LucideIcon(.plus, size: 12).frame(width: 28, height: 24)
             }
             .buttonStyle(.plain)
+            .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem)
             .foregroundStyle(CidaDesign.textSecondary)
             .disabled(editor.isDirty)
             .opacity(editor.isDirty ? 0.45 : 1)
@@ -177,16 +179,19 @@ struct ActionsSettingsView: View {
         .keyboardShortcut(.return, modifiers: .command)
         .accessibilityIdentifier("settings-action-done")
         .buttonStyle(SettingsBorderedButtonStyle(fontSize: 11.5))
+        .settingsKeyboardFocus()
       } else if isRunning {
         Button(action: editor.stopPreview) { barLabel("停止", key: "⌘.") }
           .keyboardShortcut(".", modifiers: .command)
           .accessibilityIdentifier("settings-action-stop")
           .buttonStyle(SettingsBorderedButtonStyle(fontSize: 11.5))
+          .settingsKeyboardFocus()
       } else {
         Button { beginEditing() } label: { barLabel("编辑", key: "⌘E") }
           .keyboardShortcut("e", modifiers: .command)
           .accessibilityIdentifier("settings-action-edit")
           .buttonStyle(SettingsBorderedButtonStyle(fontSize: 11.5))
+          .settingsKeyboardFocus()
       }
     }
     .buttonStyle(.plain)
@@ -215,6 +220,7 @@ struct ActionsSettingsView: View {
             set: { editor.draft?.action.name = $0 })
         )
         .textFieldStyle(.plain)
+        .focusEffectDisabled()
         .focused($nameFocused)
         .onSubmit {
           nameFocused = false
@@ -237,7 +243,6 @@ struct ActionsSettingsView: View {
             .frame(height: 24)
         }
         .buttonStyle(.plain)
-        .focusable()
         .focusEffectDisabled()
         .focused($focusedAction, equals: action.id)
         .overlay {
@@ -274,6 +279,11 @@ struct ActionsSettingsView: View {
     .frame(height: 24)
     .background(selected ? CidaDesign.surface : .clear)
     .clipShape(.rect(cornerRadius: CidaDesign.Radius.segmentItem))
+    .overlay {
+      SettingsFocusRing(
+        isFocused: editor.draft == nil && focusedAction == action.id,
+        cornerRadius: CidaDesign.Radius.segmentItem)
+    }
     .overlay(alignment: dropTarget?.after == true ? .trailing : .leading) {
       if dropTarget?.id == action.id { Rectangle().fill(CidaDesign.accent).frame(width: 2) }
     }
@@ -302,10 +312,12 @@ struct ActionsSettingsView: View {
             draft.action.prompt != CidaSettings.defaultPrompt(for: draft.action.id)
           {
             Button("恢复默认", action: editor.restoreDefault)
+              .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem, inset: -3)
               .accessibilityIdentifier("settings-action-reset")
           }
           if draft.action.id != .translate {
             Button("删除动作") { editor.delete(editor.selected, from: &model.settings) }
+              .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem, inset: -3)
               .accessibilityIdentifier("settings-action-delete")
           }
         }

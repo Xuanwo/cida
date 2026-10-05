@@ -3,6 +3,139 @@ import XCTest
 
 @MainActor
 final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
+  func testSettingsKeyboardFocusAndSelectionRemainIndependent() throws {
+    driver.launch(additionalArguments: ["-AppleKeyboardUIMode", "3"])
+    driver.openSettings()
+    driver.showSettingsTab("general", title: "通用")
+
+    func capture(_ name: String) {
+      let attachment = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+      attachment.name = name
+      attachment.lifetime = .keepAlways
+      add(attachment)
+    }
+
+    capture("settings-general-keyboard-focus")
+    driver.settingsWindow.typeKey(.tab, modifierFlags: [])
+    XCTAssertTrue(driver.settingsWindow.buttons["settings-tab-general"].isSelected)
+    capture("settings-keyboard-focus-actions")
+    driver.settingsWindow.typeKey(" ", modifierFlags: [])
+    XCTAssertTrue(driver.waitForTitle("动作", of: driver.settingsWindow, timeout: 3))
+    XCTAssertTrue(driver.settingsWindow.buttons["settings-tab-translation"].isSelected)
+    capture("settings-keyboard-activated-actions")
+
+    driver.settingsWindow.typeKey(.tab, modifierFlags: .shift)
+    XCTAssertTrue(driver.settingsWindow.buttons["settings-tab-translation"].isSelected)
+    driver.settingsWindow.typeKey(" ", modifierFlags: [])
+    XCTAssertTrue(driver.waitForTitle("模型", of: driver.settingsWindow, timeout: 3))
+    XCTAssertTrue(driver.settingsWindow.buttons["settings-tab-model"].isSelected)
+
+    driver.settingsWindow.typeKey(.tab, modifierFlags: [])
+    driver.settingsWindow.typeKey(.tab, modifierFlags: [])
+    driver.settingsWindow.typeKey(.tab, modifierFlags: [])
+    driver.settingsWindow.typeKey(" ", modifierFlags: [])
+    XCTAssertTrue(driver.waitForTitle("通用", of: driver.settingsWindow, timeout: 3))
+    capture("settings-general-selected-focus")
+    driver.settingsWindow.typeKey(.tab, modifierFlags: [])
+    capture("settings-keyboard-focus-leaves-tabs")
+  }
+
+  func testSettingsControlsShowKeyboardFocusAcrossPages() throws {
+    try inspectSettingsControlFocus(dark: false)
+  }
+
+  func testSettingsControlsShowKeyboardFocusInDarkAppearance() throws {
+    try inspectSettingsControlFocus(dark: true)
+  }
+
+  private func inspectSettingsControlFocus(dark: Bool) throws {
+    var arguments = ["-AppleKeyboardUIMode", "3", "--automation-permissions", "denied"]
+    if dark { arguments += ["--design-state", "dark-empty"] }
+    driver.launch(additionalArguments: arguments)
+    try driver.configureModelService()
+    driver.openSettings()
+    let prefix = dark ? "dark-" : ""
+
+    func capture(_ name: String) {
+      let attachment = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+      attachment.name = prefix + name
+      attachment.lifetime = .keepAlways
+      add(attachment)
+    }
+
+    func focus(_ element: XCUIElement, _ name: String) {
+      XCTAssertTrue(element.exists, name)
+      for _ in 0..<24 {
+        if element.debugDescription.components(separatedBy: "\n").first?
+          .contains("Keyboard Focused") == true {
+          capture(name)
+          return
+        }
+        driver.settingsWindow.typeKey(.tab, modifierFlags: [])
+      }
+      XCTFail("Keyboard navigation did not reach \(name)")
+    }
+
+    focus(driver.modelCheckButton, "focus-model-check")
+    focus(driver.app.buttons["settings-copy-configuration-prompt"], "focus-model-copy")
+    driver.settingsWindow.typeKey(" ", modifierFlags: [])
+    XCTAssertTrue(driver.app.buttons["settings-copy-configuration-prompt"].exists)
+
+    driver.showSettingsTab("general", title: "通用")
+    let toggle = driver.element(identifier: "settings-launch-at-login-toggle")
+    focus(toggle, "focus-general-toggle-off")
+    let value = String(describing: toggle.value ?? "")
+    driver.settingsWindow.typeKey(" ", modifierFlags: [])
+    XCTAssertNotEqual(String(describing: toggle.value ?? ""), value)
+    capture("focus-general-toggle-on")
+    driver.settingsWindow.typeKey(" ", modifierFlags: [])
+    XCTAssertEqual(String(describing: toggle.value ?? ""), value)
+    focus(driver.app.buttons["settings-check-for-updates"], "focus-general-update")
+    focus(driver.app.buttons["settings-feedback"], "focus-general-feedback")
+
+    driver.showSettingsTab("shortcuts", title: "快捷键")
+    for identifier in ["settings-shortcut", "settings-capture-shortcut",
+                       "settings-layer-shortcut", "settings-improvement-shortcut"] {
+      focus(driver.app.buttons[identifier], "focus-" + identifier)
+    }
+    focus(driver.app.buttons["settings-selection-access-request"], "focus-accessibility-permission")
+    focus(driver.app.buttons["settings-capture-access-request"], "focus-screen-permission")
+    driver.app.buttons["settings-shortcut"].click()
+    capture("focus-shortcut-recording")
+    driver.settingsWindow.typeKey(.delete, modifierFlags: [])
+    focus(driver.app.buttons["settings-shortcut-reset"], "focus-shortcut-reset")
+    driver.settingsWindow.typeKey(" ", modifierFlags: [])
+    XCTAssertFalse(driver.app.buttons["settings-shortcut-reset"].exists)
+
+    driver.showSettingsTab("translation", title: "动作")
+    focus(driver.app.textFields["settings-my-language-editor"], "focus-my-language")
+    for identifier in ["settings-action-translate", "settings-action-improve",
+                       "settings-action-add", "settings-action-edit"] {
+      let button = driver.app.buttons[identifier]
+      focus(button, "focus-" + identifier)
+      if identifier == "settings-action-translate" || identifier == "settings-action-improve" {
+        driver.settingsWindow.typeKey(" ", modifierFlags: [])
+        XCTAssertTrue(button.isSelected)
+      }
+    }
+    driver.app.buttons["settings-action-improve"].click()
+    driver.app.buttons["settings-action-edit"].click()
+    driver.app.textFields["settings-action-name"].click()
+    capture("focus-action-name")
+    let prompt = driver.app.textViews["settings-action-prompt"]
+    prompt.click()
+    prompt.typeText(" Additional instruction.")
+    capture("focus-action-prompt")
+    driver.showSettingsTab("general", title: "通用")
+    driver.showSettingsTab("translation", title: "动作")
+    focus(driver.app.buttons["settings-action-done"], "focus-action-done")
+    focus(driver.app.buttons["settings-action-reset"], "focus-action-reset")
+    focus(driver.app.buttons["settings-action-delete"], "focus-action-delete")
+    prompt.click()
+    driver.settingsWindow.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(driver.app.buttons["settings-action-edit"].waitForExistence(timeout: 3))
+  }
+
   func testImprovementShortcutReplacesSelectionPreservesClipboardAndUndoes() throws {
     driver.launch()
     driver.hidePanel()
@@ -710,8 +843,11 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let target = driver.app.buttons["settings-action-translate"]
     custom.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
       .press(forDuration: 0.2, thenDragTo: target.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)))
+    XCTAssertLessThan(custom.frame.minX, target.frame.minX)
     driver.settingsWindow.typeKey(.rightArrow, modifierFlags: .option)
+    XCTAssertGreaterThan(custom.frame.minX, target.frame.minX)
     driver.settingsWindow.typeKey(.leftArrow, modifierFlags: .option)
+    XCTAssertLessThan(custom.frame.minX, target.frame.minX)
     shot("actions-reordered")
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     driver.showPanel()
