@@ -40,7 +40,8 @@ final class ShortcutCaptureNSView: NSView {
     didSet { applyKeyFocus() }
   }
 
-  override var acceptsFirstResponder: Bool { true }
+  // Only an active recording owns keys; the invisible view must not enter the Tab loop.
+  override var acceptsFirstResponder: Bool { wantsKeyFocus }
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()

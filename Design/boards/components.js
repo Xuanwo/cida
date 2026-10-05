@@ -101,6 +101,7 @@ class CidaSettings extends HTMLElement {
   connectedCallback() {
     const is = (name, value) => this.getAttribute(name) === value;
     const granted = is("grants", "all");
+    const focus = (name) => is("focused-control", name) ? " focused" : "";
     const row = (title, caption, controls, align = "") => `
       <div class="row">
         <div class="labels"><b>${title}</b>${caption ? `<small>${caption}</small>` : ""}</div>
@@ -117,7 +118,7 @@ class CidaSettings extends HTMLElement {
       <section class="actions-preview">
         <div class="actions-sample"><small><span>样例</span><span>使用当前模型</span></small>
           <p>想跟你同步一下，原定周五的分享会要改到下周三下午三点，地点还是二楼会议室。主要是因为演示还没准备好，有几处细节想再确认一下。如果这个时间不方便，麻烦明天中午前告诉我，我们再一起看看怎么安排。</p></div>
-        <div class="bar"><div class="seg"><span class="${actionEditing ? "" : "on"}">翻译</span><span class="${actionEditing ? "on" : ""}">改进</span><span>+</span></div><span class="bar-action"><span>${actionEditing ? "完成" : "编辑"}</span><span class="key">${actionEditing ? "⌘↵" : "⌘E"}</span></span></div>
+        <div class="bar"><div class="seg"><span class="${actionEditing ? "" : "on"}${focus("action-translate")}">翻译</span><span class="${actionEditing ? "on" : ""}${focus("action-improve")}">改进</span><span>+</span></div><span class="bar-action${focus("action-edit")}"><span>${actionEditing ? "完成" : "编辑"}</span><span class="key">${actionEditing ? "⌘↵" : "⌘E"}</span></span></div>
         <div class="actions-paper">${actionEditing ? `<div class="actions-instruction"><small><span>提示词</span><span>删除动作</span></small><p>You are a writing assistant. Improve the user-provided text for clarity, grammar, and natural tone. Keep the original language and meaning. Prefer precise technical wording. Return only the improved text.</p></div>` : ""}
           ${actionEditing ? '<small>完成后预览 · ⌘↵</small>' : '<p class="actions-placeholder">完成提示词编辑后，在这里看它的效果。</p><small>使用当前模型 · 固定样例</small>'}
         </div>
@@ -132,7 +133,7 @@ class CidaSettings extends HTMLElement {
         ? row("显示辞达", "在任何应用里唤起", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
         : is("shortcut", "unset")
           ? row("显示辞达", "在任何应用里唤起", unset, "end spaced")
-          : row("显示辞达", "在任何应用里唤起", `<span class="chip">⌥ A</span>`, "end");
+          : row("显示辞达", "在任何应用里唤起", `<span class="chip${focus("shortcut")}">⌥ A</span>`, "end");
     const capture = row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end");
     const layerShortcut = is("shortcut", "unset")
       ? row("原处翻译", "加 ⇧ 翻译整个窗口", unset, "end spaced")
@@ -143,11 +144,11 @@ class CidaSettings extends HTMLElement {
     // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
     const permission = (title, caption) => row(title, caption,
       granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
-    const launch = row("开机启动", "", `<span class="toggle${is("launch", "on") ? " on" : ""}"></span>`, "end");
+    const launch = row("开机启动", "", `<span class="toggle${is("launch", "on") ? " on" : ""}${focus("launch")}"></span>`, "end");
     const updates = is("update", "available")
       ? row("更新", "新版本 1.1.0 可以安装", `<span class="button">安装…</span>`, "end")
-      : row("更新", "每天自动检查", `<span class="button">检查更新</span>`, "end");
-    const feedback = row("反馈", "报告问题或提建议", `<span class="button">去反馈</span>`, "end");
+      : row("更新", "每天自动检查", `<span class="button${focus("updates")}">检查更新</span>`, "end");
+    const feedback = row("反馈", "报告问题或提建议", `<span class="button${focus("feedback")}">去反馈</span>`, "end");
 
     // The agent-configured model group (spec/configuration.md §四):
     // config="unset|unset-copied|ready|updated|checking|failed".
@@ -190,12 +191,13 @@ class CidaSettings extends HTMLElement {
         : `${serviceRow}${failure}${adjustRow}`;
 
     const tab = this.getAttribute("tab") ?? "model";
+    const focusedTab = this.getAttribute("focused-tab");
     const tabs = [
       ["model", "模型", "sparkles"], ["translation", "动作", "pen-line"],
       ["shortcuts", "快捷键", "keyboard"], ["general", "通用", "sliders-horizontal"],
     ];
     const tabBar = `<div class="settings-tabs">${tabs.map(([key, title, icon]) =>
-      `<span class="${key === tab ? "on" : ""}"><i class="icon icon-${icon}"></i>${title}</span>`).join("")}</div>`;
+      `<span class="${key === tab ? "on" : ""}${key === focusedTab ? " focused" : ""}"><i class="icon icon-${icon}"></i>${title}</span>`).join("")}</div>`;
     // A tab with one group has no heading: the title names it.
     const content = {
       model: `<div class="group">${modelGroup}</div>`,

@@ -242,6 +242,8 @@ final class SettingsContentController: NSViewController {
     guard move == heightMoveCount else { return }
     if window.frame != target { window.setFrame(target, display: true) }
     setHostHeight(height)
+    // Tab changes and action editing replace focusable controls while resizing the host.
+    window.recalculateKeyViewLoop()
   }
 
   private func setHostHeight(_ height: CGFloat) {
@@ -296,6 +298,7 @@ private struct SettingsTabBar: View {
           .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .settingsKeyboardFocus()
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityIdentifier("settings-tab-\(tab.rawValue)")
@@ -415,7 +418,7 @@ private struct LanguagesRow: View {
   }
 }
 
-/// A single-line field: Inter 12.5 on `surface`, a 1.5 pt accent rule while focused. The owner
+/// A single-line field: Inter 12.5 on `surface`, a 1 pt accent rule while focused. The owner
 /// attaches the focus binding.
 private struct SettingsTextField: View {
   @Binding var text: String
@@ -427,6 +430,7 @@ private struct SettingsTextField: View {
   var body: some View {
     TextField(placeholder, text: $text)
       .textFieldStyle(.plain)
+      .focusEffectDisabled()
       .font(CidaDesign.ui(12.5))
       .foregroundStyle(CidaDesign.textPrimary)
       .padding(.horizontal, 10)
@@ -437,7 +441,7 @@ private struct SettingsTextField: View {
       .overlay {
         RoundedRectangle(cornerRadius: CidaDesign.Radius.segment, style: .continuous)
           .strokeBorder(
-            isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: isFocused ? 1.5 : 1)
+            isFocused ? CidaDesign.accent : CidaDesign.border, lineWidth: 1)
       }
       .accessibilityLabel(accessibilityLabel)
       .accessibilityIdentifier(accessibilityIdentifier)
@@ -509,6 +513,44 @@ private struct SettingsLabel: View {
           .lineLimit(1)
       }
     }
+  }
+}
+
+/// The settings controls share one focus treatment without changing activation or selection.
+struct SettingsFocusRing: View {
+  let isFocused: Bool
+  var cornerRadius: CGFloat = CidaDesign.Radius.card
+  var inset: CGFloat = 0
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      .strokeBorder(isFocused ? CidaDesign.accent : .clear, lineWidth: 1)
+      .padding(inset)
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+  }
+}
+
+private struct SettingsKeyboardFocus: ViewModifier {
+  var cornerRadius: CGFloat
+  var inset: CGFloat
+  @FocusState private var isFocused: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .focused($isFocused)
+      .focusEffectDisabled()
+      .overlay {
+        SettingsFocusRing(isFocused: isFocused, cornerRadius: cornerRadius, inset: inset)
+      }
+  }
+}
+
+extension View {
+  func settingsKeyboardFocus(
+    cornerRadius: CGFloat = CidaDesign.Radius.card, inset: CGFloat = 0
+  ) -> some View {
+    modifier(SettingsKeyboardFocus(cornerRadius: cornerRadius, inset: inset))
   }
 }
 
@@ -664,6 +706,7 @@ private struct ModelServiceRow: View {
           Task { await model.checkModelService() }
         }
         .buttonStyle(SettingsBorderedButtonStyle())
+        .settingsKeyboardFocus()
         .disabled(status == .checking)
         .accessibilityIdentifier("settings-model-check")
       }
@@ -713,6 +756,7 @@ private struct CopyConfigurationPromptButton: View {
       }
     }
     .buttonStyle(SettingsBorderedButtonStyle(isHighlighted: isCopied))
+    .settingsKeyboardFocus()
     // The panel's 已复制 cross-fades over `motion-icon-swap-ms`; this one does too.
     .animation(.easeOut(duration: CidaMotion.iconSwapSeconds), value: isCopied)
     .accessibilityLabel(isCopied ? "已复制" : "复制配置提示词")
@@ -800,6 +844,7 @@ private struct GlobalShortcutRow: View {
           .buttonStyle(.plain)
           .font(CidaDesign.ui(12, weight: .medium))
           .foregroundStyle(CidaDesign.textSecondary)
+          .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem, inset: -3)
           .accessibilityIdentifier("\(identifierPrefix)-reset")
         }
         Button {
@@ -811,6 +856,7 @@ private struct GlobalShortcutRow: View {
             isRecording: isRecording, isUnset: shortcut == nil)
         }
         .buttonStyle(.plain)
+        .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.chip)
         .background {
           ShortcutCaptureView(
             isRecording: Binding(
@@ -859,7 +905,7 @@ private struct ShortcutChip: View {
       .overlay {
         if isRecording {
           RoundedRectangle(cornerRadius: CidaDesign.Radius.chip, style: .continuous)
-            .strokeBorder(CidaDesign.accent, lineWidth: 1.5)
+            .strokeBorder(CidaDesign.accent, lineWidth: 1)
         }
       }
   }
@@ -939,6 +985,7 @@ private struct PermissionRow: View {
       } else {
         Button("去授权", action: request)
           .buttonStyle(SettingsBorderedButtonStyle())
+          .settingsKeyboardFocus()
           .accessibilityIdentifier("\(identifier)-request")
       }
     }
@@ -947,24 +994,36 @@ private struct PermissionRow: View {
 
 // MARK: - 通用
 
+/// Keep Toggle's value and activation semantics while drawing the settings switch ourselves.
+private struct SettingsSwitchButtonStyle: ButtonStyle {
+  let isOn: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    Capsule()
+      .fill(isOn ? CidaDesign.accent : CidaDesign.toggleOff)
+      .overlay(alignment: isOn ? .trailing : .leading) {
+        Circle().fill(.white).frame(width: 14, height: 14).padding(2)
+      }
+      .frame(width: 32, height: 18)
+  }
+}
+
 private struct LaunchAtLoginRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
     SettingsRow(title: "开机启动", alignment: .trailing) {
       Toggle(
-        "",
+        "开机启动",
         isOn: Binding(
           get: { model.settings.launchAtLogin },
-          set: { enabled in
-            model.setLaunchAtLogin(enabled)
-          }
+          set: { model.setLaunchAtLogin($0) }
         )
       )
-      .labelsHidden()
-      .toggleStyle(.switch)
-      .tint(CidaDesign.accent)
-      .controlSize(.small)
+      .toggleStyle(.button)
+      .buttonStyle(SettingsSwitchButtonStyle(isOn: model.settings.launchAtLogin))
+      .settingsKeyboardFocus(cornerRadius: 11, inset: -2)
+      .accessibilityLabel("开机启动")
       .accessibilityIdentifier("settings-launch-at-login-toggle")
     }
     .onAppear(perform: model.refreshLaunchAtLoginStatus)
@@ -984,6 +1043,7 @@ private struct UpdatesRow: View {
     ) {
       Button(updates.availableVersion == nil ? "检查更新" : "安装…", action: updates.checkForUpdates)
         .buttonStyle(SettingsBorderedButtonStyle())
+        .settingsKeyboardFocus()
         .accessibilityIdentifier("settings-check-for-updates")
     }
   }
@@ -995,6 +1055,7 @@ private struct FeedbackRow: View {
     SettingsRow(title: "反馈", caption: "报告问题或提建议", alignment: .trailing) {
       Button("去反馈") { NSWorkspace.shared.open(FeedbackForm.url()) }
         .buttonStyle(SettingsBorderedButtonStyle())
+        .settingsKeyboardFocus()
         .accessibilityIdentifier("settings-feedback")
     }
   }

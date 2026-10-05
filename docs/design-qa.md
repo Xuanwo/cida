@@ -133,6 +133,25 @@ inside a disposable headless Tart macOS session. Neither path activates the test
 - Failures retain approved/current/design/diff images in the `.xcresult`; baseline recording is
   never automatic.
 
+## Settings keyboard focus
+
+Settings uses a one-point accent focus treatment across tabs, buttons, switches, shortcut chips,
+action segments and fields. Focus remains independent of selection: Tab and Shift-Tab navigate;
+Space activates the focused button or toggle. Native system dialogs and Full Keyboard Access
+highlights remain system-owned.
+
+The signed Release app was exercised in headless Tart on macOS 26.4 in light and dark appearances.
+`PanelAndSettingsJourneyTests` covers focus/selection independence, every Settings page, shortcut
+recording and reset, action editing, and mouse/keyboard reordering. The inactive recorder is excluded
+from the key view loop, the loop is refreshed after Settings content resizing, and action buttons
+have only their native focus target.
+
+Native captures: [before](images/settings-focus-before.png),
+[tabs](images/settings-focus-tabs.png), [switch](images/settings-focus-switch.png),
+[shortcuts](images/settings-focus-shortcuts.png), [actions](images/settings-focus-actions.png),
+[dark editing](images/settings-focus-dark.png). The static design/native comparisons remain in
+`Design/QACurrent`; keyboard focus states are captured by the Tart journeys.
+
 ## Remaining certification boundary
 
 Tart proves real macOS interaction and WindowServer composition, not physical 120 Hz cadence.

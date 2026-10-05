@@ -523,6 +523,13 @@ body {
 .settings-tabs .icon { width: 18px; height: 18px; }
 .settings-tabs span.on { background: var(--surface-dim); color: var(--text-primary); }
 .settings-tabs span.on .icon { color: var(--accent); }
+.settings-tabs span.focused,
+.settings .button.focused,
+.settings .bar-action.focused,
+.settings .chip.focused,
+.settings .seg span.focused { box-shadow: inset 0 0 0 1px var(--accent); }
+.settings .toggle.focused { outline: 1px solid var(--accent); outline-offset: 2px; }
+.settings .link.focused { outline: 1px solid var(--accent); outline-offset: 3px; border-radius: var(--radius-segment-item); }
 
 .settings { padding: 6px var(--space-window-x) 24px; }
 .settings .group { padding-top: 20px; }
@@ -582,7 +589,7 @@ body {
   font-size: 11.5px;
 }
 .field.placeholder { color: var(--text-tertiary); }
-.field.focused { border: 1.5px solid var(--accent); }
+.field.focused { border: 1px solid var(--accent); }
 .field.text { font-family: var(--font-ui); font-size: 12.5px; }
 .field.short { flex: 0 0 180px; }
 .row .controls .swap { flex: none; font-size: 13px; color: var(--text-tertiary); }
@@ -696,8 +703,8 @@ body {
 }
 .chip.unset { color: var(--text-tertiary); }
 .chip.recording {
-  padding: 2.5px 7.5px;
-  border: 1.5px solid var(--accent);
+  padding: 3px 8px;
+  border: 1px solid var(--accent);
   background: var(--surface);
   color: var(--text-tertiary);
 }
@@ -713,13 +720,15 @@ body {
 }
 .toggle::after { content: ""; width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF; }
 .toggle.on { justify-content: flex-end; background: var(--accent); }
+.settings .toggle { width: 32px; height: 18px; border-radius: 9px; }
+.settings .toggle::after { width: 14px; height: 14px; }
 
 .prompt-editor { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
 .prompt-editor .head { display: flex; align-items: center; justify-content: space-between; }
 .prompt-editor .head b { font-size: 13.5px; font-weight: 400; line-height: 20px; }
 .prompt-editor .sheet {
   padding: 12.5px;
-  border: 1.5px solid var(--accent);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-card);
   background: var(--surface-paper);
   font-size: 13px;
@@ -996,7 +1005,7 @@ body {
 .chat-empty { height: 120px; margin: 0 20px; }
 /* ⌥⇧D: the window outlined for a moment when it starts, 3px outside and concentric with
    its 16px corners. */
-.layer-outline { position: absolute; border: 1.5px solid var(--accent); border-radius: 19px; pointer-events: none; }
+.layer-outline { position: absolute; border: 1px solid var(--accent); border-radius: 19px; pointer-events: none; }
 
 /* Translations sit on Cida's paper in Cida's ink, whatever the app looks like. */
 .layer-card {
