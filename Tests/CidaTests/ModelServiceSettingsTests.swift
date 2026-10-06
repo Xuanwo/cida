@@ -20,19 +20,27 @@ final class ModelServiceSettingsTests: XCTestCase {
     let settings = CidaSettings.designPreview
     let model = AppModel(settings: settings, saveSettings: { _ in })
     XCTAssertTrue(model.isModelServiceConfigured)
-    XCTAssertEqual(model.modelServiceStatus, .ready, "Complete and never checked is 已就绪")
+    XCTAssertEqual(model.modelServiceStatus, .unchecked)
+    XCTAssertFalse(model.modelServiceStatus.passed)
 
-    model.applyExternalSettings(settings, lastCheck: failedCheck(for: settings))
-    XCTAssertEqual(model.modelServiceStatus, .failed("401 · 服务商拒绝了 API Key"))
-    XCTAssertEqual(
-      model.modelServiceStatus.failureNote, "401 · 服务商拒绝了 API Key。复制配置提示词，让 AI 助手修好。")
-    XCTAssertEqual(model.modelServiceStatus.caption, "检查失败")
+    let failed = failedCheck(for: settings)
+    model.applyExternalSettings(settings, lastCheck: failed)
+    XCTAssertEqual(model.modelServiceStatus, .failed(failed.checkedAt))
+    XCTAssertEqual(model.modelServiceStatus.caption, "检查未通过")
+    XCTAssertNotNil(model.modelServiceStatus.checkedAtCaption)
+    XCTAssertTrue(model.configurationPrompt.contains("继续检查："))
+
+    var passed = failed
+    passed.passed = true
+    model.applyExternalSettings(settings, lastCheck: passed)
+    XCTAssertEqual(model.modelServiceStatus, .passed(passed.checkedAt))
+    XCTAssertTrue(model.modelServiceStatus.passed)
 
     var fixed = settings
     fixed.apiKey = "sk-a-new-key"
     model.applyExternalSettings(fixed, lastCheck: failedCheck(for: settings))
     XCTAssertEqual(
-      model.modelServiceStatus, .ready, "A check of another configuration no longer applies")
+      model.modelServiceStatus, .unchecked, "A check of another configuration no longer applies")
   }
 
   func testTheCheckButtonRunsTheCheckAndRecordsIt() async throws {
@@ -63,7 +71,36 @@ final class ModelServiceSettingsTests: XCTestCase {
 
     XCTAssertFalse(model.isCheckingModelService)
     XCTAssertEqual(recorded.count, 1)
-    XCTAssertEqual(model.modelServiceStatus, .failed("429 · 请求太频繁或额度不足"))
+    XCTAssertEqual(model.modelServiceStatus, .failed(recorded[0].checkedAt))
+  }
+
+  func testAConfigChangeDuringCheckingCannotReplaceTheNewConfigurationsResult() async throws {
+    let gate = AsyncGate()
+    var recorded: [ModelServiceCheckRecord] = []
+    let model = AppModel(
+      settings: .designPreview, saveSettings: { _ in },
+      checkModelService: { settings in
+        await gate.wait()
+        return ModelServiceCheckResult(
+          model: settings.modelService.model, duration: 0.1,
+          reply: "", failure: nil, request: nil, responseStatus: 200, responseBody: "",
+          record: ModelServiceCheckRecord(
+            passed: true, checkedAt: Date(),
+            fingerprint: settings.modelServiceFingerprint))
+      }, recordModelServiceCheck: { recorded.append($0) })
+    let checking = Task { await model.checkModelService() }
+    try await waitUntil { model.isCheckingModelService }
+    var changed = CidaSettings.designPreview
+    changed.modelService.model = "replacement-model"
+    model.applyExternalSettings(changed, lastCheck: nil)
+    XCTAssertEqual(model.modelServiceStatus, .unchecked)
+    let external = failedCheck(for: changed)
+    model.applyExternalSettings(changed, lastCheck: external)
+    XCTAssertEqual(model.modelServiceStatus, .failed(external.checkedAt))
+    await gate.open()
+    await checking.value
+    XCTAssertTrue(recorded.isEmpty)
+    XCTAssertEqual(model.currentModelServiceCheck, external)
   }
 
   func testCopyingThePromptShowsCopiedFor800MillisecondsAndTheCardUntilConfigured()
@@ -159,8 +196,10 @@ final class ModelServiceSettingsTests: XCTestCase {
       readFile: { _ in Data() }, output: { _ in }, errorOutput: { _ in },
       check: { await ModelServiceCheck.run(settings: $0) })
     let status = await CommandLineInterface.run(
-      ["config", "set", "endpoint=http://127.0.0.1:8080/v1/messages", "format=anthropic-messages",
-       "model=local-claude"],
+      [
+        "config", "set", "endpoint=http://127.0.0.1:8080/v1/messages", "format=anthropic-messages",
+        "model=local-claude",
+      ],
       context: context)
     XCTAssertEqual(status, 0)
 

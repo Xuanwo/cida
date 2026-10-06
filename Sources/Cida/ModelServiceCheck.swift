@@ -93,25 +93,45 @@ struct ModelServiceCheckRecord: Codable, Equatable, Sendable {
 
 /// What Settings' 模型服务 row says under its label (`Design/spec/configuration.md` §四).
 enum ModelServiceStatus: Equatable, Sendable {
-  case ready
+  case incomplete
+  case unchecked
   case checking
-  /// The latest check of this configuration failed: `401 · 服务商拒绝了 API Key`.
-  case failed(String)
+  case passed(Date)
+  case failed(Date)
 
   var caption: String {
     switch self {
-    case .ready: "已就绪"
+    case .incomplete: "还没配好"
+    case .unchecked: "已配置 · 未检查"
     case .checking: "正在检查…"
-    case .failed: "检查失败"
+    case .passed: "检查通过"
+    case .failed: "检查未通过"
     }
   }
 
-  /// Only 已就绪 gets the accent dot.
-  var isReady: Bool { self == .ready }
+  var passed: Bool {
+    if case .passed = self { return true }
+    return false
+  }
 
-  /// The line under the row that says what failed and how to fix it.
-  var failureNote: String? {
-    guard case .failed(let summary) = self else { return nil }
-    return "\(summary)。复制配置提示词，让 AI 助手修好。"
+  var failed: Bool {
+    if case .failed = self { return true }
+    return false
+  }
+
+  var checkedAt: Date? {
+    switch self {
+    case .passed(let date), .failed(let date): date
+    default: nil
+    }
+  }
+
+  var checkedAtCaption: String? {
+    guard let checkedAt else { return nil }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.dateFormat =
+      Calendar.current.isDateInToday(checkedAt) ? "'今天' HH:mm" : "yyyy/M/d HH:mm"
+    return formatter.string(from: checkedAt)
   }
 }

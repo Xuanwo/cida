@@ -195,37 +195,46 @@ final class ModelConfigurationTests: XCTestCase {
 
   // MARK: - Configuration prompt (spec §五)
 
-  func testConfigurationPromptIsTheSpecTextWithThePathAndTheCurrentConfiguration() {
-    let text = ConfigurationPrompt.text(
-      executablePath: "/Applications/Cida.app/Contents/MacOS/Cida",
-      settings: .designPreview)
-    XCTAssertEqual(
-      text,
-      """
-      帮我配置辞达（macOS 上的翻译与改写应用）使用的模型服务。
-
-      辞达的命令行：/Applications/Cida.app/Contents/MacOS/Cida
-      当前配置：deepseek-chat · api.deepseek.com · Chat Completions
-
-      请这样做：
-      1. 问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。
-      2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。辞达只用来翻译和改写，用不上思考：模型能关闭思考就在 `body` 里关掉，关不掉就设到它支持的最低档。
-      3. 用 `Cida config set 字段=值 …` 一次写入。
-      4. API Key 不要让我发给你，也不要打印或写进文件：请我先复制 Key，再运行 `pbpaste | Cida config set api-key --stdin`；Key 已经在环境变量或文件里时，用 `--env` 或 `--file`。
-      5. 运行 `Cida check`；失败时用 `Cida check --verbose` 找原因、修改配置，直到通过。
-      6. 最后用 `Cida config show` 告诉我配置结果。
-
-      如果你不能运行命令，就把每一步的命令写给我，我粘贴到「终端」里运行，再把输出贴给你。
-      """)
+  func testConfigurationPromptPreservesTheCurrentTaskAndKeepsDiagnosticsWithTheAgent() {
+    let settings = CidaSettings.designPreview
+    let initial = ConfigurationPrompt.text(settings: CidaSettings())
+    XCTAssertTrue(initial.contains("从头配置：问我想用"))
     XCTAssertEqual(ConfigurationPrompt.currentConfiguration(CidaSettings()), "还没配置")
-    var partial = CidaSettings.designPreview
+
+    var partial = settings
     partial.apiKey = ""
-    XCTAssertEqual(
-      ConfigurationPrompt.currentConfiguration(partial),
-      "deepseek-chat · api.deepseek.com · Chat Completions（还缺 api-key）")
-    XCTAssertFalse(
-      ConfigurationPrompt.text(settings: .designPreview).contains("sk-preview"),
-      "The prompt never carries the key")
+    let continued = ConfigurationPrompt.text(settings: partial)
+    XCTAssertTrue(continued.contains("继续配置：保留已选的服务与模型"))
+    XCTAssertTrue(continued.contains("还缺 api-key"))
+    XCTAssertFalse(continued.contains("从头配置："))
+
+    let adjusted = ConfigurationPrompt.text(
+      executablePath: "/Applications/Cida.app/Contents/MacOS/Cida",
+      settings: settings)
+    XCTAssertTrue(adjusted.contains("辞达的命令行：/Applications/Cida.app/Contents/MacOS/Cida"))
+    XCTAssertTrue(adjusted.contains("调整配置：先问我想调整什么"))
+    XCTAssertTrue(adjusted.contains("deepseek-chat · api.deepseek.com"))
+
+    var check = ModelServiceCheckRecord(
+      passed: false, statusCode: 401,
+      reason: "secret provider diagnostics", checkedAt: Date(timeIntervalSince1970: 1_790_000_000),
+      fingerprint: settings.modelServiceFingerprint)
+    let repair = ConfigurationPrompt.text(settings: settings, lastCheck: check)
+    XCTAssertTrue(repair.contains("继续检查：最近一次检查未通过"))
+    XCTAssertTrue(repair.contains("Cida check --verbose"))
+    XCTAssertTrue(repair.contains("不反复重试同一个失败"))
+    XCTAssertTrue(repair.contains("授权或处理账户付费"))
+    XCTAssertFalse(repair.contains("401"))
+    XCTAssertFalse(repair.contains(check.reason!))
+    XCTAssertFalse(repair.contains(settings.apiKey))
+    XCTAssertFalse(repair.contains("从头配置："))
+
+    check.fingerprint = "obsolete"
+    XCTAssertTrue(ConfigurationPrompt.text(settings: settings, lastCheck: check).contains("调整配置："))
+    check.fingerprint = settings.modelServiceFingerprint
+    check.passed = true
+    XCTAssertTrue(ConfigurationPrompt.text(settings: settings, lastCheck: check).contains("调整配置："))
+    XCTAssertTrue(ConfigurationPrompt.text(settings: partial, lastCheck: check).contains("继续配置："))
   }
 
   // MARK: - Fields (spec §三)

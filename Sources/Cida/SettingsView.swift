@@ -34,6 +34,7 @@ enum SettingsTab: String, CaseIterable {
 struct SettingsWindowView: View {
   @Bindable var model: AppModel
   let updates: UpdateState
+  var returnToPanel: @MainActor () -> Void = {}
   /// The tallest the window's content may be; below the tabs the groups scroll past it.
   @State private var maxContentHeight: CGFloat
   /// The tab's natural height, measured on every layout.
@@ -43,10 +44,12 @@ struct SettingsWindowView: View {
 
   init(
     model: AppModel, updates: UpdateState,
-    maxContentHeight: CGFloat = SettingsWindowFactory.screenContentHeight()
+    maxContentHeight: CGFloat = SettingsWindowFactory.screenContentHeight(),
+    returnToPanel: @escaping @MainActor () -> Void = {}
   ) {
     self.model = model
     self.updates = updates
+    self.returnToPanel = returnToPanel
     _maxContentHeight = State(initialValue: maxContentHeight)
   }
 
@@ -57,7 +60,7 @@ struct SettingsWindowView: View {
         SettingsTabBar(selection: $model.settingsTab)
         Hairline()
         ScrollView(.vertical) {
-          SettingsBody(model: model, updates: updates)
+          SettingsBody(model: model, updates: updates, returnToPanel: returnToPanel)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bodyHeight = $0 }
         }
         .scrollBounceBehavior(.basedOnSize)
@@ -104,11 +107,13 @@ enum SettingsWindowFactory {
 
   static func makeWindowController(
     model: AppModel, updates: UpdateState,
-    maxContentHeight: CGFloat = screenContentHeight()
+    maxContentHeight: CGFloat = screenContentHeight(),
+    returnToPanel: @escaping @MainActor () -> Void = {}
   ) -> NSWindowController {
     let content = SettingsContentController(
       rootView: SettingsWindowView(
-        model: model, updates: updates, maxContentHeight: maxContentHeight))
+        model: model, updates: updates, maxContentHeight: maxContentHeight,
+        returnToPanel: returnToPanel))
     let window = CidaWindowFactory.makeWindow(
       size: CGSize(width: width, height: content.contentHeight),
       minimumSize: CGSize(width: width, height: 200),
@@ -312,6 +317,7 @@ private struct SettingsTabBar: View {
 private struct SettingsBody: View {
   @Bindable var model: AppModel
   let updates: UpdateState
+  var returnToPanel: @MainActor () -> Void = {}
 
   var body: some View {
     VStack(spacing: 0) {
@@ -319,7 +325,7 @@ private struct SettingsBody: View {
       case .model:
         // One group a tab needs no heading: the title already names it.
         SettingsGroup(isFirst: true) {
-          ModelServiceGroup(model: model)
+          ModelServiceGroup(model: model, returnToPanel: returnToPanel)
         }
       case .translation:
         SettingsGroup(title: "语言", isFirst: true) {
@@ -585,12 +591,54 @@ struct SettingsBorderedButtonStyle: ButtonStyle {
 /// shows where it stands and copies the prompt (`Design/spec/configuration.md` §四).
 private struct ModelServiceGroup: View {
   @Bindable var model: AppModel
+  let returnToPanel: @MainActor () -> Void
+
+  private var note: String? {
+    if !model.isModelServiceConfigured {
+      if model.settings.modelService.missingFields(hasAPIKey: !model.settings.apiKey.isEmpty)
+        .contains("api-key")
+      {
+        return "还差 API Key。复制配置提示词交给 AI 助手，按它的提示把 Key 交给辞达；Key 不必发进对话。"
+      }
+      return "复制配置提示词，交给 AI 助手继续配置。"
+    }
+    if model.modelServiceStatus.failed {
+      return "复制配置提示词，交给 AI 助手继续检查。"
+    }
+    if model.modelServiceStatus == .unchecked {
+      let changed =
+        model.lastModelServiceCheck != nil
+        ? "配置已更新，之前的检查结果不再适用。" : ""
+      return changed + "可以直接使用；想确认就点「检查」。"
+    }
+    return nil
+  }
 
   var body: some View {
-    if model.isModelServiceConfigured {
+    if !model.settings.modelService.isUnset {
       ModelServiceRow(model: model)
-      if let note = model.modelServiceStatus.failureNote {
-        ModelServiceFailureNote(text: note)
+      if let note {
+        VStack(alignment: .leading, spacing: 4) {
+          Text(note)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier(model.modelServiceStatus.failed
+              ? "settings-model-failure" : "settings-model-guidance")
+          if model.modelServiceStatus == .unchecked {
+            Button("回到辞达", action: returnToPanel)
+              .buttonStyle(.plain)
+              .foregroundStyle(CidaDesign.textSecondary)
+              .settingsKeyboardFocus()
+              .accessibilityIdentifier("settings-return-to-panel")
+          }
+        }
+        .font(CidaDesign.ui(11.5))
+        .foregroundStyle(CidaDesign.textSecondary)
+        .lineSpacing(3)
+        .padding(.leading, 144)
+        .padding(.top, -2)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
       }
       SettingsRow(title: "调整配置", caption: "交给 AI 助手", alignment: .trailing) {
         CopyConfigurationPromptButton(model: model)
@@ -652,14 +700,17 @@ private struct ModelServiceRow: View {
 
   private var status: ModelServiceStatus { model.modelServiceStatus }
 
-  private var statusText: String {
-    model.isModelServiceRecentlyUpdated ? "\(status.caption) · 刚刚更新" : status.caption
+  private var detail: String? {
+    let parts = [status.checkedAtCaption, model.isModelServiceRecentlyUpdated ? "刚刚更新" : nil]
+      .compactMap { $0 }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
   /// The model name, followed by the reasoning level `body` sets, in a quieter tone.
   private var modelTitle: Text {
     let service = model.settings.modelService
-    let name = Text(service.model).foregroundStyle(CidaDesign.textPrimary)
+    let name = Text(service.model.isEmpty ? "未填写模型" : service.model)
+      .foregroundStyle(service.model.isEmpty ? CidaDesign.textTertiary : CidaDesign.textPrimary)
     guard let reasoning = service.reasoning else { return name }
     return name + Text(" " + reasoning).foregroundStyle(CidaDesign.textSecondary)
   }
@@ -672,10 +723,15 @@ private struct ModelServiceRow: View {
           .foregroundStyle(CidaDesign.textPrimary)
           .frame(height: 20)
         HStack(spacing: 6) {
-          Circle()
-            .fill(status.isReady ? CidaDesign.accent : CidaDesign.textTertiary)
-            .frame(width: 6, height: 6)
-          Text(statusText)
+          if status.failed {
+            LucideIcon(.circleAlert, size: 11)
+              .foregroundStyle(CidaDesign.textTertiary)
+          } else {
+            Circle()
+              .fill(status.passed ? CidaDesign.accent : CidaDesign.textTertiary)
+              .frame(width: 6, height: 6)
+          }
+          Text(status.caption)
             .font(CidaDesign.ui(11.5))
             .foregroundStyle(CidaDesign.textTertiary)
             .lineLimit(1)
@@ -683,6 +739,13 @@ private struct ModelServiceRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("settings-model-status")
+        if let detail {
+          Text(detail)
+            .font(CidaDesign.ui(11.5))
+            .foregroundStyle(CidaDesign.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("settings-model-check-detail")
+        }
       }
       .frame(width: 120, alignment: .leading)
 
@@ -707,37 +770,13 @@ private struct ModelServiceRow: View {
         }
         .buttonStyle(SettingsBorderedButtonStyle())
         .settingsKeyboardFocus()
-        .disabled(status == .checking)
+        .disabled(model.isCheckingModelService || !model.isModelServiceConfigured)
+        .opacity(model.isModelServiceConfigured ? 1 : 0.45)
         .accessibilityIdentifier("settings-model-check")
       }
       .frame(maxWidth: .infinity)
     }
     .padding(.vertical, 9)
-  }
-}
-
-/// Under a failed check, starting at the control column: what failed and how to fix it.
-private struct ModelServiceFailureNote: View {
-  let text: String
-
-  var body: some View {
-    HStack(alignment: .top, spacing: 8) {
-      LucideIcon(.circleAlert, size: 13)
-        .foregroundStyle(CidaDesign.textTertiary)
-        .padding(.top, 2)
-      Text(text)
-        .font(CidaDesign.ui(11.5))
-        .foregroundStyle(CidaDesign.textSecondary)
-        .lineSpacing(3)
-        .padding(.vertical, 1.5)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .padding(.leading, 144)
-    .padding(.top, -2)
-    .padding(.bottom, 6)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("settings-model-failure")
   }
 }
 

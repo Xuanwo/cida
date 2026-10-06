@@ -28,7 +28,8 @@ for state in empty translate improve stale stopped failed long translate-into-mi
   settings settings-translation settings-language-editing settings-prompt-editing \
   settings-shortcuts settings-shortcuts-custom settings-shortcuts-unset settings-recording settings-general settings-update-available \
   settings-config-unset settings-config-copied settings-config-ready settings-config-updated \
-  settings-config-checking settings-config-failed \
+  settings-config-checking settings-config-failed settings-config-passed \
+  settings-config-missing-key settings-config-incomplete dark-settings-config-failed \
   lifecycle-welcome lifecycle-welcome-submitted lifecycle-welcome-ready lifecycle-update-checking lifecycle-update-found \
   lifecycle-update-downloading lifecycle-update-ready lifecycle-update-current \
   lifecycle-update-failed lifecycle-update-read-only \

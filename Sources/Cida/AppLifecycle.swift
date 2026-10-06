@@ -655,17 +655,24 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         model.setModelServiceStateForDesign(recentlyUpdated: true)
       case .settingsConfigChecking:
         model.setModelServiceStateForDesign(checking: true)
-      case .settingsConfigFailed:
+      case .settingsConfigFailed, .settingsConfigPassed:
         model.setModelServiceStateForDesign(
           lastCheck: ModelServiceCheckRecord(
-            passed: false, statusCode: 401, reason: "服务商拒绝了 API Key", checkedAt: Date(),
+            passed: launchOptions.designState == .settingsConfigPassed,
+            statusCode: launchOptions.designState == .settingsConfigFailed ? 401 : nil,
+            reason: nil,
+            checkedAt: Calendar.current.date(bySettingHour: 14, minute: 35, second: 0, of: Date())!,
             fingerprint: model.settings.modelServiceFingerprint))
       default:
         break
       }
     #endif
     settingsWindowController = SettingsWindowFactory.makeWindowController(
-      model: model, updates: updater.state)
+      model: model, updates: updater.state,
+      returnToPanel: { [weak self] in
+        self?.settingsWindowController?.close()
+        self?.showPanel()
+      })
   }
 
   private func installPerformanceProbeIfNeeded() {
@@ -887,6 +894,9 @@ private enum DesignState: String {
   case settingsConfigUpdated = "settings-config-updated"
   case settingsConfigChecking = "settings-config-checking"
   case settingsConfigFailed = "settings-config-failed"
+  case settingsConfigPassed = "settings-config-passed"
+  case settingsConfigMissingKey = "settings-config-missing-key"
+  case settingsConfigIncomplete = "settings-config-incomplete"
   case lifecycleWelcome = "lifecycle-welcome"
   case lifecycleWelcomeSubmitted = "lifecycle-welcome-submitted"
   case lifecycleWelcomeReady = "lifecycle-welcome-ready"
@@ -919,7 +929,8 @@ private enum DesignState: String {
   var settingsTab: SettingsTab? {
     switch self {
     case .settings, .settingsConfigUnset, .settingsConfigCopied, .settingsConfigReady,
-      .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed:
+      .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed,
+      .settingsConfigPassed, .settingsConfigMissingKey, .settingsConfigIncomplete:
       .model
     case .settingsTranslation, .settingsLanguageEditing, .settingsPromptEditing: .translation
     case .settingsShortcuts, .settingsShortcutsCustom, .settingsShortcutsUnset, .settingsRecording:
@@ -985,6 +996,12 @@ private struct LaunchOptions {
       {
         settings.modelService = ModelConfiguration()
         settings.apiKey = ""
+      }
+      if usesDesignFixtures, designState == .settingsConfigMissingKey {
+        settings.apiKey = ""
+      }
+      if usesDesignFixtures, designState == .settingsConfigIncomplete {
+        settings.modelService.model = ""
       }
       if usesDesignFixtures, designState == .settingsConfigUpdated {
         // The assistant has just moved to a model whose reasoning cannot be turned off and set
@@ -1079,7 +1096,9 @@ private struct LaunchOptions {
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
-        .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted, .lifecycleWelcomeReady,
+        .settingsConfigPassed, .settingsConfigMissingKey, .settingsConfigIncomplete,
+        .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted,
+        .lifecycleWelcomeReady,
         .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
         .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
         .lifecycleUpdateReadOnly:
@@ -1113,6 +1132,7 @@ private struct LaunchOptions {
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
+        .settingsConfigPassed, .settingsConfigMissingKey, .settingsConfigIncomplete,
         .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeReady, .lifecycleUpdateChecking,
         .lifecycleUpdateFound,
         .lifecycleUpdateDownloading, .lifecycleUpdateReady, .lifecycleUpdateCurrent,
