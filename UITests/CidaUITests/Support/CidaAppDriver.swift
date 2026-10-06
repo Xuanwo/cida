@@ -130,8 +130,12 @@ final class CidaAppDriver {
 
     XCTAssertTrue(waitForRunning(timeout: 10))
     XCTAssertTrue(panel.waitForExistence(timeout: 10))
-    XCTAssertTrue(composer.waitForExistence(timeout: 5))
-    XCTAssertTrue(translateAction.waitForExistence(timeout: 5))
+    if endpointOverride {
+      XCTAssertTrue(composer.waitForExistence(timeout: 5))
+      XCTAssertTrue(translateAction.waitForExistence(timeout: 5))
+    } else {
+      XCTAssertTrue(app.buttons["welcome-connect"].waitForExistence(timeout: 5))
+    }
   }
 
   func terminate() {
@@ -154,7 +158,7 @@ final class CidaAppDriver {
   }
 
   func openSettings() {
-    composer.typeKey(",", modifierFlags: .command)
+    app.typeKey(",", modifierFlags: .command)
     XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
   }
 

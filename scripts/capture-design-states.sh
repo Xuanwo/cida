@@ -29,7 +29,7 @@ for state in empty translate improve stale stopped failed long translate-into-mi
   settings-shortcuts settings-shortcuts-custom settings-shortcuts-unset settings-recording settings-general settings-update-available \
   settings-config-unset settings-config-copied settings-config-ready settings-config-updated \
   settings-config-checking settings-config-failed \
-  lifecycle-welcome lifecycle-welcome-submitted lifecycle-update-checking lifecycle-update-found \
+  lifecycle-welcome lifecycle-welcome-submitted lifecycle-welcome-ready lifecycle-update-checking lifecycle-update-found \
   lifecycle-update-downloading lifecycle-update-ready lifecycle-update-current \
   lifecycle-update-failed lifecycle-update-read-only \
   dark-empty dark-improve dark-stale dark-lifecycle-welcome \

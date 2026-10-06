@@ -119,7 +119,7 @@ extension InteractionReproductionTests {
   /// An input method's provisional text lives only in the native view; a
   /// SwiftUI update while it is composing must not write the binding back.
   func testBindingWriteBackIsSkippedWhileAnInputMethodIsComposing() async throws {
-    let model = AppModel(inputText: "")
+    let model = AppModel(inputText: "", service: ImmediateStreamingService())
     let controller = makeHiddenPanel(model: model)
     let hostingView = try XCTUnwrap(controller.contentView)
     let input = try XCTUnwrap(firstTextView(in: hostingView, identifier: "composer-input"))

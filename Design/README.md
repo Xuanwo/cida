@@ -5,6 +5,10 @@ change edits the spec and the board here before, or together with, the code. Eve
 spec and one board; a replaced rule is edited in place and an abandoned one is deleted, never kept as
 a versioned copy.
 
+The [interaction review decisions](spec/review-decisions.md) track the numbered proposals and
+their approval status. Only item 01 is approved; items 02–09 remain proposals until individually
+reviewed. Accepted changes update the topic's existing spec and board in place.
+
 | Topic | Rules | States |
 | --- | --- | --- |
 | Panel: shape, structure, actions, states, keys, selection import, capture, the copied image | [`spec/panel.md`](spec/panel.md) | [`boards/panel-states.html`](boards/panel-states.html), [`boards/capture.html`](boards/capture.html), [`boards/share-card.html`](boards/share-card.html) |

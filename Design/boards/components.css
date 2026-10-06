@@ -1115,3 +1115,12 @@ body {
 .actions-instruction { padding-bottom: 14px; }
 .actions-instruction p { font-family: var(--font-ui); font-size: var(--font-size-body); line-height: calc(var(--font-size-body) * var(--line-height-body)); margin: 14px 0 0; color: var(--text-ink); }
 .actions-placeholder { font-family: var(--font-body); font-size: 13px; line-height: 21px; min-height: 42px; margin: 0 0 16px; color: var(--text-tertiary); }
+
+/* First use occupies the panel before the composer becomes available. */
+.welcome-heading { padding: 24px 28px; font: 500 18px var(--font-ui); background: var(--surface); color: var(--text-primary); }
+.welcome-paper { padding: 22px 28px; background: var(--surface-paper); display: flex; flex-direction: column; gap: 18px; }
+.welcome-copy { font: 17px/1.8 var(--font-result-cjk); color: var(--text-primary); }
+.welcome-actions { display: flex; gap: 14px; }
+.welcome-actions button { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: 500 12.5px var(--font-ui); color: var(--text-control); background: var(--surface); }
+.welcome-actions button.primary { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.welcome-caption { font: 12px/1.5 var(--font-ui); color: var(--text-secondary); }

@@ -66,7 +66,7 @@ final class LifecycleTests: XCTestCase {
 
   // MARK: Welcome
 
-  func testWithoutAModelServiceReturnRemindsInsteadOfSending() {
+  func testWithoutAModelServiceSubmissionPreservesInputWithoutSending() {
     var settings = CidaSettings()
     settings.apiKey = ""
     let model = AppModel(
@@ -76,14 +76,17 @@ final class LifecycleTests: XCTestCase {
     XCTAssertTrue(model.submit())
     XCTAssertNil(model.result, "No request, no failed result")
     XCTAssertFalse(model.isProcessing)
-    XCTAssertTrue(model.showsConfigurationReminder)
+    XCTAssertTrue(model.showsSetupWelcome)
 
     XCTAssertTrue(model.importSelection("Selected"))
     XCTAssertNil(model.result, "A selection is brought in but not sent")
     XCTAssertEqual(model.inputText, "Selected")
 
-    model.clearConfigurationReminder()
-    XCTAssertFalse(model.showsConfigurationReminder)
+    model.prepareSetupWelcome()
+    model.settings = .designPreview
+    XCTAssertEqual(model.inputText, "Selected")
+    XCTAssertFalse(model.showsFirstTranslation, "Imported text takes precedence over the sample")
+    XCTAssertNil(model.result, "Configuration does not send retained text automatically")
   }
 
   func testAConfiguredServiceNeedsNoWelcome() {
@@ -98,15 +101,36 @@ final class LifecycleTests: XCTestCase {
       "A service that talks to no model service needs no configuration")
   }
 
-  func testTheWelcomeOffersSettingsInTheActionSlot() {
-    XCTAssertEqual(
-      BarActionPresentation.resolve(
-        isProcessing: false, canCopyResult: false, showsWelcome: true),
-      .openSettings)
-    XCTAssertEqual(
-      BarActionPresentation.resolve(
-        isProcessing: true, canCopyResult: false, showsWelcome: true),
-      .stop)
+  func testFirstTranslationRequiresAnExplicitChoiceAfterSetup() {
+    let model = AppModel(service: PreviewTextProcessingService())
+    model.prepareSetupWelcome()
+    model.settings = .designPreview
+    XCTAssertTrue(model.showsFirstTranslation)
+    XCTAssertNil(model.result, "Receiving configuration does not send a sample")
+    model.tryFirstTranslation()
+    XCTAssertFalse(model.showsFirstTranslation)
+    XCTAssertEqual(model.result?.source, "Good tools leave room for thought.")
+    XCTAssertEqual(model.result?.mode, .translate)
+    model.cancelProcessing()
+  }
+
+  func testTrialCanBeSkippedAndIsNotOfferedOnConfiguredLaunches() {
+    let configured = AppModel(settings: .designPreview, service: PreviewTextProcessingService())
+    configured.prepareSetupWelcome()
+    XCTAssertFalse(configured.showsFirstTranslation)
+    let model = AppModel(service: PreviewTextProcessingService())
+    model.prepareSetupWelcome()
+    model.settings = .designPreview
+    model.dismissFirstTranslation()
+    XCTAssertFalse(model.showsFirstTranslation)
+    XCTAssertTrue(model.inputText.isEmpty)
+    XCTAssertNil(model.result)
+    model.settings.foreignLanguage = "French"
+    XCTAssertFalse(model.showsFirstTranslation, "Later settings edits do not restore the trial")
+    model.settings.modelService = ModelConfiguration()
+    model.prepareSetupWelcome()
+    model.settings = .designPreview
+    XCTAssertFalse(model.showsFirstTranslation, "Replacing the service does not repeat first use")
   }
 
   // MARK: Languages

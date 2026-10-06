@@ -666,6 +666,35 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       layer.wait(timeout: 10) { !$0.contains("CIDA_LAYER_TRANSLATED_") }, "and ⌥⇧D stops it again")
   }
 
+  func testFirstUseConnectsThenOffersAnExplicitTrial() throws {
+    driver.launch(endpointOverride: false)
+    XCTAssertFalse(driver.composer.exists)
+    XCTAssertFalse(driver.translateAction.exists)
+    attachWelcome("welcome-before-configuration")
+    driver.app.typeKey(.return, modifierFlags: [])
+    XCTAssertTrue(driver.settingsWindow.waitForExistence(timeout: 5))
+    try driver.configureModelService()
+    driver.settingsWindow.typeKey("w", modifierFlags: .command)
+    driver.app.typeKey("a", modifierFlags: .option)
+    let trial = driver.app.buttons["welcome-try-translation"]
+    XCTAssertTrue(trial.waitForExistence(timeout: 5))
+    XCTAssertFalse(driver.resultPane.exists, "Connecting does not send the sample")
+    attachWelcome("welcome-ready-for-trial")
+    trial.click()
+    XCTAssertTrue(driver.composer.waitForExistence(timeout: 5))
+    XCTAssertEqual(driver.composer.value as? String, "Good tools leave room for thought.")
+    XCTAssertTrue(driver.resultPane.waitForExistence(timeout: 10))
+    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 15))
+    attachWelcome("welcome-trial-completed")
+  }
+
+  private func attachWelcome(_ name: String) {
+    let attachment = XCTAttachment(screenshot: driver.panel.screenshot())
+    attachment.name = name
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
   /// `Design/spec/configuration.md` §四: Settings starts with the onboarding card, copies the
   /// prompt, and follows what the artifact's own command line writes and checks while the
   /// window stays open. Prompts are still edited in Settings.
@@ -751,7 +780,11 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
 
     settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
-    driver.showPanel()
+    driver.app.typeKey("a", modifierFlags: .option)
+    let skipTrial = driver.app.buttons["welcome-skip-trial"]
+    XCTAssertTrue(skipTrial.waitForExistence(timeout: 5))
+    skipTrial.click()
+    XCTAssertTrue(driver.composer.waitForExistence(timeout: 3))
     driver.openSettings()
     XCTAssertTrue(
       driver.waitForTitle("动作", of: settingsWindow, timeout: 3), "Settings reopens on the last tab")

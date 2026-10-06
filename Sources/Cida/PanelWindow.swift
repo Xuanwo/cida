@@ -141,10 +141,7 @@ final class PanelController {
   /// Shows the panel and focuses its source without changing the text selection.
   /// Explicit entry points retain their action; ordinary appearances use the first saved action.
   func show(action: ProcessingMode? = nil) {
-    if model.panelMessage == nil, model.needsModelConfiguration {
-      // The welcome may have been answered with ⏎ in an earlier appearance.
-      model.clearConfigurationReminder()
-    }
+    if model.panelMessage == nil { model.prepareSetupWelcome() }
     if let action {
       model.setMode(action, animated: false)
     } else {
@@ -320,6 +317,23 @@ final class PanelController {
           return nil
         default:
           return nil
+        }
+      }
+
+      if self.model.showsSetupWelcome || self.model.showsFirstTranslation {
+        switch event.keyCode {
+        case 36 where modifiers.isEmpty, 76 where modifiers.isEmpty:
+          if self.model.showsSetupWelcome {
+            self.openSettings()
+          } else {
+            self.model.tryFirstTranslation()
+          }
+          return nil
+        case 53 where modifiers.isEmpty:
+          self.hide()
+          return nil
+        default:
+          return event
         }
       }
 
