@@ -5,7 +5,7 @@
 | 编号 | 主题 | 状态 | 落地位置 |
 | --- | --- | --- | --- |
 | 01 | 初次连接 | 已确认、已实现、原生验证通过 | [生命周期 §三](lifecycle.md#三第一次使用)、[生命周期设计板](../boards/lifecycle.html) |
-| 02 | Agent 配置 | 已确认、已实现，待原生验收 | [配置](configuration.md)、[配置设计板](../boards/configuration.html) |
+| 02 | Agent 配置 | 已确认、已实现 | [配置](configuration.md)、[配置设计板](../boards/configuration.html) |
 | 03 | 执行与语言 | 待确认 | [面板](panel.md)、[面板设计板](../boards/panel-states.html) |
 | 04 | 旧结果 | 待确认 | [面板](panel.md)、[面板设计板](../boards/panel-states.html) |
 | 05 | 失败恢复 | 待确认 | [面板](panel.md)、[分享图设计板](../boards/share-card.html) |

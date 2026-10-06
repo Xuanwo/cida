@@ -111,6 +111,7 @@ final class CidaAppDriver {
 
   func launch(
     endpointOverride: Bool = true,
+    configuredBeforeLaunch: Bool = false,
     additionalArguments: [String] = []
   ) {
     app = XCUIApplication(url: URL(fileURLWithPath: environment.appPath))
@@ -130,7 +131,8 @@ final class CidaAppDriver {
 
     XCTAssertTrue(waitForRunning(timeout: 10))
     XCTAssertTrue(panel.waitForExistence(timeout: 10))
-    if endpointOverride {
+    // Tests may configure the service through the CLI before launching without an override.
+    if endpointOverride || configuredBeforeLaunch {
       XCTAssertTrue(composer.waitForExistence(timeout: 5))
       XCTAssertTrue(translateAction.waitForExistence(timeout: 5))
     } else {

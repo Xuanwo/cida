@@ -733,9 +733,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(partial.status, 0, partial.errorOutput)
     XCTAssertTrue(driver.waitForValue("还没配好", in: driver.modelStatus, timeout: 3))
     XCTAssertFalse(driver.modelCheckButton.isEnabled)
-    XCTAssertTrue(
-      driver.app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "还差 API Key"))
-        .firstMatch.exists)
+    XCTAssertTrue(driver.waitForText(containing: "还差 API Key",
+      in: driver.element(identifier: "settings-model-guidance"), timeout: 3))
     attachConfiguration("missing-key")
     copy.click()
     XCTAssertTrue(driver.waitForLabel("已复制", in: copy, timeout: 0.6))
@@ -796,9 +795,10 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(
       driver.waitForText(
         containing: "复制配置提示词，交给 AI 助手继续检查。", in: driver.modelFailure, timeout: 2))
-    XCTAssertFalse(
-      driver.app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "连不上服务"))
-        .firstMatch.exists)
+    let visibleText = driver.app.staticTexts.allElementsBoundByIndex.map {
+      ($0.value as? String ?? "") + $0.label
+    }.joined(separator: "\n")
+    XCTAssertFalse(visibleText.contains("连不上服务"))
     attachConfiguration("check-failed")
     copy.click()
     XCTAssertTrue(driver.waitForLabel("已复制", in: copy, timeout: 0.6))
@@ -1144,7 +1144,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let refused = try driver.runCommandLine(["config", "set", "api-key=sk-first-instance"])
     XCTAssertEqual(refused.status, 64, "A key written in the command is refused")
     XCTAssertFalse(refused.errorOutput.contains("sk-first-instance"))
-    driver.launch(endpointOverride: false)
+    driver.launch(endpointOverride: false, configuredBeforeLaunch: true)
     driver.openSettings()
     XCTAssertTrue(driver.waitForExistence(of: driver.modelStatus, timeout: 3))
     XCTAssertTrue(driver.waitForValue("已配置 · 未检查", in: driver.modelStatus, timeout: 3))

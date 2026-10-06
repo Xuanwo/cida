@@ -34,7 +34,7 @@ final class VisualAndAccessibilityJourneyTests: CidaReleaseUITestCase {
     let key = try driver.runCommandLine(
       ["config", "set", "api-key", "--stdin"], standardInput: "sk-preview-key-3f2a")
     XCTAssertEqual(key.status, 0, key.errorOutput)
-    driver.launch(endpointOverride: false, additionalArguments: ["--automation-permissions", "denied"])
+    driver.launch(endpointOverride: false, configuredBeforeLaunch: true, additionalArguments: ["--automation-permissions", "denied"])
     driver.openSettings()
     let settingsWindow = driver.settingsWindow
     XCTAssertTrue(driver.waitForExistence(of: driver.modelStatus, timeout: 3))
