@@ -577,7 +577,7 @@ final class InteractionReproductionTests: XCTestCase {
   // MARK: - Responder chain
 
   func testClickingComposerThenTypingUsesTheRealResponderChain() async throws {
-    let model = AppModel()
+    let model = AppModel(service: ImmediateStreamingService())
     let controller = makeHiddenPanel(model: model)
     let window = controller.panel
     let hostingView = try XCTUnwrap(controller.contentView)

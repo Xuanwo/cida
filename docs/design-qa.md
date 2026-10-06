@@ -55,7 +55,7 @@ compared natively:
 | 菜单栏菜单 · 平时 / 开发版 / 显示辞达未设置快捷键 | `status-menu` / `status-menu-dev` / `status-menu-shortcut-unset` | (native menu, no fixture) |
 | 截图框选 · 拖动前 / 框选中 / 暗屏 | `capture-veiled` / `capture-lifted` / `capture-lifted-dark` | (overlay; XCUI attaches `capture-overlay-veiled`) |
 | DMG 窗口 / 背景图 | `dmg-window` / `dmg-background` | (Finder; the background ships in the DMG) |
-| 第一次使用 · 欢迎 / 没配置就回车 | `lifecycle-welcome` / `lifecycle-welcome-submitted` | same |
+| 第一次使用 · 欢迎 / 已保留原文 / 配置收到后试译 | `lifecycle-welcome` / `lifecycle-welcome-submitted` / `lifecycle-welcome-ready` | same |
 | 更新 · 检查中 / 发现新版本 / 下载中 / 准备好 / 已是最新 / 出错 / 磁盘映像里运行 | `lifecycle-update-checking` / `-found` / `-downloading` / `-ready` / `-current` / `-failed` / `-read-only` | same |
 
 `swift scripts/render-design.swift` renders every board off screen to `Design/rendered/boards` and
@@ -158,3 +158,27 @@ Tart proves real macOS interaction and WindowServer composition, not physical 12
 Physical performance is accepted only when the nonactivating runner detects a real 120 Hz display
 and the exact manifest-bound app satisfies the frame budget. A 60 Hz run remains useful diagnostic
 evidence but cannot be labeled a 120 Hz pass.
+
+## First connection
+
+Item 01 of `Design/spec/review-decisions.md` was accepted and verified on 2026-10-06. The welcome
+replaces the composer until configuration is complete and explains that the configuration prompt
+is copied in Settings. Imported text is retained without a request. Receiving configuration offers
+an explicit, optional sample only when there is no retained source; it does not imply that a
+connection check has passed. The implementation follows `Design/spec/lifecycle.md` §三.
+
+- `swift build -Xswiftc -warnings-as-errors`, 314 unit tests, and `scripts/build-website.py` passed.
+  `LifecycleTests` covers retained source, no automatic request, skipping, and configured launches.
+- `scripts/capture-design-states.sh` regenerated the boards and isolated native captures. The
+  welcome, retained-source, optional-trial, and dark welcome comparisons in `Design/QACurrent`
+  were inspected.
+- The signed Release artifact passed `testFirstUseConnectsThenOffersAnExplicitTrial` and
+  `testModelServiceFollowsTheCommandLineAndPromptsEditInSettings` in headless Tart: two tests,
+  zero failures, 47.232 seconds. The latter also exercises skipping the sample. The result bundle
+  is `TestResults/first-connection-20261006-delivery/CidaUITests.xcresult`. Screenshots are retained
+  in the repository: [welcome](images/first-connection/welcome.png),
+  [optional trial](images/first-connection/trial-ready.png), and
+  [completed trial](images/first-connection/trial-completed.png).
+- Host isolation passed, with no tested artifact process or focus observed on the host. The
+  journeys use the local mock model service, not a live provider. They are targeted diagnostic
+  journeys, not the full release gate. No approved pixel baseline changed.

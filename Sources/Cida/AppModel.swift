@@ -97,7 +97,10 @@ final class AppModel {
   var mode: ProcessingMode
   var inputText: String {
     didSet {
-      if inputText != oldValue { scheduleSourceLanguageCheck() }
+      if inputText != oldValue {
+        if !inputText.isEmpty, firstUseState == .offeringTrial { firstUseState = .finished }
+        scheduleSourceLanguageCheck()
+      }
     }
   }
   /// The one result the panel shows. A new submission replaces it; hiding the
@@ -107,6 +110,9 @@ final class AppModel {
     didSet {
       if settings.requestLanguages != oldValue.requestLanguages { settleSourceLanguage(animated: false) }
       if !settings.actions.contains(where: { $0.id == mode }) { resetModeToDefault() }
+      if firstUseState == .awaitingConfiguration, !needsModelConfiguration {
+        firstUseState = result == nil && !hasSubmittableInput ? .offeringTrial : .finished
+      }
     }
   }
   /// Whether the source is in my language, as the panel last decided once typing paused
@@ -156,8 +162,9 @@ final class AppModel {
   /// (`Design/spec/lifecycle.md` §一); the source, action and result wait underneath.
   private(set) var panelMessage: PanelMessage?
   @ObservationIgnored private var panelMessageHandler: PanelMessageHandler?
-  /// ⏎ was pressed before a model service was configured (`Design/spec/lifecycle.md` §三).
-  private(set) var showsConfigurationReminder = false
+  /// A trial is offered only after the user actually saw setup in this session.
+  private enum FirstUseState { case unseen, awaitingConfiguration, offeringTrial, finished }
+  private var firstUseState = FirstUseState.unseen
   #if DEBUG
     /// The settings-language-editing design state shows 我的语言 focused.
     @ObservationIgnored var focusesMyLanguageForDesign = false
@@ -263,6 +270,30 @@ final class AppModel {
     !service.isConfigured(by: settings)
   }
 
+  // MARK: - First use
+
+  var showsSetupWelcome: Bool { result == nil && needsModelConfiguration }
+
+  var showsFirstTranslation: Bool {
+    firstUseState == .offeringTrial && !needsModelConfiguration && result == nil && !hasSubmittableInput
+  }
+
+  func prepareSetupWelcome() {
+    if firstUseState == .unseen, showsSetupWelcome { firstUseState = .awaitingConfiguration }
+  }
+
+  func tryFirstTranslation() {
+    guard showsFirstTranslation else { return }
+    firstUseState = .finished
+    replaceSource(with: "Good tools leave room for thought.", action: .translate)
+    submit()
+  }
+
+  func dismissFirstTranslation() {
+    firstUseState = .finished
+    requestInputFocus()
+  }
+
   // MARK: - Panel messages
 
   /// Shows `message` in the panel, replacing any earlier message and its handler.
@@ -276,10 +307,6 @@ final class AppModel {
     guard var message = panelMessage, message.kind == kind else { return }
     change(&message)
     panelMessage = message
-  }
-
-  func clearConfigurationReminder() {
-    showsConfigurationReminder = false
   }
 
   /// Takes the message away without telling its owner, which already knows.
@@ -598,10 +625,8 @@ final class AppModel {
     isCopyMenuOpen = false
     guard !needsModelConfiguration else {
       processingTask?.cancel()
-      showsConfigurationReminder = true
       return
     }
-    showsConfigurationReminder = false
     let requestText = currentInputDocument
     let requestCharacterCount = inputDocumentUTF16Count
     processingTask?.cancel()

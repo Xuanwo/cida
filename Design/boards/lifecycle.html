@@ -33,23 +33,10 @@
   <div class="divider"></div>
 
 
-  <p class="caption">② 第一次使用 — 还没有模型服务时，空态的结果栏是欢迎;右侧「打开设置 ⌘,」;原文照常可输入,⏎ 不发请求而提示还没配置模型服务;就绪后回到平常的空态</p>
-  <section class="panel" data-state="lifecycle-welcome">
-    <div class="source"><span class="placeholder">输入内容，回车翻译…</span></div>
-    <cida-bar action="settings"></cida-bar>
-    <div class="result">
-      <div class="text cjk">辞达需要一个模型服务。打开设置，复制配置提示词交给你的 AI 助手，它会帮你配好。</div>
-      <div class="aside">⌥ A 随时唤起 · ⌥ S 截图翻译 · ⌥ D 原处翻译 · 辞达住在菜单栏</div>
-    </div>
-  </section>
-  <section class="panel" data-state="lifecycle-welcome-submitted">
-    <div class="source">Consistency is the last refuge of the unimaginative.</div>
-    <cida-bar action="settings"></cida-bar>
-    <div class="result">
-      <div class="text cjk">辞达需要一个模型服务。打开设置，复制配置提示词交给你的 AI 助手，它会帮你配好。</div>
-      <cida-note kind="failed">还没配置模型服务 · ⌘, 打开设置</cida-note>
-    </div>
-  </section>
+  <p class="caption">② 第一次使用 — 连接前不显示输入框；保留已带入的原文；连接后明确选择试译或直接开始</p>
+  <section class="panel" data-state="lifecycle-welcome"><div class="welcome-heading">先连接你的模型服务</div><div class="welcome-paper"><div class="welcome-copy">在设置里复制配置提示词，交给你的 AI 助手。配好后，辞达会自动接收配置。</div><div class="welcome-actions"><button class="primary">连接模型服务 ⏎</button></div><div class="welcome-caption">辞达住在菜单栏，随时可以回来继续。</div></div></section>
+  <section class="panel" data-state="lifecycle-welcome-submitted"><div class="welcome-heading">先连接你的模型服务</div><div class="welcome-paper"><div class="welcome-copy">在设置里复制配置提示词，交给你的 AI 助手。配好后，辞达会自动接收配置。</div><div class="welcome-actions"><button class="primary">连接模型服务 ⏎</button></div><div class="welcome-caption">已保留选中文字，连接后可继续翻译。</div></div></section>
+  <section class="panel" data-state="lifecycle-welcome-ready"><div class="welcome-heading">配置已收到，试译一句</div><div class="welcome-paper"><div class="welcome-copy">Good tools leave room for thought.</div><div class="welcome-actions"><button class="primary">试译这句话 ⏎</button><button>直接开始</button></div><div class="welcome-caption">点击后会将这句话发送给已配置的模型。也可以直接输入自己的内容。</div></div></section>
   <div class="divider"></div>
 
   <p class="caption">③ 发现新版本 — 用户检查、点菜单或设置里的「安装…」，或启动时发现;结果栏是这个版本手写的中文更新说明(docs/releases/&lt;版本&gt;.md),超出上限时内部滚动</p>

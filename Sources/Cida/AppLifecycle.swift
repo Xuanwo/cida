@@ -822,8 +822,11 @@ extension CidaAppDelegate: UpdatePresenter {
       if let message {
         model.present(message, handler: PanelMessageHandler(choose: { _ in }, dismiss: {}))
       }
-      if launchOptions.designState == .lifecycleWelcomeSubmitted {
-        model.submit()
+      if launchOptions.designState == .lifecycleWelcomeReady {
+        let configured = model.settings
+        model.settings.modelService = ModelConfiguration()
+        model.prepareSetupWelcome()
+        model.settings = configured
       }
       if launchOptions.designState == .targetEditing {
         model.beginEditingForeignLanguage()
@@ -886,6 +889,7 @@ private enum DesignState: String {
   case settingsConfigFailed = "settings-config-failed"
   case lifecycleWelcome = "lifecycle-welcome"
   case lifecycleWelcomeSubmitted = "lifecycle-welcome-submitted"
+  case lifecycleWelcomeReady = "lifecycle-welcome-ready"
   case lifecycleUpdateChecking = "lifecycle-update-checking"
   case lifecycleUpdateFound = "lifecycle-update-found"
   case lifecycleUpdateDownloading = "lifecycle-update-downloading"
@@ -1075,7 +1079,7 @@ private struct LaunchOptions {
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
-        .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted,
+        .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted, .lifecycleWelcomeReady,
         .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
         .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
         .lifecycleUpdateReadOnly:
@@ -1109,7 +1113,8 @@ private struct LaunchOptions {
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
-        .settingsConfigFailed, .lifecycleWelcome, .lifecycleUpdateChecking, .lifecycleUpdateFound,
+        .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeReady, .lifecycleUpdateChecking,
+        .lifecycleUpdateFound,
         .lifecycleUpdateDownloading, .lifecycleUpdateReady, .lifecycleUpdateCurrent,
         .lifecycleUpdateFailed, .lifecycleUpdateReadOnly:
         ""

@@ -56,20 +56,15 @@ enum BarActionPresentation: Equatable, Sendable {
   case stop
   case copy
   case copied(CopyFeedback)
-  /// 打开设置 ⌘, while the panel welcomes a user without a model service
-  /// (`Design/spec/lifecycle.md` §三).
-  case openSettings
 
   static func resolve(
     isProcessing: Bool,
     canCopyResult: Bool,
-    copyFeedback: CopyFeedback? = nil,
-    showsWelcome: Bool = false
+    copyFeedback: CopyFeedback? = nil
   ) -> BarActionPresentation {
     if isProcessing { return .stop }
     if let copyFeedback { return .copied(copyFeedback) }
     if canCopyResult { return .copy }
-    if showsWelcome { return .openSettings }
     return .none
   }
 }

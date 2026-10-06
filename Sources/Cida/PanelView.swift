@@ -40,6 +40,9 @@ struct PanelView: View {
     VStack(spacing: 0) {
       if let message = model.panelMessage {
         PanelMessageView(model: model, message: message, heightBudget: heightBudget)
+      } else if model.showsSetupWelcome || model.showsFirstTranslation {
+        WelcomePane(model: model, openSettings: openSettings)
+          .frame(width: CidaDesign.Panel.width)
       } else {
         translationPanes
       }
@@ -70,12 +73,8 @@ struct PanelView: View {
       ControlBar(
         model: model,
         presentation: barActionPresentation,
-        closesWithHairline: model.result != nil || showsWelcome,
-        openSettings: openSettings
+        closesWithHairline: model.result != nil
       )
-      if showsWelcome {
-        WelcomePane(model: model)
-      }
       if model.result != nil {
         ResultPane(
           model: model,
@@ -131,7 +130,7 @@ struct PanelView: View {
       if let message = model.panelMessage {
         message.hasPaper
       } else {
-        model.result != nil || showsWelcome
+        model.result != nil || model.showsSetupWelcome || model.showsFirstTranslation
       }
     return endsOnPaper ? CidaDesign.surfacePaper : CidaDesign.surface
   }
@@ -180,19 +179,13 @@ struct PanelView: View {
     return result.phase == .streaming || result.resultUTF16Length > 0
   }
 
-  /// No model service yet and nothing to show: the paper pane welcomes the user.
-  private var showsWelcome: Bool {
-    model.result == nil && model.needsModelConfiguration
-  }
-
   // MARK: - Bar action
 
   private var barActionPresentation: BarActionPresentation {
     .resolve(
       isProcessing: model.isProcessing,
       canCopyResult: model.canCopyResult,
-      copyFeedback: shownCopyFeedback,
-      showsWelcome: showsWelcome
+      copyFeedback: shownCopyFeedback
     )
   }
 
@@ -263,14 +256,13 @@ private struct ControlBar: View {
   let model: AppModel
   let presentation: BarActionPresentation
   let closesWithHairline: Bool
-  let openSettings: @MainActor () -> Void
 
   var body: some View {
     HStack(spacing: 8) {
       ModeSegmentedControl(model: model, isEnabled: !model.isProcessing)
       TabHint(isDimmed: model.isProcessing)
       Spacer(minLength: 12)
-      BarActionButton(model: model, presentation: presentation, openSettings: openSettings)
+      BarActionButton(model: model, presentation: presentation)
     }
     .modifier(ControlBarChrome(closesWithHairline: closesWithHairline))
   }
@@ -434,7 +426,6 @@ private struct DimmedWhileWorking: ViewModifier {
 private struct BarActionButton: View {
   let model: AppModel
   let presentation: BarActionPresentation
-  var openSettings: @MainActor () -> Void = {}
 
   var body: some View {
     ZStack {
@@ -464,12 +455,6 @@ private struct BarActionButton: View {
         pill(identifier: "bar-action-image-too-long", label: "太长，复制不了图片", key: nil, accent: false) {
           EmptyView()
         } action: {}
-      case .openSettings:
-        pill(identifier: "bar-action-open-settings", label: "打开设置", key: "⌘,", accent: false) {
-          EmptyView()
-        } action: {
-          openSettings()
-        }
       }
     }
   }
@@ -757,44 +742,58 @@ struct ResultNoteRow: View {
 
 // MARK: - Welcome
 
-/// The paper pane of an empty panel before a model service is configured
-/// (`Design/spec/lifecycle.md` §三).
+/// Setup and its optional first request occupy the whole panel (`Design/spec/lifecycle.md` §三).
 private struct WelcomePane: View {
   let model: AppModel
+  var openSettings: @MainActor () -> Void
+
+  private var isReady: Bool { model.showsFirstTranslation }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      PaperText(["辞达需要一个模型服务。打开设置，复制配置提示词交给你的 AI 助手，它会帮你配好。"])
-      // ⏎ without a model service swaps the shortcuts for what is missing.
-      if model.showsConfigurationReminder {
-        ResultNoteRow(note: ResultNote(kind: .failed, text: "还没配置模型服务 · ⌘, 打开设置"))
-      } else {
-        Text(shortcutsLine)
-          .font(CidaDesign.mainUI(11))
-          .foregroundStyle(CidaDesign.textTertiary)
-          // The caption's 1.5 line height.
-          .frame(height: 16.5)
-          .accessibilityIdentifier("welcome-shortcuts")
+    VStack(alignment: .leading, spacing: 0) {
+      Text(isReady ? "配置已收到，试译一句" : "先连接你的模型服务")
+        .font(CidaDesign.mainUI(18, weight: .medium))
+        .foregroundStyle(CidaDesign.textPrimary)
+        .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+        .padding(.vertical, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(CidaDesign.surface)
+      VStack(alignment: .leading, spacing: 18) {
+        PaperText([isReady
+          ? "Good tools leave room for thought."
+          : "在设置里复制配置提示词，交给你的 AI 助手。配好后，辞达会自动接收配置。"])
+        HStack(spacing: 14) {
+          Button(isReady ? "试译这句话 ⏎" : "连接模型服务 ⏎") {
+            if isReady { model.tryFirstTranslation() } else { openSettings() }
+          }
+          .buttonStyle(SettingsBorderedButtonStyle(isHighlighted: true))
+          .settingsKeyboardFocus()
+          .accessibilityIdentifier(isReady ? "welcome-try-translation" : "welcome-connect")
+          if isReady {
+            Button("直接开始") { model.dismissFirstTranslation() }
+              .buttonStyle(SettingsBorderedButtonStyle())
+              .settingsKeyboardFocus()
+              .accessibilityIdentifier("welcome-skip-trial")
+          }
+        }
+        Text(isReady
+          ? "点击后会将这句话发送给已配置的模型。也可以直接输入自己的内容。"
+          : model.hasSubmittableInput
+            ? "已保留选中文字，连接后可继续翻译。"
+            : "辞达住在菜单栏，随时可以回来继续。")
+          .font(CidaDesign.mainUI(12))
+          .foregroundStyle(CidaDesign.textSecondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("welcome-caption")
       }
+      .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
+      .padding(.vertical, CidaDesign.Spacing.resultVertical)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(CidaDesign.surfacePaper)
     }
-    .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
-    .padding(.vertical, CidaDesign.Spacing.resultVertical)
-    .frame(maxWidth: .infinity, alignment: .leading)
     .fixedSize(horizontal: false, vertical: true)
-    .background(CidaDesign.surfacePaper)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("welcome-pane")
-  }
-
-  /// Names only the shortcuts that are set; the menu bar item is always there.
-  private var shortcutsLine: String {
-    let settings = model.settings
-    let shortcuts: [(GlobalShortcut?, String)] = [
-      (settings.shortcut, "随时唤起"), (settings.captureShortcut, "截图翻译"),
-      (settings.layerShortcut, "原处翻译"),
-    ]
-    return (shortcuts.compactMap { shortcut, action in shortcut.map { "\($0.displayText) \(action)" } }
-      + ["辞达住在菜单栏"]).joined(separator: " · ")
   }
 }
 
