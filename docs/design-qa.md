@@ -141,6 +141,17 @@ failure reporting and check invalidation. Its retained attachments show each tra
 updated Settings baseline. Both it and the instance-isolation journey explicitly declare that the
 CLI configured the service before launch, independently of the test endpoint override.
 
+On 2026-10-06, the three focused Tart journeys passed with zero failures: the model configuration
+journey, instance isolation, and the approved Settings baseline. The test harness was `6b8a93b`;
+the unchanged application was the signed `c25fb4f` artifact (app-tree SHA-256
+`8e136942c7b36af5558e6434779d50958030eb348ee3d11d172e92eecb9b847f`). The result bundle is
+`TestResults/agent-configuration-focused/CidaUITests.xcresult`; host artifact isolation passed.
+Retained native screenshots: [missing key](images/agent-configuration/missing-key.png),
+[unchecked configuration](images/agent-configuration/configured-unchecked.png),
+[passed check](images/agent-configuration/check-passed.png),
+[failed check](images/agent-configuration/check-failed.png), and
+[invalidated check](images/agent-configuration/configuration-invalidates-check.png).
+
 The pull request records the tested source commit, signed artifact digest and final gate result.
 These loopback journeys do not certify a live provider or physical 120 Hz performance.
 
