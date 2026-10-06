@@ -23,37 +23,50 @@
 
   <p class="caption">② 设置 · 已配置 — 纸收起；「模型服务」标签下是状态，控件列是模型名与域名，body 设了思考档位时模型名后浅色接档位（如 minimal），右侧「检查」；下一行「调整配置」复制同一段提示词。助手改完配置时窗口实时刷新，状态带「刚刚更新」3 秒</p>
   <div class="states-grid">
-    <figure><div class="state-label">已就绪（settings-config-ready）</div>
+    <figure><div class="state-label">已配置 · 未检查（settings-config-ready）</div>
       <cida-settings state="settings-config-ready" config="ready"></cida-settings></figure>
     <figure><div class="state-label">助手刚改完（settings-config-updated）</div>
       <cida-settings state="settings-config-updated" config="updated"></cida-settings></figure>
   </div>
   <div class="divider"></div>
 
-  <p class="caption">③ 设置 · 检查 — 「检查」与命令行 check 相同；进行中按钮为「检查中…」；失败时行下一句写原因和补救：交给 AI 助手修</p>
+  <p class="caption">③ 设置 · 检查 — 「检查」与命令行 check 相同；进行中按钮为「检查中…」；失败只写结果与下一步，诊断交给 AI 助手</p>
   <div class="states-grid">
     <figure><div class="state-label">检查中（settings-config-checking）</div>
       <cida-settings state="settings-config-checking" config="checking"></cida-settings></figure>
-    <figure><div class="state-label">检查失败（settings-config-failed）</div>
+    <figure><div class="state-label">检查未通过（settings-config-failed）</div>
       <cida-settings state="settings-config-failed" config="failed"></cida-settings></figure>
+  </div>
+  <div class="states-grid">
+    <figure><div class="state-label">检查通过（settings-config-passed）</div>
+      <cida-settings state="settings-config-passed" config="passed"></cida-settings></figure>
+    <figure><div class="state-label">还差 API Key（settings-config-missing-key）</div>
+      <cida-settings state="settings-config-missing-key" config="missing-key"></cida-settings></figure>
+    <figure><div class="state-label">配置不完整（settings-config-incomplete）</div>
+      <cida-settings state="settings-config-incomplete" config="incomplete"></cida-settings></figure>
+    <figure><div class="state-label">检查未通过 · 深色（dark-settings-config-failed）</div>
+      <cida-settings state="dark-settings-config-failed" config="failed" data-appearance="dark"></cida-settings></figure>
   </div>
   <div class="divider"></div>
 
-  <p class="caption">④ 复制出的配置提示词 — 带上命令行的绝对路径与当前配置；要求助手先问、查文档、Key 只走 stdin / 文件 / 环境变量、check 通过才算完；不能运行命令的助手给出命令让用户粘贴</p>
+  <p class="caption">④ 复制出的配置提示词 — 带上命令行的绝对路径与当前配置；要求助手先问、查文档、Key 只走 stdin / 文件 / 环境变量、check 通过才算完；不能运行命令时说明需要本机 agent</p>
   <div class="prompt-sheet" data-state="configuration-prompt">帮我配置辞达（macOS 上的翻译与改写应用）使用的模型服务。
 
 辞达的命令行：/Applications/Cida.app/Contents/MacOS/Cida
+下文的 `Cida` 均指这个可执行文件，请使用带引号的绝对路径运行。
 当前配置：还没配置
 
-请这样做：
-1. 问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。
-2. 运行 `Cida config schema` 了解全部字段，查这家服务的官方文档，确定端点、请求格式和需要的参数。辞达只用来翻译和改写，用不上思考：模型能关闭思考就在 `body` 里关掉，关不掉就设到它支持的最低档。
-3. 用 `Cida config set 字段=值 …` 一次写入。
-4. API Key 不要让我发给你，也不要打印或写进文件：请我先复制 Key，再运行 `pbpaste | Cida config set api-key --stdin`；Key 已经在环境变量或文件里时，用 `--env` 或 `--file`。
-5. 运行 `Cida check`；失败时用 `Cida check --verbose` 找原因、修改配置，直到通过。
-6. 最后用 `Cida config show` 告诉我配置结果。
+这次任务：从头配置：问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。
 
-如果你不能运行命令，就把每一步的命令写给我，我粘贴到「终端」里运行，再把输出贴给你。</div>
+请这样做：
+1. 运行 `Cida config show --json` 读取最新配置和缺项，再运行 `Cida config schema` 了解字段。以上配置是复制时的快照，以命令行的当前结果为准。
+2. 查这家服务的官方文档，确定端点、请求格式和需要的参数。辞达只用来翻译和改写，用不上思考：模型能关闭思考就在 `body` 里关掉，关不掉就设到它支持的最低档。
+3. 用 `Cida config set 字段=值 …` 一次写入需要修改的字段，不擅自更换服务或模型。
+4. API Key 不要让我发给你，也不要打印或写进文件：需要 Key 时请我先复制，再运行 `pbpaste | Cida config set api-key --stdin`；Key 已经在环境变量或文件里时，用 `--env` 或 `--file`。已有 Key 不需要重新提供。
+5. 修改后运行 `Cida check`；失败时用 `Cida check --verbose` 读取诊断，按新证据调整后再验证，不反复重试同一个失败。需要我提供信息、授权或处理账户付费时，说明我需要做什么并等待，不承诺一定修好。
+6. 最后用 `Cida config show --json` 核对配置与检查结果，简短告诉我是否可用，以及是否还有需要我做的事，不转述技术诊断。
+
+如果你不能运行命令，请明确告诉我需要一个能在本机运行辞达命令行的 AI 助手。</div>
   <div class="divider"></div>
 
   <p class="caption">⑤ 助手的一次配置 — 写入多项一次生效；Key 从剪贴板经 stdin 进钥匙串，对话里没有明文；check 通过才结束，正在运行的辞达立即改用新配置</p>

@@ -624,9 +624,12 @@ body {
 .row .controls .stack.summary b { font-size: 13.5px; font-weight: 400; line-height: 20px; }
 .row .controls .stack.summary .reasoning { color: var(--text-secondary); }
 .row .controls .push { margin-left: auto; }
+.row .controls .button.disabled { opacity: .45; }
 .dot-caption { display: inline-flex; align-items: center; gap: 6px; }
 .dot-caption i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .dot-caption.pending i { background: var(--text-tertiary); }
+.dot-caption i.icon { width: 11px; height: 11px; border-radius: 0; }
+.row .labels small > small { display: block; margin-top: 3px; }
 .row-note {
   display: flex;
   align-items: flex-start;

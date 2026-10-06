@@ -151,14 +151,17 @@ class CidaSettings extends HTMLElement {
     const feedback = row("反馈", "报告问题或提建议", `<span class="button${focus("feedback")}">去反馈</span>`, "end");
 
     // The agent-configured model group (spec/configuration.md §四):
-    // config="unset|unset-copied|ready|updated|checking|failed".
+    // config="unset|unset-copied|missing-key|incomplete|ready|updated|checking|passed|failed".
     const config = this.getAttribute("config") ?? "ready";
     const copyIcon = `<i class="icon icon-copy"></i>`;
     const statusCaption = {
-      ready: `<span class="dot-caption"><i></i>已就绪</span>`,
-      updated: `<span class="dot-caption"><i></i>已就绪 · 刚刚更新</span>`,
+      ready: `<span class="dot-caption pending"><i></i>已配置 · 未检查</span>`,
+      updated: `<span class="dot-caption pending"><i></i>已配置 · 未检查</span><small>刚刚更新</small>`,
       checking: `<span class="dot-caption pending"><i></i>正在检查…</span>`,
-      failed: `<span class="dot-caption pending"><i></i>检查失败</span>`,
+      failed: `<span class="dot-caption pending"><i class="icon icon-circle-alert"></i>检查未通过</span><small>今天 14:35</small>`,
+      passed: `<span class="dot-caption"><i></i>检查通过</span><small>今天 14:35</small>`,
+      "missing-key": `<span class="dot-caption pending"><i></i>还没配好</span>`,
+      incomplete: `<span class="dot-caption pending"><i></i>还没配好</span>`,
     }[config];
     const serviceRow = `
       <div class="row">
@@ -166,13 +169,18 @@ class CidaSettings extends HTMLElement {
         <div class="controls">
           ${config === "updated"
             ? `<div class="stack summary"><b>gpt-5 <span class="reasoning">minimal</span></b><small>api.openai.com</small></div>`
-            : `<div class="stack summary"><b>deepseek-chat</b><small>api.deepseek.com</small></div>`}
-          <span class="button push">${config === "checking" ? "检查中…" : "检查"}</span>
+            : `<div class="stack summary"><b>${config === "incomplete" ? `<span style="color:var(--text-tertiary)">未填写模型</span>` : "deepseek-chat"}</b><small>api.deepseek.com</small></div>`}
+          <span class="button push${["missing-key", "incomplete"].includes(config) ? " disabled" : ""}">${config === "checking" ? "检查中…" : "检查"}</span>
         </div>
       </div>`;
-    const failure = config === "failed"
-      ? `<div class="row-note"><i class="icon icon-circle-alert"></i><span>401 · 服务商拒绝了 API Key。复制配置提示词，让 AI 助手修好。</span></div>`
-      : "";
+    const note = {
+      ready: `可以直接使用；想确认就点「检查」。<br><span class="link">回到辞达</span>`,
+      updated: `可以直接使用；想确认就点「检查」。<br><span class="link">回到辞达</span>`,
+      failed: "复制配置提示词，交给 AI 助手继续检查。",
+      "missing-key": "还差 API Key。复制配置提示词交给 AI 助手，按它的提示把 Key 交给辞达；Key 不必发进对话。",
+      incomplete: "复制配置提示词，交给 AI 助手继续配置。",
+    }[config];
+    const guidance = note ? `<div class="row-note"><span>${note}</span></div>` : "";
     const adjustRow = row("调整配置", "交给 AI 助手", `<span class="button with-icon">${copyIcon}复制配置提示词</span>`, "end");
     const onboarding = (copied) => `
       <div class="agent-card">
@@ -188,7 +196,7 @@ class CidaSettings extends HTMLElement {
       </div>`;
     const modelGroup = config.startsWith("unset")
         ? onboarding(config === "unset-copied")
-        : `${serviceRow}${failure}${adjustRow}`;
+        : `${serviceRow}${guidance}${adjustRow}`;
 
     const tab = this.getAttribute("tab") ?? "model";
     const focusedTab = this.getAttribute("focused-tab");

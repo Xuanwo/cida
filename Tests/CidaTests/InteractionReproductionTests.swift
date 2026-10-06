@@ -396,7 +396,7 @@ final class InteractionReproductionTests: XCTestCase {
     RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
     let modelFrame = window.frame
-    XCTAssertEqual(modelFrame.height, 250, accuracy: 4, "The board's 模型 is 252 pt tall")
+    XCTAssertEqual(modelFrame.height, 285, accuracy: 4, "The unchecked model includes usage guidance")
     XCTAssertEqual(window.title, "模型")
     let contentView = try XCTUnwrap(window.contentView)
     let content = try XCTUnwrap(

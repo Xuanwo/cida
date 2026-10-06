@@ -47,11 +47,15 @@ compared natively:
 | 设置 · 通用 · 有新版本可以安装 | `settings-update-available` | `settings-update-available` |
 | 配置 · 还没有模型服务 | `settings-config-unset` | `settings-config-unset` |
 | 配置 · 已复制提示词 | `settings-config-copied` | `settings-config-copied` |
-| 配置 · 已就绪 | `settings-config-ready` | `settings-config-ready` |
+| 配置 · 已配置，未检查 | `settings-config-ready` | `settings-config-ready` |
 | 配置 · 助手刚改完 | `settings-config-updated` | `settings-config-updated` |
 | 配置 · 检查中 | `settings-config-checking` | `settings-config-checking` |
-| 配置 · 检查失败 | `settings-config-failed` | `settings-config-failed` |
-| 配置 · 提示词全文 / 助手的一次配置 / 助手自己闭环 | `configuration-prompt` / `configuration-agent-session` / `configuration-agent-errors` | (text and command-line output; `ModelConfigurationTests` and `CommandLineInterfaceTests` pin the strings) |
+| 配置 · 检查未通过 | `settings-config-failed` | `settings-config-failed` |
+| Configuration · passed check | `settings-config-passed` | `settings-config-passed` |
+| Configuration · missing API key | `settings-config-missing-key` | `settings-config-missing-key` |
+| Configuration · incomplete | `settings-config-incomplete` | `settings-config-incomplete` |
+| Configuration · dark failed check | `dark-settings-config-failed` | `dark-settings-config-failed` |
+| 配置 · 提示词全文 / 助手的一次配置 / 助手自己闭环 | `configuration-prompt` / `configuration-agent-session` / `configuration-agent-errors` | (text and command-line output; `ModelConfigurationTests` covers task selection and secret exclusion; `CommandLineInterfaceTests` covers CLI output) |
 | 菜单栏菜单 · 平时 / 开发版 / 显示辞达未设置快捷键 | `status-menu` / `status-menu-dev` / `status-menu-shortcut-unset` | (native menu, no fixture) |
 | 截图框选 · 拖动前 / 框选中 / 暗屏 | `capture-veiled` / `capture-lifted` / `capture-lifted-dark` | (overlay; XCUI attaches `capture-overlay-veiled`) |
 | DMG 窗口 / 背景图 | `dmg-window` / `dmg-background` | (Finder; the background ships in the DMG) |
@@ -110,16 +114,46 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   completion, and the slot crossfading between 停止 and 复制结果 over 150 ms.
 - Settings follows `Spec — 设置`: a fixed-width (560 pt) titled window whose height follows its
   content up to the screen's visible height, with four groups in the order of the user's
-  questions. The 模型 group follows `spec/configuration.md` §四: without a complete configuration
-  it is one `surface-paper` card (还没有模型服务, the caption, and 复制配置提示词, which shows
-  `✓ 已复制` on `accent-soft` for 800 ms and turns the caption into the next step until a
-  configuration arrives); with one it is the 模型服务 row (a 6 pt status dot and 已就绪 / 正在检查… /
-  检查失败 under the label, `· 刚刚更新` for three seconds after the command line changed it, the
-  model over `<host> · <format>`, and 检查 / 检查中…), a failure line under it when the latest
-  check of this configuration failed, and 调整配置 with the same copy button. Prompts collapse to a
-  one-line preview with `编辑` and expand into a `surface-paper` sheet (Inter 13 / 21 pt lines in
-  `text-ink`, accent focus ring). Accent appears only on the ready dot, the copied feedback, focus
-  rings, and the switch.
+  questions. The 模型 group follows `spec/configuration.md` §四: an unset service uses the
+  onboarding card; partial and complete configurations show the chosen service and status.
+  Unchecked configuration is neutral and usable immediately, with an optional check and a return
+  action. Only a passed check has a green dot; completed checks show their actual time. Failed
+  checks show the handoff instruction without provider diagnostics. Missing API keys get an
+  actionable explanation, and incomplete configurations disable the check button. One copy entry
+  covers initial setup, continuation, adjustments and diagnosis; its feedback lasts 800 ms and
+  never represents agent activity. The Settings pixel baseline includes the unchecked guidance
+  and return action (285 pt native height).
+
+## Agent configuration
+
+Item 02 of `Design/spec/review-decisions.md` was accepted on 2026-10-06. Static comparisons in
+`Design/QACurrent/comparison-settings-config-*.png` cover the current configuration states,
+including the dark failure state (`comparison-dark-settings-config-failed.png`). The CLI retains
+its diagnostic contract for agents; this change removes technical diagnostics from Settings.
+
+`ModelServiceSettingsTests` covers configuration-bound results and an external configuration change
+while a Settings check is in flight. `ModelConfigurationTests` covers the four prompt tasks, stale
+check exclusion, and secret exclusion. The Tart journey
+`PanelAndSettingsJourneyTests/testModelServiceFollowsTheCommandLineAndPromptsEditInSettings` covers
+the native clipboard handoff, incomplete configuration, optional checks, returning to Cida, CLI
+failure reporting and check invalidation. Its retained attachments show each transition.
+`VisualAndAccessibilityJourneyTests/testSettingsMatchesTheApprovedDesignBaseline` verifies the
+updated Settings baseline. Both it and the instance-isolation journey explicitly declare that the
+CLI configured the service before launch, independently of the test endpoint override.
+
+On 2026-10-06, the three focused Tart journeys passed with zero failures: the model configuration
+journey, instance isolation, and the approved Settings baseline. The test harness was `6b8a93b`;
+the unchanged application was the signed `c25fb4f` artifact (app-tree SHA-256
+`8e136942c7b36af5558e6434779d50958030eb348ee3d11d172e92eecb9b847f`). The result bundle is
+`TestResults/agent-configuration-focused/CidaUITests.xcresult`; host artifact isolation passed.
+Retained native screenshots: [missing key](images/agent-configuration/missing-key.png),
+[unchecked configuration](images/agent-configuration/configured-unchecked.png),
+[passed check](images/agent-configuration/check-passed.png),
+[failed check](images/agent-configuration/check-failed.png), and
+[invalidated check](images/agent-configuration/configuration-invalidates-check.png).
+
+The pull request records the tested source commit, signed artifact digest and final gate result.
+These loopback journeys do not certify a live provider or physical 120 Hz performance.
 
 ## Executable evidence
 

@@ -192,6 +192,7 @@ final class AppModel {
   /// fingerprint matches the configuration (`modelServiceStatus`).
   private(set) var lastModelServiceCheck: ModelServiceCheckRecord?
   private(set) var isCheckingModelService = false
+  private var checkingModelServiceFingerprint: String?
   /// Three seconds after the command line changed the model service or checked it.
   private(set) var isModelServiceRecentlyUpdated = false
   /// The onboarding card says the prompt was copied until a configuration arrives.
@@ -724,21 +725,27 @@ final class AppModel {
     settings.isModelServiceComplete
   }
 
-  /// The service row's status: a running check, then the latest check of this exact
-  /// configuration, and 已就绪 for a complete configuration nobody has checked yet.
-  var modelServiceStatus: ModelServiceStatus {
-    if isCheckingModelService { return .checking }
-    if let lastModelServiceCheck, !lastModelServiceCheck.passed,
+  /// A check applies only to the complete configuration that actually sent it.
+  var currentModelServiceCheck: ModelServiceCheckRecord? {
+    guard isModelServiceConfigured,
+      let lastModelServiceCheck,
       lastModelServiceCheck.fingerprint == settings.modelServiceFingerprint
-    {
-      return .failed(lastModelServiceCheck.failureSummary ?? "检查失败")
-    }
-    return .ready
+    else { return nil }
+    return lastModelServiceCheck
   }
 
-  /// The prompt 复制配置提示词 copies, with this executable's path and the current service.
+  var modelServiceStatus: ModelServiceStatus {
+    guard isModelServiceConfigured else { return .incomplete }
+    if isCheckingModelService, checkingModelServiceFingerprint == settings.modelServiceFingerprint {
+      return .checking
+    }
+    guard let check = currentModelServiceCheck else { return .unchecked }
+    return check.passed ? .passed(check.checkedAt) : .failed(check.checkedAt)
+  }
+
+  /// The handoff follows the current task; diagnostics stay in the command-line interface.
   var configurationPrompt: String {
-    ConfigurationPrompt.text(settings: settings)
+    ConfigurationPrompt.text(settings: settings, lastCheck: currentModelServiceCheck)
   }
 
   func copyConfigurationPrompt() {
@@ -757,10 +764,15 @@ final class AppModel {
   /// reads it.
   func checkModelService() async {
     guard !isCheckingModelService, isModelServiceConfigured else { return }
+    checkingModelServiceFingerprint = settings.modelServiceFingerprint
     isCheckingModelService = true
     let result = await checkService(settings)
-    recordCheck(result.record)
-    lastModelServiceCheck = result.record
+    // An agent may have replaced the configuration while this request was in flight.
+    if result.record.fingerprint == settings.modelServiceFingerprint {
+      recordCheck(result.record)
+      lastModelServiceCheck = result.record
+    }
+    checkingModelServiceFingerprint = nil
     isCheckingModelService = false
   }
 
@@ -812,6 +824,7 @@ final class AppModel {
       isShowingConfigurationPromptCopied = copied
       isModelServiceRecentlyUpdated = recentlyUpdated
       isCheckingModelService = checking
+      checkingModelServiceFingerprint = checking ? settings.modelServiceFingerprint : nil
       lastModelServiceCheck = lastCheck
     }
   #endif

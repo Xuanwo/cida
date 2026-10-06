@@ -702,6 +702,12 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.launch(endpointOverride: false)
     driver.openSettings()
     let settingsWindow = driver.settingsWindow
+    func attachConfiguration(_ name: String) {
+      let shot = XCTAttachment(screenshot: settingsWindow.screenshot())
+      shot.name = "agent-configuration-" + name
+      shot.lifetime = .keepAlways
+      add(shot)
+    }
 
     XCTAssertTrue(driver.modelOnboarding.waitForExistence(timeout: 3), "No service yet")
     XCTAssertFalse(driver.modelStatus.exists)
@@ -720,6 +726,20 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
         in: driver.modelOnboardingCaption, timeout: 1),
       "The card says what comes next until a service arrives")
 
+    // Partial writes preserve the chosen service and only ask for the missing input.
+    let partial = try driver.runCommandLine([
+      "config", "set", "endpoint=https://api.deepseek.com/chat/completions", "model=deepseek-chat",
+    ])
+    XCTAssertEqual(partial.status, 0, partial.errorOutput)
+    XCTAssertTrue(driver.waitForValue("还没配好", in: driver.modelStatus, timeout: 3))
+    XCTAssertFalse(driver.modelCheckButton.isEnabled)
+    XCTAssertTrue(driver.waitForText(containing: "还差 API Key",
+      in: driver.element(identifier: "settings-model-guidance"), timeout: 3))
+    attachConfiguration("missing-key")
+    copy.click()
+    XCTAssertTrue(driver.waitForLabel("已复制", in: copy, timeout: 0.6))
+    XCTAssertTrue((NSPasteboard.general.string(forType: .string) ?? "").contains("继续配置："))
+
     // The assistant configures the service while Settings stays open.
     let set = try driver.runCommandLine([
       "config", "set", "endpoint=\(e2eEnvironment.endpoint)", "format=chat-completions",
@@ -733,7 +753,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       driver.waitForExistence(of: driver.modelStatus, timeout: 3),
       "The open window refreshes at once")
     XCTAssertTrue(
-      driver.waitForValue("已就绪 · 刚刚更新", in: driver.modelStatus, timeout: 3),
+      driver.waitForValue("已配置 · 未检查", in: driver.modelStatus, timeout: 3),
       "The open window refreshes at once")
     XCTAssertFalse(driver.modelOnboarding.exists)
     XCTAssertTrue(
@@ -741,15 +761,28 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(
       driver.waitForText(containing: "127.0.0.1", in: driver.modelSummary, timeout: 1))
     XCTAssertTrue(
-      driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 5), "刚刚更新 lasts 3 s")
+      driver.waitForValue("已配置 · 未检查", in: driver.modelStatus, timeout: 5),
+      "Complete configuration is immediately usable")
+
+    attachConfiguration("configured-unchecked")
+    let detail = driver.element(identifier: "settings-model-check-detail")
+    XCTAssertTrue(detail.waitForNonExistence(timeout: 5), "The update hint expires")
+    copy.click()
+    XCTAssertTrue(driver.waitForLabel("已复制", in: copy, timeout: 0.6))
+    XCTAssertTrue((NSPasteboard.general.string(forType: .string) ?? "").contains("调整配置："))
+    driver.app.buttons["settings-return-to-panel"].click()
+    XCTAssertTrue(settingsWindow.waitForNonExistence(timeout: 3))
+    XCTAssertTrue(driver.app.buttons["welcome-skip-trial"].waitForExistence(timeout: 3))
+    driver.openSettings()
 
     // 检查 sends the same request as `Cida check`.
     driver.modelCheckButton.click()
     XCTAssertNotNil(try scenarioServer.wait(for: "hello", status: "completed", timeout: 10))
-    XCTAssertTrue(driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 5))
+    XCTAssertTrue(driver.waitForValue("检查通过", in: driver.modelStatus, timeout: 5))
+    attachConfiguration("check-passed")
     XCTAssertFalse(driver.modelFailure.exists)
 
-    // A failing command-line check shows up with its reason and the remedy.
+    // A failing command-line check shows its outcome; diagnosis belongs to the agent.
     let unreachable = try driver.runCommandLine([
       "config", "set", "endpoint=http://127.0.0.1:9/v1/chat/completions",
     ])
@@ -758,15 +791,29 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertEqual(check.status, 69, check.output)
     XCTAssertTrue(check.output.hasPrefix("✗ 检查失败 · 连不上服务"), check.output)
     XCTAssertTrue(
-      driver.waitForValue("检查失败 · 刚刚更新", in: driver.modelStatus, timeout: 3))
+      driver.waitForValue("检查未通过", in: driver.modelStatus, timeout: 3))
     XCTAssertTrue(
       driver.waitForText(
-        containing: "连不上服务。复制配置提示词，让 AI 助手修好。", in: driver.modelFailure, timeout: 2))
+        containing: "复制配置提示词，交给 AI 助手继续检查。", in: driver.modelFailure, timeout: 2))
+    let visibleText = driver.app.staticTexts.allElementsBoundByIndex.map {
+      ($0.value as? String ?? "") + $0.label
+    }.joined(separator: "\n")
+    XCTAssertFalse(visibleText.contains("连不上服务"))
+    attachConfiguration("check-failed")
+    copy.click()
+    XCTAssertTrue(driver.waitForLabel("已复制", in: copy, timeout: 0.6))
+    let repairPrompt = NSPasteboard.general.string(forType: .string) ?? ""
+    XCTAssertTrue(repairPrompt.contains("继续检查：最近一次检查未通过"))
+    XCTAssertTrue(repairPrompt.contains("Cida check --verbose"))
+    XCTAssertFalse(repairPrompt.contains("连不上服务"))
     try driver.configureModelService()
     XCTAssertTrue(
-      driver.waitForValue("已就绪 · 刚刚更新", in: driver.modelStatus, timeout: 3),
-      "A changed configuration is 已就绪 until it is checked")
+      driver.waitForValue("已配置 · 未检查", in: driver.modelStatus, timeout: 3),
+      "A changed configuration is unchecked until a new check finishes")
     XCTAssertFalse(driver.modelFailure.exists)
+    XCTAssertTrue(driver.waitForText(containing: "之前的检查结果不再适用",
+      in: driver.element(identifier: "settings-model-guidance"), timeout: 3))
+    attachConfiguration("configuration-invalidates-check")
 
     driver.showSettingsTab("translation", title: "动作")
     XCTAssertFalse(driver.app.textViews["settings-action-prompt"].exists, "Prompts start collapsed")
@@ -1097,10 +1144,10 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     let refused = try driver.runCommandLine(["config", "set", "api-key=sk-first-instance"])
     XCTAssertEqual(refused.status, 64, "A key written in the command is refused")
     XCTAssertFalse(refused.errorOutput.contains("sk-first-instance"))
-    driver.launch(endpointOverride: false)
+    driver.launch(endpointOverride: false, configuredBeforeLaunch: true)
     driver.openSettings()
     XCTAssertTrue(driver.waitForExistence(of: driver.modelStatus, timeout: 3))
-    XCTAssertTrue(driver.waitForValue("已就绪", in: driver.modelStatus, timeout: 3))
+    XCTAssertTrue(driver.waitForValue("已配置 · 未检查", in: driver.modelStatus, timeout: 3))
     XCTAssertTrue(
       driver.waitForText(containing: "first-instance-model", in: driver.modelSummary, timeout: 1))
     driver.terminate()
