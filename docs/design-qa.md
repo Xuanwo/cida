@@ -256,3 +256,11 @@ in both unit and Release tests. The signed Release app tree SHA-256 was
 The pixel baselines, accessibility audit, and host-session guards passed. Structural
 performance checks passed; physical 120 Hz certification was skipped because the active
 display supported 60 Hz. Commit `d4d13be` subsequently retained screenshots and this QA record.
+
+The stable `执行` label follow-up was validated on clean commit
+`481851be6e633b578cd494b343daf8a3ea77cb1f`: warnings-as-errors build, all 317 Swift tests,
+website build, and three focused Tart journeys passed (execution, long custom-action overflow,
+and the empty-panel pixel baseline). The execution screenshot above was refreshed from this run.
+The overflow journey verifies that a long custom-action name leaves the execution button at 92 pt.
+The signed app tree SHA-256 was `83d0a5ab4f636c4bcb53a9d169e1a7dc563234e3acc699aaea3006c76333f224`.
+This focused run supplements the earlier full nightly gate; it does not repeat its mutation tests.
