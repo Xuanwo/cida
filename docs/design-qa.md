@@ -106,7 +106,8 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   `surface-paper`. Accent appears only on the selected action label, the streaming caret, and the
   copied feedback.
 - Control bar: `翻译 | 改进` segmented control (selected item white with hairline and accent text),
-  the `⇥ 切换` hint in `hint`, and one right-hand slot: nothing while typing, `停止 ⌘.` while a
+  the `⇥ 切换` hint in `hint`, and one right-hand slot: the selected action while typing
+  (disabled for blank input), `停止 ⌘.` while a
   request runs, `复制结果 ⌘C` once a result exists, `✓ 已复制` on `accent-soft` for 800 ms after
   copying. Every appearance of the panel resets the action to 翻译.
 - Result notes share one row under the result: `原文已修改 · ⏎ 重新生成` (result dimmed to 55%),
@@ -236,10 +237,20 @@ execution button without changing its dimensions or tolerances.
 
 The Composer Tart journeys exercise clicking the selected action, empty-input disabling,
 request counts, language confirmation hints, Return submission, Tab, Escape and focus-loss
-cancellation. They retain `execution-ready` and `language-edit-confirmation` screenshots.
+cancellation. Their `execution-ready` and `language-edit-confirmation` screenshots are retained in
+`docs/images/panel-execution`.
 The native field-editor test verifies that marked text switches the hint to candidate selection,
 survives a SwiftUI update, and restores the confirmation hint on unmarking. `target-composing`
 uses native marked text in its offscreen capture. Real Chinese/Japanese input-method sessions
-and VoiceOver navigation remain manual validation
-boundaries; the Swift suite exercises native marked-text routing without host activation.
+and VoiceOver navigation remain manual validation boundaries; the Swift suite exercises native
+marked-text routing without host activation.
 The README translation/improvement clips show the changed control bar and need re-recording.
+
+Validation on clean commit `d997dc5179a19ea5a78d3de4f466c4d7c957dcf8`:
+`scripts/e2e/run-nightly-gate.sh --results-dir TestResults/panel-execution-final-gate`
+passed on 2026-10-07 with 317 Swift tests, 38 Tart journeys, and all eight mutations killed
+in both unit and Release tests. The signed Release app tree SHA-256 was
+`2bdb806fa48fcbe3d1b715549f40f074c1434694b2943a6df7b94ba382769109`.
+The pixel baselines, accessibility audit, and host-session guards passed. Structural
+performance checks passed; physical 120 Hz certification was skipped because the active
+display supported 60 Hz. Subsequent changes only retain screenshots and this QA record.
