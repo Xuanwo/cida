@@ -14,7 +14,6 @@ import SwiftUI
 struct ResultTextView: NSViewRepresentable {
   let record: ResultRecord?
   let generationState: GenerationPresentationState
-  let isStale: Bool
   /// The tallest the text area can get before the pane scrolls instead.
   let maxVisibleHeight: CGFloat
 
@@ -52,7 +51,6 @@ struct ResultTextView: NSViewRepresentable {
       in: container
     )
     container.setResultAccessibilityIdentifier("result-text")
-    container.setDimmed(isStale, animated: !replacesDocument)
     if replacesDocument {
       // The previous document must not be what the pane scrolls or shows.
       context.coordinator.layoutForSizing(container, width: container.frame.width)

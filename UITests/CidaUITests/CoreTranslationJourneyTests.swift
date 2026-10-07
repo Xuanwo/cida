@@ -44,7 +44,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     )
     XCTAssertTrue(driver.resultText.waitForExistence(timeout: 3))
     XCTAssertEqual(driver.resultText.value as? String, "")
-    XCTAssertFalse(driver.copyButton.exists, "No copy while the new request runs")
+    XCTAssertFalse(driver.copyButton.isEnabled, "Copy stays in place but is disabled while the request runs")
     XCTAssertEqual(driver.textValue(in: driver.composer), "CIDA_E2E_DELAYED_RESULT_B")
 
     XCTContext.runActivity(named: "No old result pixels before the first byte") { activity in
@@ -175,7 +175,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
       (failedNote.value as? String ?? "").contains("请求失败"),
       failedNote.debugDescription)
     XCTAssertFalse(driver.app.sheets.firstMatch.exists, "No alert sheet for a request failure")
-    XCTAssertFalse(driver.copyButton.exists, "Nothing to copy after a failure without text")
+    XCTAssertFalse(driver.copyButton.isEnabled, "Nothing to copy after a failure without text")
 
     driver.submit("CIDA_E2E_POOL_RECOVERY")
     XCTAssertTrue(

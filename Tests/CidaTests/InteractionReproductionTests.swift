@@ -181,6 +181,9 @@ final class InteractionReproductionTests: XCTestCase {
     input.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: input))
     XCTAssertTrue(model.isResultStale)
     XCTAssertEqual(model.resultNote, .stale)
+    try await Task.sleep(for: .milliseconds(200))
+    let resultPane = try XCTUnwrap(firstResultScrollView(in: contentView))
+    XCTAssertEqual(resultPane.container.alphaValue, 1, "An old result keeps readable ink")
 
     XCTAssertTrue(model.submit())
     XCTAssertFalse(model.result === firstResult, "A new submission replaces the record")
@@ -190,34 +193,37 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
-  /// One slot: execute while typing, 停止 while a request runs,
-  /// 复制结果 once a result exists, ✓ 已复制 right after copying.
-  func testControlBarSlotShowsStopWhileStreamingAndCopyAfterwards() async throws {
+  func testControlBarKeepsExecutionIndependentOfCopyFeedback() async throws {
     let model = AppModel(
       inputText: "Slot source",
       service: DelayedStreamingService(chunks: ["Slot", " result"], delay: .milliseconds(120))
     )
-    func slot(copied: Bool = false) -> BarActionPresentation {
-      .resolve(
-        isProcessing: model.isProcessing,
-        canCopyResult: model.canCopyResult,
-        hasResult: model.result != nil,
-        copyFeedback: copied ? .text : nil
-      )
+    func slot() -> BarActionPresentation {
+      .resolve(isProcessing: model.isProcessing, repeatsAction: model.result?.mode == model.mode)
     }
     XCTAssertEqual(slot(), .execute)
-
     XCTAssertTrue(model.submit())
     XCTAssertEqual(slot(), .stop)
-    XCTAssertEqual(slot(copied: true), .stop, "Stop wins while the request runs")
-
     try await waitUntil(timeout: .seconds(3)) { model.result?.phase == .completed }
-    XCTAssertEqual(slot(), .copy)
+    XCTAssertEqual(slot(), .reexecute)
     XCTAssertTrue(model.copyResult())
-    XCTAssertEqual(slot(copied: true), .copied(.text))
+    XCTAssertEqual(slot(), .reexecute, "Copy feedback belongs to the result header")
 
-    model.cancelProcessing()
-    XCTAssertEqual(slot(), .copy, "Cancelling an idle model changes nothing")
+    let result = try XCTUnwrap(model.result)
+    model.inputText = "Edited source"
+    XCTAssertTrue(model.isResultStale)
+    XCTAssertEqual(slot(), .reexecute)
+    model.setMode(.improve)
+    XCTAssertEqual(slot(), .execute)
+    model.setMode(.translate)
+    XCTAssertEqual(slot(), .reexecute)
+    model.inputText = "Slot source"
+    XCTAssertFalse(model.isResultStale, "Restoring source and action restores the current result")
+    model.inputText = ""
+    XCTAssertFalse(model.hasSubmittableInput)
+    XCTAssertTrue(model.canCopyResult, "Clearing the source preserves the copyable result")
+    XCTAssertTrue(model.result === result)
+    XCTAssertEqual(result.source, "Slot source")
   }
 
   // MARK: - Settings window

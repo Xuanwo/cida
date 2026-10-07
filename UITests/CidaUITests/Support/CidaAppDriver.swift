@@ -26,12 +26,12 @@ final class CidaAppDriver {
   var translateAction: XCUIElement { app.buttons["action-translate"] }
   var improveAction: XCUIElement { app.buttons["action-improve"] }
   var stopButton: XCUIElement { app.buttons["bar-action-stop"] }
-  var copyButton: XCUIElement { app.buttons["bar-action-copy"] }
-  var copyMenuButton: XCUIElement { app.buttons["bar-action-copy-menu"] }
+  var copyButton: XCUIElement { app.buttons["result-action-copy"] }
+  var copyMenuButton: XCUIElement { app.buttons["result-action-copy-menu"] }
   var copyMenuResultItem: XCUIElement { app.buttons["copy-menu-result"] }
   var copyMenuImageItem: XCUIElement { app.buttons["copy-menu-image"] }
-  var imageCopiedButton: XCUIElement { app.buttons["bar-action-image-copied"] }
-  var copiedButton: XCUIElement { app.buttons["bar-action-copied"] }
+  var imageCopiedButton: XCUIElement { app.buttons["result-action-image-copied"] }
+  var copiedButton: XCUIElement { app.buttons["result-action-copied"] }
   var resultPane: XCUIElement { element(identifier: "result-pane") }
   /// The menu bar mark; XCUI may report it as a status item or as its button.
   var statusItem: XCUIElement {
@@ -231,7 +231,9 @@ final class CidaAppDriver {
   }
 
   func waitForCompletion(timeout: TimeInterval = 8) {
-    XCTAssertTrue(copyButton.waitForExistence(timeout: timeout), "复制结果 appears once done")
+    XCTAssertTrue(stopButton.waitForNonExistence(timeout: timeout), "The request finishes")
+    XCTAssertTrue(copyButton.waitForExistence(timeout: 2))
+    XCTAssertTrue(copyButton.isEnabled, "The finished result can be copied")
     XCTAssertFalse(stopButton.exists)
   }
 

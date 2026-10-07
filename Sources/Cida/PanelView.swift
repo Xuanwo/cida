@@ -79,36 +79,33 @@ struct PanelView: View {
         ResultPane(
           model: model,
           maxTextHeight: resultTextMaxHeight,
-          showsText: showsResultText
+          showsText: showsResultText,
+          copyFeedback: shownCopyFeedback
         )
       }
     }
     .frame(width: CidaDesign.Panel.width)
     .background(CidaDesign.surface)
     .overlay(alignment: .topTrailing) {
-      if model.isCopyMenuOpen, barActionPresentation == .copy {
+      if model.isCopyMenuOpen, model.canCopyResult {
         copyMenuLayer
       }
     }
   }
 
-  /// The copy menu hangs from the copy button over the result pane; a click
-  /// above or below the control bar only closes it (`Design/spec/panel.md` §八).
-  /// The control bar stays uncovered: a layer that appears over ⌄ under a
-  /// resting pointer leaves ⌄ deaf to the next click once it goes, so ⌄ closes
-  /// the menu itself and the bar's other controls close it through the model.
+  /// Keep the copy button and action bar hittable while the menu covers the paper.
   private var copyMenuLayer: some View {
     ZStack(alignment: .topTrailing) {
       VStack(spacing: 0) {
         closesCopyMenu.frame(height: sourcePaneHeight)
-        Color.clear
-          .frame(height: CidaDesign.Panel.controlBarHeight)
-          .allowsHitTesting(false)
+        Color.clear.frame(height: CidaDesign.Panel.controlBarHeight).allowsHitTesting(false)
+        closesCopyMenu.frame(height: CidaDesign.Spacing.resultVertical)
+        Color.clear.frame(height: ResultHeader.height).allowsHitTesting(false)
         closesCopyMenu
       }
       CopyMenu(model: model)
-        // 6 below the button, which sits in the middle of the control bar.
-        .padding(.top, sourcePaneHeight + CopyMenu.topInControlBar)
+        .padding(.top, sourcePaneHeight + CidaDesign.Panel.controlBarHeight
+          + CidaDesign.Spacing.resultVertical + ResultHeader.height + CopyMenu.gap)
         .padding(.trailing, CidaDesign.Spacing.windowHorizontal)
     }
   }
@@ -167,10 +164,11 @@ struct PanelView: View {
   /// whole lines of the result's typography, so the pane never cuts a line
   /// through its glyphs.
   private var resultTextMaxHeight: CGFloat {
-    let noteAllowance: CGFloat = model.resultNote == nil ? 0 : ResultNoteRow.height + 10
+    let noteAllowance: CGFloat = ResultPane.footerNote(model) == nil ? 0 : ResultNoteRow.height + 10
     let lineHeight = ResultTextStyle.lineHeight(for: model.result?.outputLanguage ?? .english)
     let available =
-      resultPaneMaxHeight - CidaDesign.Spacing.resultVertical * 2 - noteAllowance
+      resultPaneMaxHeight - CidaDesign.Spacing.resultVertical * 2
+      - ResultHeader.height - 10 - noteAllowance
     return max(1, floor(available / lineHeight)) * lineHeight
   }
 
@@ -184,9 +182,7 @@ struct PanelView: View {
   private var barActionPresentation: BarActionPresentation {
     .resolve(
       isProcessing: model.isProcessing,
-      canCopyResult: model.canCopyResult,
-      hasResult: model.result != nil,
-      copyFeedback: shownCopyFeedback
+      repeatsAction: model.result?.mode == model.mode
     )
   }
 
@@ -430,9 +426,7 @@ private struct DimmedWhileWorking: ViewModifier {
   }
 }
 
-/// One slot, one button: execute while typing, 停止 while a
-/// request runs, 复制结果 once a result exists (`Design/spec/panel.md` §二),
-/// with the segment that opens the copy menu (§八).
+/// The control bar always operates on the current input and selected action.
 private struct BarActionButton: View {
   let model: AppModel
   let presentation: BarActionPresentation
@@ -440,12 +434,10 @@ private struct BarActionButton: View {
   var body: some View {
     ZStack {
       switch presentation {
-      case .none:
-        EmptyView()
-      case .execute:
+      case .execute, .reexecute:
         pill(
           identifier: "bar-action-execute",
-          label: "执行",
+          label: presentation == .reexecute ? "重新执行" : "执行",
           key: "⏎", accent: false, minimumWidth: 92
         ) { EmptyView() } action: {
           model.submit()
@@ -460,21 +452,7 @@ private struct BarActionButton: View {
         } action: {
           model.cancelProcessing()
         }
-      case .copy:
-        CopyButton(model: model)
-          .transition(.opacity.animation(.easeOut(duration: CidaMotion.iconSwapSeconds)))
-      case .copied(.text):
-        pill(identifier: "bar-action-copied", label: "已复制", key: nil, accent: true) {
-          LucideIcon(.check, size: 12).foregroundStyle(CidaDesign.accent)
-        } action: {}
-      case .copied(.image):
-        pill(identifier: "bar-action-image-copied", label: "已复制图片", key: nil, accent: true) {
-          LucideIcon(.check, size: 12).foregroundStyle(CidaDesign.accent)
-        } action: {}
-      case .copied(.imageTooLong):
-        pill(identifier: "bar-action-image-too-long", label: "太长，复制不了图片", key: nil, accent: false) {
-          EmptyView()
-        } action: {}
+
       }
     }
   }
@@ -526,59 +504,68 @@ private struct BarActionButton: View {
 
 // MARK: - Copy button and menu
 
-/// 复制结果 and the segment that opens the copy menu: one pill, a short inset
-/// hairline between the two, a quiet chevron (`Design/spec/panel.md` §二, §八).
+/// A quiet, fixed result action; feedback never replaces the execution button.
 private struct CopyButton: View {
   @Bindable var model: AppModel
+  let feedback: CopyFeedback?
+  @State private var isHovered = false
+
+  private var label: String {
+    switch feedback {
+    case .text: "已复制"
+    case .image: "已复制图片"
+    case .imageTooLong: "太长，复制不了图片"
+    case nil: "复制"
+    }
+  }
+
+  private var identifier: String {
+    switch feedback {
+    case .text: "result-action-copied"
+    case .image: "result-action-image-copied"
+    case .imageTooLong: "result-action-image-too-long"
+    case nil: "result-action-copy"
+    }
+  }
 
   var body: some View {
-    let isOpen = model.isCopyMenuOpen
     HStack(spacing: 0) {
-      Button {
-        _ = model.copyResult()
-      } label: {
-        HStack(spacing: 8) {
-          LucideIcon(.copy, size: 12).foregroundStyle(CidaDesign.textControl)
-          Text("复制结果")
-            .font(CidaDesign.mainUI(11.5, weight: .semibold))
-            .foregroundStyle(CidaDesign.textControl)
-          Text("⌘C")
-            .font(CidaDesign.mainUI(11))
-            .foregroundStyle(CidaDesign.textTertiary)
+      Button { _ = model.copyResult() } label: {
+        HStack(spacing: 6) {
+          LucideIcon(feedback == nil ? .copy : feedback == .imageTooLong ? .circleAlert : .check, size: 12)
+          Text(label).font(CidaDesign.mainUI(11.5, weight: .medium))
+          if feedback == nil {
+            Text("⌘C").font(CidaDesign.mainUI(11)).foregroundStyle(CidaDesign.textTertiary)
+          }
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 10)
+        .padding(.horizontal, 8)
         .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
       }
-      .buttonStyle(HoverFadeButtonStyle())
-      .accessibilityLabel("复制结果")
-      .accessibilityIdentifier("bar-action-copy")
-
-      Rectangle()
-        .fill(CidaDesign.border)
-        .frame(width: 1, height: 14)
-        .opacity(isOpen ? 0 : 1)
-
-      Button {
-        model.isCopyMenuOpen.toggle()
-      } label: {
+      .buttonStyle(.plain)
+      .accessibilityLabel(feedback == nil ? (model.isResultStale ? "复制上次结果" : "复制结果") : label)
+      .accessibilityIdentifier(identifier)
+      Button { model.isCopyMenuOpen.toggle() } label: {
         LucideIcon(.chevronDown, size: 10)
-          .foregroundStyle(isOpen ? CidaDesign.textControl : CidaDesign.textTertiary)
-          .frame(width: 26)
-          .frame(maxHeight: .infinity)
-          .background(isOpen ? CidaDesign.surfaceDim : .clear)
+          .foregroundStyle(CidaDesign.textTertiary)
+          .frame(width: 22, height: ResultHeader.height)
+          .contentShape(Rectangle())
       }
-      .buttonStyle(HoverFadeButtonStyle())
+      .buttonStyle(.plain)
       .accessibilityLabel("更多复制方式")
-      .accessibilityIdentifier("bar-action-copy-menu")
+      .accessibilityIdentifier("result-action-copy-menu")
     }
-    .frame(height: 30)
-    .background(CidaDesign.surface)
-    .clipShape(RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous))
-    .overlay {
+    .foregroundStyle(feedback == nil ? CidaDesign.textControl : CidaDesign.accent)
+    .frame(minWidth: 116, alignment: .trailing)
+    .frame(height: ResultHeader.height)
+    .background {
       RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
-        .strokeBorder(CidaDesign.border, lineWidth: 1)
+        .fill(feedback != nil ? CidaDesign.accentSoft
+          : isHovered || model.isCopyMenuOpen ? CidaDesign.surfaceDim : .clear)
     }
+    .onHover { isHovered = $0 }
+    .disabled(!model.canCopyResult)
+    .opacity(model.canCopyResult ? 1 : 0.45)
   }
 }
 
@@ -586,9 +573,8 @@ private struct CopyButton: View {
 /// surface. Radius 14 around 6 of padding keeps the rows' radius 8 concentric
 /// with it (`Design/spec/panel.md` §八).
 private struct CopyMenu: View {
-  /// From the control bar's top edge: the button's 10 of inset and 30 of
-  /// height, then 6 of gap.
-  static let topInControlBar: CGFloat = 46
+  static let gap: CGFloat = 6
+  static let height: CGFloat = 74
 
   let model: AppModel
   @State private var hovered: Item?
@@ -602,7 +588,7 @@ private struct CopyMenu: View {
 
   var body: some View {
     VStack(spacing: 2) {
-      row(.result, icon: .copy, title: "复制结果", key: "⌘C", identifier: "copy-menu-result") {
+      row(.result, icon: .copy, title: model.isResultStale ? "复制上次结果" : "复制结果", key: "⌘C", identifier: "copy-menu-result") {
         model.copyResult()
       }
       row(.image, icon: .image, title: "复制图片", key: "⇧⌘C", identifier: "copy-menu-image") {
@@ -699,28 +685,66 @@ private struct ResultPane: View {
   let model: AppModel
   let maxTextHeight: CGFloat
   let showsText: Bool
+  let copyFeedback: CopyFeedback?
+
+  static func footerNote(_ model: AppModel) -> ResultNote? {
+    guard let note = model.resultNote, note.kind != .stale, note.kind != .stopped else { return nil }
+    return note
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
+      ResultHeader(model: model, copyFeedback: copyFeedback)
+        .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
       if showsText {
         ResultTextView(
           record: model.result,
           generationState: model.generationState,
-          isStale: model.isResultStale,
           maxVisibleHeight: maxTextHeight
         )
         .frame(maxWidth: .infinity)
       }
-      if let note = model.resultNote {
+      if let note = Self.footerNote(model) {
         ResultNoteRow(note: note)
           .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
       }
     }
     .padding(.vertical, CidaDesign.Spacing.resultVertical)
+    .frame(minHeight: model.isCopyMenuOpen
+      ? CidaDesign.Spacing.resultVertical + ResultHeader.height + CopyMenu.gap + CopyMenu.height + 6 : nil,
+      alignment: .top)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(CidaDesign.surfacePaper)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("result-pane")
+  }
+}
+
+private struct ResultHeader: View {
+  static let height: CGFloat = 26
+  let model: AppModel
+  let copyFeedback: CopyFeedback?
+
+  var body: some View {
+    HStack(spacing: 12) {
+      HStack(spacing: 6) {
+        Text(model.isProcessing ? "正在执行" : model.isResultStale ? "上次结果"
+          : model.result?.phase == .stopped ? "已停止" : "结果")
+          .font(CidaDesign.mainUI(12, weight: .medium))
+          .foregroundStyle(CidaDesign.textSecondary)
+        if model.isResultStale {
+          Text("· 待更新").font(CidaDesign.mainUI(12)).foregroundStyle(CidaDesign.textTertiary)
+        }
+      }
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier(model.isResultStale ? "result-note-stale"
+        : model.result?.phase == .stopped ? "result-note-stopped" : "result-header-status")
+      Spacer(minLength: 12)
+      CopyButton(model: model, feedback: copyFeedback)
+    }
+    .frame(height: Self.height)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("result-header")
   }
 }
 
@@ -876,10 +900,9 @@ private struct PanelMessageView: View {
         TabHint(isDimmed: message.isWorking)
       }
       Spacer(minLength: 12)
-      BarActionButton(
-        model: model,
-        presentation: message.slot == .stop ? .stop : .none
-      )
+      if message.slot == .stop {
+        BarActionButton(model: model, presentation: .stop)
+      }
     }
     .modifier(ControlBarChrome(closesWithHairline: message.hasPaper))
   }

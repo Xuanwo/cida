@@ -374,7 +374,6 @@ final class ResultTextContainer: NSView {
   private var naturalHeightPublicationGeneration = 0
   private var streamingTextViewHeightCapacity: CGFloat = 0
   private var selectionIsActive = false
-  private var isDimmed = false
   private var resultAccessibilityIdentifier: String?
 
   private(set) var fullReplacementCount = 0
@@ -762,27 +761,6 @@ final class ResultTextContainer: NSView {
         ancestor = current.superview
       }
       self.invalidateIntrinsicContentSize()
-    }
-  }
-
-  /// A stale result dims to 55%. The change fades with the note row the panel
-  /// reveals at the same time (`motion-height-ms`, `motion-ease-height`), except
-  /// when it comes with a new document.
-  func setDimmed(_ dimmed: Bool, animated: Bool) {
-    guard dimmed != isDimmed else { return }
-    isDimmed = dimmed
-    let alpha: CGFloat = dimmed ? 0.55 : 1
-    let duration =
-      animated ? CidaMotion.resolvedDuration(CidaMotion.heightSeconds, in: window) : 0
-    guard duration > 0 else {
-      layer?.removeAnimation(forKey: "opacity")
-      alphaValue = alpha
-      return
-    }
-    NSAnimationContext.runAnimationGroup { context in
-      context.duration = duration
-      context.timingFunction = CidaMotion.heightCurve.timingFunction
-      animator().alphaValue = alpha
     }
   }
 

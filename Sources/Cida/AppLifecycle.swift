@@ -884,6 +884,8 @@ private enum DesignState: String {
   case improve
   case streaming
   case stale
+  case staleAction = "stale-action"
+  case staleEmpty = "stale-empty"
   case stopped
   case failed
   case long
@@ -1068,7 +1070,7 @@ private struct LaunchOptions {
   }
 
   var initialMode: ProcessingMode {
-    designState == .improve || designState == .shareImprove ? .improve : .translate
+    designState == .improve || designState == .shareImprove || designState == .staleAction ? .improve : .translate
   }
 
   var initialResult: ResultRecord? {
@@ -1081,7 +1083,7 @@ private struct LaunchOptions {
         return ResultRecord.designCompleted(mode: .improve)
       case .shareRead:
         return ResultRecord.designRead()
-      case .stale:
+      case .stale, .staleAction, .staleEmpty:
         return ResultRecord.designCompleted(mode: .translate)
       case .stopped:
         let record = ResultRecord(
@@ -1135,13 +1137,13 @@ private struct LaunchOptions {
         ResultRecord.designImproveSource
       case .shareRead:
         ResultRecord.designReadSource
-      case .stale:
+      case .stale, .staleAction:
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:
         ResultRecord.designLongInput
       case .lifecycleWelcomeSubmitted:
         "Consistency is the last refuge of the unimaginative."
-      case .empty, .settings, .settingsTranslation, .settingsLanguageEditing,
+      case .empty, .staleEmpty, .settings, .settingsTranslation, .settingsLanguageEditing,
         .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,

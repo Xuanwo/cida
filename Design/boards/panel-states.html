@@ -31,84 +31,97 @@
   <section class="panel" data-state="waiting">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="English" processing action="stop"></cida-bar>
-    <div class="result"><div class="text"><span class="cursor"></span></div></div>
+    <div class="result"><cida-result-header status="streaming" disabled></cida-result-header><div class="text"><span class="cursor"></span></div></div>
   </section>
   <section class="panel" data-state="streaming">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="English" processing action="stop"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write <span class="fading">performance whi</span><span class="cursor"></span></div></div>
+    <div class="result"><cida-result-header status="streaming" disabled></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write <span class="fading">performance whi</span><span class="cursor"></span></div></div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">④ 完成 — 光标 200ms(motion-cursor-out-ms)淡出;右侧槽位由「停止」交叉淡化为「复制结果 ⌘C」(右侧 ⌄ 打开复制菜单,见 ⑤′);焦点仍在原文:⏎ 重新生成,Tab 换动作后 ⏎ 用另一动作处理同一段原文</p>
+  <p class="caption">④ 完成 — 光标 200ms(motion-cursor-out-ms)淡出;右侧槽位由「停止」交叉淡化为「重新执行 ⏎」;复制固定在结果标题行(⌄ 打开复制菜单,见 ⑤′);焦点仍在原文:⏎ 重新执行,Tab 换动作后 ⏎ 用另一动作处理同一段原文</p>
   <section class="panel" data-state="translate">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English" action="copy"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>
 
   <p class="caption">⑤ 已复制 — 点击复制结果或 ⌘C(原文与结果都无选区时;有选区时 ⌘C 复制选区):按钮变「✓ 已复制」800ms(motion-copied-hold-ms)后复原</p>
   <section class="panel" data-state="copied">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English" action="copied"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current" feedback="text"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑤′ 复制菜单 — 「复制结果 ⌘C」右侧的 ⌄ 段打开菜单:复制结果 ⌘C · 复制图片 ⇧⌘C。菜单右缘对齐按钮、顶边在按钮下 6,120ms(motion-icon-in-ms)淡入;悬停的行铺 surface-dim,键帽变白底描边。选一项、Esc、点菜单外都立即收起,Esc 只收起菜单。复制图片把生成这段结果的原文与结果排成一张图放进剪贴板(见 share-card.html),按钮变「✓ 已复制图片」800ms 后复原,面板不隐藏</p>
+  <p class="caption">⑤′ 复制菜单 — 结果标题行「复制 ⌘C」右侧的 ⌄ 段打开菜单:复制结果 ⌘C · 复制图片 ⇧⌘C。菜单右缘对齐按钮、顶边在按钮下 6,120ms(motion-icon-in-ms)淡入;悬停的行铺 surface-dim,键帽变白底描边。选一项、Esc、点菜单外都立即收起,Esc 只收起菜单。复制图片把生成这段结果的原文与结果排成一张图放进剪贴板(见 share-card.html),按钮变「✓ 已复制图片」800ms 后复原,面板不隐藏</p>
   <section class="panel" data-state="copy-menu">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English" action="copy-menu"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current" open></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <section class="panel" data-state="image-copied">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English" action="image-copied"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current" feedback="image"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑥ 已修改 — 原文或动作与生成时不同:结果降为 text-secondary,结果栏末尾一行说明;复制仍可用;不自动重新请求</p>
+  <p class="caption">⑥ 已修改 — 原文或动作与生成时不同:标题显示「上次结果 · 待更新」,正文保持墨色;复制位置不变,控制栏可重新执行;不自动请求</p>
   <section class="panel" data-state="stale">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。</div>
-    <cida-bar target="English" action="copy"></cida-bar>
-    <div class="result">
-      <div class="text stale">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div>
-      <cida-note kind="stale">原文已修改 · ⏎ 重新生成</cida-note>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="stale"></cida-result-header>
+      <div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div>
+    </div>
+  </section>
+  <p class="caption">切换动作:执行新动作;清空原文:禁用执行,保留可复制的上次结果。恢复原文和动作后标题回到「结果」。</p>
+  <section class="panel" data-state="stale-action">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。</div>
+    <cida-bar mode="improve" action="execute"></cida-bar>
+    <div class="result"><cida-result-header status="stale"></cida-result-header>
+      <div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div>
+    </div>
+  </section>
+  <section class="panel" data-state="stale-empty">
+    <div class="source"><span class="placeholder">输入内容，回车翻译…</span></div>
+    <cida-bar action="reexecute" disabled></cida-bar>
+    <div class="result"><cida-result-header status="stale"></cida-result-header>
+      <div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div>
     </div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑦ 已停止 / 出错 — 已输出文字保留;结果栏末尾一行说明代替 alert;⏎ 重试。已停止仍可复制结果,出错时右侧槽位为空</p>
+  <p class="caption">⑦ 已停止 / 出错 — 已输出文字保留;结果栏末尾一行说明代替 alert;⏎ 重试。已停止在标题行标注,有文字时可复制;控制栏保持重新执行</p>
   <section class="panel" data-state="stopped">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English" action="copy"></cida-bar>
-    <div class="result">
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="stopped"></cida-result-header>
       <div class="text">Our system adopts a brand-new storage engine that significantly improves read and write</div>
-      <cida-note kind="stopped">已停止 · ⏎ 重新生成</cida-note>
     </div>
   </section>
   <section class="panel" data-state="failed">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English"></cida-bar>
-    <div class="result"><cida-note kind="failed">请求失败:401 Unauthorized(deepseek-chat)。检查 API Key 后按 ⏎ 重试</cida-note></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current" disabled></cida-result-header><cida-note kind="failed">请求失败:401 Unauthorized(deepseek-chat)。检查 API Key 后按 ⏎ 重试</cida-note></div>
   </section>
   <div class="divider"></div>
 
   <p class="caption">⑧ 改进 — Tab 切到「改进」后 ⏎;输出语言跟随原文,没有外语可选;下次唤起动作回到默认「翻译」</p>
   <section class="panel" data-state="improve">
     <div class="source">这个功能通过复用已有的缓存结果,使得整体的处理流程在大多数的情况下都能够得到比较明显的加速。</div>
-    <cida-bar mode="improve" action="copy"></cida-bar>
-    <div class="result"><div class="text cjk">这个功能复用已有的缓存结果,使整体处理流程在大多数情况下都明显加速。</div></div>
+    <cida-bar mode="improve" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="text cjk">这个功能复用已有的缓存结果,使整体处理流程在大多数情况下都明显加速。</div></div>
   </section>
   <div class="divider"></div>
 
   <p class="caption">⑨ 再次唤起 — 面板带着上次的原文与结果原样出现,动作回到「翻译」,焦点回到原文栏,保留光标与选区,不自动全选;替换整段原文先按 ⌘A,再输入或粘贴</p>
   <section class="panel" data-state="reopened">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English" action="copy"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>
 
@@ -116,23 +129,23 @@
   <section class="panel" data-state="selection-imported">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="English" processing action="stop"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write <span class="fading">performance whi</span><span class="cursor"></span></div></div>
+    <div class="result"><cida-result-header status="streaming" disabled></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write <span class="fading">performance whi</span><span class="cursor"></span></div></div>
   </section>
   <div class="divider"></div>
 
   <p class="caption">⑪ 截图 · 未识别到文字 — 截图翻译快捷键框选的区域里没有文字:原文清空,结果栏只有一行说明「截图里没有识别到文字」(info 图标),不发请求;识别到文字时与 ⑩ 相同,原文是识别结果并立即翻译</p>
   <section class="panel" data-state="capture-unrecognized">
     <div class="source"><span class="placeholder">输入内容，回车翻译…</span></div>
-    <cida-bar></cida-bar>
-    <div class="result"><cida-note kind="unrecognized">截图里没有识别到文字</cida-note></div>
+    <cida-bar action="reexecute" disabled></cida-bar>
+    <div class="result"><cida-result-header status="current" disabled></cida-result-header><cida-note kind="unrecognized">截图里没有识别到文字</cida-note></div>
   </section>
   <div class="divider"></div>
 
   <p class="caption">⑫ 最大高度 — 面板上限 = 屏幕可见高度 70%(panel-max-ratio);原文栏上限 30%(source-max-ratio),超出后内部滚动;结果栏拿剩余,按整行取高(不切在字中间);下方还有文字时底边渐隐</p>
   <section class="panel" data-state="long">
     <div class="source" style="height: 300px; overflow: hidden">在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。</div>
-    <cida-bar target="English" action="copy"></cida-bar>
-    <div class="result"><div class="viewport more-below" style="height: 290px"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data again: schemas are reviewed like public APIs, retention is decided when a table is created rather than when the disk fills up, and the data-access layer reports which queries are about to cross a shard long before they reach production. None of this needs a new database; it needs the same discipline we already apply to code.</div></div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="viewport more-below" style="height: 232px"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data again: schemas are reviewed like public APIs, retention is decided when a table is created rather than when the disk fills up, and the data-access layer reports which queries are about to cross a shard long before they reach production. None of this needs a new database; it needs the same discipline we already apply to code.</div></div></div>
   </section>
   <div class="divider"></div>
 
@@ -140,58 +153,58 @@
   <section class="panel" data-state="long-streaming">
     <div class="source" style="height: 300px; overflow: hidden">在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。</div>
     <cida-bar target="English" processing action="stop"></cida-bar>
-    <div class="result"><div class="viewport more-below" style="height: 290px"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data <span class="fading">again: sche</span><span class="cursor"></span></div></div></div>
+    <div class="result"><cida-result-header status="streaming" disabled></cida-result-header><div class="viewport more-below" style="height: 232px"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data <span class="fading">again: sche</span><span class="cursor"></span></div></div></div>
   </section>
   <div class="divider"></div>
 
   <p class="caption">⑭ 长结果 · 读到中间 — 上下都还有文字,两条边都渐隐:墨色在 58pt(result-fade)内淡到 4%(result-fade-floor);深度等于那边藏着的文字,滚向末端时随之收窄</p>
   <section class="panel" data-state="long-scrolled">
     <div class="source" style="height: 300px; overflow: hidden">在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。</div>
-    <cida-bar target="English" action="copy"></cida-bar>
-    <div class="result"><div class="viewport more-above more-below" style="height: 290px"><div class="text" style="margin-top: -116px">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data again: schemas are reviewed like public APIs, retention is decided when a table is created rather than when the disk fills up, and the data-access layer reports which queries are about to cross a shard long before they reach production. None of this needs a new database; it needs the same discipline we already apply to code.</div></div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="viewport more-above more-below" style="height: 232px"><div class="text" style="margin-top: -116px">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data again: schemas are reviewed like public APIs, retention is decided when a table is created rather than when the disk fills up, and the data-access layer reports which queries are about to cross a shard long before they reach production. None of this needs a new database; it needs the same discipline we already apply to code.</div></div></div>
   </section>
   <div class="divider"></div>
 
   <p class="caption">⑮ 长结果 · 读到末尾 — 最后一行下面没有文字,底边不渐隐;上方还有,顶边渐隐</p>
   <section class="panel" data-state="long-end">
     <div class="source" style="height: 300px; overflow: hidden">在过去的十年里,我们团队的存储架构经历了三次大的演进。最初的单机数据库在业务量突破百万级之后开始频繁出现性能瓶颈,主从复制的延迟问题让读写分离的方案变得不再可靠。第二阶段我们引入了分库分表,虽然缓解了单点压力,但跨分片的事务和查询让业务代码变得越来越复杂,每一次扩容都需要停机迁移数据,运维成本居高不下。第三阶段,也就是现在,我们把核心链路迁移到了分布式数据库上,把冷数据下沉到对象存储,通过统一的数据访问层屏蔽底层差异。这个过程中最大的教训是:架构演进的节奏必须与业务发展的节奏匹配,过早引入复杂性和过晚偿还技术债,代价同样高昂。</div>
-    <cida-bar target="English" action="copy"></cida-bar>
-    <div class="result"><div class="viewport more-above" style="height: 290px; display: flex; flex-direction: column; justify-content: flex-end"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data again: schemas are reviewed like public APIs, retention is decided when a table is created rather than when the disk fills up, and the data-access layer reports which queries are about to cross a shard long before they reach production. None of this needs a new database; it needs the same discipline we already apply to code.</div></div></div>
+    <cida-bar target="English" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="viewport more-above" style="height: 232px; display: flex; flex-direction: column; justify-content: flex-end"><div class="text">Over the past decade, our team's storage architecture has gone through three major evolutions. The initial single-node database began to hit performance bottlenecks frequently once traffic passed the million mark, and replication lag made read/write splitting unreliable. In the second phase we introduced sharding, which relieved the single point of pressure but made cross-shard transactions and queries increasingly complex; every scale-out required downtime to migrate data, and operating costs stayed high. In the third phase, which is where we are now, we moved the core path onto a distributed database, sank cold data into object storage, and hid the underlying differences behind a unified data-access layer. The biggest lesson from this process is that the pace of architectural evolution must match the pace of the business: introducing complexity too early and repaying technical debt too late are equally expensive.<br>Looking ahead, the next step is not another migration. We want every team to own the shape of its data again: schemas are reviewed like public APIs, retention is decided when a table is created rather than when the disk fills up, and the data-access layer reports which queries are about to cross a shard long before they reach production. None of this needs a new database; it needs the same discipline we already apply to code.</div></div></div>
   </section>
   <div class="divider"></div>
   <p class="caption">⑯ 译成我的语言 — 原文不是我的语言:只有一个去处,「翻译」段只有动词;本机识别只决定写不写外语,方向仍由模型判断</p>
   <section class="panel" data-state="translate-into-mine">
     <div class="source">The new storage engine keeps every write in an append-only log.</div>
-    <cida-bar action="copy"></cida-bar>
-    <div class="result"><div class="text cjk">新的存储引擎把每一次写入都记在只追加的日志里。</div></div>
+    <cida-bar action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="text cjk">新的存储引擎把每一次写入都记在只追加的日志里。</div></div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑰ 换一门外语 — ⌘L 或点「English」这几个字,外语就地变成可编辑的文字(全选,下方细线),「成」不动,直接输入即替换;写要译成的语言,写法任意(日本語、한국어、英式英语、文言文);⏎ 确定并重新生成,Esc 或点别处复原。不提供语言列表</p>
+  <p class="caption">⑰ 换一门外语 — ⌘L 或点「English」这几个字,外语就地变成可编辑的文字(全选,下方细线),「成」不动,直接输入即替换;写要译成的语言,写法任意(日本語、한국어、英式英语、文言文);⏎ 确定并重新执行,Esc 或点别处复原。不提供语言列表</p>
   <section class="panel" data-state="target-editing">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target-editing="English" target-selected action="copy"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target-editing="English" target-selected action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <p class="caption">外语已改写 — 确认前说明会重新翻译;Esc 或点别处取消</p>
   <section class="panel" data-state="target-editing-changed">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target-editing="日本語" target-changed action="copy"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target-editing="日本語" target-changed action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <p class="caption">输入法组字 — Enter 先选词,Esc 先取消组字;不提交语言</p>
   <section class="panel" data-state="target-composing">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target-editing="にほん" target-composing action="copy"></cida-bar>
-    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+    <cida-bar target-editing="にほん" target-composing action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑱ 已换成日本語 — 用新的外语重新生成,并记住它:之后唤起面板、⌥D 指着我的语言的一段,都译成日本語</p>
+  <p class="caption">⑱ 已换成日本語 — 用新的外语重新执行,并记住它:之后唤起面板、⌥D 指着我的语言的一段,都译成日本語</p>
   <section class="panel" data-state="target-changed">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="日本語" processing action="stop"></cida-bar>
-    <div class="result"><div class="text cjk">当社のシステムはまったく新しいストレージエンジンを採用し、データの一貫性を保ちながら<span class="fading">読み書き性</span><span class="cursor"></span></div></div>
+    <div class="result"><cida-result-header status="streaming" disabled></cida-result-header><div class="text cjk">当社のシステムはまったく新しいストレージエンジンを採用し、データの一貫性を保ちながら<span class="fading">読み書き性</span><span class="cursor"></span></div></div>
   </section>
 </main>
 </body>
