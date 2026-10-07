@@ -60,6 +60,7 @@ final class PanelController {
   private let hostingView: NSHostingView<PanelView>
   private var keyMonitor: Any?
   private var resignObserver: NSObjectProtocol?
+  private var fieldEditorObserver: NSObjectProtocol?
   private var contentHeight: CGFloat = 120
   /// Identifies the latest height change, so an interrupted animation's
   /// completion does not shrink the host under a newer one.
@@ -103,6 +104,28 @@ final class PanelController {
     panel.contentView = container
     applyRootView()
     installKeyMonitor()
+    // Marked text changes storage attributes without posting textDidChange. Keep SwiftUI's
+    // own field editor and read its composition after AppKit finishes the storage edit.
+    fieldEditorObserver = NotificationCenter.default.addObserver(
+      forName: NSTextStorage.didProcessEditingNotification, object: nil, queue: .main
+    ) { [weak self] notification in
+      let storageID = (notification.object as? NSTextStorage).map(ObjectIdentifier.init)
+      MainActor.assumeIsolated {
+        guard let self, self.model.isEditingForeignLanguage,
+          let editor = self.panel.firstResponder as? NSTextView, editor.isFieldEditor,
+          storageID == editor.textStorage.map(ObjectIdentifier.init)
+        else { return }
+        Task { @MainActor [weak self, weak editor] in
+          guard let self, let editor, self.model.isEditingForeignLanguage,
+            self.panel.firstResponder === editor
+          else { return }
+          let composing = editor.hasMarkedText()
+          if self.model.isComposingForeignLanguage != composing {
+            self.model.isComposingForeignLanguage = composing
+          }
+        }
+      }
+    }
     resignObserver = NotificationCenter.default.addObserver(
       forName: NSWindow.didResignKeyNotification,
       object: panel,
@@ -123,6 +146,10 @@ final class PanelController {
     if let keyMonitor {
       NSEvent.removeMonitor(keyMonitor)
       self.keyMonitor = nil
+    }
+    if let fieldEditorObserver {
+      NotificationCenter.default.removeObserver(fieldEditorObserver)
+      self.fieldEditorObserver = nil
     }
     if let resignObserver {
       NotificationCenter.default.removeObserver(resignObserver)

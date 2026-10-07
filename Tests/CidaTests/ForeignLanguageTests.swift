@@ -103,6 +103,25 @@ final class ForeignLanguageTests: XCTestCase {
     XCTAssertTrue(service.requests.isEmpty)
   }
 
+  func testConfirmationHintOnlyPromisesARequestForAChangedNonblankLanguage() {
+    let model = AppModel(inputText: "我们的系统")
+    model.beginEditingForeignLanguage()
+    XCTAssertEqual(model.foreignLanguageDraft, "English")
+    XCTAssertFalse(model.foreignLanguageEditWillSubmit)
+    model.foreignLanguageDraft = "  English  "
+    XCTAssertFalse(model.foreignLanguageEditWillSubmit)
+    model.foreignLanguageDraft = "  "
+    XCTAssertFalse(model.foreignLanguageEditWillSubmit)
+    model.foreignLanguageDraft = "日本語"
+    XCTAssertTrue(model.foreignLanguageEditWillSubmit)
+    model.cancelForeignLanguageEditing()
+    model.beginEditingForeignLanguage()
+    XCTAssertEqual(model.foreignLanguageDraft, "English", "A cancelled draft is discarded")
+    model.foreignLanguageDraft = "日本語"
+    model.inputText = ""
+    XCTAssertFalse(model.foreignLanguageEditWillSubmit)
+  }
+
   func testAnAbandonedEditKeepsTheLanguage() {
     let model = AppModel(inputText: "我们的系统")
 

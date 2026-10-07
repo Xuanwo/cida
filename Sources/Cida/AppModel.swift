@@ -124,6 +124,19 @@ final class AppModel {
   @ObservationIgnored private(set) var animatesForeignLanguageChange = false
   /// ⌘L or a click on the foreign language turned it into a field.
   private(set) var isEditingForeignLanguage = false
+  var foreignLanguageDraft = ""
+  var isComposingForeignLanguage = false
+
+  var foreignLanguageConfirmationHint: String {
+    if isComposingForeignLanguage { return "输入法组字中 · ⏎ 选词" }
+    return foreignLanguageEditWillSubmit
+      ? "⏎ 确定并重新翻译 · Esc 取消" : "⏎ 确定 · Esc 取消"
+  }
+
+  var foreignLanguageEditWillSubmit: Bool {
+    let language = foreignLanguageDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !language.isEmpty && language != foreignLanguage && hasSubmittableInput
+  }
   /// Bumped when an edit is abandoned: the language as it was is written in again.
   private(set) var foreignLanguageRewriteRevision = 0
   /// Tests set it to zero so the decision follows each change at once.
@@ -391,6 +404,9 @@ final class AppModel {
   @discardableResult
   func beginEditingForeignLanguage() -> Bool {
     guard showsForeignLanguage, !isProcessing, !isEditingForeignLanguage else { return false }
+    foreignLanguageDraft = foreignLanguage
+    isComposingForeignLanguage = false
+    isCopyMenuOpen = false
     isEditingForeignLanguage = true
     return true
   }
@@ -400,6 +416,7 @@ final class AppModel {
   func commitForeignLanguage(_ text: String) {
     guard isEditingForeignLanguage else { return }
     isEditingForeignLanguage = false
+    isComposingForeignLanguage = false
     requestInputFocus()
     let language = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !language.isEmpty else {
@@ -418,6 +435,7 @@ final class AppModel {
   func cancelForeignLanguageEditing() {
     guard isEditingForeignLanguage else { return }
     isEditingForeignLanguage = false
+    isComposingForeignLanguage = false
     foreignLanguageRewriteRevision &+= 1
     requestInputFocus()
   }

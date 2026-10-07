@@ -919,7 +919,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.replaceText(in: name, with: "Concise")
     driver.app.buttons["settings-action-done"].click()
     XCTAssertEqual(try scenarioServer.state().count, requests, "Renaming keeps the cached preview")
-    let custom = driver.app.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch
+    let custom = driver.settingsWindow.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch
     let target = driver.app.buttons["settings-action-translate"]
     custom.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
       .press(forDuration: 0.2, thenDragTo: target.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)))
@@ -931,7 +931,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     shot("actions-reordered")
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     driver.showPanel()
-    let selected = driver.app.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch
+    let selected = driver.panel.buttons.matching(NSPredicate(
+      format: "identifier BEGINSWITH %@ AND label == %@", "action-", "Concise")).firstMatch
     XCTAssertTrue(selected.waitForExistence(timeout: 3))
     XCTAssertTrue(selected.isSelected)
     driver.submit("CIDA_E2E_POOL_CUSTOM_ACTION")
@@ -946,7 +947,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.app.buttons["settings-action-delete"].click()
     XCTAssertTrue(driver.app.buttons["settings-action-undo"].waitForExistence(timeout: 3))
     driver.app.buttons["settings-action-undo"].click()
-    XCTAssertTrue(driver.app.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch.exists)
+    XCTAssertTrue(driver.settingsWindow.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch.exists)
   }
 
   func testActionPreviewFailureRetryAndStopKeepThePreviousResult() throws {
@@ -1017,7 +1018,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.replaceText(in: prompt, with: "Unsaved policy")
     driver.terminate()
     driver.launch()
-    let saved = driver.app.buttons.matching(NSPredicate(format: "label == %@", "Persistent summary")).firstMatch
+    let saved = driver.panel.buttons.matching(NSPredicate(
+      format: "identifier BEGINSWITH %@ AND label == %@", "action-", "Persistent summary")).firstMatch
     XCTAssertTrue(saved.waitForExistence(timeout: 3))
     XCTAssertTrue(saved.isSelected, "The reordered default survives a process restart")
     driver.openSettings()
@@ -1067,10 +1069,13 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
     driver.showPanel()
     for _ in 0..<7 { driver.composer.typeKey(.tab, modifierFlags: []) }
-    let last = driver.app.buttons.matching(NSPredicate(format: "label == %@",
-      "Long action name 5 that exceeds the visible segment width")).firstMatch
+    let last = driver.panel.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@",
+      "action-", "Long action name 5 that exceeds the visible segment width")).firstMatch
     XCTAssertTrue(last.isSelected)
     XCTAssertTrue(last.isHittable, "Tab scrolls the selected action into the production panel")
+    let execute = driver.element(identifier: "bar-action-execute")
+    XCTAssertEqual(execute.label, "执行")
+    XCTAssertEqual(execute.frame.width, 92, accuracy: 1, "Long action names do not widen execution")
     XCTAssertEqual(driver.panel.frame.width, 800, accuracy: 1)
   }
 

@@ -104,12 +104,12 @@ final class ShareCardTests: XCTestCase {
   }
 
   func testTheCopyFeedbackSaysWhatWasCopiedForItsOwnTime() {
-    XCTAssertEqual(BarActionPresentation.resolve(isProcessing: false, canCopyResult: true), .copy)
+    XCTAssertEqual(BarActionPresentation.resolve(isProcessing: false, canCopyResult: true, hasResult: true), .copy)
     XCTAssertEqual(
-      BarActionPresentation.resolve(isProcessing: false, canCopyResult: true, copyFeedback: .image),
+      BarActionPresentation.resolve(isProcessing: false, canCopyResult: true, hasResult: true, copyFeedback: .image),
       .copied(.image))
     XCTAssertEqual(
-      BarActionPresentation.resolve(isProcessing: true, canCopyResult: false, copyFeedback: .image),
+      BarActionPresentation.resolve(isProcessing: true, canCopyResult: false, hasResult: true, copyFeedback: .image),
       .stop)
     XCTAssertEqual(CopyFeedback.imageTooLong.holdMilliseconds, 1_500)
     XCTAssertEqual(CopyFeedback.image.holdMilliseconds, CidaMotion.copiedHoldMilliseconds)

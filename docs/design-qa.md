@@ -22,7 +22,7 @@ compared natively:
 | Board state | `data-state` | `--design-state` |
 | --- | --- | --- |
 | ① 空态 | `empty` | `empty` |
-| ② 输入中 | `typing` | (typing, no fixture) |
+| ② 输入中 | `typing` | `typing` |
 | ③ 生成中 · 等待首字 / 流式 | `waiting` / `streaming` | `streaming` |
 | ④ 完成 | `translate` | `translate` |
 | ⑤ 已复制 | `copied` | (transient, 800 ms) |
@@ -35,6 +35,8 @@ compared natively:
 | ⑫ 最大高度 | `long` | `long` |
 | ⑯ 译成我的语言 | `translate-into-mine` | `translate-into-mine` |
 | ⑰ 换一门外语 · ⌘L | `target-editing` | `target-editing` |
+| Language edit · changed draft | `target-editing-changed` | `target-editing-changed` |
+| Language edit · marked text | `target-composing` | `target-composing` |
 | ⑱ 已换成日本語 | `target-changed` | (after ⏎ in the field; `ForeignLanguageTests`) |
 | 设置 · 模型（默认） | `settings` | `settings` |
 | 设置 · 翻译 | `settings-translation` | `settings-translation` |
@@ -66,7 +68,8 @@ compared natively:
 every state to `Design/rendered/states` at 2x. `scripts/capture-design-states.sh` renders the boards,
 captures every `--design-state` offscreen with an isolated, non-activating Debug build into
 `Design/ImplementationCurrent`, and writes logical-size reference, implementation, and side-by-side
-comparison images to `Design/QACurrent`.
+comparison images to `Design/QACurrent`. These comparisons support local QA. PRs display
+only the native captures, as separate, labeled Before and After images at a readable width.
 
 ## Approved visual contracts
 
@@ -104,7 +107,8 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   `surface-paper`. Accent appears only on the selected action label, the streaming caret, and the
   copied feedback.
 - Control bar: `翻译 | 改进` segmented control (selected item white with hairline and accent text),
-  the `⇥ 切换` hint in `hint`, and one right-hand slot: nothing while typing, `停止 ⌘.` while a
+  the `⇥ 切换` hint in `hint`, and one right-hand slot: `执行 ⏎` while typing
+  (disabled for blank input), `停止 ⌘.` while a
   request runs, `复制结果 ⌘C` once a result exists, `✓ 已复制` on `accent-soft` for 800 ms after
   copying. Every appearance of the panel resets the action to 翻译.
 - Result notes share one row under the result: `原文已修改 · ⏎ 重新生成` (result dimmed to 55%),
@@ -216,3 +220,48 @@ connection check has passed. The implementation follows `Design/spec/lifecycle.m
 - Host isolation passed, with no tested artifact process or focus observed on the host. The
   journeys use the local mock model service, not a live provider. They are targeted diagnostic
   journeys, not the full release gate. No approved pixel baseline changed.
+
+
+## Panel execution and language confirmation
+
+Item 03 was accepted on 2026-10-07. The right-hand slot offers `执行 ⏎` before
+there is a result, disabled for blank input. Execution and stop share a 92 pt minimum width.
+The execution label stays the same for built-in and custom actions; the selected segment identifies the action without duplicating
+potentially long names in the right-hand slot.
+Language editing replaces the slot with an explicit Return/Escape hint; a changed, nonblank
+language and a nonempty source promise immediate translation. Escape and focus loss cancel.
+The field retains native input-method routing, and its submit handler also rejects marked text.
+
+`comparison-empty.png`, `comparison-typing.png`, `comparison-target-editing.png` and
+`comparison-target-editing-changed.png` under `Design/QACurrent` pair the approved boards with
+offscreen native captures. The prior empty/editing native captures from base commit
+`2197412ac5621b657ddddbd39f49d5af744debb2` are retained in `docs/images/panel-execution`. The empty-panel pixel baseline is re-approved for the disabled
+execution button without changing its dimensions or tolerances.
+
+The Composer Tart journeys exercise clicking the selected action, empty-input disabling,
+request counts, language confirmation hints, Return submission, Tab, Escape and focus-loss
+cancellation. Their `execution-ready` and `language-edit-confirmation` screenshots are retained in
+`docs/images/panel-execution`.
+The native field-editor test verifies that marked text switches the hint to candidate selection,
+survives a SwiftUI update, and restores the confirmation hint on unmarking. `target-composing`
+uses native marked text in its offscreen capture. Real Chinese/Japanese input-method sessions
+and VoiceOver navigation remain manual validation boundaries; the Swift suite exercises native
+marked-text routing without host activation.
+The README translation/improvement clips show the changed control bar and need re-recording.
+
+Validation on clean commit `d997dc5179a19ea5a78d3de4f466c4d7c957dcf8`:
+`scripts/e2e/run-nightly-gate.sh --results-dir TestResults/panel-execution-final-gate`
+passed on 2026-10-07 with 317 Swift tests, 38 Tart journeys, and all eight mutations killed
+in both unit and Release tests. The signed Release app tree SHA-256 was
+`2bdb806fa48fcbe3d1b715549f40f074c1434694b2943a6df7b94ba382769109`.
+The pixel baselines, accessibility audit, and host-session guards passed. Structural
+performance checks passed; physical 120 Hz certification was skipped because the active
+display supported 60 Hz. Commit `d4d13be` subsequently retained screenshots and this QA record.
+
+The stable `执行` label follow-up was validated on clean commit
+`481851be6e633b578cd494b343daf8a3ea77cb1f`: warnings-as-errors build, all 317 Swift tests,
+website build, and three focused Tart journeys passed (execution, long custom-action overflow,
+and the empty-panel pixel baseline). The execution screenshot above was refreshed from this run.
+The overflow journey verifies that a long custom-action name leaves the execution button at 92 pt.
+The signed app tree SHA-256 was `83d0a5ab4f636c4bcb53a9d169e1a7dc563234e3acc699aaea3006c76333f224`.
+This focused run supplements the earlier full nightly gate; it does not repeat its mutation tests.

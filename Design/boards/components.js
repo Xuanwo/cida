@@ -25,7 +25,8 @@ class CidaBar extends HTMLElement {
     const action = this.getAttribute("action") ?? "none";
     const actions = {
       none: "",
-      stop: `<div class="bar-action"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
+      execute: `<div class="bar-action execution${this.hasAttribute("disabled") ? " disabled" : ""}"><span class="label">执行</span><span class="key">⏎</span></div>`,
+      stop: `<div class="bar-action execution"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
       copy: copyButton(false),
       "copy-menu": copyButton(true) + copyMenu,
       copied: `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制</span></div>`,
@@ -58,14 +59,14 @@ class CidaBar extends HTMLElement {
         ? `<span class="on">${option}${index === 0 ? joint(option) + object : ""}</span>`
         : `<span>${option}</span>`)
       .join("");
-    const hint = options.length > 1 ? `<span class="tab-hint">⇥ 切换</span>` : "";
+    const hint = options.length > 1 && editing === null ? `<span class="tab-hint">⇥ 切换</span>` : "";
     this.outerHTML = `
       <div class="bar${this.hasAttribute("processing") ? " processing" : ""}">
         <div class="action-group">
           <div class="seg">${segments}</div>
           ${hint}
         </div>
-        ${actions[action]}
+        ${this.hasAttribute("target-composing") ? `<span class="language-confirmation">输入法组字中 · ⏎ 选词</span>` : editing !== null ? `<span class="language-confirmation">⏎ ${this.hasAttribute("target-changed") ? "确定并重新翻译" : "确定"} · Esc 取消</span>` : actions[action]}
       </div>`;
   }
 }

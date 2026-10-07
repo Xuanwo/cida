@@ -13,17 +13,17 @@
 <main class="board" data-board="panel-states">
   <div class="board-title">面板交互 · 状态(动作 = 翻译 / 改进分段选择,Tab 切换,⏎ 执行;量值 = token)</div>
 
-  <p class="caption">① 唤起 · 空态 — 顶边固定在活动屏幕可见高度 20%(panel-top-ratio)处、水平居中;高度 = 输入一行 + 控制条;动作默认「翻译」;右侧槽位为空,⏎ 执行</p>
+  <p class="caption">① 唤起 · 空态 — 顶边固定在活动屏幕可见高度 20%(panel-top-ratio)处、水平居中;高度 = 输入一行 + 控制条;动作默认「翻译」;右侧「执行 ⏎」禁用,输入后可点按执行</p>
   <section class="panel" data-state="empty">
     <div class="source"><span class="placeholder">输入内容，回车翻译…</span></div>
-    <cida-bar></cida-bar>
+    <cida-bar action="execute" disabled></cida-bar>
   </section>
   <div class="divider"></div>
 
   <p class="caption">② 输入中 — Tab 在翻译 / 改进之间切换,⏎ 执行当前动作;原文是我的语言,「翻译」段写作「翻译成」,后面写出要译成的外语「English」,段随之 150ms 变宽;面板每换一行 +26pt,150ms(motion-height-ms)</p>
   <section class="panel" data-state="typing">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English"></cida-bar>
+    <cida-bar target="English" action="execute"></cida-bar>
   </section>
   <div class="divider"></div>
 
@@ -171,6 +171,18 @@
   <section class="panel" data-state="target-editing">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target-editing="English" target-selected action="copy"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <p class="caption">外语已改写 — 确认前说明会重新翻译;Esc 或点别处取消</p>
+  <section class="panel" data-state="target-editing-changed">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target-editing="日本語" target-changed action="copy"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
+  <p class="caption">输入法组字 — Enter 先选词,Esc 先取消组字;不提交语言</p>
+  <section class="panel" data-state="target-composing">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target-editing="にほん" target-composing action="copy"></cida-bar>
     <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
   <div class="divider"></div>

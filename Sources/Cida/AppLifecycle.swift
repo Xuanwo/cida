@@ -762,6 +762,13 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
 
     Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(launchOptions.snapshotDelayMilliseconds))
+      if launchOptions.designState == .targetComposing,
+        let editor = window.firstResponder as? NSTextView, editor.isFieldEditor
+      {
+        editor.setMarkedText("にほん", selectedRange: NSRange(location: 3, length: 0),
+          replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
+        try? await Task.sleep(for: .milliseconds(50))
+      }
       do {
         try SnapshotWriter.write(window: window, to: outputURL)
       } catch {
@@ -835,8 +842,12 @@ extension CidaAppDelegate: UpdatePresenter {
         model.prepareSetupWelcome()
         model.settings = configured
       }
-      if launchOptions.designState == .targetEditing {
+      if launchOptions.designState == .targetEditing || launchOptions.designState == .targetEditingChanged
+        || launchOptions.designState == .targetComposing
+      {
         model.beginEditingForeignLanguage()
+        if launchOptions.designState == .targetEditingChanged { model.foreignLanguageDraft = "日本語" }
+        if launchOptions.designState == .targetComposing { model.foreignLanguageDraft = "にほん" }
       }
     }
   #endif
@@ -878,6 +889,9 @@ private enum DesignState: String {
   case long
   case translateIntoMine = "translate-into-mine"
   case targetEditing = "target-editing"
+  case targetEditingChanged = "target-editing-changed"
+  case targetComposing = "target-composing"
+  case typing
   case settings
   case settingsTranslation = "settings-translation"
   case settingsLanguageEditing = "settings-language-editing"
@@ -1089,9 +1103,9 @@ private struct LaunchOptions {
         return ResultRecord.designLong()
       case .translateIntoMine:
         return ResultRecord.designIntoMine()
-      case .targetEditing:
+      case .targetEditing, .targetEditingChanged, .targetComposing:
         return ResultRecord.designCompleted(mode: .translate)
-      case .empty, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
+      case .empty, .typing, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
         .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
@@ -1113,7 +1127,7 @@ private struct LaunchOptions {
     guard usesDesignFixtures else { return "" }
     #if DEBUG
       return switch designState {
-      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate, .targetEditing:
+      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate, .targetEditing, .targetEditingChanged, .targetComposing, .typing:
         ResultRecord.designTranslateSource
       case .translateIntoMine:
         ResultRecord.designIntoMineSource
