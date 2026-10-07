@@ -233,6 +233,9 @@ body {
   background: var(--surface);
   color: var(--text-control);
 }
+.bar-action.execution { min-width: 92px; justify-content: center; }
+.bar-action.disabled { opacity: 0.45; }
+.language-confirmation { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 .bar-action .label { font-size: var(--font-size-label); font-weight: 600; }
 .bar-action .key { font-size: var(--font-size-caption); color: var(--text-tertiary); }
 .bar-action .stop-icon {

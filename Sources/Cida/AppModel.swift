@@ -124,6 +124,12 @@ final class AppModel {
   @ObservationIgnored private(set) var animatesForeignLanguageChange = false
   /// ⌘L or a click on the foreign language turned it into a field.
   private(set) var isEditingForeignLanguage = false
+  var foreignLanguageDraft = ""
+
+  var foreignLanguageEditWillSubmit: Bool {
+    let language = foreignLanguageDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !language.isEmpty && language != foreignLanguage && hasSubmittableInput
+  }
   /// Bumped when an edit is abandoned: the language as it was is written in again.
   private(set) var foreignLanguageRewriteRevision = 0
   /// Tests set it to zero so the decision follows each change at once.
@@ -391,6 +397,8 @@ final class AppModel {
   @discardableResult
   func beginEditingForeignLanguage() -> Bool {
     guard showsForeignLanguage, !isProcessing, !isEditingForeignLanguage else { return false }
+    foreignLanguageDraft = foreignLanguage
+    isCopyMenuOpen = false
     isEditingForeignLanguage = true
     return true
   }

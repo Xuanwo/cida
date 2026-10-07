@@ -27,10 +27,11 @@ struct PanelForeignLanguage: View {
   @State private var fade = 0.0
   @State private var wordWidth: CGFloat = 0
   @State private var jointGlyphWidth: CGFloat = 0
-  @State private var draft = ""
+  @State private var isHovered = false
   @State private var draftWidth: CGFloat = 0
   @State private var leaveTask: Task<Void, Never>?
   @FocusState private var isFieldFocused: Bool
+  @FocusState private var isLanguageFocused: Bool
 
   var body: some View {
     content
@@ -47,6 +48,21 @@ struct PanelForeignLanguage: View {
       .background(measurements)
       .contentShape(Rectangle())
       .onTapGesture { model.beginEditingForeignLanguage() }
+      .onHover { isHovered = $0 }
+      .focusable(!model.isEditingForeignLanguage && model.showsForeignLanguage)
+      .focused($isLanguageFocused)
+      .focusEffectDisabled()
+      .overlay {
+        if isLanguageFocused && !model.isEditingForeignLanguage {
+          RoundedRectangle(cornerRadius: 2)
+            .strokeBorder(CidaDesign.accent, lineWidth: 1)
+        }
+      }
+      .onKeyPress(.space) {
+        model.beginEditingForeignLanguage() ? .handled : .ignored
+      }
+      .help("点按或 ⌘L 修改")
+      .accessibilityAction { model.beginEditingForeignLanguage() }
       .accessibilityElement(children: model.isEditingForeignLanguage ? .contain : .ignore)
       .accessibilityLabel("要译成的语言")
       .accessibilityValue(model.foreignLanguage)
@@ -75,7 +91,6 @@ struct PanelForeignLanguage: View {
   }
 
   private func startEditing() {
-    draft = model.foreignLanguage
     Task { @MainActor in isFieldFocused = true }
   }
 
@@ -99,12 +114,15 @@ struct PanelForeignLanguage: View {
   @ViewBuilder
   private var language: some View {
     if model.isEditingForeignLanguage {
-      TextField("", text: $draft)
+      TextField("", text: $model.foreignLanguageDraft)
         .textFieldStyle(.plain)
         .font(Self.font)
         .foregroundStyle(CidaDesign.textPrimary)
         .focused($isFieldFocused)
-        .onSubmit { model.commitForeignLanguage(draft) }
+        .onSubmit {
+          if let window = NSApp.keyWindow, InputMethodRouting.isComposing(in: window) { return }
+          model.commitForeignLanguage(model.foreignLanguageDraft)
+        }
         .frame(width: draftWidth + 2, alignment: .leading)
         .overlay(alignment: .bottom) {
           Rectangle()
@@ -118,6 +136,7 @@ struct PanelForeignLanguage: View {
       Text(model.foreignLanguage)
         .font(Self.font)
         .foregroundStyle(CidaDesign.textSecondary)
+        .underline(isHovered, color: CidaDesign.textSecondary)
         .fixedSize()
         .textRenderer(
           WriteInRenderer(
@@ -151,7 +170,7 @@ struct PanelForeignLanguage: View {
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { jointGlyphWidth = $0 }
       Text(model.foreignLanguage).font(Self.font).fixedSize()
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { wordWidth = $0 }
-      Text(draft.isEmpty ? " " : draft).font(Self.font).fixedSize()
+      Text(model.foreignLanguageDraft.isEmpty ? " " : model.foreignLanguageDraft).font(Self.font).fixedSize()
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { draftWidth = $0 }
     }
     .hidden()

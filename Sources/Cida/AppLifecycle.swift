@@ -835,8 +835,9 @@ extension CidaAppDelegate: UpdatePresenter {
         model.prepareSetupWelcome()
         model.settings = configured
       }
-      if launchOptions.designState == .targetEditing {
+      if launchOptions.designState == .targetEditing || launchOptions.designState == .targetEditingChanged {
         model.beginEditingForeignLanguage()
+        if launchOptions.designState == .targetEditingChanged { model.foreignLanguageDraft = "日本語" }
       }
     }
   #endif
@@ -878,6 +879,8 @@ private enum DesignState: String {
   case long
   case translateIntoMine = "translate-into-mine"
   case targetEditing = "target-editing"
+  case targetEditingChanged = "target-editing-changed"
+  case typing
   case settings
   case settingsTranslation = "settings-translation"
   case settingsLanguageEditing = "settings-language-editing"
@@ -1089,9 +1092,9 @@ private struct LaunchOptions {
         return ResultRecord.designLong()
       case .translateIntoMine:
         return ResultRecord.designIntoMine()
-      case .targetEditing:
+      case .targetEditing, .targetEditingChanged:
         return ResultRecord.designCompleted(mode: .translate)
-      case .empty, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
+      case .empty, .typing, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
         .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
@@ -1113,7 +1116,7 @@ private struct LaunchOptions {
     guard usesDesignFixtures else { return "" }
     #if DEBUG
       return switch designState {
-      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate, .targetEditing:
+      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate, .targetEditing, .targetEditingChanged, .typing:
         ResultRecord.designTranslateSource
       case .translateIntoMine:
         ResultRecord.designIntoMineSource

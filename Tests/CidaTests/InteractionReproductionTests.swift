@@ -190,7 +190,7 @@ final class InteractionReproductionTests: XCTestCase {
     assertTestProcessIsNotFrontmost()
   }
 
-  /// One slot, three phases: nothing while typing, 停止 while a request runs,
+  /// One slot: execute while typing, 停止 while a request runs,
   /// 复制结果 once a result exists, ✓ 已复制 right after copying.
   func testControlBarSlotShowsStopWhileStreamingAndCopyAfterwards() async throws {
     let model = AppModel(
@@ -201,10 +201,11 @@ final class InteractionReproductionTests: XCTestCase {
       .resolve(
         isProcessing: model.isProcessing,
         canCopyResult: model.canCopyResult,
+        hasResult: model.result != nil,
         copyFeedback: copied ? .text : nil
       )
     }
-    XCTAssertEqual(slot(), .none)
+    XCTAssertEqual(slot(), .execute)
 
     XCTAssertTrue(model.submit())
     XCTAssertEqual(slot(), .stop)

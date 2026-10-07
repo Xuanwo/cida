@@ -185,6 +185,7 @@ struct PanelView: View {
     .resolve(
       isProcessing: model.isProcessing,
       canCopyResult: model.canCopyResult,
+      hasResult: model.result != nil,
       copyFeedback: shownCopyFeedback
     )
   }
@@ -260,9 +261,19 @@ private struct ControlBar: View {
   var body: some View {
     HStack(spacing: 8) {
       ModeSegmentedControl(model: model, isEnabled: !model.isProcessing)
-      TabHint(isDimmed: model.isProcessing)
+      if !model.isEditingForeignLanguage { TabHint(isDimmed: model.isProcessing) }
       Spacer(minLength: 12)
-      BarActionButton(model: model, presentation: presentation)
+      if model.isEditingForeignLanguage {
+        Text(model.foreignLanguageEditWillSubmit
+          ? "⏎ 确定并重新翻译 · Esc 取消" : "⏎ 确定 · Esc 取消")
+          .font(CidaDesign.mainUI(11))
+          .foregroundStyle(CidaDesign.textTertiary)
+          .fixedSize()
+          .accessibilityIdentifier("foreign-language-confirmation-hint")
+      } else {
+        BarActionButton(model: model, presentation: presentation)
+          .fixedSize()
+      }
     }
     .modifier(ControlBarChrome(closesWithHairline: closesWithHairline))
   }
@@ -420,7 +431,7 @@ private struct DimmedWhileWorking: ViewModifier {
   }
 }
 
-/// One slot, one button, three phases: nothing while typing, 停止 while a
+/// One slot, one button: execute while typing, 停止 while a
 /// request runs, 复制结果 once a result exists (`Design/spec/panel.md` §二),
 /// with the segment that opens the copy menu (§八).
 private struct BarActionButton: View {
@@ -432,8 +443,18 @@ private struct BarActionButton: View {
       switch presentation {
       case .none:
         EmptyView()
+      case .execute:
+        pill(
+          identifier: "bar-action-execute",
+          label: model.settings.actions.first(where: { $0.id == model.mode })?.name ?? model.mode.title,
+          key: "⏎", accent: false, minimumWidth: 92
+        ) { EmptyView() } action: {
+          model.submit()
+        }
+        .disabled(!model.hasSubmittableInput)
+        .opacity(model.hasSubmittableInput ? 1 : 0.45)
       case .stop:
-        pill(identifier: "bar-action-stop", label: "停止", key: "⌘.", accent: false) {
+        pill(identifier: "bar-action-stop", label: "停止", key: "⌘.", accent: false, minimumWidth: 92) {
           RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(CidaDesign.textControl)
             .frame(width: 10, height: 10)
@@ -465,6 +486,7 @@ private struct BarActionButton: View {
     label: String,
     key: String?,
     accent: Bool,
+    minimumWidth: CGFloat = 0,
     @ViewBuilder icon: () -> Icon,
     action: @escaping () -> Void
   ) -> some View {
@@ -481,6 +503,7 @@ private struct BarActionButton: View {
         }
       }
       .padding(.horizontal, 12)
+      .frame(minWidth: minimumWidth)
       .frame(height: 30)
       .background {
         RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)

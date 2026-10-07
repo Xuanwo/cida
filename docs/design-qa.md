@@ -22,7 +22,7 @@ compared natively:
 | Board state | `data-state` | `--design-state` |
 | --- | --- | --- |
 | ① 空态 | `empty` | `empty` |
-| ② 输入中 | `typing` | (typing, no fixture) |
+| ② 输入中 | `typing` | `typing` |
 | ③ 生成中 · 等待首字 / 流式 | `waiting` / `streaming` | `streaming` |
 | ④ 完成 | `translate` | `translate` |
 | ⑤ 已复制 | `copied` | (transient, 800 ms) |
@@ -35,6 +35,7 @@ compared natively:
 | ⑫ 最大高度 | `long` | `long` |
 | ⑯ 译成我的语言 | `translate-into-mine` | `translate-into-mine` |
 | ⑰ 换一门外语 · ⌘L | `target-editing` | `target-editing` |
+| Language edit · changed draft | `target-editing-changed` | `target-editing-changed` |
 | ⑱ 已换成日本語 | `target-changed` | (after ⏎ in the field; `ForeignLanguageTests`) |
 | 设置 · 模型（默认） | `settings` | `settings` |
 | 设置 · 翻译 | `settings-translation` | `settings-translation` |
@@ -216,3 +217,25 @@ connection check has passed. The implementation follows `Design/spec/lifecycle.m
 - Host isolation passed, with no tested artifact process or focus observed on the host. The
   journeys use the local mock model service, not a live provider. They are targeted diagnostic
   journeys, not the full release gate. No approved pixel baseline changed.
+
+
+## Panel execution and language confirmation
+
+Item 03 was accepted on 2026-10-07. The right-hand slot offers the selected action before
+there is a result, disabled for blank input. Execution and stop share a 92 pt minimum width.
+Language editing replaces the slot with an explicit Return/Escape hint; a changed, nonblank
+language and a nonempty source promise immediate translation. Escape and focus loss cancel.
+The field retains native input-method routing, and its submit handler also rejects marked text.
+
+`comparison-empty.png`, `comparison-typing.png`, `comparison-target-editing.png` and
+`comparison-target-editing-changed.png` under `Design/QACurrent` pair the approved boards with
+offscreen native captures. The prior empty/editing comparisons are retained in
+`docs/images/panel-execution`. The empty-panel pixel baseline is re-approved for the disabled
+execution button without changing its dimensions or tolerances.
+
+The Composer Tart journeys exercise clicking the selected action, empty-input disabling,
+request counts, language confirmation hints, Return submission, Tab, Escape and focus-loss
+cancellation. They retain `execution-ready` and `language-edit-confirmation` screenshots.
+Real Chinese/Japanese input-method sessions and VoiceOver navigation remain manual validation
+boundaries; the Swift suite exercises native marked-text routing without host activation.
+The README translation/improvement clips show the changed control bar and need re-recording.

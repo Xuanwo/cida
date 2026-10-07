@@ -49,10 +49,12 @@ enum CopyFeedback: Equatable, Sendable {
 }
 
 /// What the right-hand slot of the control bar shows. One slot, one button,
-/// three phases (`Design/spec/panel.md` §二); 复制结果 carries the segment that
+/// with execution available before the first result (`Design/spec/panel.md` §二).
+/// 复制结果 carries the segment that
 /// opens the copy menu (§八).
 enum BarActionPresentation: Equatable, Sendable {
   case none
+  case execute
   case stop
   case copy
   case copied(CopyFeedback)
@@ -60,11 +62,12 @@ enum BarActionPresentation: Equatable, Sendable {
   static func resolve(
     isProcessing: Bool,
     canCopyResult: Bool,
+    hasResult: Bool,
     copyFeedback: CopyFeedback? = nil
   ) -> BarActionPresentation {
     if isProcessing { return .stop }
     if let copyFeedback { return .copied(copyFeedback) }
     if canCopyResult { return .copy }
-    return .none
+    return hasResult ? .none : .execute
   }
 }

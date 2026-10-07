@@ -3,6 +3,27 @@ import XCTest
 
 @MainActor
 final class ComposerJourneyTests: CidaReleaseUITestCase {
+  func testExecutionButtonRunsTheSelectedActionAndDisablesForEmptySource() throws {
+    driver.launch()
+    let execute = driver.element(identifier: "bar-action-execute")
+    XCTAssertTrue(execute.waitForExistence(timeout: 3))
+    XCTAssertFalse(execute.isEnabled)
+    driver.improveAction.click()
+    XCTAssertTrue(try scenarioServer.state().isEmpty, "Choosing an action does not submit")
+    driver.replaceSource(with: "This sentence are unclear and too wordy. CIDA_E2E_IMPROVE_ENGLISH")
+    XCTAssertTrue(execute.isEnabled)
+    XCTAssertEqual(execute.label, "改进")
+    XCTContext.runActivity(named: "Clickable execution before the first result") { activity in
+      driver.attachPanelScreenshot(named: "execution-ready", to: activity)
+    }
+    execute.click()
+    XCTAssertTrue(driver.result(containing: "CIDA_E2E_IMPROVE_ENGLISH_COMPLETE").waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+    XCTAssertFalse(execute.exists)
+    XCTAssertTrue(driver.copyButton.exists)
+    XCTAssertEqual(try scenarioServer.state().count, 1)
+  }
+
   func testImprovementPreservesEnglishAndChineseSourceLanguages() {
     driver.launch()
 
@@ -32,7 +53,7 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
 
   /// `Design/spec/panel.md` §三: a source in my language writes the foreign language after
   /// 翻译, ⌘L rewrites it in place, ⏎ keeps it and translates again, Esc drops an edit.
-  func testForeignLanguageIsRewrittenAfterTranslateAndTranslatesAgain() {
+  func testForeignLanguageIsRewrittenAfterTranslateAndTranslatesAgain() throws {
     driver.launch()
     let language = driver.element(identifier: "foreign-language")
     let editor = driver.element(identifier: "foreign-language-editor")
@@ -47,11 +68,22 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
 
     driver.composer.typeKey("l", modifierFlags: .command)
     XCTAssertTrue(editor.waitForExistence(timeout: 3), "⌘L turns the language into a field")
+    let hint = driver.element(identifier: "foreign-language-confirmation-hint")
+    XCTAssertTrue(hint.waitForExistence(timeout: 3))
+    XCTAssertTrue(driver.waitForText(containing: "⏎ 确定 · Esc 取消", in: hint, timeout: 3))
+    XCTAssertFalse(driver.element(identifier: "bar-action-execute").exists)
+    editor.typeKey(.tab, modifierFlags: [])
+    XCTAssertTrue(editor.exists, "Tab stays in the language edit")
     // ⌘L leaves the language selected, so pasting replaces it without a click.
     let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
     XCTAssertTrue(pasteboard.setString("日本語", forType: .string))
     editor.typeKey("v", modifierFlags: .command)
+    XCTAssertTrue(driver.waitForText(containing: "⏎ 确定并重新翻译 · Esc 取消", in: hint, timeout: 3))
+    XCTAssertTrue(try scenarioServer.state().isEmpty, "Editing does not submit")
+    XCTContext.runActivity(named: "Language edit explains the confirmation") { activity in
+      driver.attachPanelScreenshot(named: "language-edit-confirmation", to: activity)
+    }
     editor.typeKey(.return, modifierFlags: [])
 
     XCTAssertTrue(
@@ -68,6 +100,14 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(editor.waitForNonExistence(timeout: 3), "Esc drops the edit")
     XCTAssertTrue(driver.panel.exists, "Esc in the field does not hide the panel")
     XCTAssertTrue(driver.waitForValue("日本語", in: language, timeout: 2))
+
+    language.click()
+    XCTAssertTrue(editor.waitForExistence(timeout: 3))
+    editor.typeText("French")
+    driver.composer.click()
+    XCTAssertTrue(editor.waitForNonExistence(timeout: 3), "Clicking elsewhere cancels")
+    XCTAssertTrue(driver.waitForValue("日本語", in: language, timeout: 2))
+    XCTAssertEqual(try scenarioServer.state().count, 1, "Neither cancellation makes a request")
 
     driver.hidePanel()
     driver.showPanel()
