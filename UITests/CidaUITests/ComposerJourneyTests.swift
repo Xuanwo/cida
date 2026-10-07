@@ -22,9 +22,62 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     execute.click()
     XCTAssertTrue(driver.result(containing: "CIDA_E2E_IMPROVE_ENGLISH_COMPLETE").waitForExistence(timeout: 8))
     driver.waitForCompletion()
-    XCTAssertFalse(execute.exists)
+    XCTAssertTrue(execute.exists)
+    XCTAssertEqual(execute.label, "重新执行")
     XCTAssertTrue(driver.copyButton.exists)
     XCTAssertEqual(try scenarioServer.state().count, 1)
+  }
+
+  func testOldResultKeepsCopyAndExecutionInTheirOwnPlaces() throws {
+    driver.launch()
+    let source = "CIDA_E2E_POOL_COPY"
+    driver.submit(source)
+    let completed = driver.result(containing: "CIDA_E2E_POOL_COPY_COMPLETE")
+    XCTAssertTrue(completed.waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+    let output = driver.textValue(in: completed)
+    let execute = driver.element(identifier: "bar-action-execute")
+    let copyFrame = driver.copyButton.frame
+    XCTAssertEqual(execute.label, "重新执行")
+    XCTAssertGreaterThan(copyFrame.minY, execute.frame.maxY, "Copy belongs to the result")
+
+    driver.replaceSource(with: "CIDA_E2E_POOL_EDITED")
+    XCTAssertTrue(driver.resultNote("stale").waitForExistence(timeout: 3))
+    XCTAssertTrue(driver.waitForText(containing: "待更新", in: driver.resultNote("stale"), timeout: 2))
+    XCTAssertEqual(driver.textValue(in: completed), output)
+    XCTAssertEqual(driver.copyButton.frame.minY, copyFrame.minY, accuracy: 1)
+    XCTAssertEqual(execute.label, "重新执行")
+    driver.copyButton.click()
+    XCTAssertTrue(driver.waitForPasteboard(output, timeout: 2))
+    XCTAssertTrue(execute.exists, "Copy feedback never occupies the execution slot")
+    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 3))
+    driver.copyMenuButton.click()
+    XCTAssertTrue(driver.copyMenuResultItem.waitForExistence(timeout: 2))
+    XCTAssertEqual(driver.copyMenuResultItem.label, "复制上次结果")
+    XCTAssertTrue(driver.copyMenuImageItem.isHittable, "The menu fits even a short result")
+    driver.copyMenuButton.click()
+
+    driver.improveAction.click()
+    XCTAssertEqual(execute.label, "执行")
+    driver.translateAction.click()
+    XCTAssertEqual(execute.label, "重新执行")
+    driver.replaceSource(with: source)
+    XCTAssertTrue(driver.resultNote("stale").waitForNonExistence(timeout: 3))
+    XCTAssertEqual(try scenarioServer.state().count, 1, "Editing or restoring never submits")
+
+    driver.replaceSource(with: "")
+    XCTAssertFalse(execute.isEnabled)
+    XCTAssertTrue(driver.copyButton.isEnabled)
+    XCTAssertTrue(driver.resultNote("stale").exists)
+    driver.copyButton.click()
+    XCTAssertTrue(driver.waitForPasteboard(output, timeout: 2))
+
+    driver.replaceSource(with: "CIDA_E2E_POOL_EDITED")
+    execute.click()
+    XCTAssertTrue(driver.result(containing: "CIDA_E2E_POOL_EDITED_COMPLETE").waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+    XCTAssertFalse(driver.resultNote("stale").exists)
+    XCTAssertEqual(try scenarioServer.state().count, 2)
   }
 
   func testImprovementPreservesEnglishAndChineseSourceLanguages() {

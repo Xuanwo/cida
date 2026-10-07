@@ -246,27 +246,21 @@ body {
 }
 .bar-action.copied { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
 
-/* 复制结果 and the segment that opens its menu: one pill, a short inset
- * hairline between the two, a quiet chevron. */
-.copy-button {
-  display: flex;
-  align-items: center;
-  height: 30px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  color: var(--text-control);
-}
-.copy-button .main { display: flex; align-items: center; gap: 8px; height: 100%; padding: 0 10px 0 12px; }
-.copy-button .label { font-size: var(--font-size-label); font-weight: 600; }
+/* Quiet result actions share a fixed header, including copy feedback. */
+.result-header { display: flex; align-items: center; justify-content: space-between; height: 26px; position: relative; flex-shrink: 0; }
+.result-status { display: flex; gap: 6px; font: 500 12px var(--font-ui); color: var(--text-secondary); }
+.result-status span { font-weight: 400; color: var(--text-tertiary); }
+.copy-button { display: flex; align-items: center; justify-content: flex-end; min-width: 116px; height: 26px; border-radius: var(--radius-card); color: var(--text-control); }
+.copy-button .main { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 8px; }
+.copy-button .icon { width: 12px; height: 12px; }
+.copy-button .label { font-size: var(--font-size-label); font-weight: 500; }
 .copy-button .key { font-size: var(--font-size-caption); color: var(--text-tertiary); }
-.copy-button .rule { width: 1px; height: 14px; background: var(--border); }
-.copy-button .more { display: flex; align-items: center; justify-content: center; width: 26px; height: 100%; }
+.copy-button .more { display: flex; align-items: center; justify-content: center; width: 22px; height: 100%; }
 .copy-button .more .icon { width: 10px; height: 10px; color: var(--text-tertiary); }
-.copy-button.open .rule { opacity: 0; }
-.copy-button.open .more { background: var(--surface-dim); }
-.copy-button.open .more .icon { color: var(--text-control); }
+.copy-button.open, .copy-button:hover { background: var(--surface-dim); }
+.copy-button.disabled { opacity: 0.45; }
+.copy-button.copied { background: var(--accent-soft); color: var(--accent); }
+.result:has(.copy-button.open) { min-height: 134px; }
 
 /* The copy menu, drawn by Cida on the hint pill's surface. Radius 14 around
  * 6 of padding keeps the rows' radius 8 concentric with it. Its right edge is
@@ -275,8 +269,8 @@ body {
 .copy-menu {
   position: absolute;
   z-index: 1;
-  top: 46px;
-  right: var(--space-window-x);
+  top: 32px;
+  right: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;

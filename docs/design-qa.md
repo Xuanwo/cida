@@ -265,3 +265,44 @@ and the empty-panel pixel baseline). The execution screenshot above was refreshe
 The overflow journey verifies that a long custom-action name leaves the execution button at 92 pt.
 The signed app tree SHA-256 was `83d0a5ab4f636c4bcb53a9d169e1a7dc563234e3acc699aaea3006c76333f224`.
 This focused run supplements the earlier full nightly gate; it does not repeat its mutation tests.
+
+## Stable result actions
+
+The approved 04 interaction keeps execution in the control bar and copy actions in
+one result header. Editing the source or selecting another action changes the
+header to “上次结果 · 待更新” without dimming or replacing the output. Restoring the
+source and action clears that marker. Empty input disables execution but keeps the
+previous result copyable. Copy feedback never replaces execution; image copying
+continues to use the result's original source.
+
+The 2026-10-07 focused Tart run passed both
+`ComposerJourneyTests/testOldResultKeepsCopyAndExecutionInTheirOwnPlaces` and
+`ComposerJourneyTests/testShiftCommandCCopiesTheSourceAndResultAsAnImage`. These
+exercise native control positions, source restoration, action switching, empty
+input, explicit reruns, pasteboard contents, and repeated menu open/close actions.
+`InteractionReproductionTests` additionally checks that stale result ink remains
+fully opaque. The existing share-card test covers the original source snapshot.
+
+Native before/after captures are retained in `docs/images/stable-result-actions/`.
+The changed panel states, including dark stale output, were captured offscreen
+with `scripts/capture-design-states.sh`. Board comparisons remain local design QA;
+PR screenshots use only the actual App. The empty-panel visual baseline pixels
+are unchanged; only the linked design-document digest changes.
+
+The additional header uses 36 pt of the result's height budget. Copy is visible but
+disabled while a request runs, preserving the terminal-result copy contract.
+The panel and translating/improving README demos now need re-recording to show the
+fixed result actions; capture-overlay and translation-layer demos are unaffected.
+
+The first full native run passed 37 of 39 journeys. The two pre-byte pixel checks
+counted the new “正在执行” header as leaked result ink. The exported failure capture
+shows an empty body. The visual oracle now starts at the native result-text frame,
+so both blank-body and painted-body assertions exclude the header without changing
+their pixel thresholds. Mutation verification must still catch a renderer that
+fails to clear or paint the body.
+
+Both corrected pixel journeys passed in the focused Tart rerun. The follow-up
+nightly run selects `CidaUITests/CoreTranslationJourneyTests` for correctness and
+runs the complete mutation catalog. The other 37 passing native journeys remain
+valid: the follow-up changes only the screenshot oracle, its three call sites,
+and identifier documentation; production code and the other journeys are unchanged.

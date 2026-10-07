@@ -3,18 +3,28 @@
 
 // The panel's own actions by default; a lifecycle panel (spec/lifecycle.md §一) passes its
 // choices as options="移到「应用程序」|暂不" with selected="0", and a status text for the slot.
-// 复制结果 with its menu segment (spec/panel.md §二); open="true" while the menu shows.
-const copyButton = (open) => `
-  <div class="copy-button${open ? " open" : ""}">
-    <div class="main"><i class="icon icon-copy"></i><span class="label">复制结果</span><span class="key">⌘C</span></div>
-    <i class="rule"></i>
-    <div class="more"><i class="icon icon-chevron-down"></i></div>
-  </div>`;
-const copyMenu = `
-  <div class="copy-menu">
-    <div class="row"><i class="icon icon-copy"></i><b>复制结果</b><kbd>⌘C</kbd></div>
-    <div class="row on"><i class="icon icon-image"></i><b>复制图片</b><kbd>⇧⌘C</kbd></div>
-  </div>`;
+// Result actions stay on the paper in every state.
+class CidaResultHeader extends HTMLElement {
+  connectedCallback() {
+    const status = this.getAttribute("status") ?? "current";
+    const feedback = this.getAttribute("feedback");
+    const open = this.hasAttribute("open");
+    const title = { current: "结果", stale: "上次结果", streaming: "正在执行", stopped: "已停止" }[status];
+    const label = feedback === "image" ? "已复制图片" : feedback === "text" ? "已复制" : "复制";
+    this.outerHTML = `<div class="result-header">
+      <div class="result-status">${title}${status === "stale" ? '<span>· 待更新</span>' : ''}</div>
+      <div class="copy-button${open ? ' open' : ''}${this.hasAttribute("disabled") ? ' disabled' : ''}${feedback ? ' copied' : ''}">
+        <div class="main"><i class="icon icon-${feedback ? 'check' : 'copy'}"></i><span class="label">${label}</span>${feedback ? '' : '<span class="key">⌘C</span>'}</div>
+        <div class="more"><i class="icon icon-chevron-down"></i></div>
+      </div>
+      ${open ? `<div class="copy-menu">
+        <div class="row"><i class="icon icon-copy"></i><b>${status === "stale" ? '复制上次结果' : '复制结果'}</b><kbd>⌘C</kbd></div>
+        <div class="row on"><i class="icon icon-image"></i><b>复制图片</b><kbd>⇧⌘C</kbd></div>
+      </div>` : ''}
+    </div>`;
+  }
+}
+customElements.define("cida-result-header", CidaResultHeader);
 
 // target="English" writes the foreign language my language goes into after 翻译, which then
 // reads 翻译成 (spec/panel.md §三); target-editing="日本語" draws it as a field, target-selected
@@ -27,10 +37,7 @@ class CidaBar extends HTMLElement {
       none: "",
       execute: `<div class="bar-action execution${this.hasAttribute("disabled") ? " disabled" : ""}"><span class="label">执行</span><span class="key">⏎</span></div>`,
       stop: `<div class="bar-action execution"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
-      copy: copyButton(false),
-      "copy-menu": copyButton(true) + copyMenu,
-      copied: `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制</span></div>`,
-      "image-copied": `<div class="bar-action copied"><i class="icon icon-check"></i><span class="label">已复制图片</span></div>`,
+      reexecute: `<div class="bar-action execution${this.hasAttribute("disabled") ? " disabled" : ""}"><span class="label">重新执行</span><span class="key">⏎</span></div>`,
       settings: `<div class="bar-action"><span class="label">打开设置</span><span class="key">⌘,</span></div>`,
       status: `<span class="bar-status">${this.getAttribute("status") ?? ""}</span>`,
     };

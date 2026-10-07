@@ -18,8 +18,8 @@
 2. 流式中：字符在光标后淡入，每字 120ms（`motion-char-in-ms`）ease-out（`motion-ease-char-in`），blur 2px（`motion-blur-char-px`）→ 0；第一个字到达时光标用 200ms（`motion-cursor-out-ms`，`motion-ease-cursor-out`）回到 opacity 1，之后随书写头前进，无呼吸（呼吸仅表示等待）。
 3. 高度增长：结果栏与面板高度过渡 150ms（`motion-height-ms`）ease-out（`motion-ease-height`），不逐 token 跳变；面板顶边固定，只向下生长。
 4. 停在开头：面板到上限（`panel-max-ratio`）后结果栏停在开头，新文字在下方继续写、不自动滚动，底边渐隐；用户滚到正在写的最后一行时才跟随尾部，上滚立即解除（`spec/panel.md` §二「长结果」）。
-5. 完成：光标 200ms（`motion-cursor-out-ms`）ease-out（`motion-ease-cursor-out`）淡出；复制按钮 150ms（`motion-icon-swap-ms`）淡入，与停止按钮交叉淡化；动作选择恢复。
-6. 中断 / 出错：已输出文字保留；结果栏末尾展开一行说明「已停止」或「请求失败：…」；光标直接淡出；再次 ⏎ 重新生成。
+5. 完成：光标 200ms（`motion-cursor-out-ms`）ease-out（`motion-ease-cursor-out`）淡出；「重新执行」150ms（`motion-icon-swap-ms`）淡入，与停止按钮交叉淡化；结果标题中的复制按钮恢复可用；动作选择恢复。
+6. 中断 / 出错：已输出文字保留；停止状态更新结果标题为「已停止」，错误仍在结果末尾显示「请求失败：…」；光标直接淡出；再次 ⏎ 重新执行。
 
 ## 三、约束
 

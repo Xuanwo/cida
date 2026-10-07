@@ -479,8 +479,8 @@
       const p = this.m.panel, list = this.ready(), index = list.findIndex((a) => a.id === p.current);
       const names = list.map((a) => esc(esc(a.name.replaceAll("|", "｜")))).join("|");
       const target = p.current === "translate" && cjk(p.source) ? ' target="English"' : "";
-      const action = p.running ? "stop" : p.result?.output ? "copy" : "none";
-      this.querySelector(".bar-host").innerHTML = `<cida-bar options="${names}" selected="${index}" action="${action}"${p.running ? " processing" : ""}${target}></cida-bar>`;
+      const action = p.running ? "stop" : p.result?.id === p.current ? "reexecute" : "execute";
+      this.querySelector(".bar-host").innerHTML = `<cida-bar options="${names}" selected="${index}" action="${action}"${p.running ? " processing" : ""}${!p.source.trim() ? " disabled" : ""}${target}></cida-bar>`;
       this.querySelectorAll(".bar-host .seg > span").forEach((span, i) => {
         const b = document.createElement("button");
         b.type = "button"; b.className = "seg-button cursor-interaction"; b.dataset.pick = list[i].id;
@@ -489,10 +489,10 @@
       });
       const r = p.result, stale = r && (r.id !== p.current || r.source !== p.source);
       this.querySelector(".result-host").innerHTML = p.running
-        ? `<div class="result"><div class="text"><i class="cursor waiting"></i></div></div>`
+        ? `<div class="result"><cida-result-header status="streaming" disabled></cida-result-header><div class="text"><i class="cursor waiting"></i></div></div>`
         : !r ? ""
-        : r.output === null ? `<div class="result">${note("failed", "没有连接模型：只有预置动作在这段样例上有结果")}</div>`
-        : `<div class="result"><div class="text ${cjk(r.output) ? "cjk" : ""} ${stale ? "stale" : ""}">${esc(r.output)}</div>${stale ? note("stale", "原文已修改 · ⏎ 重新生成") : ""}</div>`;
+        : r.output === null ? `<div class="result"><cida-result-header disabled></cida-result-header>${note("failed", "没有连接模型：只有预置动作在这段样例上有结果")}</div>`
+        : `<div class="result"><cida-result-header status="${stale ? "stale" : "current"}"></cida-result-header><div class="text ${cjk(r.output) ? "cjk" : ""}">${esc(r.output)}</div></div>`;
     }
     showPage(page) {
       this.m.page = page;

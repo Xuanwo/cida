@@ -684,7 +684,7 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(driver.composer.waitForExistence(timeout: 5))
     XCTAssertEqual(driver.composer.value as? String, "Good tools leave room for thought.")
     XCTAssertTrue(driver.resultPane.waitForExistence(timeout: 10))
-    XCTAssertTrue(driver.copyButton.waitForExistence(timeout: 15))
+    driver.waitForCompletion(timeout: 15)
     attachWelcome("welcome-trial-completed")
   }
 

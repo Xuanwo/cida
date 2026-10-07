@@ -6,6 +6,7 @@ enum VisualOracle {
     in screenshot: XCUIScreenshot,
     logicalWidth: CGFloat,
     topPoints: CGFloat,
+    ignoringTopPoints: CGFloat = 0,
     ignoringLeadingPoints: CGFloat = 8
   ) -> Int {
     guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation) else {
@@ -15,9 +16,14 @@ enum VisualOracle {
 
     let scale = CGFloat(bitmap.pixelsWide) / max(1, logicalWidth)
     let maximumY = min(bitmap.pixelsHigh, max(1, Int(ceil(topPoints * scale))))
+    let minimumY = max(0, Int(ceil(ignoringTopPoints * scale)))
+    guard minimumY < maximumY else {
+      XCTFail("The screenshot has no visible result body to sample")
+      return .max
+    }
     let minimumX = min(bitmap.pixelsWide, max(0, Int(ceil(ignoringLeadingPoints * scale))))
     var count = 0
-    for y in 0..<maximumY {
+    for y in minimumY..<maximumY {
       for x in minimumX..<bitmap.pixelsWide {
         guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
           continue

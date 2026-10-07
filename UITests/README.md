@@ -37,7 +37,9 @@ The app is a menu-bar application whose main interface is a borderless floating 
 | --- | --- |
 | source editor | `composer-input` |
 | action segment / items | `action-segment`, `action-translate`, `action-improve` |
-| control bar slot | `bar-action-stop`, `bar-action-copy`, `bar-action-copied`, `bar-action-copy-menu`, `bar-action-image-copied`, `bar-action-image-too-long` |
+| control bar slot | `bar-action-execute`, `bar-action-stop` |
+| result header / status | `result-header`, `result-header-status` |
+| result copy actions | `result-action-copy`, `result-action-copied`, `result-action-copy-menu`, `result-action-image-copied`, `result-action-image-too-long` |
 | copy menu / items | `copy-menu`, `copy-menu-result`, `copy-menu-image` |
 | result pane / text | `result-pane`, `result-text` |
 | result notes | `result-note-stale`, `result-note-stopped`, `result-note-failed`, `result-note-unrecognized` |
@@ -46,7 +48,8 @@ The app is a menu-bar application whose main interface is a borderless floating 
 
 ⏎ submits, Tab switches the action, Escape hides, Option-A shows, ⌘, opens Settings, ⌘C copies
 the result when nothing is selected, ⇧⌘C copies the source and result as an image (so does 复制图片 in
-the menu the ⌄ beside 复制结果 opens), ⌘. stops. There is no send button and no title bar.
+the menu the ⌄ beside 复制 opens), ⌘. stops. The control bar also has a clickable
+执行 / 重新执行 button. The panel has no title bar.
 
 ## Journey ownership
 

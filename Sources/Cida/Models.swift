@@ -197,7 +197,7 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
     case .streaming, .completed:
       replacementNote.map { ResultNote(kind: .replacement, text: $0) }
     case .stopped:
-      ResultNote(kind: .stopped, text: "已停止 · ⏎ 重新生成")
+      ResultNote(kind: .stopped, text: "已停止 · ⏎ 重新执行")
     case .failed(let message):
       ResultNote(kind: .failed, text: "请求失败：\(message) 按 ⏎ 重试")
     case .unrecognized:
@@ -218,7 +218,7 @@ struct ResultNote: Equatable, Sendable {
   let kind: Kind
   let text: String
 
-  static let stale = ResultNote(kind: .stale, text: "原文已修改 · ⏎ 重新生成")
+  static let stale = ResultNote(kind: .stale, text: "上次结果 · 待更新")
 }
 
 struct CidaSettings: Equatable, Sendable {

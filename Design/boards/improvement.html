@@ -46,11 +46,11 @@
   <section class="improvement-state" data-state="improvement-unchanged">
     <div class="capture-hint static"><span class="wordmark">辞达</span><span>无需修改 · 原文未变</span></div>
   </section>
-  <div class="state-label">查看结果 · 保留改进动作，不重新生成</div>
+  <div class="state-label">查看结果 · 保留改进动作，不重新执行</div>
   <section class="panel" data-state="improvement-fallback">
     <div class="source">I has send you the file yesterday.</div>
-    <cida-bar mode="improve" action="copy"></cida-bar>
-    <div class="result"><div class="text">I sent you the file yesterday.</div><cida-note kind="unrecognized">编辑位置已变化或无法直接替换，请复制结果后手动使用。</cida-note></div>
+    <cida-bar mode="improve" action="reexecute"></cida-bar>
+    <div class="result"><cida-result-header status="current" disabled></cida-result-header><div class="text">I sent you the file yesterday.</div><cida-note kind="unrecognized">编辑位置已变化或无法直接替换，请复制结果后手动使用。</cida-note></div>
   </section>
 </main>
 </body>

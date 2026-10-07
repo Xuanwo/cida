@@ -52,7 +52,8 @@ final class CidaReleaseArtifactSmokeTests: XCTestCase {
       NSPredicate(format: "identifier == %@ AND value CONTAINS %@", "result-text", "CIDA_UI_E2E_COMPLETE")
     ).firstMatch
     XCTAssertTrue(completedResult.waitForExistence(timeout: 30))
-    XCTAssertTrue(app.buttons["bar-action-copy"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["bar-action-stop"].waitForNonExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["result-action-copy"].isEnabled)
     XCTAssertEqual(composer.value as? String, "CIDA_RELEASE_ARTIFACT_SMOKE")
   }
 }
