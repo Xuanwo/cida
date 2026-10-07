@@ -165,6 +165,35 @@ extension InteractionReproductionTests {
     assertTestProcessIsNotFrontmost()
   }
 
+  func testComposerLanguageHintFollowsTheNativeFieldEditorsMarkedText() async throws {
+    let model = AppModel(inputText: "我们的系统", settings: .designPreview)
+    let controller = makeHiddenPanel(model: model)
+    controller.panel.orderBack(nil)
+    model.beginEditingForeignLanguage()
+    let content = try XCTUnwrap(controller.contentView)
+    try await waitUntil(timeout: .seconds(2)) {
+      self.firstTextField(in: content, identifier: "foreign-language-editor") != nil
+    }
+    let field = try XCTUnwrap(firstTextField(in: content, identifier: "foreign-language-editor"))
+    _ = controller.panel.makeFirstResponder(field)
+    let editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
+    editor.setMarkedText("nihon", selectedRange: NSRange(location: 5, length: 0),
+      replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
+    try await waitUntil(timeout: .seconds(2)) { model.isComposingForeignLanguage }
+    XCTAssertEqual(model.foreignLanguageConfirmationHint, "输入法组字中 · ⏎ 选词")
+    XCTAssertTrue(InputMethodRouting.isComposing(in: controller.panel))
+    XCTAssertTrue(model.isEditingForeignLanguage)
+    XCTAssertNil(model.result)
+    await Task.yield()
+    content.layoutSubtreeIfNeeded()
+    XCTAssertTrue(editor.hasMarkedText(), "Rendering the hint must preserve composition")
+    editor.unmarkText()
+    try await waitUntil(timeout: .seconds(2)) { !model.isComposingForeignLanguage }
+    XCTAssertFalse(model.foreignLanguageConfirmationHint.contains("组字中"))
+    model.cancelForeignLanguageEditing()
+    assertTestProcessIsNotFrontmost()
+  }
+
   func testLongInputAndResultScrollWithSystemScrollBarsOnOneEdge() async throws {
     let model = AppModel(inputText: ResultRecord.designLongInput, settings: .designPreview)
     model.setResultForTesting(ResultRecord.designLong())

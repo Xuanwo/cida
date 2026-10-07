@@ -179,6 +179,12 @@
     <cida-bar target-editing="日本語" target-changed action="copy"></cida-bar>
     <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
   </section>
+  <p class="caption">输入法组字 — Enter 先选词,Esc 先取消组字;不提交语言</p>
+  <section class="panel" data-state="target-composing">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target-editing="にほん" target-composing action="copy"></cida-bar>
+    <div class="result"><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write performance while preserving data consistency.</div></div>
+  </section>
   <div class="divider"></div>
 
   <p class="caption">⑱ 已换成日本語 — 用新的外语重新生成,并记住它:之后唤起面板、⌥D 指着我的语言的一段,都译成日本語</p>

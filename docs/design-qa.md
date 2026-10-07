@@ -36,6 +36,7 @@ compared natively:
 | ⑯ 译成我的语言 | `translate-into-mine` | `translate-into-mine` |
 | ⑰ 换一门外语 · ⌘L | `target-editing` | `target-editing` |
 | Language edit · changed draft | `target-editing-changed` | `target-editing-changed` |
+| Language edit · marked text | `target-composing` | `target-composing` |
 | ⑱ 已换成日本語 | `target-changed` | (after ⏎ in the field; `ForeignLanguageTests`) |
 | 设置 · 模型（默认） | `settings` | `settings` |
 | 设置 · 翻译 | `settings-translation` | `settings-translation` |
@@ -236,6 +237,9 @@ execution button without changing its dimensions or tolerances.
 The Composer Tart journeys exercise clicking the selected action, empty-input disabling,
 request counts, language confirmation hints, Return submission, Tab, Escape and focus-loss
 cancellation. They retain `execution-ready` and `language-edit-confirmation` screenshots.
-Real Chinese/Japanese input-method sessions and VoiceOver navigation remain manual validation
+The native field-editor test verifies that marked text switches the hint to candidate selection,
+survives a SwiftUI update, and restores the confirmation hint on unmarking. `target-composing`
+uses native marked text in its offscreen capture. Real Chinese/Japanese input-method sessions
+and VoiceOver navigation remain manual validation
 boundaries; the Swift suite exercises native marked-text routing without host activation.
 The README translation/improvement clips show the changed control bar and need re-recording.

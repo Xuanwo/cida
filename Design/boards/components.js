@@ -66,7 +66,7 @@ class CidaBar extends HTMLElement {
           <div class="seg">${segments}</div>
           ${hint}
         </div>
-        ${editing !== null ? `<span class="language-confirmation">⏎ ${this.hasAttribute("target-changed") ? "确定并重新翻译" : "确定"} · Esc 取消</span>` : actions[action]}
+        ${this.hasAttribute("target-composing") ? `<span class="language-confirmation">输入法组字中 · ⏎ 选词</span>` : editing !== null ? `<span class="language-confirmation">⏎ ${this.hasAttribute("target-changed") ? "确定并重新翻译" : "确定"} · Esc 取消</span>` : actions[action]}
       </div>`;
   }
 }

@@ -264,8 +264,7 @@ private struct ControlBar: View {
       if !model.isEditingForeignLanguage { TabHint(isDimmed: model.isProcessing) }
       Spacer(minLength: 12)
       if model.isEditingForeignLanguage {
-        Text(model.foreignLanguageEditWillSubmit
-          ? "⏎ 确定并重新翻译 · Esc 取消" : "⏎ 确定 · Esc 取消")
+        Text(model.foreignLanguageConfirmationHint)
           .font(CidaDesign.mainUI(11))
           .foregroundStyle(CidaDesign.textTertiary)
           .fixedSize()
