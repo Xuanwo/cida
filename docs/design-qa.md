@@ -293,3 +293,16 @@ The additional header uses 36 pt of the result's height budget. Copy is visible 
 disabled while a request runs, preserving the terminal-result copy contract.
 The panel and translating/improving README demos now need re-recording to show the
 fixed result actions; capture-overlay and translation-layer demos are unaffected.
+
+The first full native run passed 37 of 39 journeys. The two pre-byte pixel checks
+counted the new “正在执行” header as leaked result ink. The exported failure capture
+shows an empty body. The visual oracle now starts at the native result-text frame,
+so both blank-body and painted-body assertions exclude the header without changing
+their pixel thresholds. Mutation verification must still catch a renderer that
+fails to clear or paint the body.
+
+Both corrected pixel journeys passed in the focused Tart rerun. The follow-up
+nightly run selects `CidaUITests/CoreTranslationJourneyTests` for correctness and
+runs the complete mutation catalog. The other 37 passing native journeys remain
+valid: the follow-up changes only the screenshot oracle, its three call sites,
+and identifier documentation; production code and the other journeys are unchanged.

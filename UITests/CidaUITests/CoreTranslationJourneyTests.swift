@@ -50,6 +50,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     XCTContext.runActivity(named: "No old result pixels before the first byte") { activity in
       // The pane, not the text view: the text view's accessibility frame is
       // its full document height and would screenshot the desktop below. The
+      // result header is excluded using the body's native frame. The
       // bottom 16 pt hold the panel's rounded corners, where the desktop shows,
       // and the leading 34 pt hold the breathing caret, whose faded edge
       // pixels are neutral enough to count as ink.
@@ -64,6 +65,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
           in: screenshot,
           logicalWidth: pane.frame.width,
           topPoints: pane.frame.height - 16,
+          ignoringTopPoints: driver.resultText.frame.minY - pane.frame.minY,
           ignoringLeadingPoints: 34
         ),
         24
@@ -93,7 +95,8 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
         inkPixels = VisualOracle.neutralDarkPixelCount(
           in: screenshot,
           logicalWidth: pane.frame.width,
-          topPoints: pane.frame.height - 16
+          topPoints: pane.frame.height - 16,
+          ignoringTopPoints: driver.resultText.frame.minY - pane.frame.minY
         )
         if inkPixels >= 1_000 { break }
         Thread.sleep(forTimeInterval: 0.2)
@@ -132,6 +135,7 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
         in: preByteScreenshot,
         logicalWidth: pane.frame.width,
         topPoints: pane.frame.height - 16,
+        ignoringTopPoints: driver.resultText.frame.minY - pane.frame.minY,
         ignoringLeadingPoints: 34
       ),
       24,
