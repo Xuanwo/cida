@@ -8,11 +8,14 @@ final class ComposerJourneyTests: CidaReleaseUITestCase {
     let execute = driver.element(identifier: "bar-action-execute")
     XCTAssertTrue(execute.waitForExistence(timeout: 3))
     XCTAssertFalse(execute.isEnabled)
+    XCTAssertEqual(execute.label, "执行")
+    let executionWidth = execute.frame.width
     driver.improveAction.click()
     XCTAssertTrue(try scenarioServer.state().isEmpty, "Choosing an action does not submit")
     driver.replaceSource(with: "This sentence are unclear and too wordy. CIDA_E2E_IMPROVE_ENGLISH")
     XCTAssertTrue(execute.isEnabled)
-    XCTAssertEqual(execute.label, "改进")
+    XCTAssertEqual(execute.label, "执行")
+    XCTAssertEqual(execute.frame.width, executionWidth, accuracy: 1)
     XCTContext.runActivity(named: "Clickable execution before the first result") { activity in
       driver.attachPanelScreenshot(named: "execution-ready", to: activity)
     }

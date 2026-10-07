@@ -25,7 +25,7 @@ class CidaBar extends HTMLElement {
     const action = this.getAttribute("action") ?? "none";
     const actions = {
       none: "",
-      execute: `<div class="bar-action execution${this.hasAttribute("disabled") ? " disabled" : ""}"><span class="label">${mode === "improve" ? "改进" : "翻译"}</span><span class="key">⏎</span></div>`,
+      execute: `<div class="bar-action execution${this.hasAttribute("disabled") ? " disabled" : ""}"><span class="label">执行</span><span class="key">⏎</span></div>`,
       stop: `<div class="bar-action execution"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
       copy: copyButton(false),
       "copy-menu": copyButton(true) + copyMenu,

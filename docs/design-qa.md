@@ -106,7 +106,7 @@ inside a disposable headless Tart macOS session. Neither path activates the test
   `surface-paper`. Accent appears only on the selected action label, the streaming caret, and the
   copied feedback.
 - Control bar: `翻译 | 改进` segmented control (selected item white with hairline and accent text),
-  the `⇥ 切换` hint in `hint`, and one right-hand slot: the selected action while typing
+  the `⇥ 切换` hint in `hint`, and one right-hand slot: `执行 ⏎` while typing
   (disabled for blank input), `停止 ⌘.` while a
   request runs, `复制结果 ⌘C` once a result exists, `✓ 已复制` on `accent-soft` for 800 ms after
   copying. Every appearance of the panel resets the action to 翻译.
@@ -223,8 +223,10 @@ connection check has passed. The implementation follows `Design/spec/lifecycle.m
 
 ## Panel execution and language confirmation
 
-Item 03 was accepted on 2026-10-07. The right-hand slot offers the selected action before
+Item 03 was accepted on 2026-10-07. The right-hand slot offers `执行 ⏎` before
 there is a result, disabled for blank input. Execution and stop share a 92 pt minimum width.
+The execution label stays the same for built-in and custom actions; the selected segment identifies the action without duplicating
+potentially long names in the right-hand slot.
 Language editing replaces the slot with an explicit Return/Escape hint; a changed, nonblank
 language and a nonempty source promise immediate translation. Escape and focus loss cancel.
 The field retains native input-method routing, and its submit handler also rejects marked text.
@@ -253,4 +255,4 @@ in both unit and Release tests. The signed Release app tree SHA-256 was
 `2bdb806fa48fcbe3d1b715549f40f074c1434694b2943a6df7b94ba382769109`.
 The pixel baselines, accessibility audit, and host-session guards passed. Structural
 performance checks passed; physical 120 Hz certification was skipped because the active
-display supported 60 Hz. Subsequent changes only retain screenshots and this QA record.
+display supported 60 Hz. Commit `d4d13be` subsequently retained screenshots and this QA record.

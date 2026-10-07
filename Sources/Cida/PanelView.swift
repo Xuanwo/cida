@@ -445,7 +445,7 @@ private struct BarActionButton: View {
       case .execute:
         pill(
           identifier: "bar-action-execute",
-          label: model.settings.actions.first(where: { $0.id == model.mode })?.name ?? model.mode.title,
+          label: "执行",
           key: "⏎", accent: false, minimumWidth: 92
         ) { EmptyView() } action: {
           model.submit()

@@ -1073,6 +1073,9 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
       "action-", "Long action name 5 that exceeds the visible segment width")).firstMatch
     XCTAssertTrue(last.isSelected)
     XCTAssertTrue(last.isHittable, "Tab scrolls the selected action into the production panel")
+    let execute = driver.element(identifier: "bar-action-execute")
+    XCTAssertEqual(execute.label, "执行")
+    XCTAssertEqual(execute.frame.width, 92, accuracy: 1, "Long action names do not widen execution")
     XCTAssertEqual(driver.panel.frame.width, 800, accuracy: 1)
   }
 
