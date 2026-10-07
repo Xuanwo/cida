@@ -68,7 +68,8 @@ compared natively:
 every state to `Design/rendered/states` at 2x. `scripts/capture-design-states.sh` renders the boards,
 captures every `--design-state` offscreen with an isolated, non-activating Debug build into
 `Design/ImplementationCurrent`, and writes logical-size reference, implementation, and side-by-side
-comparison images to `Design/QACurrent`.
+comparison images to `Design/QACurrent`. These comparisons support local QA. PRs display
+only the native captures, as separate, labeled Before and After images at a readable width.
 
 ## Approved visual contracts
 
@@ -233,8 +234,8 @@ The field retains native input-method routing, and its submit handler also rejec
 
 `comparison-empty.png`, `comparison-typing.png`, `comparison-target-editing.png` and
 `comparison-target-editing-changed.png` under `Design/QACurrent` pair the approved boards with
-offscreen native captures. The prior empty/editing comparisons are retained in
-`docs/images/panel-execution`. The empty-panel pixel baseline is re-approved for the disabled
+offscreen native captures. The prior empty/editing native captures from base commit
+`2197412ac5621b657ddddbd39f49d5af744debb2` are retained in `docs/images/panel-execution`. The empty-panel pixel baseline is re-approved for the disabled
 execution button without changing its dimensions or tolerances.
 
 The Composer Tart journeys exercise clicking the selected action, empty-input disabling,

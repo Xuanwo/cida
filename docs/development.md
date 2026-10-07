@@ -53,7 +53,7 @@ Prompts are stored as stable task policies rather than string templates. Each re
 
 ## Screenshots
 
-`scripts/capture-design-states.sh` captures every panel and Settings state from an isolated, non-activating build into `Design/ImplementationCurrent` and compares each with its board.
+`scripts/capture-design-states.sh` captures every panel and Settings state from an isolated, non-activating build into `Design/ImplementationCurrent` and compares each with its board. For PR screenshots, use only the native captures from that directory (or `Design/QACurrent/implementation-<state>.png`), labeled Before and After and stacked at a readable width. Board renders and stitched comparisons are local QA artifacts; do not embed them in PRs.
 
 The README's demos (`docs/images/demo-*.gif`) are screen recordings of the signed Release app driven by XCUI in a Tart guest. The translation and capture clips use a local article in Chrome. The improvement, custom-action and in-place translation clips use a native writing fixture with public sample text. Model replies come from the loopback scenario server, so the recordings demonstrate interactions rather than remote-model quality. The guest display is 1512 × 982 pt at 2x; recording stays inside the guest, with no host capture or input. Keep the finalized movie as an XCTest attachment with `.keepAlways`, then export it with `xcrun xcresulttool export attachments`. Successful tests normally discard their automatic screen recordings. Decode from the start before cutting the exported movie: direct seeking can lose the reference frames needed by its screen-content encoding.
 

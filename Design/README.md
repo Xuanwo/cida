@@ -62,6 +62,9 @@ everything that never takes focus) and writes, at 2x:
 
 `scripts/capture-design-states.sh` renders the boards, captures the same states from an isolated
 Debug build, and writes logical-size reference, implementation and side-by-side comparison images to
-`QACurrent`. The approved empty-panel and Settings baselines, and the board files they come from,
+`QACurrent`. PRs display only native App captures from `ImplementationCurrent/<state>.png`
+or `QACurrent/implementation-<state>.png`; board renders and stitched comparison images stay
+in local design QA. Label Before and After separately and stack them at a readable width.
+The approved empty-panel and Settings baselines, and the board files they come from,
 are pinned by SHA-256 in `UITests/Resources/VisualBaselines/manifest.json` (see
 [`../docs/design-qa.md`](../docs/design-qa.md)).
