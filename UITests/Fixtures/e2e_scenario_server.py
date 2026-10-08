@@ -140,7 +140,8 @@ def plan_for(submitted_text):
     if "CIDA_AUTO_SEGMENT_" in submitted_text:
         if len(submitted_text.encode("utf-8")) > 80:
             return {"status": 413, "body": "request too large", "failureDelay": 0.01}
-        return {"chunks": [submitted_text.replace("CIDA_AUTO_SEGMENT_", "Completed segment ")]}
+        return {"chunks": [submitted_text.replace("CIDA_AUTO_SEGMENT_", "Completed segment ")],
+                "gateFirstByte": "CIDA_AUTO_SEGMENT_1 " in submitted_text}
     if "CIDA_AUTO_STOP_SEGMENT_" in submitted_text:
         if len(submitted_text.encode("utf-8")) > 60:
             return {"status": 413, "body": "request too large", "failureDelay": 0.01}

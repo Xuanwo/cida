@@ -277,6 +277,9 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     let source = (1...8).map { "CIDA_AUTO_SEGMENT_\($0) " + String(repeating: "source ", count: 4) + "." }
       .joined(separator: "\n\n")
     driver.submit(source, expectsStreamingState: true)
+    let firstSegment = try XCTUnwrap(source.components(separatedBy: "\n\n").first)
+    XCTAssertNotNil(try scenarioServer.wait(for: firstSegment, status: "headers-sent", timeout: 8))
+    try scenarioServer.releaseFirstByte(for: firstSegment)
     let expected = source.replacingOccurrences(of: "CIDA_AUTO_SEGMENT_", with: "Completed segment ")
     XCTAssertTrue(driver.waitForTextValue(expected, in: driver.resultText, timeout: 20))
     driver.waitForCompletion()
