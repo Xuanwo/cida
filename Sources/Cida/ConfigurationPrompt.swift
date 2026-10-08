@@ -23,20 +23,22 @@ enum ConfigurationPrompt {
   static func text(
     executablePath: String = executablePath, settings: CidaSettings,
     lastCheck: ModelServiceCheckRecord? = nil,
-    requestFailure: ProcessingFailure? = nil
+    requestFailure: ProcessingFailure? = nil, previewFailure: ProcessingFailure? = nil
   ) -> String {
+    let failures = [("面板请求", requestFailure), ("动作试运行", previewFailure)].compactMap { context, failure -> String? in
+      guard let failure, failure.configurationFingerprint == settings.modelServiceFingerprint else { return nil }
+      return "\(context)未完成，错误类别为 \(failure.category.rawValue)"
+    }
     let task: String
     if settings.modelService.isUnset {
       task = "从头配置：问我想用哪家模型服务和哪个模型；我没想好时推荐两三个并说明差别。"
     } else if !settings.isModelServiceComplete {
       task = "继续配置：保留已选的服务与模型，读取当前缺项并补齐，不重新从头选择服务。"
-    } else if let failure = requestFailure,
-      failure.configurationFingerprint == settings.modelServiceFingerprint
-    {
+    } else if !failures.isEmpty {
       task = """
-        继续检查：面板请求未完成，错误类别为 \(failure.category.rawValue)。这不是一次连接检查的结果。
+        继续检查：\(failures.joined(separator: "；"))。这不是一次连接检查的结果。
         先运行 `Cida config show --json` 与 `Cida check --verbose`，按诊断证据修正并验证，默认保留现有服务与模型。
-        面板原文、输出和服务商原文未附带；普通连接检查成功不能证明原请求已恢复，自动分段仍无法完成时，应检查模型容量、提示词和请求参数。不索取用户原文来盲目重现。
+        请求原文、输出和服务商原文未附带；普通连接检查成功不能证明原请求已恢复，自动分段仍无法完成时，应检查模型容量、提示词和请求参数。不索取用户原文来盲目重现。
         """
     } else if let lastCheck, !lastCheck.passed,
       lastCheck.fingerprint == settings.modelServiceFingerprint

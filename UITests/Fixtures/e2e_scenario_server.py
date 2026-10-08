@@ -86,13 +86,14 @@ class ScenarioState:
                 item
                 for item in self.requests
                 if item["scenario"] == scenario
-                and item["status"] in {"request-received", "headers-sent"}
+                and item["status"] in {"request-received", "headers-sent", "chunk-sent"}
             ]
             if not matching:
                 return False
             request_id = matching[-1]["requestID"]
             self.gates[request_id].set()
-        self.event(request_id, "first-byte-released")
+            after_partial = matching[-1]["chunksSent"] > 0
+        self.event(request_id, "remaining-chunks-released" if after_partial else "first-byte-released")
         return True
 
     def reset(self):
@@ -128,7 +129,9 @@ def plan_for(submitted_text):
             return {"status": 503, "body": "controlled preview failure"}
         return {"chunks": ["CIDA_ACTION_RECOVERED"]}
     if submitted_text == "CIDA_ACTION_STOP":
-        return {"chunks": ["CIDA_ACTION_STOPPED_LATE"], "gateFirstByte": True}
+        return {"chunks": ["CIDA_ACTION_PARTIAL", "CIDA_ACTION_STOPPED_LATE"], "gateAfterChunks": 1}
+    if submitted_text == "CIDA_ACTION_CONFIG":
+        return {"status": 401, "body": "PRIVATE_PROVIDER_CANARY"}
     if submitted_text == "CIDA_E2E_PARTIAL_FAILURE":
         attempts = sum(item["scenario"] == submitted_text for item in state.snapshot()["requests"])
         if attempts == 1:
@@ -389,7 +392,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         scenario = submitted_text
         # The preview's input stays fixed; policies identify controlled failure/stop scenarios.
         if submitted_text.startswith("想跟你同步一下，原定周五的分享会"):
-            for marker in ("CIDA_ACTION_RETRY", "CIDA_ACTION_STOP"):
+            for marker in ("CIDA_ACTION_RETRY", "CIDA_ACTION_STOP", "CIDA_ACTION_CONFIG"):
                 if marker in system_message:
                     scenario = marker
                     break
@@ -445,6 +448,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         delays = plan.get("delays", [0.01])
         try:
             for index, chunk in enumerate(plan["chunks"]):
+                if index == plan.get("gateAfterChunks"):
+                    state.wait_for_release(request_id)
                 delay = delays[min(index, len(delays) - 1)]
                 if delay > 0:
                     time.sleep(delay)

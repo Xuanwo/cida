@@ -48,6 +48,7 @@ final class ActionEditorTests: XCTestCase {
     XCTAssertEqual(editor.draft?.action.name, "摘要")
     XCTAssertTrue(editor.apply(to: &settings))
     XCTAssertEqual(settings.actions.last?.id, id)
+    editor.stopPreview()
     editor.move(id, to: 0, settings: &settings)
     editor.delete(id, from: &settings)
     editor.undoChange(settings: &settings)
@@ -58,7 +59,7 @@ final class ActionEditorTests: XCTestCase {
     editor.stopPreview()
   }
 
-  func testPreviewOnlyRunsOnApplyAndSupersededRequestsCannotReplaceIt() async throws {
+  func testApplySkipsUnchangedResultsAndSupersededRequestsCannotReplaceIt() async throws {
     let service = ControlledActionService()
     var settings = CidaSettings()
     let editor = ActionEditor(service: service)
@@ -98,6 +99,98 @@ final class ActionEditorTests: XCTestCase {
     await Task.yield()
     XCTAssertEqual(editor.previews[.improve]?.text, "Latest")
     XCTAssertNil(editor.running)
+  }
+
+  func testSavedActionRunsWithoutEditingAndStopRetainsOnlyCurrentPartialOutput() async {
+    let service = ControlledActionService()
+    let settings = CidaSettings()
+    let editor = ActionEditor(service: service)
+    editor.select(.improve)
+    XCTAssertEqual(service.count, 0)
+    editor.trySavedAction(settings: settings)
+    await wait { service.count == 1 }
+    XCTAssertNil(editor.draft)
+    XCTAssertEqual(service.requests[0].text, ActionEditor.sample)
+    service.finish(0, text: "Previous complete result")
+    await wait { editor.running == nil }
+    editor.trySavedAction(settings: settings)
+    await wait { service.count == 2 }
+    service.yield(1, text: "Current partial")
+    await wait { editor.attempts[.improve]?.preview.text == "Current partial" }
+    XCTAssertEqual(editor.previews[.improve]?.text, "Previous complete result")
+    editor.stopPreview()
+    service.finish(1, text: " must not appear")
+    await Task.yield()
+    XCTAssertEqual(editor.attempts[.improve]?.preview.text, "Current partial")
+    guard case .stopped = editor.attempts[.improve]?.phase else { return XCTFail("Expected stopped") }
+    editor.trySavedAction(settings: settings)
+    await wait { service.count == 3 }
+    service.finish(2, text: "New complete result")
+    await wait { editor.running == nil }
+    XCTAssertNil(editor.attempts[.improve])
+    XCTAssertEqual(editor.previews[.improve]?.text, "New complete result")
+  }
+
+  func testFailedSaveKeepsAppliedPolicyAndConfigurationRetryNeedsAChange() async {
+    let service = ControlledActionService()
+    var settings = CidaSettings()
+    let editor = ActionEditor(service: service)
+    editor.begin(settings)
+    editor.draft?.action.prompt = "Keep the new policy"
+    XCTAssertTrue(editor.apply(to: &settings))
+    await wait { service.count == 1 }
+    service.fail(0, error: ModelServiceError.http(status: 401,
+      providerMessage: "PRIVATE_PROVIDER_DETAIL", body: "PRIVATE_PROVIDER_DETAIL"))
+    await wait { editor.running == nil }
+    XCTAssertEqual(settings.translationPrompt, "Keep the new policy")
+    XCTAssertEqual(editor.attempts[.translate]?.saved, true)
+    XCTAssertEqual(editor.attempts[.translate]?.failure?.category, .configuration)
+    XCTAssertTrue(editor.needsConfiguration(settings: settings))
+    editor.trySavedAction(settings: settings)
+    XCTAssertEqual(service.count, 1)
+    editor.begin(settings)
+    XCTAssertTrue(editor.apply(to: &settings))
+    XCTAssertEqual(service.count, 1, "Finishing an unchanged draft cannot bypass configuration recovery")
+    settings.modelService.model = "new-model"
+    editor.trySavedAction(settings: settings)
+    await wait { service.count == 2 }
+    XCTAssertEqual(editor.attempts[.translate]?.saved, false)
+    service.finish(1, text: "Recovered")
+    await wait { editor.running == nil }
+  }
+
+  func testDiscardLeavesSavedPolicyAndPreviewUntouchedAndDraftCannotRun() async {
+    let service = ControlledActionService()
+    let settings = CidaSettings()
+    let editor = ActionEditor(service: service)
+    editor.trySavedAction(settings: settings)
+    await wait { service.count == 1 }
+    service.finish(0, text: "Reference")
+    await wait { editor.running == nil }
+    editor.begin(settings)
+    editor.draft?.action.prompt = "Unsaved policy"
+    editor.trySavedAction(settings: settings)
+    XCTAssertEqual(service.count, 1)
+    editor.discard(settings: settings)
+    XCTAssertNil(editor.draft)
+    XCTAssertEqual(editor.previews[.translate]?.prompt, settings.translationPrompt)
+    XCTAssertEqual(editor.previews[.translate]?.text, "Reference")
+  }
+
+  func testAgentHandoffKeepsBothFailureContextsAndFiltersOutdatedConfiguration() {
+    var settings = CidaSettings()
+    settings.modelService.model = "local-model"
+    settings.modelService.endpoint = "https://example.com/v1/chat/completions"
+    settings.apiKey = "private-key"
+    let panel = ProcessingFailure(category: .offline, settings: settings)
+    let trial = ProcessingFailure(category: .configuration, settings: settings)
+    let prompt = ConfigurationPrompt.text(settings: settings, requestFailure: panel, previewFailure: trial)
+    XCTAssertTrue(prompt.contains("面板请求未完成，错误类别为 offline"))
+    XCTAssertTrue(prompt.contains("动作试运行未完成，错误类别为 configuration"))
+    XCTAssertFalse(prompt.contains("private-key"))
+    settings.modelService.model = "changed-model"
+    let updated = ConfigurationPrompt.text(settings: settings, requestFailure: panel, previewFailure: trial)
+    XCTAssertFalse(updated.contains("未完成，错误类别"))
   }
 
   func testDefaultActionIsUsedByPanelAndSelectionButCaptureStillTranslates() async {
@@ -163,14 +256,14 @@ final class ActionEditorTests: XCTestCase {
     service.fail(1)
     await wait { editor.running == nil }
     XCTAssertEqual(editor.previews[.translate]?.text, "Previous")
-    XCTAssertNotNil(editor.previewNotes[.translate])
+    XCTAssertNotNil(editor.attempts[.translate]?.failure)
     editor.begin(settings)
     editor.apply(to: &settings)
     await wait { service.count == 3 }
     service.finish(2, text: "Recovered")
     await wait { editor.running == nil }
     XCTAssertEqual(editor.previews[.translate]?.text, "Recovered")
-    XCTAssertNil(editor.previewNotes[.translate])
+    XCTAssertNil(editor.attempts[.translate]?.failure)
   }
 
   func testApplicationSavingKeepsActionOrderAndDoesNotOverwriteCLIModelConfiguration() {
@@ -281,7 +374,7 @@ final class ActionEditorTests: XCTestCase {
     XCTAssertTrue(editor.apply(to: &settings))
     XCTAssertEqual(settings.translationPrompt, CidaSettings.defaultTranslationPrompt)
     XCTAssertNil(editor.running)
-    XCTAssertNotNil(editor.previewNotes[.translate])
+    XCTAssertNotNil(editor.attempts[.translate]?.failure)
     XCTAssertNil(editor.previews[.translate])
   }
 
@@ -324,9 +417,12 @@ private final class ControlledActionService: TextProcessingService, @unchecked S
   > {
     AsyncThrowingStream { continuation in lock.withLock { values.append((request, continuation)) } }
   }
-  func fail(_ index: Int) {
+  func yield(_ index: Int, text: String) {
+    lock.withLock { values[index].1 }.yield(text)
+  }
+  func fail(_ index: Int, error: Error = ModelServiceError.emptyResult) {
     let continuation = lock.withLock { values[index].1 }
-    continuation.finish(throwing: ModelServiceError.emptyResult)
+    continuation.finish(throwing: error)
   }
   func finish(_ index: Int, text: String) {
     let continuation = lock.withLock { values[index].1 }

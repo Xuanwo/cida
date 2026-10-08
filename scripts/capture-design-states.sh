@@ -26,6 +26,8 @@ swift build --package-path "$project_dir"
 for state in empty typing translate improve stale stale-action stale-empty stopped failed failed-timeout failed-offline failed-limited failed-secure failed-unknown failed-changed failed-configured dark-failed long translate-into-mine target-editing target-editing-changed target-composing copy-menu \
   share-translate share-read share-improve share-interrupted share-stopped \
   settings settings-translation settings-language-editing settings-prompt-editing \
+  settings-action-running settings-action-stopped settings-action-result settings-action-editing \
+  settings-action-saved-failed settings-action-failed settings-action-configuration \
   settings-shortcuts settings-shortcuts-custom settings-shortcuts-unset settings-recording settings-general settings-update-available \
   settings-config-unset settings-config-copied settings-config-ready settings-config-updated \
   settings-config-checking settings-config-failed settings-config-passed \

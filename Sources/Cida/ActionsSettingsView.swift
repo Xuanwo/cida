@@ -24,14 +24,13 @@ struct ActionsSettingsView: View {
   }
   private var preview: ActionEditor.Preview? { editor.previews[editor.selected] }
   private var isRunning: Bool { editor.running == editor.selected }
+  private var attempt: ActionEditor.Attempt? { editor.attempts[editor.selected] }
   private var stale: Bool {
-    editor.isDirty || isRunning || editor.previewNotes[editor.selected] != nil
-      || preview.map {
-        $0.prompt != model.settings.prompt(for: editor.selected)
-          || $0.fingerprint != model.settings.modelServiceFingerprint
-          || $0.languages != model.settings.requestLanguages
-      } == true
+    guard let preview, let action = model.settings.actions.first(where: { $0.id == editor.selected })
+    else { return false }
+    return !preview.matches(action, settings: model.settings)
   }
+  private var locked: Bool { editor.isDirty || editor.running != nil }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -95,7 +94,7 @@ struct ActionsSettingsView: View {
             .foregroundStyle(CidaDesign.accent)
             .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem, inset: -3)
             .keyboardShortcut("z", modifiers: .command)
-            .disabled(editor.isDirty)
+            .disabled(locked)
             .accessibilityIdentifier("settings-action-undo")
         }
         .font(CidaDesign.ui(11))
@@ -109,7 +108,7 @@ struct ActionsSettingsView: View {
     }
     .onExitCommand { editor.discard(settings: model.settings) }
     .onKeyPress(keys: [.leftArrow, .rightArrow, .delete, .init("\u{F705}")]) { key in
-      guard let focusedAction, editor.draft == nil else { return .ignored }
+      guard let focusedAction, editor.draft == nil, editor.running == nil else { return .ignored }
       if key.modifiers.contains(.option), key.key == .leftArrow || key.key == .rightArrow {
         move(focusedAction, key.key == .leftArrow ? -1 : 1)
         return .handled
@@ -144,8 +143,8 @@ struct ActionsSettingsView: View {
             .buttonStyle(.plain)
             .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem)
             .foregroundStyle(CidaDesign.textSecondary)
-            .disabled(editor.isDirty)
-            .opacity(editor.isDirty ? 0.45 : 1)
+            .disabled(locked)
+            .opacity(locked ? 0.45 : 1)
             .accessibilityLabel("新建动作")
             .accessibilityIdentifier("settings-action-add")
             .id("actions-add")
@@ -199,18 +198,18 @@ struct ActionsSettingsView: View {
     .foregroundStyle(CidaDesign.textSecondary)
   }
 
-  private func barLabel(_ title: String, key: String) -> some View {
+  private func barLabel(_ title: String, key: String, width: CGFloat = 56) -> some View {
     HStack(spacing: 8) {
       Text(title).font(CidaDesign.ui(11.5, weight: .semibold))
       Text(key).font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textTertiary)
     }
-    .frame(width: 56)
+    .frame(width: width)
   }
 
   @ViewBuilder
   private func segment(_ action: TextAction) -> some View {
     let selected = editor.selected == action.id
-    let disabled = editor.isDirty && !selected
+    let disabled = locked && !selected
     Group {
       if selected, editor.draft != nil {
         TextField(
@@ -247,7 +246,7 @@ struct ActionsSettingsView: View {
         .focused($focusedAction, equals: action.id)
         .overlay {
           ActionDragSource(
-            name: action.name, id: action.id, enabled: !disabled,
+            name: action.name, id: action.id, enabled: !locked,
             click: { count in
               editor.select(action.id)
               focusedAction = action.id
@@ -271,7 +270,9 @@ struct ActionsSettingsView: View {
         }
         .accessibilityAction(named: "左移") { move(action.id, -1) }
         .accessibilityAction(named: "右移") { move(action.id, 1) }
-        .accessibilityAction(named: "删除") { editor.delete(action.id, from: &model.settings) }
+        .accessibilityAction(named: "删除") {
+          if editor.running == nil { editor.delete(action.id, from: &model.settings) }
+        }
       }
     }
     .font(CidaDesign.ui(11.5, weight: selected ? .semibold : .medium))
@@ -306,8 +307,11 @@ struct ActionsSettingsView: View {
     VStack(alignment: .leading, spacing: 0) {
       if let draft = editor.draft {
         HStack {
-          Text("提示词")
+          Text(editor.isDirty ? "提示词 · 草稿未保存" : "提示词 · 已保存")
           Spacer()
+          Button("放弃修改") { editor.discard(settings: model.settings) }
+            .settingsKeyboardFocus(cornerRadius: CidaDesign.Radius.segmentItem, inset: -3)
+            .accessibilityIdentifier("settings-action-discard")
           if draft.action.id == .translate || draft.action.id == .improve,
             draft.action.prompt != CidaSettings.defaultPrompt(for: draft.action.id)
           {
@@ -345,34 +349,68 @@ struct ActionsSettingsView: View {
         Text(error).font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textSecondary)
           .padding(16).accessibilityIdentifier("settings-action-validation")
       }
-      if editor.draft == nil || preview != nil {
-        ActionPreviewText(
-          text: preview?.text ?? (isRunning ? "" : "完成提示词编辑后，在这里看它的效果。"),
-          isRunning: isRunning)
-          .font(
-            preview == nil ? Font(Self.sampleFont) : Font(
-              CidaDesign.appKitResult(
-                for: TextLanguageDetector.typography(of: preview?.text ?? "") ?? .chinese, size: 15))
-          )
-          .lineSpacing(preview == nil ? Self.sampleLineSpacing : 7)
-          .foregroundStyle(
-            preview == nil
-              ? CidaDesign.textTertiary : stale ? CidaDesign.textSecondary : CidaDesign.textInk
-          )
-          .textSelection(.enabled)
-          .fixedSize(horizontal: false, vertical: true)
-          .frame(maxWidth: .infinity, minHeight: 42, alignment: .topLeading)
-          .padding(16)
-          .accessibilityIdentifier("settings-action-preview")
-      }
-      HStack(spacing: 6) {
+      if editor.draft == nil {
         Text(previewNote)
           .font(CidaDesign.ui(11))
           .foregroundStyle(CidaDesign.textTertiary)
+          .padding(.horizontal, 16).padding(.top, 12)
+          .accessibilityIdentifier("settings-action-preview-status")
+        if let failure = attempt?.failure {
+          Text(editor.needsConfiguration(settings: model.settings)
+            ? failure.category.explanation
+            : failure.category == .configuration
+              ? "配置或提示词已更新，可以重新试运行。" : failure.category.explanation)
+            .font(CidaDesign.ui(13)).foregroundStyle(CidaDesign.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 16).padding(.top, 8)
+            .accessibilityIdentifier("settings-action-preview-failure")
+        }
+        if let attempt, !attempt.preview.text.isEmpty || isRunning {
+          previewText(attempt.preview.text, running: isRunning, secondary: false,
+            identifier: "settings-action-preview")
+        } else if preview == nil, attempt == nil {
+          Text("还没有运行过。用已保存的提示词处理上面的样例。")
+            .font(Font(Self.sampleFont)).foregroundStyle(CidaDesign.textTertiary)
+            .padding(16).accessibilityIdentifier("settings-action-preview")
+        }
       }
-      .padding(.horizontal, 16)
-      .padding(.bottom, 12)
-      .accessibilityIdentifier("settings-action-preview-status")
+      if let preview {
+        if editor.draft != nil || attempt != nil {
+          if editor.draft == nil { Hairline().padding(.horizontal, 16).padding(.top, 12) }
+          Text(stale ? "参照 · 上一版提示词或配置的结果 · 已过期" : "参照 · 已保存版本的结果")
+            .font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textTertiary)
+            .padding(.horizontal, 16).padding(.top, 12)
+            .accessibilityIdentifier("settings-action-reference-status")
+        }
+        previewText(preview.text, running: false,
+          secondary: stale || editor.draft != nil || attempt != nil,
+          identifier: attempt?.preview.text.isEmpty == false || isRunning
+            ? "settings-action-reference" : "settings-action-preview")
+      } else if editor.draft != nil {
+        Text("完成后试运行 · ⌘↵")
+          .font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textTertiary)
+          .padding(16)
+      }
+      if editor.draft == nil, !isRunning {
+        HStack {
+          Spacer()
+          if editor.needsConfiguration(settings: model.settings) {
+            Button("模型设置") { model.settingsTab = .model }
+              .settingsKeyboardFocus()
+              .accessibilityIdentifier("settings-action-model-settings")
+          } else {
+            Button { editor.trySavedAction(settings: model.settings) } label: {
+              barLabel(attempt?.failure != nil ? "重试" : preview != nil || attempt != nil ? "再次运行" : "试运行", key: "⌘↵", width: 84)
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .settingsKeyboardFocus()
+            .accessibilityIdentifier("settings-action-run")
+          }
+        }
+        .buttonStyle(SettingsBorderedButtonStyle(fontSize: 11.5))
+        .padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 8)
+      }
+
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(CidaDesign.surfacePaper)
@@ -398,18 +436,37 @@ struct ActionsSettingsView: View {
           ).height) + 28))
   }
 
+  private func previewText(_ text: String, running: Bool, secondary: Bool, identifier: String) -> some View {
+    ActionPreviewText(text: text, isRunning: running)
+      .font(Font(CidaDesign.appKitResult(
+        for: TextLanguageDetector.typography(of: text) ?? .chinese, size: 15)))
+      .lineSpacing(7)
+      .foregroundStyle(secondary ? CidaDesign.textSecondary : CidaDesign.textInk)
+      .textSelection(.enabled)
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: .infinity, minHeight: 42, alignment: .topLeading)
+      .padding(16)
+      .accessibilityIdentifier(identifier)
+  }
+
   private var previewNote: String {
-    if isRunning { return "正在按新提示词更新 · ⌘. 停止" }
-    if editor.draft != nil, preview == nil { return "完成后预览 · ⌘↵" }
-    if editor.isDirty { return preview == nil ? "完成后，看看这个动作的效果" : "上次的结果 · 完成后更新" }
-    if let note = editor.previewNotes[editor.selected] { return note }
-    return preview == nil ? "使用当前模型 · 固定样例" : stale ? "上次的结果 · 完成后更新" : "当前提示词的效果"
+    if let attempt {
+      switch attempt.phase {
+      case .running: return "运行中 · 已保存的提示词"
+      case .stopped: return "已停止 · 未完成"
+      case .failed(let failure):
+        let title = attempt.saved ? "已保存 · 试运行失败" : "试运行失败"
+        return failure.modelName.isEmpty ? title : "\(title) · \(failure.modelName)"
+      }
+    }
+    return preview == nil ? "已保存的提示词" : stale ? "上一版提示词或配置的结果 · 已过期" : "已保存版本的结果"
   }
   private func actionNameWidth(_ name: String) -> CGFloat {
     let font = NSFont(name: "Inter-SemiBold", size: 11.5) ?? CidaDesign.appKitBody(11.5)
     return max(24, min(130, ceil((name as NSString).size(withAttributes: [.font: font]).width)))
   }
   private func beginEditing(rename: Bool = false) {
+    guard editor.running == nil else { return }
     editor.begin(model.settings)
     focusedAction = nil
     if rename { nameFocused = true } else { promptFocus += 1 }

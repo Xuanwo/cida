@@ -362,3 +362,44 @@ Validation on the local working tree on 2026-10-08:
 
 Transport timeout, offline and TLS classification is covered by Swift tests.
 No remote paid model was used for the segmentation validation.
+
+## Saved-action trials
+
+The approved 06 interaction runs the fixed sample with the saved action without
+opening an editor. Editing keeps the previous complete result as a labeled
+reference and offers an explicit discard action. Applying a valid draft saves it
+before making the preview request; a failed request never rolls the save back.
+Current streamed text and the previous complete result have separate identities.
+Stopping preserves the current partial result and rejects late chunks. Configuration
+failures open Model Settings and block unchanged retries, including finishing an
+unchanged draft. Agent handoff identifies panel and action-trial failures separately
+and filters out failures from a different configuration.
+
+Native before/after captures are in `docs/images/action-trial/`. Additional running
+and failure states are in `Design/ImplementationCurrent/settings-action-*.png`.
+These are actual offscreen App captures; board comparisons remain local design QA.
+The stopped fixture was recaptured after correcting its initial selected action.
+The Settings baseline pixels and tolerances are unchanged; its linked board digest
+is updated. The existing successful panel README demos remain accurate.
+
+Validation on the working tree on 2026-10-08:
+
+- Warnings-as-errors build, all 334 Swift tests, and website build passed. The
+  committed website font subset now covers the new Chinese captions.
+- Eight distinct signed Release native journeys passed across
+  `TestResults/action-trial`, `TestResults/action-trial-recovery`, and
+  `TestResults/action-trial-final`: direct trial/discard, configuration handoff,
+  failure/retry/partial stop, draft persistence/reordering, validation/overflow,
+  custom actions, and keyboard focus in both appearances.
+- The first run exposed lost segment focus while running; preserving the current
+  segment's focus fixed keyboard reordering. The persistence rerun passed. The stop
+  fixture now gates after one chunk and permits releasing that gate; the final run
+  verified cancellation against deliberately late output, plus configuration handoff.
+- The final native App tree SHA-256 was `c9092bcb59db0260c506f6494881cd81cc58bad396b9dfa4ab79ba3cb956507c`.
+  Artifact integrity and host-session guards passed. Earlier passing journeys
+  remain applicable; subsequent changes were limited to focus preservation, the
+  controlled stop fixture, and retaining both safe handoff contexts.
+
+These are diagnostic working-tree runs. A clean committed nightly gate is still
+required before PR delivery. No paid model or semantic output-quality claim is
+part of this verification.

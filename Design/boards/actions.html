@@ -89,7 +89,7 @@
      a --design-state, and spec/panel.md and spec/settings.md stay the rules in force. -->
 <main class="board" data-board="actions">
   <div class="board-title">动作 — 任意「原文 → 提示词 → 结果」都是一个动作；在设置里用固定样例调校</div>
-  <p class="caption">规则见 spec/settings.md。原生应用已经实现；这份交互稿使用预置结果演示。没有连接模型：只有预置的提示词在样例上有预置结果，其他提示词写明没有结果。下面的窗口可以直接操作：点分段看效果；编辑 ⌘E 把提示词写在纸面上方、旧结果留在下面，完成 ⌘↵ 应用并在样例上生成；+ 新建；拖动排序、首项默认；Esc 放弃与删除都可以撤销。「在面板中查看」是同一份动作在生产面板里的样子。</p>
+  <p class="caption">规则见 spec/settings.md。原生应用已经实现；这份交互稿使用预置结果演示。没有连接模型：只有预置的提示词在样例上有预置结果，其他提示词写明没有结果。下面的窗口可以直接操作：点分段看效果；「试运行 ⌘↵」不修改提示词即可运行；编辑 ⌘E 把提示词写在纸面上方、旧结果留在下面，完成 ⌘↵ 应用并在样例上生成；+ 新建；拖动排序、首项默认；Esc 放弃与删除都可以撤销。「在面板中查看」是同一份动作在生产面板里的样子。</p>
   <cida-actions-proposal view="switch"></cida-actions-proposal>
   <div class="divider"></div>
 
@@ -219,12 +219,13 @@
 
     select(id) {
       if (!this.action(id) || id === this.m.selected) return;
-      if (this.dirty()) return;
+      if (this.dirty() || this.m.run) return;
       this.m.edit = null; this.m.error = "";
       this.m.selected = id;
       this.render();
     }
     startEdit(field = "prompt") {
+      if (this.m.run) return;
       const a = this.action();
       if (!this.m.edit) {
         this.m.edit = { id: a.id, name: a.name, prompt: a.prompt };
@@ -269,7 +270,7 @@
       if (this.m.edit) this.startEdit(); else this.focus(this.railButton());
     }
     add() {
-      if (this.dirty()) return;
+      if (this.dirty() || this.m.run) return;
       let n = 1; while (this.m.actions.some((a) => a.name === `新动作 ${n}`)) n++;
       const a = { id: `custom-${Date.now().toString(36)}-${n}`, name: `新动作 ${n}`, prompt: "", created: true };
       this.m.actions.push(a);
@@ -292,7 +293,7 @@
       this.render(); this.focus(this.railButton());
     }
     reorder(id, targetId, after) {
-      if (this.dirty()) return;
+      if (this.dirty() || this.m.run) return;
       const list = this.m.actions, from = list.findIndex((a) => a.id === id);
       if (from < 0 || id === targetId) return;
       const [a] = list.splice(from, 1);
@@ -389,7 +390,7 @@
     paintPaper() {
       const e = this.m.edit;
       this.paper.innerHTML = e
-        ? `<div class="instruction"><div class="head"><span>提示词</span><span class="links"></span></div>
+        ? `<div class="instruction"><div class="head"><span>提示词 · 草稿</span><span class="links"></span></div>
              <textarea aria-label="${esc(this.action(e.id).name)}的提示词" rows="1" spellcheck="false" placeholder="告诉辞达怎么处理上面的样例，例如：改写成一封简短、礼貌的英文邮件。">${esc(e.prompt)}</textarea>
              <div class="error" role="alert"></div></div><div class="effect"></div>`
         : `<div class="effect"></div>`;
@@ -412,25 +413,27 @@
       const e = this.m.edit, links = this.paper.querySelector(".instruction .links");
       if (!e || !links) return;
       const a = this.action(e.id);
-      links.innerHTML = `${a.builtin && e.prompt !== DEFAULTS[a.id] ? '<button type="button" class="cursor-interaction" data-command="restore">恢复默认</button>' : ""}${
+      links.innerHTML = `<button type="button" class="cursor-interaction" data-command="discard">放弃修改</button>${a.builtin && e.prompt !== DEFAULTS[a.id] ? '<button type="button" class="cursor-interaction" data-command="restore">恢复默认</button>' : ""}${
         a.id !== KEPT ? '<button type="button" class="cursor-interaction" data-command="delete">删除动作</button>' : ""}`;
     }
     paintEffect() {
       const host = this.paper.querySelector(".effect"), a = this.action(), e = this.m.edit;
       const preview = this.m.previews[a.id], running = this.m.run?.id === a.id;
       host.toggleAttribute("data-empty", !!e && !preview);
-      if (e && !preview) { host.innerHTML = '<div class="note">完成后预览 · ⌘↵</div>'; return; }
+      if (e && !preview) { host.innerHTML = '<div class="note">完成后试运行 · ⌘↵</div>'; return; }
       const target = e ? e.prompt : a.prompt, fresh = preview && preview.prompt === target && !running;
       const text = preview
-        ? `<div class="text ${cjk(preview.output) ? "cjk" : ""} ${fresh ? "" : "stale"}">${esc(preview.output)}${running ? '<i class="cursor waiting"></i>' : ""}</div>`
-        : running ? '<div class="text"><i class="cursor waiting"></i></div>'
-        : `<div class="text placeholder">完成后，这里是它在样例上的结果。</div>`;
-      const status = running ? note("stale", "正在按新提示词更新 · ⌘. 停止")
-        : e ? (preview && !fresh ? note("stale", "上次的结果 · 完成后更新") : "")
+        ? `<div class="text ${cjk(preview.output) ? "cjk" : ""} ${fresh ? "" : "stale"}">${esc(preview.output)}</div>`
+        : running || this.m.failed[a.id] === a.prompt || this.m.stopped === a.id ? ''
+        : `<div class="text placeholder">还没有运行过。用已保存的提示词处理上面的样例。</div>`;
+      const status = running ? ""
+        : e ? (preview && !fresh ? note("stale", "参照 · 已保存版本的结果") : "")
         : this.m.failed[a.id] === a.prompt ? note("failed", NO_EXAMPLE)
-        : this.m.stopped === a.id ? note("stopped", "已停止 · 仍是上次的结果")
+        : this.m.stopped === a.id ? note("stopped", "已停止 · 未完成")
         : "";
-      host.innerHTML = text + status;
+      const label = preview ? `<div class="note">${e || running || this.m.stopped === a.id || this.m.failed[a.id] === a.prompt ? '参照 · ' : ''}${preview.prompt === a.prompt ? '已保存版本的结果' : '上一版提示词的结果 · 已过期'}</div>` : '';
+      const pending = running ? '<div class="note">运行中 · 已保存的提示词</div><div class="text"><i class="cursor waiting"></i></div>' : '';
+      host.innerHTML = pending + status + label + text + (!e && !running ? `<div class="nav"><button type="button" class="bar-action" data-command="run">${preview ? '再次运行' : '试运行'} <kbd>⌘↵</kbd></button></div>` : '');
     }
     paintMessage() {
       this.messageBox.innerHTML = this.m.message ? `<span>${esc(this.m.message)}</span>${this.m.undo ? '<button type="button" class="cursor-interaction" data-command="undo">撤销</button>' : ""}` : "";
@@ -523,7 +526,7 @@
         // A clicked segment keeps the keyboard focus, as in AppKit, so ⌘E reaches the window.
         if (b.dataset.id) { this.select(b.dataset.id); this.focus(this.railButton()); return; }
         ({
-          add: () => this.add(), edit: () => this.startEdit(), done: () => this.done(), stop: () => this.stop(),
+          run: () => { if (!this.m.edit && !this.m.run) this.preview(this.m.selected); }, discard: () => this.discard(), add: () => this.add(), edit: () => this.startEdit(), done: () => this.done(), stop: () => this.stop(),
           undo: () => this.undo(), delete: () => this.remove(this.m.edit.id),
           restore: () => { this.m.edit.prompt = DEFAULTS[this.m.edit.id]; this.render(); this.startEdit(); },
           "show-panel": () => this.showPage("panel"), "show-settings": () => this.showPage("settings"),
@@ -552,7 +555,7 @@
         if (!this.mirror || !e.target.closest?.(".window")) return;
         const typing = e.target.matches?.("textarea, input");
         if (command && e.key.toLowerCase() === "e") { e.preventDefault(); this.startEdit(); }
-        else if (command && e.key === "Enter" && this.m.edit) { e.preventDefault(); this.done(); }
+        else if (command && e.key === "Enter") { e.preventDefault(); if (this.m.edit) this.done(); else if (!this.m.run) this.preview(this.m.selected); }
         else if (command && e.key === ".") { e.preventDefault(); this.stop(); }
         else if (e.key === "Escape" && this.m.edit) { e.preventDefault(); this.discard(); }
         else if (command && !e.shiftKey && e.key.toLowerCase() === "z" && !typing && this.m.undo) { e.preventDefault(); this.undo(); }

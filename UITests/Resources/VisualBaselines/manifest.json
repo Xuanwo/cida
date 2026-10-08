@@ -24,7 +24,7 @@
       "designReference": "Design/QACurrent/reference-settings.png",
       "designReferenceSHA256": "bb8d52352eab13235350a7ed4d075135598ef44b43d8ea150fc553aadf4ba0d7",
       "designDocument": "Design/boards/settings-states.html",
-      "designDocumentSHA256": "60fb3eebab18c5a7a81b20aa10a14c0580f7aa5e1e1377c59f244ddb11d3053a",
+      "designDocumentSHA256": "7c2190cdd2d127050b5f45282d6b39b05ce1fac52de007e404ee51867aacf6c2",
       "logicalWidth": 560,
       "logicalHeight": 285,
       "blockSize": 8,
