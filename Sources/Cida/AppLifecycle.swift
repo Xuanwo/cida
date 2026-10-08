@@ -638,6 +638,28 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
         model.actionEditor.select(.improve)
         model.actionEditor.begin(model.settings)
       }
+      if launchOptions.designState.rawValue.hasPrefix("settings-action-") { model.mode = .improve }
+      switch launchOptions.designState {
+      case .settingsActionRunning:
+        model.actionEditor.setPreviewForDesign(settings: model.settings, phase: .running,
+          partial: "原定周五的分享会调整至下周三下午三点，地点仍为二楼会议室。")
+      case .settingsActionStopped:
+        model.actionEditor.setPreviewForDesign(settings: model.settings, phase: .stopped,
+          partial: "原定周五的分享会调整至下周三下午三点，地点仍为二楼会议室。")
+      case .settingsActionResult, .settingsActionEditing:
+        model.actionEditor.setPreviewForDesign(settings: model.settings)
+        if launchOptions.designState == .settingsActionEditing {
+          model.actionEditor.begin(model.settings)
+          model.actionEditor.draft?.action.prompt += "\n保留原文语气。"
+        }
+      case .settingsActionSavedFailed, .settingsActionFailed, .settingsActionConfiguration:
+        let configuration = launchOptions.designState == .settingsActionConfiguration
+        model.actionEditor.setPreviewForDesign(settings: model.settings,
+          phase: .failed(ProcessingFailure(category: configuration ? .configuration : .timeout,
+            settings: model.settings)), saved: launchOptions.designState == .settingsActionSavedFailed,
+          reference: launchOptions.designState == .settingsActionSavedFailed)
+      default: break
+      }
       if launchOptions.designState == .settingsRecording {
         model.recordingShortcut = .showPanel
       }
@@ -906,6 +928,14 @@ private enum DesignState: String {
   case settingsTranslation = "settings-translation"
   case settingsLanguageEditing = "settings-language-editing"
   case settingsPromptEditing = "settings-prompt-editing"
+  case settingsActionRunning = "settings-action-running"
+  case settingsActionStopped = "settings-action-stopped"
+  case settingsActionResult = "settings-action-result"
+  case settingsActionEditing = "settings-action-editing"
+  case settingsActionSavedFailed = "settings-action-saved-failed"
+  case settingsActionFailed = "settings-action-failed"
+  case settingsActionConfiguration = "settings-action-configuration"
+
   case settingsShortcuts = "settings-shortcuts"
   case settingsShortcutsCustom = "settings-shortcuts-custom"
   case settingsShortcutsUnset = "settings-shortcuts-unset"
@@ -959,7 +989,8 @@ private enum DesignState: String {
       .settingsConfigUpdated, .settingsConfigChecking, .settingsConfigFailed,
       .settingsConfigPassed, .settingsConfigMissingKey, .settingsConfigIncomplete:
       .model
-    case .settingsTranslation, .settingsLanguageEditing, .settingsPromptEditing: .translation
+    case .settingsTranslation, .settingsLanguageEditing, .settingsPromptEditing,
+      .settingsActionRunning, .settingsActionStopped, .settingsActionResult, .settingsActionEditing, .settingsActionSavedFailed, .settingsActionFailed, .settingsActionConfiguration: .translation
     case .settingsShortcuts, .settingsShortcutsCustom, .settingsShortcutsUnset, .settingsRecording:
       .shortcuts
     case .settingsGeneral, .settingsUpdateAvailable: .general
@@ -1132,7 +1163,8 @@ private struct LaunchOptions {
       case .targetEditing, .targetEditingChanged, .targetComposing:
         return ResultRecord.designCompleted(mode: .translate)
       case .empty, .typing, .streaming, .lengthRecovery, .settings, .settingsTranslation, .settingsLanguageEditing,
-        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
+        .settingsPromptEditing, .settingsActionRunning, .settingsActionStopped, .settingsActionResult, .settingsActionEditing, .settingsActionSavedFailed, .settingsActionFailed, .settingsActionConfiguration,
+        .settingsShortcuts, .settingsShortcutsCustom,
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,
@@ -1171,7 +1203,8 @@ private struct LaunchOptions {
       case .lifecycleWelcomeSubmitted:
         "Consistency is the last refuge of the unimaginative."
       case .empty, .staleEmpty, .settings, .settingsTranslation, .settingsLanguageEditing,
-        .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
+        .settingsPromptEditing, .settingsActionRunning, .settingsActionStopped, .settingsActionResult, .settingsActionEditing, .settingsActionSavedFailed, .settingsActionFailed, .settingsActionConfiguration,
+        .settingsShortcuts, .settingsShortcutsCustom,
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
         .settingsConfigReady, .settingsConfigUpdated, .settingsConfigChecking,

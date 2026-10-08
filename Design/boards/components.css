@@ -1128,3 +1128,7 @@ body {
 /* Recovery copy stays quiet and reserves two lines at the panel width. */
 .failure-explanation { height: 40px; font-size: 13px; line-height: 20px; color: var(--text-secondary); }
 .share-card .incomplete-mark { margin-top: 4px; font-size: 12px; line-height: 17px; color: var(--text-secondary); }
+
+.actions-trial-result { font-family: var(--font-result-cjk); font-size: 15px; line-height: 1.75; margin: 16px 0; color: var(--text-ink); }
+.actions-trial-result.reference { color: var(--text-secondary); }
+.actions-trial-run { display: flex; justify-content: flex-end; padding-top: 8px; }

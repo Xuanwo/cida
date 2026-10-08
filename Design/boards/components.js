@@ -123,15 +123,25 @@ class CidaSettings extends HTMLElement {
     const languages = row("我的语言", "其他语言都译成它", is("language", "editing")
       ? field("繁體中文（台灣）<i class=\"caret\"></i>", "short focused") : field("简体中文", "short"), "end");
 
-    const actionEditing = is("editing", "improve");
+    const trial = this.getAttribute("trial") || "none";
+    const actionEditing = is("editing", "improve") || trial === "editing";
+    const trialRunning = trial === "running";
+    const trialResult = "原定周五的分享会调整至下周三下午三点，地点仍为二楼会议室。演示尚需完善，部分细节仍待确认。如时间不便，请于明天中午前告知，以便另行安排。";
+    const trialLabel = {none: '已保存的提示词', running: '运行中 · 已保存的提示词', stopped: '已停止 · 未完成', result: '已保存版本的结果', 'saved-failed': '已保存 · 试运行失败 · deepseek-chat', failed: '试运行失败 · deepseek-chat', configuration: '试运行失败 · deepseek-chat'}[trial] || '';
+    const trialReference = ['running', 'stopped', 'editing', 'saved-failed'].includes(trial);
+    const trialFailure = ['saved-failed', 'failed', 'configuration'].includes(trial);
+    const trialPaper = `${actionEditing ? `<div class="actions-instruction"><small><span>提示词 · ${trial === 'editing' ? '草稿未保存' : '已保存'}</span><span>放弃修改　删除动作</span></small><p>You are a writing assistant. Improve the user-provided text for clarity, grammar, and natural tone. Keep the original language and meaning. Prefer precise technical wording. Return only the improved text.</p></div>` : `<small>${trialLabel}</small>`}
+      ${trialFailure ? `<p class="actions-placeholder">${trial === 'configuration' ? '模型配置需要检查。在模型设置里复制配置提示词，交给 AI 助手继续检查；配置更新后即可重试。' : '请求超时。重试会从头执行，并替换已有输出。'}</p>` : ''}
+      ${['running','stopped'].includes(trial) ? `<p class="actions-trial-result">${trialResult.slice(0,39)}${trialRunning ? '<i class="cursor"></i>' : ''}</p>` : ''}
+      ${trialReference ? `<div class="divider"></div><small>参照 · ${trial === 'saved-failed' ? '上一版提示词或配置的结果 · 已过期' : '已保存版本的结果'}</small>` : ''}
+      ${trialReference || trial === 'result' ? `<p class="actions-trial-result${trialReference ? ' reference' : ''}">${trialResult}</p>` : actionEditing ? '<small>完成后试运行 · ⌘↵</small>' : trial === 'none' ? '<p class="actions-placeholder">还没有运行过。用已保存的提示词处理上面的样例。</p>' : ''}
+      ${!actionEditing && !trialRunning ? `<div class="actions-trial-run"><span class="bar-action"><span>${trial === 'configuration' ? '模型设置' : trialFailure ? '重试' : trial === 'none' ? '试运行' : '再次运行'}</span>${trial === 'configuration' ? '' : '<span class="key">⌘↵</span>'}</span></div>` : ''}`;
     const actions = `<div class="actions-heading"><h3>动作</h3><small>拖动排序 · 首项默认</small></div>
       <section class="actions-preview">
         <div class="actions-sample"><small><span>样例</span><span>使用当前模型</span></small>
           <p>想跟你同步一下，原定周五的分享会要改到下周三下午三点，地点还是二楼会议室。主要是因为演示还没准备好，有几处细节想再确认一下。如果这个时间不方便，麻烦明天中午前告诉我，我们再一起看看怎么安排。</p></div>
-        <div class="bar"><div class="seg"><span class="${actionEditing ? "" : "on"}${focus("action-translate")}">翻译</span><span class="${actionEditing ? "on" : ""}${focus("action-improve")}">改进</span><span>+</span></div><span class="bar-action${focus("action-edit")}"><span>${actionEditing ? "完成" : "编辑"}</span><span class="key">${actionEditing ? "⌘↵" : "⌘E"}</span></span></div>
-        <div class="actions-paper">${actionEditing ? `<div class="actions-instruction"><small><span>提示词</span><span>删除动作</span></small><p>You are a writing assistant. Improve the user-provided text for clarity, grammar, and natural tone. Keep the original language and meaning. Prefer precise technical wording. Return only the improved text.</p></div>` : ""}
-          ${actionEditing ? '<small>完成后预览 · ⌘↵</small>' : '<p class="actions-placeholder">完成提示词编辑后，在这里看它的效果。</p><small>使用当前模型 · 固定样例</small>'}
-        </div>
+        <div class="bar"><div class="seg"><span class="${actionEditing || trial !== "none" ? "" : "on"}${focus("action-translate")}">翻译</span><span class="${actionEditing || trial !== "none" ? "on" : ""}${focus("action-improve")}">改进</span><span>+</span></div><span class="bar-action${focus("action-edit")}"><span>${trialRunning ? "停止" : actionEditing ? "完成" : "编辑"}</span><span class="key">${trialRunning ? "⌘." : actionEditing ? "⌘↵" : "⌘E"}</span></span></div>
+        <div class="actions-paper">${trialPaper}</div>
       </section>`;
 
     // spec/settings.md §四: four recordable shortcuts; shortcut="unset" is someone who only

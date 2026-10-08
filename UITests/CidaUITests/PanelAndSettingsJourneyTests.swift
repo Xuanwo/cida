@@ -950,6 +950,51 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertTrue(driver.settingsWindow.buttons.matching(NSPredicate(format: "label == %@", "Concise")).firstMatch.exists)
   }
 
+  func testSavedActionRunsWithoutEditingAndDiscardKeepsItsReference() throws {
+    driver.launch()
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    let preview = driver.element(identifier: "settings-action-preview")
+    XCTAssertTrue(driver.app.buttons["settings-action-run"].exists)
+    XCTAssertEqual(try scenarioServer.state().count, 0)
+    driver.settingsWindow.typeKey(.return, modifierFlags: .command)
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE", in: preview, timeout: 10))
+    XCTAssertFalse(driver.app.textViews["settings-action-prompt"].exists)
+    XCTAssertEqual(try scenarioServer.state().count, 1)
+    driver.app.buttons["settings-action-edit"].click()
+    driver.replaceText(in: driver.app.textViews["settings-action-prompt"], with: "Unsaved policy")
+    XCTAssertTrue(driver.waitForText(containing: "已保存版本", in: driver.element(identifier: "settings-action-reference-status"), timeout: 3))
+    driver.app.buttons["settings-action-discard"].click()
+    XCTAssertFalse(driver.app.textViews["settings-action-prompt"].exists)
+    XCTAssertEqual(try scenarioServer.state().count, 1)
+    driver.app.buttons["settings-action-run"].click()
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE", in: preview, timeout: 10))
+    XCTAssertEqual(try scenarioServer.state().count, 2)
+    let screenshot = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
+    screenshot.name = "actions-direct-trial"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+  }
+
+  func testActionConfigurationFailureRoutesToAgentHandoffWithoutRetrying() throws {
+    driver.launch()
+    driver.openSettings()
+    driver.showSettingsTab("translation", title: "动作")
+    driver.app.buttons["settings-action-edit"].click()
+    driver.replaceText(in: driver.app.textViews["settings-action-prompt"], with: "CIDA_ACTION_CONFIG")
+    driver.app.buttons["settings-action-done"].click()
+    XCTAssertTrue(driver.app.buttons["settings-action-model-settings"].waitForExistence(timeout: 5))
+    driver.settingsWindow.typeKey(.return, modifierFlags: .command)
+    XCTAssertEqual(try scenarioServer.state().count, 1)
+    XCTAssertFalse(driver.app.buttons["settings-action-run"].exists)
+    driver.app.buttons["settings-action-model-settings"].click()
+    XCTAssertTrue(driver.waitForTitle("模型", of: driver.settingsWindow, timeout: 3))
+    driver.app.buttons["settings-copy-configuration-prompt"].click()
+    let prompt = NSPasteboard.general.string(forType: .string) ?? ""
+    XCTAssertTrue(prompt.contains("动作试运行未完成"))
+    XCTAssertFalse(prompt.contains("PRIVATE_PROVIDER_CANARY"))
+  }
+
   func testActionPreviewFailureRetryAndStopKeepThePreviousResult() throws {
     driver.launch()
     driver.openSettings()
@@ -967,22 +1012,25 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     XCTAssertNotNil(try scenarioServer.wait(for: "CIDA_ACTION_RETRY", status: "failed"))
     XCTAssertTrue(driver.app.buttons["settings-action-edit"].waitForExistence(timeout: 5))
     XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE", in: preview, timeout: 3))
-    XCTAssertTrue(driver.waitForText(containing: "503", in: status, timeout: 3))
+    XCTAssertTrue(driver.waitForText(containing: "已保存 · 试运行失败", in: status, timeout: 3))
+    XCTAssertFalse(driver.settingsWindow.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "503")).firstMatch.exists)
     let failure = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
     failure.name = "actions-preview-failed"
     failure.lifetime = .keepAlways
     add(failure)
-    driver.app.buttons["settings-action-edit"].click()
-    driver.app.buttons["settings-action-done"].click()
+    driver.app.buttons["settings-action-run"].click()
     XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_RECOVERED", in: preview, timeout: 10))
     XCTAssertEqual(try scenarioServer.state().filter { $0.scenario == "CIDA_ACTION_RETRY" }.count, 2)
     apply("Translate the sample. CIDA_ACTION_STOP")
-    XCTAssertNotNil(try scenarioServer.wait(for: "CIDA_ACTION_STOP", status: "headers-sent"))
+    XCTAssertNotNil(try scenarioServer.wait(for: "CIDA_ACTION_STOP", status: "chunk-sent"))
     XCTAssertTrue(driver.app.buttons["settings-action-stop"].waitForExistence(timeout: 3))
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_PARTIAL", in: preview, timeout: 3))
     driver.app.buttons["settings-action-stop"].click()
     XCTAssertTrue(driver.waitForText(containing: "已停止", in: status, timeout: 3))
     try scenarioServer.releaseFirstByte(for: "CIDA_ACTION_STOP")
-    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_RECOVERED", in: preview, timeout: 3))
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_PARTIAL", in: preview, timeout: 3))
+    XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_RECOVERED",
+      in: driver.element(identifier: "settings-action-reference"), timeout: 3))
     XCTAssertFalse(driver.waitForText(containing: "CIDA_ACTION_STOPPED_LATE", in: preview, timeout: 1))
     let stopped = XCTAttachment(screenshot: driver.settingsWindow.screenshot())
     stopped.name = "actions-preview-stopped"
@@ -1011,6 +1059,8 @@ final class PanelAndSettingsJourneyTests: CidaReleaseUITestCase {
     driver.app.buttons["settings-action-done"].click()
     XCTAssertTrue(driver.waitForText(containing: "CIDA_ACTION_SAMPLE_COMPLETE",
       in: driver.element(identifier: "settings-action-preview"), timeout: 10))
+    XCTAssertTrue(driver.app.buttons["settings-action-edit"].waitForExistence(timeout: 5),
+      "Streaming text can arrive before the preview request finishes")
     driver.settingsWindow.typeKey(.leftArrow, modifierFlags: .option)
     driver.settingsWindow.typeKey(.leftArrow, modifierFlags: .option)
     driver.app.buttons["settings-action-edit"].click()

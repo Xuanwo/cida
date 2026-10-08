@@ -20,7 +20,24 @@ final class ActionEditor {
     let prompt: String
     let fingerprint: String
     let languages: (my: String, foreign: String)
-    let text: String
+    var text: String
+
+    func matches(_ action: TextAction, settings: CidaSettings) -> Bool {
+      prompt == action.prompt && fingerprint == settings.modelServiceFingerprint
+        && languages == settings.requestLanguages
+    }
+  }
+
+  struct Attempt {
+    enum Phase { case running, stopped, failed(ProcessingFailure) }
+    var preview: Preview
+    var phase: Phase
+    let saved: Bool
+
+    var failure: ProcessingFailure? {
+      if case .failed(let failure) = phase { return failure }
+      return nil
+    }
   }
 
   private enum Undo {
@@ -34,7 +51,7 @@ final class ActionEditor {
   private(set) var running: ProcessingMode?
   private(set) var error: String?
   private(set) var notice: String?
-  private(set) var previewNotes: [ProcessingMode: String] = [:]
+  private(set) var attempts: [ProcessingMode: Attempt] = [:]
   @ObservationIgnored private var undo: Undo?
   @ObservationIgnored private var task: Task<Void, Never>?
   @ObservationIgnored private var requestID = UUID()
@@ -44,7 +61,7 @@ final class ActionEditor {
   var isDirty: Bool { draft?.isDirty == true }
 
   func select(_ id: ProcessingMode) {
-    guard !isDirty else { return }
+    guard !isDirty, running == nil else { return }
     draft = nil
     selected = id
     error = nil
@@ -59,7 +76,7 @@ final class ActionEditor {
   }
 
   func create(_ settings: CidaSettings) {
-    guard !isDirty else { return }
+    guard !isDirty, running == nil else { return }
     var number = 1
     while settings.actions.contains(where: { $0.name == "新动作 \(number)" }) { number += 1 }
     let action = TextAction(
@@ -100,16 +117,11 @@ final class ActionEditor {
     error = nil
     notice = nil
     undo = nil
-    let preview = previews[action.id]
-    if preview?.prompt != action.prompt || preview?.fingerprint != settings.modelServiceFingerprint
-      || preview?.languages.my != settings.requestLanguages.my
-      || preview?.languages.foreign != settings.requestLanguages.foreign
-    {
-      runPreview(action, settings: settings)
-    } else {
-      if running == action.id { stopPreview() }
-      previewNotes[action.id] = nil
+    if !needsConfiguration(settings: settings),
+      previews[action.id]?.matches(action, settings: settings) != true || attempts[action.id] != nil {
+      runPreview(action, settings: settings, saved: true)
     }
+
     return true
   }
 
@@ -162,53 +174,89 @@ final class ActionEditor {
   }
 
   func move(_ id: ProcessingMode, to destination: Int, settings: inout CidaSettings) {
-    guard !isDirty, let source = settings.actions.firstIndex(where: { $0.id == id }) else { return }
+    guard !isDirty, running == nil, let source = settings.actions.firstIndex(where: { $0.id == id }) else { return }
     let action = settings.actions.remove(at: source)
     settings.actions.insert(action, at: max(0, min(destination, settings.actions.count)))
+  }
+
+  #if DEBUG
+    func setPreviewForDesign(settings: CidaSettings, phase: Attempt.Phase? = nil,
+      saved: Bool = false, reference: Bool = true, partial: String = "") {
+      selected = .improve
+      let snapshot = Preview(prompt: settings.improvementPrompt,
+        fingerprint: settings.modelServiceFingerprint, languages: settings.requestLanguages,
+        text: "原定周五的分享会调整至下周三下午三点，地点仍为二楼会议室。演示尚需完善，部分细节仍待确认。如时间不便，请于明天中午前告知，以便另行安排。")
+      if reference {
+        previews[selected] = Preview(prompt: saved ? "Previous policy" : snapshot.prompt,
+          fingerprint: snapshot.fingerprint, languages: snapshot.languages, text: snapshot.text)
+      }
+      if let phase {
+        var output = snapshot
+        output.text = partial
+        attempts[selected] = Attempt(preview: output, phase: phase, saved: saved)
+        if case .running = phase { running = selected }
+      }
+    }
+  #endif
+
+  /// Browsing never requests a preview. Only an explicit run or applying a draft does.
+  func trySavedAction(settings: CidaSettings) {
+    guard draft == nil, running == nil, !needsConfiguration(settings: settings),
+      let action = settings.actions.first(where: { $0.id == selected }) else { return }
+    runPreview(action, settings: settings, saved: false)
+  }
+
+  func needsConfiguration(settings: CidaSettings) -> Bool {
+    guard let attempt = attempts[selected], attempt.failure?.category == .configuration,
+      let action = settings.actions.first(where: { $0.id == selected }) else { return false }
+    return attempt.preview.matches(action, settings: settings)
   }
 
   func stopPreview() {
     task?.cancel()
     task = nil
     requestID = UUID()
-    if let running { previewNotes[running] = "已停止 · 仍是上次的结果" }
+    if let running { attempts[running]?.phase = .stopped }
     running = nil
   }
 
-  private func runPreview(_ action: TextAction, settings: CidaSettings) {
+  private func runPreview(_ action: TextAction, settings: CidaSettings, saved: Bool) {
     stopPreview()
+    let languages = settings.requestLanguages
+    attempts[action.id] = Attempt(
+      preview: Preview(prompt: action.prompt, fingerprint: settings.modelServiceFingerprint,
+        languages: languages, text: ""), phase: .running, saved: saved)
     guard service.isConfigured(by: settings) else {
-      previewNotes[action.id] = "配置模型服务后，再完成编辑即可查看效果"
+      attempts[action.id]?.phase = .failed(ProcessingFailure(category: .configuration, settings: settings))
       return
     }
     let id = UUID()
     requestID = id
     running = action.id
-    previewNotes[action.id] = nil
-    let languages = settings.requestLanguages
     let request = ProcessingRequest(
       text: Self.sample, mode: action.id,
       myLanguage: languages.my, foreignLanguage: languages.foreign)
     let service = service
     task = Task { [weak self] in
       do {
-        var output = ""
         for try await chunk in service.stream(request, settings: settings) {
           try Task.checkCancellation()
-          output += chunk
+          guard let self, self.requestID == id else { return }
+          self.attempts[action.id]?.preview.text += chunk
         }
         try Task.checkCancellation()
-        guard !output.isEmpty else { throw ModelServiceError.emptyResult }
         guard let self, self.requestID == id else { return }
-        self.previews[action.id] = Preview(
-          prompt: action.prompt, fingerprint: settings.modelServiceFingerprint,
-          languages: languages, text: output)
+        guard let result = self.attempts[action.id]?.preview, !result.text.isEmpty else {
+          throw ModelServiceError.emptyResult
+        }
+        self.previews[action.id] = result
+        self.attempts[action.id] = nil
         self.running = nil
         self.task = nil
       } catch {
         guard let self, self.requestID == id else { return }
-        self.previewNotes[action.id] =
-          error is CancellationError ? "已停止 · 仍是上次的结果" : error.localizedDescription
+        self.attempts[action.id]?.phase = error is CancellationError ? .stopped
+          : .failed(ProcessingFailure(error: error, settings: settings))
         self.running = nil
         self.task = nil
       }

@@ -806,7 +806,8 @@ final class AppModel {
   /// The handoff follows the current task; diagnostics stay in the command-line interface.
   var configurationPrompt: String {
     ConfigurationPrompt.text(settings: settings, lastCheck: currentModelServiceCheck,
-      requestFailure: processingFailure)
+      requestFailure: processingFailure,
+      previewFailure: actionEditor.attempts[actionEditor.selected]?.failure)
   }
 
   func copyConfigurationPrompt() {
