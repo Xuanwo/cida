@@ -23,8 +23,8 @@ swift build --package-path "$project_dir"
 
 # Panel states: the capture is the panel at its content height, 800 pt wide.
 # The share-* states capture the card ⇧⌘C copies instead of a window.
-for state in empty typing translate improve stale stale-action stale-empty stopped failed long translate-into-mine target-editing target-editing-changed target-composing copy-menu \
-  share-translate share-read share-improve \
+for state in empty typing translate improve stale stale-action stale-empty stopped failed failed-timeout failed-offline failed-limited failed-secure failed-unknown failed-changed failed-configured dark-failed long translate-into-mine target-editing target-editing-changed target-composing copy-menu \
+  share-translate share-read share-improve share-interrupted share-stopped \
   settings settings-translation settings-language-editing settings-prompt-editing \
   settings-shortcuts settings-shortcuts-custom settings-shortcuts-unset settings-recording settings-general settings-update-available \
   settings-config-unset settings-config-copied settings-config-ready settings-config-updated \
@@ -40,7 +40,7 @@ for state in empty typing translate improve stale stale-action stale-empty stopp
     --snapshot-output "$implementation_dir/$state.png"
 done
 
-for state in streaming dark-streaming; do
+for state in streaming dark-streaming length-recovery; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
     --snapshot-delay-ms 800 \

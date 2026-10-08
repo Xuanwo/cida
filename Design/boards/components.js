@@ -9,16 +9,16 @@ class CidaResultHeader extends HTMLElement {
     const status = this.getAttribute("status") ?? "current";
     const feedback = this.getAttribute("feedback");
     const open = this.hasAttribute("open");
-    const title = { current: "结果", stale: "上次结果", streaming: "正在执行", stopped: "已停止" }[status];
+    const title = { current: "结果", stale: "上次结果", streaming: "正在执行", stopped: "已停止", failed: "请求失败", incomplete: "未完成", "previous-failed": "上次请求失败", "previous-incomplete": "上次请求未完成" }[status];
     const label = feedback === "image" ? "已复制图片" : feedback === "text" ? "已复制" : "复制";
     this.outerHTML = `<div class="result-header">
-      <div class="result-status">${title}${status === "stale" ? '<span>· 待更新</span>' : ''}</div>
+      <div class="result-status">${title}${this.hasAttribute('model') ? '<span>· ' + this.getAttribute('model') + '</span>' : status === "stale" ? '<span>· 待更新</span>' : ''}</div>
       <div class="copy-button${open ? ' open' : ''}${this.hasAttribute("disabled") ? ' disabled' : ''}${feedback ? ' copied' : ''}">
         <div class="main"><i class="icon icon-${feedback ? 'check' : 'copy'}"></i><span class="label">${label}</span>${feedback ? '' : '<span class="key">⌘C</span>'}</div>
         <div class="more"><i class="icon icon-chevron-down"></i></div>
       </div>
       ${open ? `<div class="copy-menu">
-        <div class="row"><i class="icon icon-copy"></i><b>${status === "stale" ? '复制上次结果' : '复制结果'}</b><kbd>⌘C</kbd></div>
+        <div class="row"><i class="icon icon-copy"></i><b>${['failed','incomplete','previous-failed','previous-incomplete'].includes(status) ? '复制已有文字' : status === "stale" ? '复制上次结果' : '复制结果'}</b><kbd>⌘C</kbd></div>
         <div class="row on"><i class="icon icon-image"></i><b>复制图片</b><kbd>⇧⌘C</kbd></div>
       </div>` : ''}
     </div>`;
@@ -38,6 +38,8 @@ class CidaBar extends HTMLElement {
       execute: `<div class="bar-action execution${this.hasAttribute("disabled") ? " disabled" : ""}"><span class="label">执行</span><span class="key">⏎</span></div>`,
       stop: `<div class="bar-action execution"><i class="stop-icon"></i><span class="label">停止</span><span class="key">⌘.</span></div>`,
       reexecute: `<div class="bar-action execution${this.hasAttribute("disabled") ? " disabled" : ""}"><span class="label">重新执行</span><span class="key">⏎</span></div>`,
+      retry: `<div class="bar-action execution"><span class="label">重试</span><span class="key">⏎</span></div>`,
+      "model-settings": `<div class="bar-action execution"><span class="label">模型设置</span><span class="key">⌘,</span></div>`,
       settings: `<div class="bar-action"><span class="label">打开设置</span><span class="key">⌘,</span></div>`,
       status: `<span class="bar-status">${this.getAttribute("status") ?? ""}</span>`,
     };

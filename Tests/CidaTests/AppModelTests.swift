@@ -73,7 +73,7 @@ final class AppModelTests: XCTestCase {
 
     let failed = ResultRecord(
       mode: .translate, source: "Source", outputLanguage: .english,
-      phase: .failed(message: "boom"))
+      phase: .failed(ProcessingFailure(category: .unknown, settings: model.settings)))
     model.setResultForTesting(failed)
     XCTAssertFalse(model.canCopyResult)
     XCTAssertEqual(model.resultNote?.kind, .failed)
@@ -185,9 +185,10 @@ final class AppModelTests: XCTestCase {
 
     let result = try XCTUnwrap(model.result)
     XCTAssertEqual(result.result, "Partial")
-    XCTAssertEqual(result.phase, .failed(message: "boom"))
+    XCTAssertEqual(result.phase, .failed(ProcessingFailure(category: .unknown, settings: model.settings)))
     XCTAssertEqual(model.resultNote?.kind, .failed)
-    XCTAssertTrue(model.resultNote?.text.contains("boom") == true)
+    XCTAssertFalse(model.resultNote?.text.contains("boom") == true)
+    XCTAssertTrue(model.failureExplanation?.contains("请求没有完成") == true)
     XCTAssertNil(model.errorMessage, "Request failures never raise a Settings alert")
   }
 

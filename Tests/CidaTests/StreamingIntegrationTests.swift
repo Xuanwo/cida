@@ -64,9 +64,7 @@ final class StreamingIntegrationTests: XCTestCase {
 
     XCTAssertEqual(
       model.result?.phase,
-      .failed(
-        message: ModelServiceError.incompleteConfiguration(missing: ["api-key"])
-          .localizedDescription)
+      .failed(ProcessingFailure(category: .configuration, settings: settings))
     )
     XCTAssertEqual(model.resultNote?.kind, .failed)
   }

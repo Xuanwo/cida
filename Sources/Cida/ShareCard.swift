@@ -4,7 +4,7 @@ import AppKit
 /// `Design/boards/share-card.html`): the source a result was generated from
 /// above the result, set as the panel sets them, on a card with the panel's
 /// edge. The image leaves Cida for chats read on phones, so the card is
-/// narrower than the panel, carries only the two texts, and is always drawn in
+/// narrower than the panel, marks unfinished output, and is always drawn in
 /// the light appearance whatever the viewer's is.
 enum ShareCard {
   /// Pixels per point: a phone showing the card full screen draws it at about
@@ -20,6 +20,11 @@ enum ShareCard {
   /// How long the button says the card is too long, as long as a brief hint pill.
   static let tooLongHoldMilliseconds = 1_500
 
+  enum IncompleteMark: String, Sendable {
+    case interrupted = "未完成 · 请求中断"
+    case stopped = "未完成 · 生成时已停止"
+  }
+
   enum Failure: Error, Equatable {
     case tooLong
     case cannotRender
@@ -34,7 +39,8 @@ enum ShareCard {
 
   @MainActor
   static func render(
-    source: String, result: String, language: Language, scale: CGFloat = ShareCard.scale
+    source: String, result: String, language: Language,
+    incomplete: IncompleteMark? = nil, scale: CGFloat = ShareCard.scale
   ) -> Swift.Result<Rendering, Failure> {
     guard source.utf16.count + result.utf16.count <= maximumUTF16Length else {
       return .failure(.tooLong)
@@ -44,11 +50,19 @@ enum ShareCard {
     let sourceText = TypesetText(
       NSAttributedString(string: source, attributes: sourceAttributes), width: textWidth)
     let resultText = TypesetText(
-      NSAttributedString(string: result, attributes: ResultTextStyle.attributes(for: language)),
+      NSAttributedString(string: incomplete == nil ? result : result + "…",
+        attributes: ResultTextStyle.attributes(for: language)),
       width: textWidth)
+    let markText = incomplete.map {
+      TypesetText(NSAttributedString(string: $0.rawValue, attributes: [
+        .font: CidaDesign.appKitBody(12),
+        .foregroundColor: CidaDesign.Palette.textSecondary.appKit(dark: false)
+      ]), width: textWidth)
+    }
+    let markHeight = markText.map { $0.height + 14 } ?? 0
     let padding = CidaDesign.Spacing.resultVertical
     let sourceHeight = sourceText.height + padding * 2
-    let resultHeight = resultText.height + padding * 2
+    let resultHeight = resultText.height + padding * 2 + markHeight
     let hairline: CGFloat = 1
     let cardHeight = ceil(sourceHeight + hairline + resultHeight)
     guard cardHeight <= maximumCardHeight else { return .failure(.tooLong) }
@@ -107,6 +121,7 @@ enum ShareCard {
       let textX = card.minX + CidaDesign.Spacing.windowHorizontal
       sourceText.draw(at: CGPoint(x: textX, y: card.minY + padding))
       resultText.draw(at: CGPoint(x: textX, y: resultTop + padding))
+      markText?.draw(at: CGPoint(x: textX, y: resultTop + padding + resultText.height + 14))
       context.restoreGState()
 
       // `panel-edge` hugs the card from outside, as the board's 1px spread does.
@@ -163,5 +178,15 @@ private struct TypesetText {
   func draw(at origin: CGPoint) {
     let glyphs = layoutManager.glyphRange(for: container)
     layoutManager.drawGlyphs(forGlyphRange: glyphs, at: origin)
+  }
+}
+
+extension ResultPhase {
+  var incompleteMark: ShareCard.IncompleteMark? {
+    switch self {
+    case .failed: .interrupted
+    case .stopped: .stopped
+    default: nil
+    }
   }
 }

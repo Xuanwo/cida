@@ -1124,3 +1124,7 @@ body {
 .welcome-actions button { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: 500 12.5px var(--font-ui); color: var(--text-control); background: var(--surface); }
 .welcome-actions button.primary { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .welcome-caption { font: 12px/1.5 var(--font-ui); color: var(--text-secondary); }
+
+/* Recovery copy stays quiet and reserves two lines at the panel width. */
+.failure-explanation { height: 40px; font-size: 13px; line-height: 20px; color: var(--text-secondary); }
+.share-card .incomplete-mark { margin-top: 4px; font-size: 12px; line-height: 17px; color: var(--text-secondary); }

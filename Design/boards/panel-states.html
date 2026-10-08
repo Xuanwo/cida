@@ -94,7 +94,7 @@
   </section>
   <div class="divider"></div>
 
-  <p class="caption">⑦ 已停止 / 出错 — 已输出文字保留;结果栏末尾一行说明代替 alert;⏎ 重试。已停止在标题行标注,有文字时可复制;控制栏保持重新执行</p>
+  <p class="caption">⑦ 已停止 — 已输出文字保留;标题行标注停止,有文字时可复制;控制栏保持重新执行。失败按下列类别恢复</p>
   <section class="panel" data-state="stopped">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
     <cida-bar target="English" action="reexecute"></cida-bar>
@@ -102,10 +102,65 @@
       <div class="text">Our system adopts a brand-new storage engine that significantly improves read and write</div>
     </div>
   </section>
+  <p class="caption">失败恢复 · failed — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
   <section class="panel" data-state="failed">
     <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
-    <cida-bar target="English" action="reexecute"></cida-bar>
-    <div class="result"><cida-result-header status="current" disabled></cida-result-header><cida-note kind="failed">请求失败:401 Unauthorized(deepseek-chat)。检查 API Key 后按 ⏎ 重试</cida-note></div>
+    <cida-bar target="English" action="model-settings"></cida-bar>
+    <div class="result"><cida-result-header status="failed" model="deepseek-chat" disabled></cida-result-header><div class="failure-explanation">模型配置需要检查。在模型设置里复制配置提示词，交给 AI 助手继续检查；配置更新后即可重试。</div></div>
+  </section>
+  <p class="caption">失败恢复 · failed-timeout — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="failed-timeout">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="retry"></cida-bar>
+    <div class="result"><cida-result-header status="incomplete" model="deepseek-chat"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write</div><div class="failure-explanation">请求超时。重试会从头执行，并替换已有输出。</div></div>
+  </section>
+  <p class="caption">失败恢复 · failed-offline — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="failed-offline">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="retry"></cida-bar>
+    <div class="result"><cida-result-header status="failed" model="deepseek-chat" disabled></cida-result-header><div class="failure-explanation">连不上模型服务。检查网络后重试；辞达不会自动重试。</div></div>
+  </section>
+  <p class="caption">长度超限 · 自动分段 — 辞达按段落、句子缩小请求,顺序完成。用户保持同一次执行,可随时停止;不要求用户缩短或手动分段。</p>
+  <section class="panel" data-state="length-recovery">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="stop" processing></cida-bar>
+    <div class="result"><cida-result-header status="streaming" disabled></cida-result-header><div class="text">Our system adopts<span class="cursor"></span></div></div>
+  </section>
+  <p class="caption">失败恢复 · failed-limited — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="failed-limited">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="retry"></cida-bar>
+    <div class="result"><cida-result-header status="failed" model="deepseek-chat" disabled></cida-result-header><div class="failure-explanation">服务商暂时限制了请求。请稍后重试；一直出现时，到服务商后台查看用量与额度。</div></div>
+  </section>
+  <p class="caption">失败恢复 · failed-secure — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="failed-secure">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="retry"></cida-bar>
+    <div class="result"><cida-result-header status="failed" model="deepseek-chat" disabled></cida-result-header><div class="failure-explanation">无法建立安全连接。检查网络或代理后重试；辞达不会跳过安全校验。</div></div>
+  </section>
+  <p class="caption">失败恢复 · failed-unknown — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="failed-unknown">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="retry"></cida-bar>
+    <div class="result"><cida-result-header status="failed" model="deepseek-chat" disabled></cida-result-header><div class="failure-explanation">请求没有完成，可以重试。反复出现时，在模型设置里复制配置提示词，交给 AI 助手继续检查。</div></div>
+  </section>
+  <p class="caption">失败恢复 · failed-changed — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="failed-changed">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。</div>
+    <cida-bar target="English" action="execute"></cida-bar>
+    <div class="result"><cida-result-header status="previous-incomplete" model="deepseek-chat"></cida-result-header><div class="text">Our system adopts a brand-new storage engine that significantly improves read and write</div><div class="failure-explanation">原文或动作已经改了。执行会发送新的请求；这条失败说明只针对上次请求。</div></div>
+  </section>
+  <p class="caption">失败恢复 · failed-configured — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="failed-configured">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="retry"></cida-bar>
+    <div class="result"><cida-result-header status="failed" model="deepseek-chat" disabled></cida-result-header><div class="failure-explanation">模型配置已更新。按 ⏎ 或点「重试」重新发送请求，并替换已有输出。</div></div>
+  </section>
+  <p class="caption">失败恢复 · dark-failed — 只显示下一步需要的信息,保留已有文字,不静默重试。</p>
+  <section class="panel" data-state="dark-failed" data-appearance="dark">
+    <div class="source">我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,显著提升了读写性能。</div>
+    <cida-bar target="English" action="model-settings"></cida-bar>
+    <div class="result"><cida-result-header status="failed" model="deepseek-chat" disabled></cida-result-header><div class="failure-explanation">模型配置需要检查。在模型设置里复制配置提示词，交给 AI 助手继续检查；配置更新后即可重试。</div></div>
   </section>
   <div class="divider"></div>
 

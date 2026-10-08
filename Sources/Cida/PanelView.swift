@@ -72,7 +72,8 @@ struct PanelView: View {
       )
       ControlBar(
         model: model,
-        presentation: barActionPresentation,
+        presentation: model.barActionPresentation,
+        openSettings: openSettings,
         closesWithHairline: model.result != nil
       )
       if model.result != nil {
@@ -164,7 +165,8 @@ struct PanelView: View {
   /// whole lines of the result's typography, so the pane never cuts a line
   /// through its glyphs.
   private var resultTextMaxHeight: CGFloat {
-    let noteAllowance: CGFloat = ResultPane.footerNote(model) == nil ? 0 : ResultNoteRow.height + 10
+    let noteAllowance: CGFloat = model.processingFailure != nil ? FailureExplanation.height + 10
+      : ResultPane.footerNote(model) == nil ? 0 : ResultNoteRow.height + 10
     let lineHeight = ResultTextStyle.lineHeight(for: model.result?.outputLanguage ?? .english)
     let available =
       resultPaneMaxHeight - CidaDesign.Spacing.resultVertical * 2
@@ -178,13 +180,6 @@ struct PanelView: View {
   }
 
   // MARK: - Bar action
-
-  private var barActionPresentation: BarActionPresentation {
-    .resolve(
-      isProcessing: model.isProcessing,
-      repeatsAction: model.result?.mode == model.mode
-    )
-  }
 
   private func showCopiedFeedback() {
     copiedFeedbackTask?.cancel()
@@ -252,6 +247,7 @@ private struct SourcePane: View {
 private struct ControlBar: View {
   let model: AppModel
   let presentation: BarActionPresentation
+  let openSettings: @MainActor () -> Void
   let closesWithHairline: Bool
 
   var body: some View {
@@ -266,7 +262,7 @@ private struct ControlBar: View {
           .fixedSize()
           .accessibilityIdentifier("foreign-language-confirmation-hint")
       } else {
-        BarActionButton(model: model, presentation: presentation)
+        BarActionButton(model: model, presentation: presentation, openSettings: openSettings)
           .fixedSize()
       }
     }
@@ -430,20 +426,28 @@ private struct DimmedWhileWorking: ViewModifier {
 private struct BarActionButton: View {
   let model: AppModel
   let presentation: BarActionPresentation
+  var openSettings: @MainActor () -> Void = {}
 
   var body: some View {
     ZStack {
       switch presentation {
-      case .execute, .reexecute:
+      case .execute, .reexecute, .retry:
         pill(
           identifier: "bar-action-execute",
-          label: presentation == .reexecute ? "重新执行" : "执行",
+          label: presentation == .retry ? "重试" : presentation == .reexecute ? "重新执行" : "执行",
           key: "⏎", accent: false, minimumWidth: 92
         ) { EmptyView() } action: {
           model.submit()
         }
         .disabled(!model.hasSubmittableInput)
         .opacity(model.hasSubmittableInput ? 1 : 0.45)
+      case .modelSettings:
+        pill(identifier: "bar-action-model-settings", label: "模型设置", key: "⌘,", accent: false, minimumWidth: 92) {
+          EmptyView()
+        } action: {
+          model.settingsTab = .model
+          openSettings()
+        }
       case .stop:
         pill(identifier: "bar-action-stop", label: "停止", key: "⌘.", accent: false, minimumWidth: 92) {
           RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -543,7 +547,7 @@ private struct CopyButton: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .accessibilityLabel(feedback == nil ? (model.isResultStale ? "复制上次结果" : "复制结果") : label)
+      .accessibilityLabel(feedback == nil ? model.resultCopyLabel : label)
       .accessibilityIdentifier(identifier)
       Button { model.isCopyMenuOpen.toggle() } label: {
         LucideIcon(.chevronDown, size: 10)
@@ -588,7 +592,7 @@ private struct CopyMenu: View {
 
   var body: some View {
     VStack(spacing: 2) {
-      row(.result, icon: .copy, title: model.isResultStale ? "复制上次结果" : "复制结果", key: "⌘C", identifier: "copy-menu-result") {
+      row(.result, icon: .copy, title: model.resultCopyLabel, key: "⌘C", identifier: "copy-menu-result") {
         model.copyResult()
       }
       row(.image, icon: .image, title: "复制图片", key: "⇧⌘C", identifier: "copy-menu-image") {
@@ -688,7 +692,7 @@ private struct ResultPane: View {
   let copyFeedback: CopyFeedback?
 
   static func footerNote(_ model: AppModel) -> ResultNote? {
-    guard let note = model.resultNote, note.kind != .stale, note.kind != .stopped else { return nil }
+    guard let note = model.resultNote, note.kind != .stale, note.kind != .stopped, note.kind != .failed else { return nil }
     return note
   }
 
@@ -703,6 +707,10 @@ private struct ResultPane: View {
           maxVisibleHeight: maxTextHeight
         )
         .frame(maxWidth: .infinity)
+      }
+      if let explanation = model.failureExplanation {
+        FailureExplanation(text: explanation)
+          .padding(.horizontal, CidaDesign.Spacing.windowHorizontal)
       }
       if let note = Self.footerNote(model) {
         ResultNoteRow(note: note)
@@ -725,19 +733,32 @@ private struct ResultHeader: View {
   let model: AppModel
   let copyFeedback: CopyFeedback?
 
+  private var title: String {
+    if model.isProcessing { return "正在执行" }
+    if model.processingFailure != nil {
+      let state = (model.result?.resultUTF16Length ?? 0) > 0 ? "未完成" : "失败"
+      return model.isResultStale ? "上次请求" + state : state == "失败" ? "请求失败" : state
+    }
+    return model.isResultStale ? "上次结果" : model.result?.phase == .stopped ? "已停止" : "结果"
+  }
+
   var body: some View {
     HStack(spacing: 12) {
       HStack(spacing: 6) {
-        Text(model.isProcessing ? "正在执行" : model.isResultStale ? "上次结果"
-          : model.result?.phase == .stopped ? "已停止" : "结果")
+        Text(title)
           .font(CidaDesign.mainUI(12, weight: .medium))
           .foregroundStyle(CidaDesign.textSecondary)
-        if model.isResultStale {
+        if let failure = model.processingFailure, !failure.modelName.isEmpty {
+          Text("· \(failure.modelName)")
+            .font(CidaDesign.mainUI(12)).foregroundStyle(CidaDesign.textTertiary)
+            .lineLimit(1).truncationMode(.middle)
+        } else if model.isResultStale {
           Text("· 待更新").font(CidaDesign.mainUI(12)).foregroundStyle(CidaDesign.textTertiary)
         }
       }
       .accessibilityElement(children: .combine)
-      .accessibilityIdentifier(model.isResultStale ? "result-note-stale"
+      .accessibilityIdentifier(model.processingFailure != nil ? "result-note-failed"
+        : model.isResultStale ? "result-note-stale"
         : model.result?.phase == .stopped ? "result-note-stopped" : "result-header-status")
       Spacer(minLength: 12)
       CopyButton(model: model, feedback: copyFeedback)
@@ -745,6 +766,22 @@ private struct ResultHeader: View {
     .frame(height: Self.height)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("result-header")
+  }
+}
+
+private struct FailureExplanation: View {
+  static let height: CGFloat = 40
+  let text: String
+
+  var body: some View {
+    Text(text)
+      .font(CidaDesign.mainUI(13))
+      .foregroundStyle(CidaDesign.textSecondary)
+      .lineSpacing(3)
+      .lineLimit(2)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(height: Self.height, alignment: .topLeading)
+      .accessibilityIdentifier("result-failure-explanation")
   }
 }
 

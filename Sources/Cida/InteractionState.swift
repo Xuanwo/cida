@@ -52,6 +52,8 @@ enum CopyFeedback: Equatable, Sendable {
 enum BarActionPresentation: Equatable, Sendable {
   case execute
   case reexecute
+  case retry
+  case modelSettings
   case stop
 
   static func resolve(isProcessing: Bool, repeatsAction: Bool) -> BarActionPresentation {
