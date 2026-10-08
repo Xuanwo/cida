@@ -85,9 +85,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
         with open(record_path, "w", encoding="utf-8") as output:
             json.dump(record, output, ensure_ascii=False)
 
+        with open(record_path + ".jsonl", "a", encoding="utf-8") as output:
+            output.write(json.dumps(record, ensure_ascii=False) + "\n")
+        body = record["body"]
+        user = body.get("input", body.get("messages", []))[-1]["content"]
+        system = body.get("instructions", body.get("system", ""))
+        if not system:
+            system = body.get("messages", [{}])[0].get("content", "")
+        limit = plan.get("maximumInputBytes")
         status = plan.get("status", 200)
+        length_error = None
+        if limit is not None and len(user.encode("utf-8")) > limit:
+            fmt = plan.get("format", "chat-completions")
+            status = 413 if fmt == "responses" else 400
+            error = ({"type": "invalid_request_error", "message": "prompt is too long: input exceeds maximum"}
+                     if fmt == "anthropic-messages" else {"code": "context_length_exceeded"})
+            length_error = json.dumps({"error": error})
+
         if status != 200:
-            body = plan.get("errorBody", "")
+            body = length_error or plan.get("errorBody", "")
             body = body.replace("{authorization}", self.headers.get("Authorization", ""))
             body = body.replace("{x-api-key}", self.headers.get("x-api-key", ""))
             payload = body.encode("utf-8")
@@ -102,6 +118,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         fmt = plan.get("format", "chat-completions")
         chunks = plan.get("chunks", [])
+        if plan.get("echoInput"):
+            chunks = [user]
+        if plan.get("structuredOutput"):
+            if "Result assembly contract:" in system:
+                items = [item for partial in json.loads(user) for item in json.loads(partial)["items"]]
+            else:
+                items = [user.split()[0]]
+            chunks = [json.dumps({"items": items}, ensure_ascii=False)]
+
         if not plan.get("stream", True):
             payload = json.dumps(complete_document(fmt, "".join(chunks)), ensure_ascii=False).encode("utf-8")
             self.send_response(200)

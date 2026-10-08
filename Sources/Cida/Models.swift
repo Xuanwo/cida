@@ -107,7 +107,7 @@ enum ResultPhase: Equatable, Sendable {
   case streaming
   case completed
   case stopped
-  case failed(message: String)
+  case failed(ProcessingFailure)
   /// A capture held no text, so nothing was requested.
   case unrecognized
 
@@ -198,8 +198,8 @@ final class ResultRecord: Identifiable, @unchecked Sendable {
       replacementNote.map { ResultNote(kind: .replacement, text: $0) }
     case .stopped:
       ResultNote(kind: .stopped, text: "已停止 · ⏎ 重新执行")
-    case .failed(let message):
-      ResultNote(kind: .failed, text: "请求失败：\(message) 按 ⏎ 重试")
+    case .failed(let failure):
+      ResultNote(kind: .failed, text: failure.category.explanation)
     case .unrecognized:
       ResultNote(kind: .unrecognized, text: "截图里没有识别到文字")
     }

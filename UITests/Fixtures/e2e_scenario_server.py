@@ -129,7 +129,22 @@ def plan_for(submitted_text):
         return {"chunks": ["CIDA_ACTION_RECOVERED"]}
     if submitted_text == "CIDA_ACTION_STOP":
         return {"chunks": ["CIDA_ACTION_STOPPED_LATE"], "gateFirstByte": True}
+    if submitted_text == "CIDA_E2E_PARTIAL_FAILURE":
+        attempts = sum(item["scenario"] == submitted_text for item in state.snapshot()["requests"])
+        if attempts == 1:
+            return {"chunks": ["Partial output before interruption."], "streamError": "PRIVATE_PROVIDER_CANARY"}
+        return {"chunks": ["Recovered output replaces the partial text."]}
+    if "CIDA_AUTO_SEGMENT_" in submitted_text:
+        if len(submitted_text.encode("utf-8")) > 80:
+            return {"status": 413, "body": "request too large", "failureDelay": 0.01}
+        return {"chunks": [submitted_text.replace("CIDA_AUTO_SEGMENT_", "Completed segment ")]}
+    if "CIDA_AUTO_STOP_SEGMENT_" in submitted_text:
+        if len(submitted_text.encode("utf-8")) > 60:
+            return {"status": 413, "body": "request too large", "failureDelay": 0.01}
+        return {"chunks": [submitted_text], "gateFirstByte": "SEGMENT_2" in submitted_text}
     plans = {
+        "CIDA_E2E_CONFIG_FAILURE": {"status": 401, "body": "PRIVATE_PROVIDER_CANARY Unauthorized"},
+        "CIDA_E2E_LIMIT_FAILURE": {"status": 429, "body": "PRIVATE_PROVIDER_CANARY"},
         # What Settings' 检查 and `Cida check` send (ModelServiceCheck.source).
         "hello": {"chunks": ["你好"]},
         "CIDA_RELEASE_ARTIFACT_SMOKE": {
@@ -402,7 +417,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 ),
             }
         if plan.get("status", 200) != 200:
-            time.sleep(2.0)
+            time.sleep(plan.get("failureDelay", 2.0))
             payload = plan.get("body", "controlled failure").encode("utf-8")
             self.send_response(plan["status"])
             self.send_header("Content-Type", "text/plain; charset=utf-8")
@@ -438,6 +453,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.wfile.flush()
                 state.event(request_id, "chunk-sent", chunksSent=index + 1)
 
+            if "streamError" in plan:
+                time.sleep(0.6)
+                error = {"error": {"message": plan["streamError"]}}
+                self.wfile.write(f"data: {json.dumps(error)}\n\n".encode("utf-8"))
+                self.wfile.flush()
+                state.event(request_id, "failed")
+                return
             self.wfile.write(b"data: [DONE]\n\n")
             self.wfile.flush()
             state.event(request_id, "completed", chunksSent=len(plan["chunks"]))

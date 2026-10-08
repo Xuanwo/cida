@@ -13,9 +13,12 @@ final class LocalModelServiceServer: @unchecked Sendable {
     var errorBody: String?
     var streamError: String?
     var delay = 0.02
+    var maximumInputBytes: Int?
+    var echoInput = false
+    var structuredOutput = false
 
     private enum CodingKeys: String, CodingKey {
-      case format, chunks, stream, status, errorBody, streamError, delay
+      case format, chunks, stream, status, errorBody, streamError, delay, maximumInputBytes, echoInput, structuredOutput
     }
 
     func encode(to encoder: Encoder) throws {
@@ -27,6 +30,9 @@ final class LocalModelServiceServer: @unchecked Sendable {
       try container.encodeIfPresent(errorBody, forKey: .errorBody)
       try container.encodeIfPresent(streamError, forKey: .streamError)
       try container.encode(delay, forKey: .delay)
+      try container.encodeIfPresent(maximumInputBytes, forKey: .maximumInputBytes)
+      try container.encode(echoInput, forKey: .echoInput)
+      try container.encode(structuredOutput, forKey: .structuredOutput)
     }
   }
 
@@ -94,6 +100,11 @@ final class LocalModelServiceServer: @unchecked Sendable {
     )
   }
 
+  func recordedRequests() throws -> [JSONValue] {
+    let data = try String(contentsOf: URL(fileURLWithPath: recordURL.path + ".jsonl"), encoding: .utf8)
+    return data.split(separator: "\n").compactMap { JSONValue.parse(String($0)) }
+  }
+
   func stop() {
     if process.isRunning {
       process.terminate()
@@ -102,6 +113,7 @@ final class LocalModelServiceServer: @unchecked Sendable {
       while process.isRunning, Date() < deadline { usleep(10_000) }
     }
     try? FileManager.default.removeItem(at: recordURL)
+    try? FileManager.default.removeItem(atPath: recordURL.path + ".jsonl")
   }
 
   enum MockServerError: Error {

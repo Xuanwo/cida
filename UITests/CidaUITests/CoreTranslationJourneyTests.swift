@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -189,4 +190,121 @@ final class CoreTranslationJourneyTests: CidaReleaseUITestCase {
     driver.waitForCompletion()
     XCTAssertFalse(driver.resultNote("failed").exists)
   }
+
+  func testConfigurationFailureRequiresChangedConfigurationOrANewRequest() throws {
+    try driver.configureModelService()
+    driver.launch(endpointOverride: false, configuredBeforeLaunch: true)
+    driver.submit("CIDA_E2E_CONFIG_FAILURE")
+    XCTAssertTrue(driver.resultNote("failed").waitForExistence(timeout: 8))
+    let settings = driver.app.buttons["bar-action-model-settings"]
+    XCTAssertTrue(settings.exists)
+    XCTAssertFalse(driver.copyButton.isEnabled)
+    XCTAssertFalse(driver.panel.debugDescription.contains("PRIVATE_PROVIDER_CANARY"))
+    driver.submitCurrentSource()
+    XCTAssertTrue(settings.exists)
+    XCTAssertEqual(try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_CONFIG_FAILURE" }.count, 1)
+    XCTAssertFalse(driver.settingsWindow.exists, "Enter cannot open a hidden settings action")
+    XCTContext.runActivity(named: "Configuration failure gives one recovery action") { activity in
+      driver.attachPanelScreenshot(named: "failure-configuration", to: activity)
+    }
+    settings.click()
+    XCTAssertTrue(driver.settingsWindow.waitForExistence(timeout: 5))
+    XCTAssertTrue(driver.waitForTitle("模型", of: driver.settingsWindow, timeout: 3))
+    driver.settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+    driver.showPanel()
+    driver.replaceSource(with: "CIDA_E2E_POOL_NEW_SOURCE")
+    let execute = driver.app.buttons["bar-action-execute"]
+    XCTAssertEqual(execute.label, "执行")
+    driver.replaceSource(with: "CIDA_E2E_CONFIG_FAILURE")
+    XCTAssertTrue(settings.waitForExistence(timeout: 3))
+    try driver.configureModelService(model: "updated-model")
+    XCTAssertTrue(driver.waitForLabel("重试", in: execute, timeout: 5))
+    XCTAssertTrue((driver.resultNote("failed").value as? String ?? "").contains("cida-ui-mock-model"),
+      "The header keeps the identity of the failed request")
+    execute.click()
+    XCTAssertTrue(driver.stopButton.waitForExistence(timeout: 3))
+    XCTAssertTrue(settings.waitForExistence(timeout: 8))
+    XCTAssertEqual(try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_CONFIG_FAILURE" }.count, 2)
+    XCTAssertTrue((driver.resultNote("failed").value as? String ?? "").contains("updated-model"))
+  }
+
+  func testServiceLimitsRemainAnExplicitRetry() throws {
+    driver.launch()
+    driver.submit("CIDA_E2E_LIMIT_FAILURE")
+    XCTAssertTrue(driver.resultNote("failed").waitForExistence(timeout: 8))
+    XCTAssertEqual(driver.app.buttons["bar-action-execute"].label, "重试")
+    XCTAssertFalse(driver.panel.debugDescription.contains("PRIVATE_PROVIDER_CANARY"))
+    driver.submitCurrentSource()
+    XCTAssertNotNil(try scenarioServer.wait(for: "CIDA_E2E_LIMIT_FAILURE", status: "failed"))
+    XCTAssertEqual(try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_LIMIT_FAILURE" }.count, 2)
+    driver.submit("CIDA_E2E_POOL_RECOVERED")
+    XCTAssertTrue(driver.result(containing: "CIDA_E2E_POOL_RECOVERED_COMPLETE").waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+  }
+
+  func testInterruptedTextCanBeCopiedAndRetryReplacesIt() throws {
+    driver.launch()
+    driver.submit("CIDA_E2E_PARTIAL_FAILURE")
+    XCTAssertTrue(driver.resultNote("failed").waitForExistence(timeout: 8))
+    XCTAssertTrue((driver.resultNote("failed").value as? String ?? "").contains("未完成"))
+    let visiblePartial = driver.resultText.value as? String ?? ""
+    XCTAssertGreaterThan(visiblePartial.count, 10)
+    XCTAssertTrue("Partial output before interruption.".hasPrefix(visiblePartial))
+    XCTAssertEqual(driver.copyButton.label, "复制已有文字")
+    driver.copyButton.click()
+    XCTAssertTrue(driver.waitForPasteboard(visiblePartial, timeout: 3))
+    driver.copyMenuButton.click()
+    driver.copyMenuImageItem.click()
+    XCTAssertTrue(driver.waitForExistence(of: driver.imageCopiedButton, timeout: 2))
+    let copiedImage = try XCTUnwrap(NSPasteboard.general.data(forType: .png))
+    XCTContext.runActivity(named: "Interrupted output stays readable and copyable") { activity in
+      driver.attachPanelScreenshot(named: "failure-partial", to: activity)
+      let attachment = XCTAttachment(data: copiedImage, uniformTypeIdentifier: "public.png")
+      attachment.name = "failure-partial-copied-image"
+      attachment.lifetime = .keepAlways
+      activity.add(attachment)
+    }
+    driver.app.buttons["bar-action-execute"].click()
+    XCTAssertTrue(driver.result(containing: "Recovered output replaces the partial text.").waitForExistence(timeout: 8))
+    driver.waitForCompletion()
+    XCTAssertFalse((driver.resultText.value as? String ?? "").contains("Partial output"))
+    XCTAssertEqual(try scenarioServer.state().filter { $0.scenario == "CIDA_E2E_PARTIAL_FAILURE" }.count, 2)
+  }
+
+
+  func testLongSourceAutomaticallyCompletesAsOneResult() throws {
+    driver.launch()
+    let source = (1...8).map { "CIDA_AUTO_SEGMENT_\($0) " + String(repeating: "source ", count: 4) + "." }
+      .joined(separator: "\n\n")
+    driver.submit(source, expectsStreamingState: true)
+    let expected = source.replacingOccurrences(of: "CIDA_AUTO_SEGMENT_", with: "Completed segment ")
+    XCTAssertTrue(driver.waitForTextValue(expected, in: driver.resultText, timeout: 20))
+    driver.waitForCompletion()
+    XCTAssertEqual(driver.textValue(in: driver.composer), source)
+    XCTAssertFalse(driver.resultNote("failed").exists)
+    XCTAssertGreaterThan(try scenarioServer.state().count, 2)
+    XCTAssertEqual(driver.app.buttons["bar-action-execute"].label, "重新执行")
+    driver.copyButton.click()
+    XCTAssertTrue(driver.waitForPasteboard(expected, timeout: 2))
+    XCTContext.runActivity(named: "Length rejection is recovered without user intervention") { activity in
+      driver.attachPanelScreenshot(named: "automatic-segmentation-complete", to: activity)
+    }
+  }
+
+  func testStopCancelsTheRemainingSegments() throws {
+    driver.launch()
+    let first = "CIDA_AUTO_STOP_SEGMENT_1 source."
+    let second = "CIDA_AUTO_STOP_SEGMENT_2 source."
+    let third = "CIDA_AUTO_STOP_SEGMENT_3 source."
+    driver.submit([first, second, third].joined(separator: "\n\n"), expectsStreamingState: true)
+    XCTAssertNotNil(try scenarioServer.wait(for: second, status: "headers-sent", timeout: 8))
+    XCTAssertTrue(driver.result(containing: first).waitForExistence(timeout: 5))
+    driver.stopButton.click()
+    XCTAssertTrue(driver.resultNote("stopped").waitForExistence(timeout: 3))
+    try scenarioServer.releaseFirstByte(for: second)
+    driver.waitForCompletion()
+    XCTAssertFalse((driver.resultText.value as? String ?? "").contains("SEGMENT_2"))
+    XCTAssertFalse(try scenarioServer.state().contains { $0.scenario == third })
+  }
+
 }

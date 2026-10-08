@@ -18,7 +18,7 @@ extension TextProcessingService {
 
 /// Sends requests to the configured model service in any of its three formats and yields the
 /// reply's text as it streams (`Design/spec/configuration.md` §三). The panel and the check
-/// share it, so a passing check means the panel's requests work too.
+/// share the same wire format and configuration; a check only validates its small sample.
 struct ModelServiceClient: TextProcessingService {
   var session: URLSession = .shared
 
@@ -33,12 +33,7 @@ struct ModelServiceClient: TextProcessingService {
     AsyncThrowingStream { continuation in
       let task = Task.detached(priority: .utility) {
         do {
-          let prepared = try Self.prepare(request, settings: settings)
-          try await send(
-            prepared,
-            format: settings.modelService.format,
-            redactor: SecretRedactor(secret: settings.apiKey)
-          ) { continuation.yield($0) }
+          try await sendRecoveringLength(request, settings: settings) { continuation.yield($0) }
           continuation.finish()
         } catch {
           continuation.finish(throwing: error)
@@ -463,6 +458,7 @@ enum ModelServiceError: LocalizedError, Equatable {
   /// The configuration lacks these fields (command-line names).
   case incompleteConfiguration(missing: [String])
   case invalidRequest
+  case lengthRecoveryExhausted
   /// A non-2xx status; `body` is the provider's text with the key redacted.
   case http(status: Int, providerMessage: String?, body: String)
   /// An error event in a successful stream, or an error document.
@@ -472,18 +468,36 @@ enum ModelServiceError: LocalizedError, Equatable {
   case emptyResult
   case transport(URLError)
 
+  var isLengthLimit: Bool {
+    guard case .http(let status, _, let body) = self else { return false }
+    if status == 413 { return true }
+    guard status == 400, let document = JSONValue.parse(body) else { return false }
+    let code = document["error"]?["code"]?.stringValue ?? document["error"]?["type"]?.stringValue
+    if code == "context_length_exceeded" || code == "request_too_large" { return true }
+    // Anthropic documents this typed 400 response without a separate length error code:
+    // https://platform.claude.com/docs/en/build-with-claude/context-windows
+    guard document["error"]?["type"]?.stringValue == "invalid_request_error",
+      let message = document["error"]?["message"]?.stringValue?.lowercased() else { return false }
+    return message.hasPrefix("prompt is too long")
+      || message.hasPrefix("input length and max_tokens exceed context limit")
+      || (message.hasPrefix("this model's maximum context length is ")
+        && message.contains("tokens") && message.contains("requested"))
+  }
+
   var statusCode: Int? {
     if case .http(let status, _, _) = self { return status }
     return nil
   }
 
-  /// The panel's failure note: `请求失败：<this> 按 ⏎ 重试`.
+  /// Diagnostic text for CLI callers. Panel recovery uses `ProcessingFailure` instead.
   var errorDescription: String? {
     switch self {
     case .incompleteConfiguration:
       "还没配置模型服务，在设置里复制配置提示词交给 AI 助手。"
     case .invalidRequest:
       "无法构造模型请求。"
+    case .lengthRecoveryExhausted:
+      "自动分段后仍超出模型服务限制，请检查模型配置和提示词。"
     case .http(let status, let providerMessage, _):
       providerMessage ?? "模型服务请求失败（HTTP \(status)）。"
     case .provider(let message):
@@ -504,6 +518,8 @@ enum ModelServiceError: LocalizedError, Equatable {
       "配置还不完整，缺少 \(missing.joined(separator: "、"))"
     case .invalidRequest:
       "无法构造请求"
+    case .lengthRecoveryExhausted:
+      "自动分段后仍超出模型服务限制"
     case .http(let status, _, _):
       switch status {
       case 401, 403: "服务商拒绝了 API Key"

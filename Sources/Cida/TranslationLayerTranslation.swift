@@ -202,14 +202,32 @@ enum LayerTranslationRequest {
     _ texts: [String], into target: String, settings: CidaSettings, service: any TextProcessingService
   ) async throws -> [String] {
     guard service.isConfigured(by: settings) else { throw LayerTranslationError.notConfigured }
+    try Task.checkCancellation()
     let request = try request(texts: texts, into: target, settings: settings)
     var reply = ""
-    for try await chunk in service.stream(request, settings: settings) {
+    do {
+      for try await chunk in service.stream(request, settings: settings) {
+        try Task.checkCancellation()
+        reply += chunk
+      }
       try Task.checkCancellation()
-      reply += chunk
+      return try decode(reply, count: texts.count)
+    } catch {
+      guard reply.isEmpty, (error as? ModelServiceError)?.isLengthLimit == true else { throw error }
+      if texts.count > 1 {
+        let middle = texts.count / 2
+        let first = try await translate(Array(texts[..<middle]), into: target, settings: settings, service: service)
+        let second = try await translate(Array(texts[middle...]), into: target, settings: settings, service: service)
+        return first + second
+      }
+      guard let text = texts.first, let parts = SourcePartition.split(text, preservingPlaceholders: true) else {
+        throw ModelServiceError.lengthRecoveryExhausted
+      }
+      let first = try await translate([parts.first], into: target, settings: settings, service: service)
+      let second = try await translate([parts.second], into: target, settings: settings, service: service)
+      return [first[0].trimmingCharacters(in: .whitespacesAndNewlines) + parts.separator
+        + second[0].trimmingCharacters(in: .whitespacesAndNewlines)]
     }
-    try Task.checkCancellation()
-    return try decode(reply, count: texts.count)
   }
 }
 

@@ -27,7 +27,10 @@ compared natively:
 | ④ 完成 | `translate` | `translate` |
 | ⑤ 已复制 | `copied` | (transient, 800 ms) |
 | ⑥ 已修改 | `stale` | `stale` |
-| ⑦ 已停止 / 出错 | `stopped` / `failed` | `stopped` / `failed` |
+| ⑦ 已停止 / 配置失败 | `stopped` / `failed` | same |
+| Failure recovery | `failed-timeout`, `failed-offline`, `failed-limited`, `failed-secure`, `failed-unknown`, `failed-changed`, `failed-configured`, `dark-failed` | same |
+| Automatic length recovery | `length-recovery` | same |
+| Incomplete copied images | `share-interrupted`, `share-stopped` | same |
 | ⑧ 改进 · 完成 | `improve` | `improve` |
 | ⑨ 再次唤起 · 保留光标与选区 | `reopened` | (interaction, no fixture) |
 | ⑩ 带入选区 | `selection-imported` | (global shortcut; XCUI `testShortcutBringsInANewSelectionAndLeavesTheSameOneAlone`) |
@@ -306,3 +309,56 @@ nightly run selects `CidaUITests/CoreTranslationJourneyTests` for correctness an
 runs the complete mutation catalog. The other 37 passing native journeys remain
 valid: the follow-up changes only the screenshot oracle, its three call sites,
 and identifier documentation; production code and the other journeys are unchanged.
+
+## Failure recovery and automatic segmentation
+
+The approved 05 interaction stores a safe error category and the failed request's
+model identity and configuration fingerprint. Configuration failures open Model
+settings; Return does nothing until the configuration or request changes. Network,
+service-limit and unknown failures offer explicit retry. The panel never displays
+status codes or provider text.
+
+Length rejection is handled by Cida. It partitions at paragraph, sentence,
+whitespace or extended-grapheme boundaries and processes smaller requests in order.
+A rejected segment is subdivided again; an accepted prefix is not resent. The
+source stays intact, the panel presents one result, and cancellation stops the
+current request and remaining segments. Custom-action outputs are assembled into
+one result under the original policy rather than concatenating independent JSON
+or summaries. Translation-layer batches preserve their JSON IDs and indivisible
+placeholders. A minimum unit that still cannot fit, or an impossible final
+assembly, enters configuration recovery rather than an unbounded request loop.
+
+Partial output remains copyable. Text copy is verbatim; image copy appends an
+ellipsis and marks interruption or user cancellation. Native screenshots are in
+`docs/images/failure-recovery/`; `automatic-segmentation-complete.png` is from the
+Release App with a controlled server that rejects large requests. The server's
+text is deterministic fixture output, not an assessment of a real model's
+translation or summarization quality.
+
+The recovery states and `length-recovery`, `share-interrupted`, and `share-stopped`
+were captured with `scripts/capture-design-states.sh`. The empty-panel baseline
+pixels and tolerances are unchanged; its linked board digest is updated. Complete
+share images and ordinary successful translation/improvement demos are unchanged.
+A demo showing the old failure guidance needs re-recording.
+
+Validation on the local working tree on 2026-10-08:
+
+- Warnings-as-errors build, all 330 Swift tests and website build passed.
+- Eight segmentation tests cover source preservation, Unicode boundaries, typed
+  limit detection, real HTTP recovery for all three wire formats (including the
+  translation layer), custom JSON assembly, cancellation, and bounded termination.
+- Ten signed Release Tart journeys passed in `TestResults/automatic-segmentation`:
+  all nine core translation journeys and the in-place translation-layer journey.
+  They include automatic long-source completion with exact full-result copying,
+  cancelling remaining segments, explicit service-limit retry, configuration
+  changes, retained partial output, and replacement of stale results.
+- The native artifact's App tree SHA-256 was
+  `c2f89265efeaf6de13917b479882740b8b79465bbe8274ae37fd4a047215cb1a`.
+  Artifact integrity and host-session guards passed. Additional typed-400 detection,
+  placeholder-safe boundaries and the linear boundary search were subsequently
+  verified in the current Swift/HTTP suite; those additions do not change the
+  native controls. This is diagnostic working-tree verification, not a clean-commit
+  release gate.
+
+Transport timeout, offline and TLS classification is covered by Swift tests.
+No remote paid model was used for the segmentation validation.

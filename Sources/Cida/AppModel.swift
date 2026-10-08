@@ -539,6 +539,47 @@ final class AppModel {
     return result.note
   }
 
+  var resultCopyLabel: String {
+    if processingFailure != nil { return "复制已有文字" }
+    return isResultStale ? "复制上次结果" : "复制结果"
+  }
+
+  var processingFailure: ProcessingFailure? {
+    guard case .failed(let failure) = result?.phase else { return nil }
+    return failure
+  }
+
+  var failureConfigurationChanged: Bool {
+    guard let failure = processingFailure else { return false }
+    return failure.configurationFingerprint != settings.modelServiceFingerprint
+  }
+
+  var barActionPresentation: BarActionPresentation {
+    if isProcessing { return .stop }
+    if let failure = processingFailure, !isResultStale {
+      if failure.category == .configuration, !failureConfigurationChanged { return .modelSettings }
+      return .retry
+    }
+    if processingFailure != nil { return .execute }
+    return .resolve(isProcessing: false, repeatsAction: result?.mode == mode)
+  }
+
+  var canSubmit: Bool {
+    hasSubmittableInput && !isProcessing
+      && barActionPresentation != .modelSettings
+  }
+
+  var failureExplanation: String? {
+    guard let failure = processingFailure else { return nil }
+    if isResultStale {
+      return "原文或动作已经改了。执行会发送新的请求；这条失败说明只针对上次请求。"
+    }
+    if failureConfigurationChanged {
+      return "模型配置已更新。按 ⏎ 或点「重试」重新发送请求，并替换已有输出。"
+    }
+    return failure.category.explanation
+  }
+
   var canCopyResult: Bool {
     result?.isCopyable == true
   }
@@ -547,7 +588,7 @@ final class AppModel {
   /// the editor; the previous result is replaced immediately.
   @discardableResult
   func submit() -> Bool {
-    guard hasSubmittableInput, !isProcessing else { return false }
+    guard canSubmit else { return false }
     startGeneration()
     return true
   }
@@ -685,7 +726,8 @@ final class AppModel {
   func copyResultImage() -> Bool {
     guard let result, result.isCopyable else { return false }
     isCopyMenuOpen = false
-    switch ShareCard.render(source: result.source, result: result.result, language: result.outputLanguage) {
+    switch ShareCard.render(source: result.source, result: result.result, language: result.outputLanguage,
+      incomplete: result.phase.incompleteMark) {
     case .success(let card):
       pasteboard.clearContents()
       pasteboard.declareTypes([.png, .tiff], owner: nil)
@@ -763,7 +805,8 @@ final class AppModel {
 
   /// The handoff follows the current task; diagnostics stay in the command-line interface.
   var configurationPrompt: String {
-    ConfigurationPrompt.text(settings: settings, lastCheck: currentModelServiceCheck)
+    ConfigurationPrompt.text(settings: settings, lastCheck: currentModelServiceCheck,
+      requestFailure: processingFailure)
   }
 
   func copyConfigurationPrompt() {
@@ -979,7 +1022,7 @@ final class AppModel {
       finish(record, phase: .stopped)
     } catch {
       presentationTask.cancel()
-      finish(record, phase: .failed(message: error.localizedDescription))
+      finish(record, phase: .failed(ProcessingFailure(error: error, settings: settings)))
     }
 
     // A superseded request must not clear the state or the task of the one

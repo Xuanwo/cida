@@ -124,7 +124,7 @@ final class SelectionImprovement {
     } catch {
       guard requestID == id, !Task.isCancelled else { return }
       result = makeResult(
-        source: target.text, output: output, phase: .failed(message: error.localizedDescription))
+        source: target.text, output: output, phase: .failed(ProcessingFailure(error: error, settings: settings)))
       recordEvent("improvement-failed")
       if showsFeedback {
         onFeedback(ImprovementFeedback(text: "改进失败 · 原文未变", action: "查看结果"))

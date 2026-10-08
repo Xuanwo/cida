@@ -145,7 +145,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
       // Without a model service, Settings opens where it is configured.
       openSettings: { [weak self] in
         guard let self else { return }
-        openSettings(on: model.isModelServiceConfigured ? nil : .model)
+        openSettings(on: model.barActionPresentation == .modelSettings || !model.isModelServiceConfigured ? .model : nil)
       }
     )
     self.panelController = panelController
@@ -198,7 +198,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
           model: model
         )
         inputInteractionProbe?.run()
-      } else if launchOptions.designState == .streaming {
+      } else if launchOptions.designState == .streaming || launchOptions.designState == .lengthRecovery {
         model.submit()
       }
     } else if launchOptions.designState.isSettings {
@@ -743,7 +743,7 @@ final class CidaAppDelegate: NSObject, NSApplicationDelegate {
     Task { @MainActor in
       if let result = model.result,
         case .success(let card) = ShareCard.render(
-          source: result.source, result: result.result, language: result.outputLanguage, scale: 2)
+          source: result.source, result: result.result, language: result.outputLanguage, incomplete: result.phase.incompleteMark, scale: 2)
       {
         do {
           try card.png.write(to: outputURL, options: .atomic)
@@ -888,6 +888,14 @@ private enum DesignState: String {
   case staleEmpty = "stale-empty"
   case stopped
   case failed
+  case failedTimeout = "failed-timeout"
+  case failedOffline = "failed-offline"
+  case lengthRecovery = "length-recovery"
+  case failedLimited = "failed-limited"
+  case failedSecure = "failed-secure"
+  case failedUnknown = "failed-unknown"
+  case failedChanged = "failed-changed"
+  case failedConfigured = "failed-configured"
   case long
   case translateIntoMine = "translate-into-mine"
   case targetEditing = "target-editing"
@@ -925,6 +933,8 @@ private enum DesignState: String {
   case lifecycleUpdateReadOnly = "lifecycle-update-read-only"
   case copyMenu = "copy-menu"
   case shareTranslate = "share-translate"
+  case shareInterrupted = "share-interrupted"
+  case shareStopped = "share-stopped"
   case shareRead = "share-read"
   case shareImprove = "share-improve"
 
@@ -932,6 +942,7 @@ private enum DesignState: String {
   /// is the card itself rather than a window.
   var isShareCard: Bool {
     self == .shareTranslate || self == .shareRead || self == .shareImprove
+      || self == .shareInterrupted || self == .shareStopped
   }
 
   /// The empty panel before a model service is configured.
@@ -1085,7 +1096,7 @@ private struct LaunchOptions {
         return ResultRecord.designRead()
       case .stale, .staleAction, .staleEmpty:
         return ResultRecord.designCompleted(mode: .translate)
-      case .stopped:
+      case .stopped, .shareStopped:
         let record = ResultRecord(
           mode: .translate,
           source: ResultRecord.designTranslateSource,
@@ -1094,12 +1105,25 @@ private struct LaunchOptions {
           phase: .stopped
         )
         return record
-      case .failed:
+      case .failed, .failedTimeout, .failedOffline, .failedLimited,
+        .failedSecure, .failedUnknown, .failedChanged, .failedConfigured, .shareInterrupted:
+        let category: ProcessingFailure.Category = switch designState {
+        case .failedTimeout, .failedChanged, .shareInterrupted: .timeout
+        case .failedOffline: .offline
+        case .failedLimited: .limited
+        case .failedSecure: .secureConnection
+        case .failedUnknown: .unknown
+        default: .configuration
+        }
+        var failedSettings = initialSettings
+        if designState == .failedConfigured { failedSettings.apiKey = "previous-fixture-key" }
+        let partial = [.failedTimeout, .failedChanged, .shareInterrupted].contains(designState)
         return ResultRecord(
           mode: .translate,
           source: ResultRecord.designTranslateSource,
           outputLanguage: .english,
-          phase: .failed(message: "401 Unauthorized（deepseek-chat）。检查 API Key 后")
+          result: partial ? "Our system adopts a brand-new storage engine that significantly improves read and write" : "",
+          phase: .failed(ProcessingFailure(category: category, settings: failedSettings))
         )
       case .long:
         return ResultRecord.designLong()
@@ -1107,7 +1131,7 @@ private struct LaunchOptions {
         return ResultRecord.designIntoMine()
       case .targetEditing, .targetEditingChanged, .targetComposing:
         return ResultRecord.designCompleted(mode: .translate)
-      case .empty, .typing, .streaming, .settings, .settingsTranslation, .settingsLanguageEditing,
+      case .empty, .typing, .streaming, .lengthRecovery, .settings, .settingsTranslation, .settingsLanguageEditing,
         .settingsPromptEditing, .settingsShortcuts, .settingsShortcutsCustom,
         .settingsShortcutsUnset, .settingsRecording, .settingsGeneral, .settingsUpdateAvailable,
         .settingsConfigUnset, .settingsConfigCopied,
@@ -1129,7 +1153,10 @@ private struct LaunchOptions {
     guard usesDesignFixtures else { return "" }
     #if DEBUG
       return switch designState {
-      case .translate, .streaming, .stopped, .failed, .copyMenu, .shareTranslate, .targetEditing, .targetEditingChanged, .targetComposing, .typing:
+      case .translate, .streaming, .stopped, .failed, .failedTimeout, .failedOffline,
+        .lengthRecovery, .failedLimited, .failedSecure, .failedUnknown, .failedConfigured,
+        .copyMenu, .shareTranslate, .shareInterrupted, .shareStopped,
+        .targetEditing, .targetEditingChanged, .targetComposing, .typing:
         ResultRecord.designTranslateSource
       case .translateIntoMine:
         ResultRecord.designIntoMineSource
@@ -1137,7 +1164,7 @@ private struct LaunchOptions {
         ResultRecord.designImproveSource
       case .shareRead:
         ResultRecord.designReadSource
-      case .stale, .staleAction:
+      case .stale, .staleAction, .failedChanged:
         "我们的系统采用了全新的存储引擎,在保证数据一致性的前提下,读写性能提升了三倍。"
       case .long:
         ResultRecord.designLongInput
