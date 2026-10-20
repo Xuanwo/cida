@@ -314,6 +314,9 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
   func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {
     phase = .checking
     installsWhenReady = false
+    version = ""
+    currentLabel = ""
+    notes = []
     cancelWork = cancellation
     show(
       Self.checkingMessage(),

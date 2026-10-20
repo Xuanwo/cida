@@ -136,6 +136,10 @@ final class UpdatesTests: XCTestCase {
     XCTAssertEqual(acknowledged, 1)
     XCTAssertEqual(checks, 1)
     driver.showUserInitiatedUpdateCheck { cancelled += 1 }
+    driver.showUpdaterError(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)) {}
+    XCTAssertEqual(presenter.message?.statement, "检查更新失败")
+    XCTAssertNil(presenter.message?.statementDetail, "A failed check must not offer the previous version")
+    driver.showUserInitiatedUpdateCheck { cancelled += 1 }
     presenter.handler?.stop()
     XCTAssertEqual(cancelled, 1)
     XCTAssertNil(presenter.message)
