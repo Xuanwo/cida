@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A008A008A008A008A0080001 /* UpdateJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A008A008A008A008A0080002 /* UpdateJourneyTests.swift */; };
 		116C00C0EAF212AA6CD07692 /* ScenarioServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16BEBDD324433E5FA03D1F7A /* ScenarioServerClient.swift */; };
 		3DBC579F27425649AFD7236A /* E2EEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64C4835C130AB6150934275E /* E2EEnvironment.swift */; };
 		604598F0EB0BA2B688EAA635 /* VisualOracle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B9D7CCB1EEA892D70EB4F6 /* VisualOracle.swift */; };
@@ -35,6 +36,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A008A008A008A008A0080002 /* UpdateJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateJourneyTests.swift; sourceTree = "<group>"; };
 		0D6117909E998A6029A69AE1 /* CidaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CidaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		140648BDD52528DA5C1EDD1E /* HarnessSelfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessSelfTests.swift; sourceTree = "<group>"; };
 		16BEBDD324433E5FA03D1F7A /* ScenarioServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioServerClient.swift; sourceTree = "<group>"; };
@@ -111,6 +113,7 @@
 				7FF95B8EB25315CE7DDB1B2A /* CoreTranslationJourneyTests.swift */,
 				140648BDD52528DA5C1EDD1E /* HarnessSelfTests.swift */,
 				659D1E8907687990A05B53EF /* PanelAndSettingsJourneyTests.swift */,
+				A008A008A008A008A0080002 /* UpdateJourneyTests.swift */,
 				BBE58D585EC1502EA7EDC7F8 /* TranslationStateMachineJourneyTests.swift */,
 				DCB642A29177A2EB430F1E13 /* VisualAndAccessibilityJourneyTests.swift */,
 				322EB8C72B1F210BAD237A40 /* Support */,
@@ -223,6 +226,7 @@
 				3DBC579F27425649AFD7236A /* E2EEnvironment.swift in Sources */,
 				E065CCA7520CAAD10A5B2B45 /* HarnessSelfTests.swift in Sources */,
 				9F6D7313C1FA05450992710D /* PanelAndSettingsJourneyTests.swift in Sources */,
+				A008A008A008A008A0080001 /* UpdateJourneyTests.swift in Sources */,
 				8915B79168311F4613F4ED4A /* PixelDiff.swift in Sources */,
 				F1E19E0C057248EF9E51DB53 /* PollingWaiter.swift in Sources */,
 				116C00C0EAF212AA6CD07692 /* ScenarioServerClient.swift in Sources */,

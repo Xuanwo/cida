@@ -12,6 +12,8 @@ import threading
 import time
 import urllib.parse
 
+from update_fixture import UpdateFixture
+
 
 if len(sys.argv) != 3:
     raise SystemExit("usage: e2e_scenario_server.py <latest request> <port file>")
@@ -349,6 +351,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
+        if path.startswith("/update/") and self.server.update_fixture is not None:
+            self.server.update_fixture.serve(self, path)
+            return
+        if path == "/control/update/state" and self.server.update_fixture is not None:
+            self.send_json(200, self.server.update_fixture.status())
+            return
         if path != "/control/state":
             self.send_error(404)
             return
@@ -356,6 +364,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed_path = urllib.parse.urlparse(self.path)
+        if parsed_path.path == "/control/update/setup":
+            self.read_json_body()
+            self.server.update_fixture = UpdateFixture(
+                os.environ["CIDA_UI_TEST_APP_PATH"], port_path.parent,
+                f"http://127.0.0.1:{self.server.server_port}")
+            self.send_json(200, self.server.update_fixture.status())
+            return
+        if parsed_path.path == "/control/update/release":
+            self.read_json_body()
+            self.server.update_fixture.release.set()
+            self.send_json(200, {"released": True})
+            return
         if parsed_path.path == "/control/reset":
             state.reset()
             self.send_json(200, {"reset": True})
@@ -496,6 +516,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Server(http.server.ThreadingHTTPServer):
     daemon_threads = True
+    update_fixture = None
 
 
 record_path.parent.mkdir(parents=True, exist_ok=True)

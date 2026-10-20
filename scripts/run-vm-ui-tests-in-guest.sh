@@ -182,7 +182,7 @@ fi
 failure_category="infrastructure"
 failure_phase="local-mock-startup"
 failure_detail="The isolated OpenAI-compatible mock failed to start."
-/usr/bin/python3 "$project_dir/UITests/Fixtures/e2e_scenario_server.py" \
+CIDA_UI_TEST_APP_PATH="$app_path" /usr/bin/python3 "$project_dir/UITests/Fixtures/e2e_scenario_server.py" \
   "$record_path" "$port_path" >"$server_log" 2>&1 &
 server_pid=$!
 

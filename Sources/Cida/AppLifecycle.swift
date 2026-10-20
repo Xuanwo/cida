@@ -843,7 +843,9 @@ extension CidaAppDelegate: UpdatePresenter {
         case .lifecycleUpdateFound: found
         case .lifecycleUpdateDownloading:
           CidaUpdateDriver.downloadingMessage(version: "1.1.0", percent: 38, notes: notes)
-        case .lifecycleUpdateReady: CidaUpdateDriver.readyMessage(version: "1.1.0")
+        case .lifecycleUpdateReady:
+          CidaUpdateDriver.readyMessage(version: "1.1.0", currentVersion: "1.0.0", notes: notes)
+        case .lifecycleUpdateInstalling: CidaUpdateDriver.installingMessage()
         case .lifecycleUpdateCurrent: CidaUpdateDriver.currentMessage(version: "1.1.0")
         case .lifecycleUpdateFailed:
           CidaUpdateDriver.failedMessage(
@@ -958,6 +960,7 @@ private enum DesignState: String {
   case lifecycleUpdateFound = "lifecycle-update-found"
   case lifecycleUpdateDownloading = "lifecycle-update-downloading"
   case lifecycleUpdateReady = "lifecycle-update-ready"
+  case lifecycleUpdateInstalling = "lifecycle-update-installing"
   case lifecycleUpdateCurrent = "lifecycle-update-current"
   case lifecycleUpdateFailed = "lifecycle-update-failed"
   case lifecycleUpdateReadOnly = "lifecycle-update-read-only"
@@ -1174,7 +1177,7 @@ private struct LaunchOptions {
         .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeSubmitted,
         .lifecycleWelcomeReady,
         .lifecycleUpdateChecking, .lifecycleUpdateFound, .lifecycleUpdateDownloading,
-        .lifecycleUpdateReady, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
+        .lifecycleUpdateReady, .lifecycleUpdateInstalling, .lifecycleUpdateCurrent, .lifecycleUpdateFailed,
         .lifecycleUpdateReadOnly:
         return nil
       }
@@ -1213,7 +1216,7 @@ private struct LaunchOptions {
         .settingsConfigPassed, .settingsConfigMissingKey, .settingsConfigIncomplete,
         .settingsConfigFailed, .lifecycleWelcome, .lifecycleWelcomeReady, .lifecycleUpdateChecking,
         .lifecycleUpdateFound,
-        .lifecycleUpdateDownloading, .lifecycleUpdateReady, .lifecycleUpdateCurrent,
+        .lifecycleUpdateDownloading, .lifecycleUpdateReady, .lifecycleUpdateInstalling, .lifecycleUpdateCurrent,
         .lifecycleUpdateFailed, .lifecycleUpdateReadOnly:
         ""
       }
