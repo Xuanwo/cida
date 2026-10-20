@@ -4,9 +4,9 @@
     {
       "name": "panel-empty",
       "approvedImage": "Design/QACurrent/implementation-empty.png",
-      "approvedImageSHA256": "d7c61314ddaa95c32b91e0017acb299967196290f618031ce948f79367a888a6",
+      "approvedImageSHA256": "99f8c4c7a32dab5d92c825691723499d770b2a2d5f19290cb872eedcc943ad94",
       "designReference": "Design/QACurrent/reference-empty.png",
-      "designReferenceSHA256": "cf11150f40a502b0a72a5c118ee293c3a0a351a16635ee133aabf9d2d6fd3401",
+      "designReferenceSHA256": "f65952443d6c7633ad03c438e8c8695f8f22aba56543418c97d03e12382dc5bc",
       "designDocument": "Design/boards/panel-states.html",
       "designDocumentSHA256": "68b5d3bcedc34ab37b154abd97c401633c98f5a0293d45d055047a7063cf2ac7",
       "logicalWidth": 800,
@@ -20,9 +20,9 @@
     {
       "name": "settings",
       "approvedImage": "Design/QACurrent/implementation-settings.png",
-      "approvedImageSHA256": "7acbd59a9eaf5d1694242cbb12a66c95788e369a7cb71572ff3b5c0aaa2eb77c",
+      "approvedImageSHA256": "00af92b893da876bcbc28081978e8828f7eb4f1ccffe7de60f53a7006d4d5b04",
       "designReference": "Design/QACurrent/reference-settings.png",
-      "designReferenceSHA256": "bb8d52352eab13235350a7ed4d075135598ef44b43d8ea150fc553aadf4ba0d7",
+      "designReferenceSHA256": "60b7ca7a7ff3e05ee7be4f0366eda594bc1e4d07ab493c5b5ceb0d10d4bc0b00",
       "designDocument": "Design/boards/settings-states.html",
       "designDocumentSHA256": "7c2190cdd2d127050b5f45282d6b39b05ce1fac52de007e404ee51867aacf6c2",
       "logicalWidth": 560,

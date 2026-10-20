@@ -197,7 +197,7 @@ body {
   color: var(--accent);
 }
 
-.tab-hint { font-size: var(--font-size-caption); color: var(--hint); }
+.tab-hint { font-size: var(--font-size-caption); color: var(--text-tertiary); }
 
 /* spec/panel.md §三: 翻译's object, the foreign language, inside the selected segment. */
 .seg span.on .object {
@@ -235,7 +235,7 @@ body {
 }
 .bar-action.execution { min-width: 92px; justify-content: center; }
 .bar-action.disabled { opacity: 0.45; }
-.language-confirmation { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+.language-confirmation { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
 .bar-action .label { font-size: var(--font-size-label); font-weight: 600; }
 .bar-action .key { font-size: var(--font-size-caption); color: var(--text-tertiary); }
 .bar-action .stop-icon {
@@ -549,7 +549,7 @@ body {
   overflow: hidden;
   font-size: var(--font-size-label);
   line-height: 14px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -557,7 +557,7 @@ body {
 .row .controls.end { justify-content: flex-end; }
 .row .controls.spaced { gap: 12px; }
 .row .controls .stack { display: flex; flex-direction: column; gap: 5px; }
-.row .controls .stack small { font-size: var(--font-size-label); color: var(--text-tertiary); }
+.row .controls .stack small { font-size: var(--font-size-label); color: var(--text-secondary); }
 
 .menu {
   display: inline-flex;
@@ -649,7 +649,7 @@ body {
 }
 .agent-card .labels { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .agent-card .labels b { font-size: 13.5px; font-weight: 500; line-height: 20px; }
-.agent-card .labels small { font-size: var(--font-size-label); line-height: 17px; color: var(--text-tertiary); }
+.agent-card .labels small { font-size: var(--font-size-label); line-height: 17px; color: var(--text-secondary); }
 .button.with-icon { display: flex; align-items: center; gap: 6px; }
 .button.with-icon .icon { width: 12px; height: 12px; color: var(--text-secondary); }
 .button.copied { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
@@ -1104,6 +1104,7 @@ body {
 .actions-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
 .actions-heading h3 { margin: 0; font-size: 12px; font-weight: 600; line-height: 17px; color: var(--text-control); }
 .actions-heading small, .actions-preview small { color: var(--text-tertiary); font-size: 11px; line-height: 16px; }
+.actions-heading small, .actions-paper small { color: var(--text-secondary); }
 .actions-preview { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); }
 .actions-sample { padding: 18px; }
 .actions-sample small, .actions-instruction small { display: flex; justify-content: space-between; }
@@ -1140,4 +1141,4 @@ body {
 /* Update commands share the main panel's trailing action treatment. */
 .bar.update-commands { justify-content: flex-end; gap: 8px; }
 .update-commands .bar-action.execution { min-width: 0; }
-.update-commands .update-skip { padding: 0 12px; font-size: 11.5px; font-weight: 500; color: var(--text-tertiary); }
+.update-commands .update-skip { padding: 0 12px; font-size: 11.5px; font-weight: 500; color: var(--text-secondary); }

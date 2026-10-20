@@ -38,7 +38,7 @@ struct ActionsSettingsView: View {
         Text("动作").font(CidaDesign.ui(12, weight: .semibold)).foregroundStyle(
           CidaDesign.textControl)
         Spacer()
-        Text("拖动排序 · 首项默认").font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textTertiary)
+        Text("拖动排序 · 首项默认").font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textSecondary)
       }
       .padding(.bottom, 12)
       VStack(alignment: .leading, spacing: 0) {
@@ -88,7 +88,7 @@ struct ActionsSettingsView: View {
           CidaDesign.border, lineWidth: 1))
       if let notice = editor.notice {
         HStack(spacing: 8) {
-          Text(notice).foregroundStyle(CidaDesign.textTertiary)
+          Text(notice).foregroundStyle(CidaDesign.textSecondary)
           Button("撤销") { editor.undoChange(settings: &model.settings) }
             .buttonStyle(.plain)
             .foregroundStyle(CidaDesign.accent)
@@ -327,7 +327,7 @@ struct ActionsSettingsView: View {
         }
         .buttonStyle(.plain)
         .font(CidaDesign.ui(11))
-        .foregroundStyle(CidaDesign.textTertiary)
+        .foregroundStyle(CidaDesign.textSecondary)
         .padding(.horizontal, 16)
         .padding(.top, 12)
         PromptTextEditor(
@@ -352,7 +352,7 @@ struct ActionsSettingsView: View {
       if editor.draft == nil {
         Text(previewNote)
           .font(CidaDesign.ui(11))
-          .foregroundStyle(CidaDesign.textTertiary)
+          .foregroundStyle(CidaDesign.textSecondary)
           .padding(.horizontal, 16).padding(.top, 12)
           .accessibilityIdentifier("settings-action-preview-status")
         if let failure = attempt?.failure {
@@ -378,7 +378,7 @@ struct ActionsSettingsView: View {
         if editor.draft != nil || attempt != nil {
           if editor.draft == nil { Hairline().padding(.horizontal, 16).padding(.top, 12) }
           Text(stale ? "参照 · 上一版提示词或配置的结果 · 已过期" : "参照 · 已保存版本的结果")
-            .font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textTertiary)
+            .font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textSecondary)
             .padding(.horizontal, 16).padding(.top, 12)
             .accessibilityIdentifier("settings-action-reference-status")
         }
@@ -388,7 +388,7 @@ struct ActionsSettingsView: View {
             ? "settings-action-reference" : "settings-action-preview")
       } else if editor.draft != nil {
         Text("完成后试运行 · ⌘↵")
-          .font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textTertiary)
+          .font(CidaDesign.ui(11)).foregroundStyle(CidaDesign.textSecondary)
           .padding(16)
       }
       if editor.draft == nil, !isRunning {

@@ -37,11 +37,10 @@
   --surface-paper: #F7F6F1;
   --border: #E8E8E3;
   --text-primary: #1A1A18;
-  --text-secondary: #8A8A83;
+  --text-secondary: #74746D;
   --text-tertiary: #B5B5AE;
   --text-ink: #161614;
   --text-control: #4E4E49;
-  --hint: #C4C4BD;
   --accent: #2E6B4F;
   --accent-soft: #EAF2EE;
   --accent-foreground: #FFFFFF;
@@ -135,7 +134,6 @@
   --text-tertiary: #5E5E58;
   --text-ink: #E9E6DD;
   --text-control: #C2C2BA;
-  --hint: #4C4C47;
   --accent: #5E9C7C;
   --accent-soft: #233129;
   --accent-foreground: #FFFFFF;
