@@ -1071,6 +1071,8 @@ private struct LaunchOptions {
       if usesDesignFixtures, designState == .settingsShortcutsCustom {
         settings.shortcut = GlobalShortcut(
           keyCode: UInt16(kVK_ANSI_T), modifiers: [.control, .option])
+        settings.layerShortcut = GlobalShortcut(
+          keyCode: UInt16(kVK_Space), modifiers: [.control, .option, .command])
       }
       if usesDesignFixtures, designState == .settingsShortcutsUnset {
         // Someone who only captures text.

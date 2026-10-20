@@ -478,20 +478,24 @@ private struct SettingsGroup<Content: View>: View {
   }
 }
 
-/// Label column (120 pt) beside a control column that fills the row.
+/// Form fields use a 120 pt label column. Shortcut and permission captions fill the
+/// space before their intrinsic-width trailing controls.
 private struct SettingsRow<Control: View>: View {
   let title: String
   var caption: String? = nil
   var verticalPadding: CGFloat = 9
   var alignment: Alignment = .leading
+  var expandsLabel = false
   @ViewBuilder let control: Control
 
   var body: some View {
     HStack(alignment: .center, spacing: 24) {
       SettingsLabel(title, caption: caption)
-        .frame(width: 120, alignment: .leading)
+        .frame(width: expandsLabel ? nil : 120, alignment: .leading)
+        .frame(maxWidth: expandsLabel ? .infinity : nil, alignment: .leading)
       control
-        .frame(maxWidth: .infinity, alignment: alignment)
+        .fixedSize(horizontal: expandsLabel, vertical: false)
+        .frame(maxWidth: expandsLabel ? nil : .infinity, alignment: alignment)
     }
     .padding(.vertical, verticalPadding)
   }
@@ -848,10 +852,10 @@ private struct GlobalShortcutRow: View {
     }
     if feedback == .rejected { return "这个组合已被占用，换一个" }
     switch action {
-    case .showPanel: return "在任何应用里唤起"
+    case .showPanel: return "打开面板；选中文字会带入，按首项动作处理"
     case .captureText: return "框选屏幕文字并翻译"
-    case .translationLayer: return "加 ⇧ 翻译整个窗口"
-    case .improveSelection: return "改进并替换选中文字"
+    case .translationLayer: return "指着的段落换成译文，再按换回；加 ⇧ 翻译整个窗口"
+    case .improveSelection: return "改进选中文字，直接写回原处"
     }
   }
 
@@ -874,7 +878,7 @@ private struct GlobalShortcutRow: View {
   }
 
   var body: some View {
-    SettingsRow(title: title, caption: caption, alignment: .trailing) {
+    SettingsRow(title: title, caption: caption, alignment: .trailing, expandsLabel: true) {
       HStack(spacing: 12) {
         if shortcut != action.defaultShortcut, !isRecording {
           Button("恢复默认") {
@@ -953,14 +957,14 @@ private struct ShortcutChip: View {
 // MARK: - 权限
 
 /// Accessibility lets the panel's shortcut bring in the frontmost application's selection and lets the
-/// translation layer read other applications' text (`Design/spec/settings.md` §五). There is no
-/// switch: granting turns both on, revoking in System Settings turns them off.
+/// translation layer and improvement action read or replace text (`Design/spec/settings.md` §五).
+/// Granting enables these capabilities; revoking in System Settings disables them.
 private struct AccessibilityPermissionRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
     PermissionRow(
-      title: "辅助功能", caption: "读取与替换应用文字", isGranted: model.isSelectionAccessGranted,
+      title: "辅助功能", caption: "带入选中文字 · 原处翻译 · 改进并替换", isGranted: model.isSelectionAccessGranted,
       request: model.requestSelectionAccess, identifier: "settings-selection-access"
     )
     // The system does not say when the permission changes for this process;
@@ -987,13 +991,13 @@ private struct AccessibilityPermissionRow: View {
 }
 
 /// Screen Recording lets the capture shortcut freeze the screen and lets the translation
-/// layer match the page's colours and follow it while it scrolls.
+/// layer follow the source text while it scrolls.
 private struct ScreenRecordingPermissionRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
     PermissionRow(
-      title: "屏幕录制", caption: "截图翻译", isGranted: model.isCaptureAccessGranted,
+      title: "屏幕录制", caption: "截图翻译；也让原处翻译跟随滚动", isGranted: model.isCaptureAccessGranted,
       request: model.requestCaptureAccess, identifier: "settings-capture-access"
     )
     .onAppear(perform: model.refreshCaptureAccess)
@@ -1014,7 +1018,7 @@ private struct PermissionRow: View {
   let identifier: String
 
   var body: some View {
-    SettingsRow(title: title, caption: caption, alignment: .trailing) {
+    SettingsRow(title: title, caption: caption, alignment: .trailing, expandsLabel: true) {
       if isGranted {
         Text("已开启")
           .font(CidaDesign.ui(12, weight: .medium))

@@ -1132,3 +1132,7 @@ body {
 .actions-trial-result { font-family: var(--font-result-cjk); font-size: 15px; line-height: 1.75; margin: 16px 0; color: var(--text-ink); }
 .actions-trial-result.reference { color: var(--text-secondary); }
 .actions-trial-run { display: flex; justify-content: flex-end; padding-top: 8px; }
+
+/* Shortcut and permission captions use the space before their trailing controls. */
+.settings .wide-caption .labels { width: auto; flex: 1; min-width: 0; }
+.settings .wide-caption .controls { flex: none; }
