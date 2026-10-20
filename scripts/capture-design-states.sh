@@ -36,7 +36,7 @@ for state in empty typing translate improve stale stale-action stale-empty stopp
   lifecycle-update-downloading lifecycle-update-ready lifecycle-update-current \
   lifecycle-update-failed lifecycle-update-read-only \
   dark-empty dark-improve dark-stale dark-lifecycle-welcome \
-  dark-settings-prompt-editing dark-settings-recording dark-settings-general; do
+  dark-settings-prompt-editing dark-settings-recording dark-settings-shortcuts dark-settings-shortcuts-custom dark-settings-general; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
     --snapshot-output "$implementation_dir/$state.png"

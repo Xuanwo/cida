@@ -150,17 +150,19 @@ class CidaSettings extends HTMLElement {
     const shortcut = is("shortcut", "recording")
       ? row("显示辞达", "⌫ 不设置 · Esc 取消", `<span class="chip recording">按下新组合…</span>`, "end")
       : is("shortcut", "custom")
-        ? row("显示辞达", "在任何应用里唤起", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
+        ? row("显示辞达", "打开面板；选中文字会带入，按首项动作处理", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ T</span>`, "end spaced")
         : is("shortcut", "unset")
-          ? row("显示辞达", "在任何应用里唤起", unset, "end spaced")
-          : row("显示辞达", "在任何应用里唤起", `<span class="chip${focus("shortcut")}">⌥ A</span>`, "end");
+          ? row("显示辞达", "打开面板；选中文字会带入，按首项动作处理", unset, "end spaced")
+          : row("显示辞达", "打开面板；选中文字会带入，按首项动作处理", `<span class="chip${focus("shortcut")}">⌥ A</span>`, "end");
     const capture = row("截图翻译", "框选屏幕文字并翻译", `<span class="chip">⌥ S</span>`, "end");
     const layerShortcut = is("shortcut", "unset")
-      ? row("原处翻译", "加 ⇧ 翻译整个窗口", unset, "end spaced")
-      : row("原处翻译", "加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
+      ? row("原处翻译", "指着的段落换成译文，再按换回；加 ⇧ 翻译整个窗口", unset, "end spaced")
+      : is("shortcut", "custom")
+        ? row("原处翻译", "指着的段落换成译文，再按换回；加 ⇧ 翻译整个窗口", `<span class="link">恢复默认</span><span class="chip">⌃ ⌥ ⌘ Space</span>`, "end spaced")
+        : row("原处翻译", "指着的段落换成译文，再按换回；加 ⇧ 翻译整个窗口", `<span class="chip">⌥ D</span>`, "end");
     const improvementShortcut = is("shortcut", "unset")
-      ? row("改进并替换", "改进并替换选中文字", unset, "end spaced")
-      : row("改进并替换", "改进并替换选中文字", `<span class="chip">⌥ F</span>`, "end");
+      ? row("改进并替换", "改进选中文字，直接写回原处", unset, "end spaced")
+      : row("改进并替换", "改进选中文字，直接写回原处", `<span class="chip">⌥ F</span>`, "end");
     // spec/settings.md §五: 已开启 once granted, otherwise 去授权.
     const permission = (title, caption) => row(title, caption,
       granted ? `<span class="status">已开启</span>` : `<span class="button">去授权</span>`, "end");
@@ -233,8 +235,8 @@ class CidaSettings extends HTMLElement {
         <div class="group"><h3>语言</h3>${languages}</div>
         <div class="group">${actions}</div>`,
       shortcuts: `
-        <div class="group"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}${improvementShortcut}</div>
-        <div class="group"><h3>权限</h3>${permission("辅助功能", "读取与替换应用文字")}${permission("屏幕录制", "截图翻译")}</div>`,
+        <div class="group wide-caption"><h3>快捷键</h3>${shortcut}${capture}${layerShortcut}${improvementShortcut}</div>
+        <div class="group wide-caption"><h3>权限</h3>${permission("辅助功能", "带入选中文字 · 原处翻译 · 改进并替换")}${permission("屏幕录制", "截图翻译；也让原处翻译跟随滚动")}</div>`,
       general: `
         <div class="group">${launch}${updates}${feedback}</div>
         <div class="footer"><span class="wordmark">辞达</span><small>1.0 · 辞达而已矣</small></div>`,
