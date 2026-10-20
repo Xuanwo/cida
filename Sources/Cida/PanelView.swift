@@ -258,7 +258,7 @@ private struct ControlBar: View {
       if model.isEditingForeignLanguage {
         Text(model.foreignLanguageConfirmationHint)
           .font(CidaDesign.mainUI(11))
-          .foregroundStyle(CidaDesign.textTertiary)
+          .foregroundStyle(CidaDesign.textSecondary)
           .fixedSize()
           .accessibilityIdentifier("foreign-language-confirmation-hint")
       } else {
@@ -295,7 +295,7 @@ private struct TabHint: View {
   var body: some View {
     Text("⇥ 切换")
       .font(CidaDesign.mainUI(11))
-      .foregroundStyle(CidaDesign.hint)
+      .foregroundStyle(CidaDesign.textTertiary)
       .modifier(DimmedWhileWorking(isDimmed: isDimmed))
       .accessibilityHidden(true)
   }
@@ -938,7 +938,7 @@ private struct PanelMessageView: View {
       HStack(spacing: 8) {
         Text(choice.title)
           .font(CidaDesign.mainUI(11.5, weight: choice.isQuiet ? .medium : .semibold))
-          .foregroundStyle(choice.isQuiet ? CidaDesign.textTertiary : CidaDesign.textControl)
+          .foregroundStyle(choice.isQuiet ? CidaDesign.textSecondary : CidaDesign.textControl)
         if index == 0 {
           Text("⏎").font(CidaDesign.mainUI(11)).foregroundStyle(CidaDesign.textTertiary)
         }

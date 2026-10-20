@@ -13,7 +13,7 @@
 深色不是把浅色反过来，而是同一套材质在夜里：
 
 - 原文栏与控制条是抬起的 `surface`，结果栏是沉下去的暖色纸 `surface-paper`，与浅色一样用材质区分「输入」与「输出」，不加线条。
-- 结果的墨色 `text-ink` 是偏暖的白，不用纯白；界面文字 `text-primary` 是中性的白。文字层级（`text-secondary`、`text-tertiary`、`hint`）在深底上保持和浅色相近的相对强弱。
+- 结果的墨色 `text-ink` 是偏暖的白，不用纯白；界面文字 `text-primary` 是中性的白。文字层级（`text-secondary`、`text-tertiary`）在深底上保持和浅色相近的相对强弱。
 - `accent` 提亮到 #5E9C7C，与应用图标暗色外观的光标同一个值（`spec/brand.md` §二）；它出现的地方不变（`spec/panel.md` §七、`spec/settings.md` §七）。`accent-soft` 是同色相的深绿。
 - 深色背景上阴影看不见：面板与提示胶囊的边改由 12% 白色细线（`panel-edge`）勾出，阴影加深（`panel-shadow`）。
 - 开关的圆钮在两种外观下都是白色。
@@ -27,7 +27,15 @@
 - 原处翻译的纸与墨就是当前外观的 `surface-paper` 与 `text-ink`，链接 `accent`（`spec/translation-layer.md` §五）。
 - 不跟外观的：应用图标（由系统按图标风格选择，`spec/brand.md` §二）、DMG 背景（Finder 窗口里是一张固定的图）。
 
-## 四、实现
+## 四、小字的颜色层级
+
+- 必须阅读或可以点击的小字用 `text-secondary` 或更深：设置行说明、快捷键录制与冲突反馈、模型状态与配置说明、更新里的「跳过这个版本」、修改外语时的确认提示、动作编辑的命令、提示词状态和参照标签。
+- `text-tertiary` 用于冗余键位符号、分隔点、占位、版本与模型名补充、小标题和禁用状态。动作编辑里的「样例」「使用当前模型」与「Esc 放弃」保留这一档。
+- 「⇥ 切换」与其他冗余键位提示统一使用 `text-tertiary`，不另设 `hint` token。
+- 浅色 `text-secondary` 为 #74746D；深色保持 #8A8A83。字号、字重、布局、品牌色和 1pt 焦点线不随本次字色调整改变。
+- 对比度取实际背景：浅色 secondary 在 `bg` 上约 4.50:1、`surface` 上约 4.71:1，在 `surface-paper` 上约 4.35:1、`surface-dim` 上约 4.27:1；深色在 `surface` 上约 4.36:1。这些数值说明当前取舍，不代表所有文字达到 4.5:1 或通过无障碍认证。
+
+## 五、实现
 
 - `CidaColorToken` 同时带浅色与深色两个值；`swiftUI` 与 `appKit` 是动态颜色，在绘制时按所在视图的外观取值。
 - 图层上的颜色（`CGColor`）不会自己变：面板的圆角底与描边、结果栏的光标、原处翻译的纸与光标在视图外观改变时（`viewDidChangeEffectiveAppearance`）重新设置。

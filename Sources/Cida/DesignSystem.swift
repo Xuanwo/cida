@@ -63,11 +63,10 @@ enum CidaDesign {
     static let surfacePaper = CidaColorToken(0xF7F6F1, dark: 0x1B1A17)
     static let border = CidaColorToken(0xE8E8E3, dark: 0x383835)
     static let textPrimary = CidaColorToken(0x1A1A18, dark: 0xEDEDE9)
-    static let textSecondary = CidaColorToken(0x8A8A83, dark: 0x8A8A83)
+    static let textSecondary = CidaColorToken(0x74746D, dark: 0x8A8A83)
     static let textTertiary = CidaColorToken(0xB5B5AE, dark: 0x5E5E58)
     static let textInk = CidaColorToken(0x161614, dark: 0xE9E6DD)
     static let textControl = CidaColorToken(0x4E4E49, dark: 0xC2C2BA)
-    static let hint = CidaColorToken(0xC4C4BD, dark: 0x4C4C47)
     static let accent = CidaColorToken(0x2E6B4F, dark: 0x5E9C7C)
     static let accentSoft = CidaColorToken(0xEAF2EE, dark: 0x233129)
     static let accentForeground = CidaColorToken(0xFFFFFF, dark: 0xFFFFFF)
@@ -89,7 +88,6 @@ enum CidaDesign {
   static let textTertiary = Palette.textTertiary.swiftUI
   static let textInk = Palette.textInk.swiftUI
   static let textControl = Palette.textControl.swiftUI
-  static let hint = Palette.hint.swiftUI
   static let accent = Palette.accent.swiftUI
   static let accentSoft = Palette.accentSoft.swiftUI
   static let accentForeground = Palette.accentForeground.swiftUI

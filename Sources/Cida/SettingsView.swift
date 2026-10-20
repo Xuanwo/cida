@@ -519,7 +519,7 @@ private struct SettingsLabel: View {
       if let caption {
         Text(caption)
           .font(CidaDesign.ui(11.5))
-          .foregroundStyle(CidaDesign.textTertiary)
+          .foregroundStyle(CidaDesign.textSecondary)
           .lineLimit(1)
       }
     }
@@ -673,7 +673,7 @@ private struct ModelServiceOnboardingCard: View {
           .frame(height: 20)
         Text(caption)
           .font(CidaDesign.ui(11.5))
-          .foregroundStyle(CidaDesign.textTertiary)
+          .foregroundStyle(CidaDesign.textSecondary)
           // The board's 17 pt lines: 3 pt between lines and half of it above and below.
           .lineSpacing(3)
           .padding(.vertical, 1.5)
@@ -737,7 +737,7 @@ private struct ModelServiceRow: View {
           }
           Text(status.caption)
             .font(CidaDesign.ui(11.5))
-            .foregroundStyle(CidaDesign.textTertiary)
+            .foregroundStyle(CidaDesign.textSecondary)
             .lineLimit(1)
             .fixedSize()
         }
@@ -746,7 +746,7 @@ private struct ModelServiceRow: View {
         if let detail {
           Text(detail)
             .font(CidaDesign.ui(11.5))
-            .foregroundStyle(CidaDesign.textTertiary)
+            .foregroundStyle(CidaDesign.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("settings-model-check-detail")
         }
@@ -762,7 +762,7 @@ private struct ModelServiceRow: View {
             .frame(height: 20)
           Text(model.settings.modelService.hostTitle)
             .font(CidaDesign.ui(11.5))
-            .foregroundStyle(CidaDesign.textTertiary)
+            .foregroundStyle(CidaDesign.textSecondary)
             .lineLimit(1)
             .truncationMode(.middle)
         }
