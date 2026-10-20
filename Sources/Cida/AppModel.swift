@@ -329,24 +329,12 @@ final class AppModel {
     panelMessageHandler = nil
   }
 
-  func selectPanelMessageChoice(_ index: Int) {
-    guard var message = panelMessage, !message.isWorking, message.choices.indices.contains(index)
+  /// Return performs the default command; clicking or pressing Space chooses a button directly.
+  func performPanelMessageChoice(_ index: Int = 0) {
+    guard let message = panelMessage, !message.isWorking,
+      message.choices.indices.contains(index), let handler = panelMessageHandler
     else { return }
-    message.selectedChoice = index
-    panelMessage = message
-  }
-
-  /// Tab: the next choice, wrapping around.
-  func selectNextPanelMessageChoice() {
-    guard let message = panelMessage, message.choices.count > 1 else { return }
-    selectPanelMessageChoice((message.selectedChoice + 1) % message.choices.count)
-  }
-
-  /// ⏎: performs the selected choice.
-  func performPanelMessageChoice() {
-    guard let message = panelMessage, !message.isWorking, let handler = panelMessageHandler
-    else { return }
-    handler.choose(message.selectedChoice)
+    handler.choose(index)
   }
 
   /// ⌘.: stops the work the message shows.
@@ -355,7 +343,7 @@ final class AppModel {
     panelMessageHandler?.stop()
   }
 
-  /// The panel went away while showing a message: the owner hears it as the last choice.
+  /// The panel went away while showing a message: the owner handles deferral or cancellation.
   func dismissPanelMessage() {
     guard let handler = panelMessageHandler else { return }
     clearPanelMessage()

@@ -893,7 +893,7 @@ private struct PanelMessageView: View {
   var body: some View {
     VStack(spacing: 0) {
       statement
-      bar
+      if message.hasBar { bar }
       if message.hasPaper {
         paper
       }
@@ -921,22 +921,10 @@ private struct PanelMessageView: View {
 
   private var bar: some View {
     HStack(spacing: 8) {
-      PanelSegmentedControl(
-        titles: message.choices,
-        selected: message.selectedChoice,
-        identifiers: message.choices.indices.map { "message-choice-\($0)" },
-        isEnabled: !message.isWorking,
-        onSelect: { index in
-          model.selectPanelMessageChoice(index)
-          model.performPanelMessageChoice()
-        }
-      )
-      .accessibilityLabel("选择")
-      .accessibilityIdentifier("message-choices")
-      if message.choices.count > 1 {
-        TabHint(isDimmed: message.isWorking)
-      }
       Spacer(minLength: 12)
+      ForEach(Array(message.choices.indices.reversed()), id: \.self) { index in
+        command(at: index)
+      }
       if message.slot == .stop {
         BarActionButton(model: model, presentation: .stop)
       }
@@ -944,11 +932,42 @@ private struct PanelMessageView: View {
     .modifier(ControlBarChrome(closesWithHairline: message.hasPaper))
   }
 
+  private func command(at index: Int) -> some View {
+    let choice = message.choices[index]
+    return Button { model.performPanelMessageChoice(index) } label: {
+      HStack(spacing: 8) {
+        Text(choice.title)
+          .font(CidaDesign.mainUI(11.5, weight: choice.isQuiet ? .medium : .semibold))
+          .foregroundStyle(choice.isQuiet ? CidaDesign.textTertiary : CidaDesign.textControl)
+        if index == 0 {
+          Text("⏎").font(CidaDesign.mainUI(11)).foregroundStyle(CidaDesign.textTertiary)
+        }
+      }
+      .padding(.horizontal, 12)
+      .frame(height: 30)
+      .background {
+        if !choice.isQuiet {
+          RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+            .fill(CidaDesign.surface)
+            .overlay {
+              RoundedRectangle(cornerRadius: CidaDesign.Radius.card, style: .continuous)
+                .strokeBorder(CidaDesign.border, lineWidth: 1)
+            }
+        }
+      }
+    }
+    .buttonStyle(HoverFadeButtonStyle())
+    .accessibilityLabel(choice.title)
+    .accessibilityIdentifier("message-choice-\(index)")
+    .disabled(message.isWorking)
+  }
+
   /// The paper pane's cap: whatever the panel's height budget leaves under the statement and bar.
   private var paperMaxHeight: CGFloat {
     max(
       CidaDesign.Typography.resultLineHeightCJK + CidaDesign.Spacing.resultVertical * 2,
-      heightBudget.panelMaxHeight - statementHeight - CidaDesign.Panel.controlBarHeight
+      heightBudget.panelMaxHeight - statementHeight
+        - (message.hasBar ? CidaDesign.Panel.controlBarHeight : 0)
     )
   }
 

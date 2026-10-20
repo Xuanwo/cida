@@ -18,6 +18,7 @@ P0_RELEASE_TESTS = (
     "CidaUITests/ComposerJourneyTests,"
     "CidaUITests/CoreTranslationJourneyTests,"
     "CidaUITests/PanelAndSettingsJourneyTests,"
+    "CidaUITests/UpdateJourneyTests,"
     "CidaUITests/TranslationStateMachineJourneyTests,"
     "CidaUITests/VisualAndAccessibilityJourneyTests"
 )

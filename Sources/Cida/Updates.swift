@@ -28,7 +28,7 @@ final class UpdateState {
     availableVersion = version
   }
 
-  /// The update session ended: installed, skipped, or dismissed.
+  /// The update session ended: installed, skipped, cancelled, or failed.
   func clearReminder() {
     availableVersion = nil
   }
@@ -140,6 +140,9 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
   private var receivedLength: UInt64 = 0
   /// The panel is showing this session; later steps replace the message on screen.
   private var isWatched = false
+  /// Explicit consent to install after this download. Leaving the panel revokes it even if the
+  /// user returns before the download finishes.
+  private var installsWhenReady = false
   /// The latest step, shown again when the user asks for the update from Settings.
   private var latest: (message: PanelMessage, handler: PanelMessageHandler)?
   private var cancelWork: (() -> Void)?
@@ -159,8 +162,8 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
 
   // MARK: Messages
 
-  static let installChoices = ["安装并重启", "稍后", "跳过这个版本"]
-  static let readyChoices = ["立即重启", "退出时安装"]
+  static let installChoices: [PanelMessage.Choice] = ["安装并重启", "稍后", .init("跳过这个版本", isQuiet: true)]
+  static let readyChoices: [PanelMessage.Choice] = ["安装并重启", "稍后"]
 
   static func foundMessage(version: String, currentVersion: String, notes: [String]) -> PanelMessage {
     PanelMessage(
@@ -186,7 +189,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
 
   static func checkingMessage() -> PanelMessage {
     PanelMessage(
-      kind: "update-checking", statement: "正在检查更新…", choices: installChoices,
+      kind: "update-checking", statement: "正在检查更新…", choices: [],
       isWorking: true, slot: .stop)
   }
 
@@ -194,7 +197,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     PanelMessage(
       kind: "update-downloading",
       statement: percent.map { "正在下载辞达 \(version) · \($0)%" } ?? "正在校验…",
-      choices: installChoices,
+      choices: [],
       body: notes.isEmpty ? .none : .lines(notes),
       bodyCaption: notes.isEmpty ? nil : notesCaption,
       isWorking: true,
@@ -202,13 +205,20 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     )
   }
 
-  static func readyMessage(version: String) -> PanelMessage {
+  static func readyMessage(
+    version: String, currentVersion: String = "", notes: [String] = []
+  ) -> PanelMessage {
+    var message = foundMessage(version: version, currentVersion: currentVersion, notes: notes)
+    message.kind = "update-ready"
+    message.statement = "辞达 \(version) 已下载"
+    message.choices = readyChoices
+    return message
+  }
+
+  static func installingMessage() -> PanelMessage {
     PanelMessage(
-      kind: "update-ready",
-      statement: "辞达 \(version) 已准备好",
-      choices: readyChoices,
-      body: .text("重启只需几秒，正在进行的翻译会停止。选「退出时安装」，下次退出辞达时换成新版本。")
-    )
+      kind: "update-installing", statement: "正在安装…", choices: [],
+      body: .text("完成后辞达会自动重新打开，留在菜单栏。"))
   }
 
   /// The step that failed, with 重试 / 稍后 and the reason under its paper.
@@ -216,7 +226,6 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     var failed = message
     failed.kind = "update-failed"
     failed.choices = ["重试", "稍后"]
-    failed.selectedChoice = 0
     failed.isWorking = false
     failed.slot = .none
     failed.note = note
@@ -265,6 +274,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
   /// The user answered: the panel goes back to what it was.
   private func finish() {
     isWatched = false
+    installsWhenReady = false
     latest = nil
     presenter?.finishUpdateMessage()
   }
@@ -272,9 +282,23 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
   /// Hiding the panel mid-session keeps the session; Settings brings it back.
   private func stopWatching() {
     isWatched = false
-    if !version.isEmpty, phase == .found || phase == .ready {
+    installsWhenReady = false
+    if !version.isEmpty, phase != .checking, phase != .installing {
       state.remindLater(of: version)
     }
+  }
+
+  private func deferInstallation() {
+    stopWatching()
+    presenter?.finishUpdateMessage()
+  }
+
+  private func install(_ reply: (SPUUserUpdateChoice) -> Void) {
+    phase = .installing
+    installsWhenReady = false
+    state.clearReminder()
+    show(Self.installingMessage(), handler: PanelMessageHandler(choose: { _ in }, dismiss: {}))
+    reply(.install)
   }
 
   // MARK: SPUUserDriver
@@ -289,6 +313,10 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
 
   func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {
     phase = .checking
+    installsWhenReady = false
+    version = ""
+    currentLabel = ""
+    notes = []
     cancelWork = cancellation
     show(
       Self.checkingMessage(),
@@ -310,12 +338,26 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     state updateState: SPUUserUpdateState,
     reply: @escaping (SPUUserUpdateChoice) -> Void
   ) {
-    phase = .found
-    (version, currentLabel) = Self.versionLabels(
+    let labels = Self.versionLabels(
       new: appcastItem.displayVersionString, newBuild: appcastItem.versionString,
       current: currentVersion, currentBuild: currentBuild)
-    notes = ReleaseNotes.lines(from: appcastItem.itemDescription)
-    let bringsUp = updateState.userInitiated || presenter?.mayPresentScheduledUpdate == true
+    showUpdateFound(
+      version: labels.new, currentVersion: labels.current,
+      notes: ReleaseNotes.lines(from: appcastItem.itemDescription),
+      bringsUp: updateState.userInitiated || presenter?.mayPresentScheduledUpdate == true,
+      reply: reply)
+  }
+
+  /// The panel's offer, after adapting Sparkle's appcast and scheduling state.
+  func showUpdateFound(
+    version: String, currentVersion: String, notes: [String], bringsUp: Bool,
+    reply: @escaping (SPUUserUpdateChoice) -> Void
+  ) {
+    phase = .found
+    installsWhenReady = false
+    self.version = version
+    currentLabel = currentVersion
+    self.notes = notes
 
     if isRunningFromReadOnlyLocation {
       show(
@@ -340,16 +382,17 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
           switch index {
           case 0:
             self.state.clearReminder()
+            self.installsWhenReady = true
             // Answer at once; Sparkle's first download step replaces this message.
             self.presenter?.updateUpdateMessage(kind: "update-found") { message in
               message.statement = "正在下载辞达 \(self.version) · 0%"
               message.statementDetail = nil
               message.isWorking = true
+              message.choices = []
             }
             reply(.install)
           case 1:
-            reply(.dismiss)
-            self.finish()
+            self.deferInstallation()
           default:
             reply(.skip)
             self.finish()
@@ -395,10 +438,11 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
       return
     }
 
-    let message = Self.failedMessage(
-      from: latest?.message
-        ?? Self.foundMessage(version: version, currentVersion: currentLabel, notes: notes),
+    installsWhenReady = false
+    var message = Self.failedMessage(
+      from: Self.foundMessage(version: version, currentVersion: currentLabel, notes: notes),
       note: "\(failureTitle)：\(Self.reason(for: error)) · ⏎ 重试")
+    if version.isEmpty { message.statement = failureTitle }
     show(
       message,
       handler: PanelMessageHandler(
@@ -428,7 +472,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
           self?.cancelWork?()
           self?.finish()
         },
-        dismiss: { [weak self] in self?.isWatched = false }))
+        dismiss: { [weak self] in self?.stopWatching() }))
   }
 
   func showDownloadDidReceiveExpectedContentLength(_ expectedContentLength: UInt64) {
@@ -453,28 +497,19 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
 
   func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {
     phase = .ready
+    cancelWork = nil
+    if installsWhenReady && isWatched {
+      install(reply)
+      return
+    }
     show(
-      Self.readyMessage(version: version),
+      Self.readyMessage(version: version, currentVersion: currentLabel, notes: notes),
       handler: PanelMessageHandler(
         choose: { [weak self] index in
           guard let self else { return }
-          if index == 0 {
-            self.phase = .installing
-            self.progress(
-              PanelMessage(
-                kind: "update-ready", statement: "正在安装…", choices: Self.readyChoices,
-                isWorking: true))
-            reply(.install)
-          } else {
-            // Sparkle installs it when Cida quits.
-            reply(.dismiss)
-            self.finish()
-          }
+          if index == 0 { self.install(reply) } else { self.deferInstallation() }
         },
-        dismiss: { [weak self] in
-          reply(.dismiss)
-          self?.isWatched = false
-        }))
+        dismiss: { [weak self] in self?.stopWatching() }))
     if !isWatched { state.remindLater(of: version) }
   }
 
@@ -483,10 +518,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
     retryTerminatingApplication: @escaping () -> Void
   ) {
     phase = .installing
-    progress(
-      PanelMessage(
-        kind: latest?.message.kind ?? "update-ready", statement: "正在安装…",
-        choices: Self.readyChoices, isWorking: true))
+    progress(Self.installingMessage())
   }
 
   func showUpdateInstalledAndRelaunched(_ relaunched: Bool, acknowledgement: @escaping () -> Void) {
@@ -503,6 +535,7 @@ final class CidaUpdateDriver: NSObject, SPUUserDriver {
   func dismissUpdateInstallation() {
     state.clearReminder()
     cancelWork = nil
+    installsWhenReady = false
     if isWatched {
       finish()
     } else {

@@ -10,7 +10,7 @@ import XCTest
 final class LifecycleTests: XCTestCase {
   // MARK: Panel messages
 
-  func testMessageChoicesFollowTabAndReturnAndHidingAnswersLater() {
+  func testMessageCommandsKeepReturnDefaultAndHidingAnswersLater() {
     let model = AppModel(service: ImmediateStreamingService())
     var chosen: [Int] = []
     var dismissed = 0
@@ -20,13 +20,12 @@ final class LifecycleTests: XCTestCase {
         choose: { chosen.append($0) },
         dismiss: { dismissed += 1 }))
 
-    model.selectNextPanelMessageChoice()
-    model.selectNextPanelMessageChoice()
-    model.selectNextPanelMessageChoice()
-    XCTAssertEqual(model.panelMessage?.selectedChoice, 0, "Tab wraps around")
-    model.selectNextPanelMessageChoice()
+    model.performPanelMessageChoice(1)
     model.performPanelMessageChoice()
-    XCTAssertEqual(chosen, [1])
+    model.performPanelMessageChoice(2)
+    model.performPanelMessageChoice()
+    model.performPanelMessageChoice(99)
+    XCTAssertEqual(chosen, [1, 0, 2, 0], "Direct commands never change the Return default")
 
     model.dismissPanelMessage()
     XCTAssertEqual(dismissed, 1)
@@ -47,9 +46,8 @@ final class LifecycleTests: XCTestCase {
         choose: { chosen.append($0) }, stop: { stopped += 1 }, dismiss: {}))
 
     model.performPanelMessageChoice()
-    model.selectPanelMessageChoice(1)
+    model.performPanelMessageChoice(1)
     XCTAssertEqual(chosen, [])
-    XCTAssertEqual(model.panelMessage?.selectedChoice, 0)
 
     model.cancelProcessing()
     XCTAssertEqual(stopped, 1, "⌘. stops the message's work, not a request")
@@ -182,7 +180,7 @@ final class LifecycleTests: XCTestCase {
       version: "1.1.0", currentVersion: "1.0.0", notes: ["第一条", "第二条"])
     XCTAssertEqual(found.statement, "辞达 1.1.0 可以安装")
     XCTAssertEqual(found.statementDetail, " · 当前 1.0.0")
-    XCTAssertEqual(found.choices, ["安装并重启", "稍后", "跳过这个版本"])
+    XCTAssertEqual(found.choices.map(\.title), ["安装并重启", "稍后", "跳过这个版本"])
     XCTAssertEqual(found.body, .lines(["第一条", "第二条"]))
 
     let downloading = CidaUpdateDriver.downloadingMessage(version: "1.1.0", percent: 38, notes: [])
@@ -193,7 +191,7 @@ final class LifecycleTests: XCTestCase {
       CidaUpdateDriver.downloadingMessage(version: "1.1.0", percent: nil, notes: []).statement,
       "正在校验…")
 
-    XCTAssertEqual(CidaUpdateDriver.readyMessage(version: "1.1.0").choices, ["立即重启", "退出时安装"])
+    XCTAssertEqual(CidaUpdateDriver.readyMessage(version: "1.1.0").choices, ["安装并重启", "稍后"])
     XCTAssertEqual(CidaUpdateDriver.currentMessage(version: "1.1.0").statement, "辞达 1.1.0 已是最新版本")
 
     let failed = CidaUpdateDriver.failedMessage(from: downloading, note: "下载失败：网络连接失败 · ⏎ 重试")

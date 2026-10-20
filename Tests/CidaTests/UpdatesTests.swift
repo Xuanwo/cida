@@ -1,4 +1,5 @@
 import Foundation
+import Sparkle
 import XCTest
 
 @testable import Cida
@@ -44,6 +45,106 @@ final class UpdatesTests: XCTestCase {
     XCTAssertNil(CidaBuild(info: release).developmentLabel)
   }
 
+  func testAcceptedUpdateInstallsWithoutASecondQuestion() throws {
+    let presenter = RecordingUpdatePresenter()
+    let state = UpdateState()
+    let driver = CidaUpdateDriver(state: state, presenter: presenter, bundle: try makeApp(info: [:]))
+    var answers: [SPUUserUpdateChoice] = []
+    driver.showUpdateFound(version: "2.0", currentVersion: "1.0", notes: ["Change"], bringsUp: true) {
+      answers.append($0)
+    }
+    presenter.handler?.choose(0)
+    XCTAssertEqual(answers, [.install])
+    XCTAssertTrue(presenter.message?.isWorking == true, "Ignore a repeated click while Sparkle responds")
+    driver.showDownloadInitiated(cancellation: {})
+    driver.showDownloadDidStartExtractingUpdate()
+    driver.showReady { answers.append($0) }
+    XCTAssertEqual(answers, [.install, .install])
+    XCTAssertEqual(presenter.message?.kind, "update-installing")
+    XCTAssertFalse(presenter.message?.hasBar ?? true)
+    XCTAssertNil(state.availableVersion)
+  }
+
+  func testLeavingDownloadRevokesRestartEvenAfterRefocusing() throws {
+    let presenter = RecordingUpdatePresenter()
+    let state = UpdateState()
+    let driver = CidaUpdateDriver(state: state, presenter: presenter, bundle: try makeApp(info: [:]))
+    var answers: [SPUUserUpdateChoice] = []
+    driver.showUpdateFound(version: "2.0", currentVersion: "1.0", notes: ["Change"], bringsUp: true) {
+      answers.append($0)
+    }
+    presenter.handler?.choose(0)
+    driver.showDownloadInitiated(cancellation: {})
+    presenter.handler?.dismiss()
+    XCTAssertEqual(state.availableVersion, "2.0")
+    driver.showUpdateInFocus()
+    driver.showReady { answers.append($0) }
+    XCTAssertEqual(answers, [.install], "Returning to progress is not permission to restart")
+    XCTAssertEqual(presenter.message?.statement, "辞达 2.0 已下载")
+    XCTAssertEqual(presenter.message?.body, .lines(["Change"]))
+    presenter.handler?.choose(1)
+    XCTAssertEqual(state.availableVersion, "2.0", "Later stays reachable in Settings")
+    XCTAssertNil(presenter.message)
+    driver.showUpdateInFocus()
+    presenter.handler?.choose(0)
+    XCTAssertEqual(answers, [.install, .install])
+    XCTAssertNil(state.availableVersion)
+  }
+
+  func testHiddenDownloadStaysQuietAndFoundLaterIsNotSkip() throws {
+    let presenter = RecordingUpdatePresenter()
+    let state = UpdateState()
+    let driver = CidaUpdateDriver(state: state, presenter: presenter, bundle: try makeApp(info: [:]))
+    var answers: [SPUUserUpdateChoice] = []
+    driver.showUpdateFound(version: "2.0", currentVersion: "1.0", notes: [], bringsUp: true) {
+      answers.append($0)
+    }
+    presenter.handler?.choose(1)
+    XCTAssertTrue(answers.isEmpty)
+    XCTAssertEqual(state.availableVersion, "2.0")
+    driver.showUpdateInFocus()
+    presenter.handler?.choose(0)
+    driver.showDownloadInitiated(cancellation: {})
+    presenter.handler?.dismiss()
+    let presentations = presenter.presentations
+    driver.showReady { answers.append($0) }
+    XCTAssertEqual(presenter.presentations, presentations, "No background presentation")
+    XCTAssertEqual(answers, [.install])
+    driver.showUpdateInFocus()
+    XCTAssertEqual(presenter.message?.kind, "update-ready")
+    presenter.handler?.dismiss()
+    driver.showUpdateInFocus()
+    presenter.handler?.choose(0)
+    XCTAssertEqual(answers, [.install, .install])
+  }
+
+  func testUpdateFailureRetriesCheckingAndStopCancelsWork() throws {
+    let presenter = RecordingUpdatePresenter()
+    let driver = CidaUpdateDriver(state: UpdateState(), presenter: presenter, bundle: try makeApp(info: [:]))
+    var cancelled = 0
+    var acknowledged = 0
+    var checks = 0
+    driver.checkForUpdates = { checks += 1 }
+    driver.showUpdateFound(version: "2.0", currentVersion: "1.0", notes: [], bringsUp: true) { _ in }
+    presenter.handler?.choose(0)
+    driver.showDownloadInitiated { cancelled += 1 }
+    driver.showUpdaterError(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)) {
+      acknowledged += 1
+    }
+    XCTAssertEqual(presenter.message?.statement, "辞达 2.0 可以安装")
+    presenter.handler?.choose(0)
+    XCTAssertEqual(acknowledged, 1)
+    XCTAssertEqual(checks, 1)
+    driver.showUserInitiatedUpdateCheck { cancelled += 1 }
+    driver.showUpdaterError(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)) {}
+    XCTAssertEqual(presenter.message?.statement, "检查更新失败")
+    XCTAssertNil(presenter.message?.statementDetail, "A failed check must not offer the previous version")
+    driver.showUserInitiatedUpdateCheck { cancelled += 1 }
+    presenter.handler?.stop()
+    XCTAssertEqual(cancelled, 1)
+    XCTAssertNil(presenter.message)
+  }
+
   /// An empty `.app` bundle whose Info.plist holds `info`, removed after the test.
   private func makeApp(info: [String: Any]) throws -> Bundle {
     let app = FileManager.default.temporaryDirectory
@@ -57,4 +158,26 @@ final class UpdatesTests: XCTestCase {
     try data.write(to: contents.appendingPathComponent("Info.plist"))
     return try XCTUnwrap(Bundle(url: app))
   }
+}
+
+@MainActor
+private final class RecordingUpdatePresenter: UpdatePresenter {
+  var message: PanelMessage?
+  var handler: PanelMessageHandler?
+  var presentations = 0
+  var mayPresentScheduledUpdate = false
+
+  func presentUpdate(_ message: PanelMessage, handler: PanelMessageHandler) {
+    self.message = message
+    self.handler = handler
+    presentations += 1
+  }
+
+  func updateUpdateMessage(kind: String, _ change: (inout PanelMessage) -> Void) {
+    guard var message, message.kind == kind else { return }
+    change(&message)
+    self.message = message
+  }
+
+  func finishUpdateMessage() { message = nil; handler = nil }
 }

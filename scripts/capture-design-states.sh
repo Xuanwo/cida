@@ -33,9 +33,9 @@ for state in empty typing translate improve stale stale-action stale-empty stopp
   settings-config-checking settings-config-failed settings-config-passed \
   settings-config-missing-key settings-config-incomplete dark-settings-config-failed \
   lifecycle-welcome lifecycle-welcome-submitted lifecycle-welcome-ready lifecycle-update-checking lifecycle-update-found \
-  lifecycle-update-downloading lifecycle-update-ready lifecycle-update-current \
+  lifecycle-update-downloading lifecycle-update-ready lifecycle-update-installing lifecycle-update-current \
   lifecycle-update-failed lifecycle-update-read-only \
-  dark-empty dark-improve dark-stale dark-lifecycle-welcome \
+  dark-empty dark-improve dark-stale dark-lifecycle-welcome dark-lifecycle-update-found dark-lifecycle-update-ready dark-lifecycle-update-installing dark-lifecycle-update-failed \
   dark-settings-prompt-editing dark-settings-recording dark-settings-shortcuts dark-settings-shortcuts-custom dark-settings-general; do
   "$automation_runner" "$binary" \
     --design-state "$state" \
